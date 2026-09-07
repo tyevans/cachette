@@ -415,8 +415,9 @@ fn the_controller_build_order_is_refused_and_counted_when_the_faction_holds_noth
     let mut build_commands = 0u32;
     for _ in 0..80 {
         field.step(1).expect("the step must run");
+        let schema = field.action_schema();
         for entry in field.controller_log() {
-            if entry.kind != cachette_core::controller::COMMAND_BUILD {
+            if schema.verb_of(entry.action) != Some(cachette_core::Verb::Build) {
                 continue;
             }
             build_commands += 1;

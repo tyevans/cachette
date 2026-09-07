@@ -3462,6 +3462,171 @@ impl PyWorld {
         Ok(out)
     }
 
+    /// Returns the declared layout of the action table, as a `dict`.
+    ///
+    /// **This is the only declaration of that layout.** An action is one
+    /// integer that indexes a bounded table the engine declares, and a
+    /// caller decodes that integer by arithmetic over this schema and never
+    /// by a table it holds.[^1] No file outside the engine may state a verb
+    /// number, a position or a bound.
+    ///
+    /// The dictionary holds three keys.
+    ///
+    /// - `version`, an integer. The version of the layout. A verb added or a
+    ///   bound changed moves every row above it, and that changes the
+    ///   meaning of a stored weight file, so a learner that loads a policy
+    ///   under another version must stop.
+    /// - `length`, an integer. How many rows the whole table holds. It is
+    ///   the length `legal_actions` returns.
+    /// - `verbs`, a list of `dict`. One entry for each verb, in the order
+    ///   the table holds them.
+    ///
+    /// Each verb entry holds four keys.
+    ///
+    /// - `name`, a string. The name of the verb.
+    /// - `first`, an integer. The action integer of the first row of the
+    ///   verb.
+    /// - `rows`, an integer. How many rows of the table the verb holds. It
+    ///   is the product of the bounds of its positions, and it is one for a
+    ///   verb that declares no position.
+    /// - `positions`, a list of `dict`. The argument positions the verb
+    ///   declares, in order.
+    ///
+    /// Each position entry holds three keys.
+    ///
+    /// - `candidate`, a string. The kind of thing the candidate list of the
+    ///   position holds.
+    /// - `bound`, an integer. The ceiling on that candidate list. **No bound
+    ///   follows the population.**
+    /// - `stride`, an integer. How far one step of the position moves the
+    ///   action integer.
+    ///
+    /// A caller reads the action integer of one verb and its arguments as
+    /// `first + sum(argument * stride)`, and it reverses that by division.
+    ///
+    /// **A verb whose content the engine resolves declares no position.** A
+    /// campaign and a crossing each name a place, and the engine chooses
+    /// that place at the tick the action applies, in the way it chooses it
+    /// for the built-in controller.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the interpreter refuses to hold the dictionary.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D1. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+    /// [^2]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+    fn action_schema<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let schema = world.action_schema();
+        let verbs = PyList::empty(python);
+        for row in schema.rows() {
+            let positions = PyList::empty(python);
+            for position in &row.positions {
+                let entry = PyDict::new(python);
+                entry.set_item("candidate", position.candidate.name())?;
+                entry.set_item("bound", position.bound)?;
+                entry.set_item("stride", position.stride)?;
+                positions.append(entry)?;
+            }
+            let entry = PyDict::new(python);
+            entry.set_item("name", row.name())?;
+            entry.set_item("first", row.first)?;
+            entry.set_item("rows", row.rows)?;
+            entry.set_item("positions", positions)?;
+            verbs.append(entry)?;
+        }
+        let out = PyDict::new(python);
+        out.set_item("version", schema.version())?;
+        out.set_item("length", schema.length())?;
+        out.set_item("verbs", verbs)?;
+        Ok(out)
+    }
+
+    /// Returns one byte for each row of the action table, as a NumPy `uint8`
+    /// array.
+    ///
+    /// The byte is one when the verb would take that row at this tick, and
+    /// zero when it would refuse it.[^1] Row zero is the no-op, and it is
+    /// always one, so the answer is never empty and a learner never learns
+    /// legality by trial.
+    ///
+    /// **The answer holds only what the faction observes.** Two verbs act on
+    /// a place, and the engine resolves each place through the readers that
+    /// answer for one faction. A byte therefore states nothing about ground
+    /// the faction has never seen.[^2]
+    ///
+    /// `action_schema` declares which row is which. This method copies the
+    /// array.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
+    fn legal_actions<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+    ) -> PyResult<Bound<'py, PyArray1<u8>>> {
+        let world = self.lock();
+        let answer = world.legal_actions(FactionId(faction)).ok_or_else(|| {
+            VerbError::new_err(format!("{faction} names no faction of this world"))
+        })?;
+        Ok(answer.to_pyarray(python))
+    }
+
+    /// Applies one action of one faction, and returns whether the verb took
+    /// it.
+    ///
+    /// The action is one integer that indexes the action table of this
+    /// world. `action_schema` declares which row is which, and
+    /// `legal_actions` says which rows the verbs would take now.
+    ///
+    /// **This runs the verb and reports what the verb did.** It does not
+    /// read the legality answer first, so a row the answer allows and the
+    /// verb then refuses is a defect rather than a silent disagreement.[^1]
+    ///
+    /// Every action goes through the same verbs a Python caller and the
+    /// built-in controller go through, so a learner reaches no store the
+    /// controller cannot reach.[^2] The engine writes one row of the
+    /// controller log for the action, whether the verb took it or refused
+    /// it, and that row carries the whole action integer.[^3]
+    ///
+    /// **Send one integer for one faction. Do not loop over entities.** A
+    /// learner is a control plane.[^4]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world,
+    /// and when the integer is at or above the length of the table.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^3]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^4]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+    fn act(&self, faction: u16, action: u32) -> PyResult<bool> {
+        let mut world = self.lock();
+        if faction >= world.faction_count().max(1) {
+            return Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
+        }
+        let length = world.action_schema().length();
+        if action >= length {
+            return Err(VerbError::new_err(format!(
+                "the action {action} is at or above the length {length} of the action table"
+            )));
+        }
+        Ok(world.act(FactionId(faction), action))
+    }
+
     /// Returns what one site earns, holds and owes, as a `dict`.
     ///
     /// The site is one settlement identity, as a Python integer. The

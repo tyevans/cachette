@@ -14175,6 +14175,75 @@ learner at the start of a run pays for the ground it has walked. A record says
 that fog storage grows with observed area, and the read now grows the same
 way.[^F572E]
 
+### FND-580 — The campaign takes no argument position, and the record's context reads as if it takes two
+
+**Believed.** ADR-0176 replaces the fixed verb-target-magnitude triple because
+the choice enumeration does not have that shape. Its context names the campaign
+as the choice that "names two things", an objective kind and an objective tile.
+A reader takes that as a statement that the campaign verb declares two argument
+positions in the new encoding.
+
+**True.** The campaign declares none. The rule that decides how many positions a
+verb takes is D2 of that record: a verb whose content the engine resolves at the
+tick the action applies takes no argument position, and a position that carried
+that content would be a second declaration of one fact.[^F580A] The engine does
+resolve both the objective kind and the objective tile for a faction, with no
+draw, in the pass that plans the tick. The crossing verb is the same shape: the
+engine surveys the tile. The context of the record explains why the triple
+failed. It does not decide what the campaign declares, and D2 does.
+
+**Evidence.** The engine holds one reader that chooses, for each faction, the
+objective it would march on, and one that chooses the tile it would cross to.
+Both are pure functions of the state. The controller's choice carries what those
+readers returned, and the raise verb takes the tile from the choice. Giving the
+learner a tile position would therefore have meant building a candidate list
+that no other caller builds, and ADR-0154 rejects a one-hot over the tiles for
+the reason that its width would follow the world.[^F580B]
+
+**What follows.** Two things.
+
+**Read the decision, not the context, for what a record binds.** The context of
+a record says why a claim was hard. The numbered decisions say what the claim
+is. A reader who sizes work from the context of ADR-0176 builds a campaign
+position that D2 forbids.
+
+**The action table stays small because two place-naming verbs carry no place.**
+The whole table is a function of the faction count and four fixed enumeration
+counts. Nothing in it follows the population, so the legality answer that names
+one byte for each row stays affordable. A benchmark measures it beside one
+step, and a blocker keeps every figure of it derived.[^28]
+
+### FND-581 — The legality answer and the verb disagreed on the project order, and only the agreement test saw it
+
+**Believed.** The three gates the project order reads before it moves a unit are
+the whole of its refusal: the faction holds a project, no campaign holds the
+destination plane, and no carrier holds it. A legality answer that reads those
+three answers for that verb.
+
+**True.** They are necessary and not sufficient. A faction may hold a project,
+hold the plane free, and still have no unit that would take the order: every
+unit either stands off a zoned tile with no project to walk to, or stands on one
+whose build the ground refuses. The verb then moves nothing and reports a
+refusal, while the answer said yes.
+
+**Evidence.** The test that compares the answer against the verb over five seeds
+and three tick counts found it on the first run, at seed 29 and tick 2. The
+repair moved the partition of the units out of the verb into one reader that the
+verb and the answer both call, so the answer now reads what the verb reads.
+
+**What follows.** Two things.
+
+**A verb that acts on a set refuses on the set, not on its gates.** A gate says
+the verb may run. It does not say the verb will do anything. Any other
+set-valued verb has the same shape, and a legality answer for one must read the
+set.
+
+**Write the agreement test before you trust the answer.** The record asks for a
+test that compares the two over a seed set, and it says a row the answer allows
+and the verb then refuses is a defect.[^F581A] Nothing else in the tree would
+have found this: the verb was correct, the answer was correct on its own terms,
+and neither had a test that read the other.
+
 
 ## References
 
@@ -14292,3 +14361,6 @@ way.[^F572E]
 [^F568B]: ADR-0059, fog storage grows with observed area, not with world area, the context. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^F568C]: The observation module of the core crate. `crates/cachette-core/src/observation.rs`
 [^F568D]: Research report 31, the state of the learner surface, claim 1. `docs/research/reports/31-the-state-of-the-learner-surface.md`
+[^F580A]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+[^F580B]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the alternatives it rejects. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^F581A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`

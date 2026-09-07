@@ -36,6 +36,8 @@
 
 use bytemuck::{Pod, Zeroable};
 
+use crate::action::{ActionSchema, Verb};
+
 use crate::campaign::wants_campaign;
 use crate::hash::StateHash;
 use crate::rates::RateSchedule;
@@ -380,45 +382,6 @@ impl GameEnd {
     }
 }
 
-/// The kind of command the controller emitted: a gather order.
-pub const COMMAND_GATHER: u8 = 0;
-
-/// The kind of command the controller emitted: a build order.
-pub const COMMAND_BUILD: u8 = 1;
-
-/// The kind of command the controller emitted: a relation move against
-/// another faction.
-pub const COMMAND_RELATION: u8 = 2;
-
-/// The kind of command the controller emitted: a campaign raised against a
-/// faction at war. The argument is the objective kind.
-pub const COMMAND_CAMPAIGN: u8 = 3;
-
-/// The kind of command the controller emitted: a whole board written from the
-/// site economies of the faction. The argument is how many rows it wrote.
-pub const COMMAND_ADVERTISE: u8 = 4;
-
-/// The kind of command the controller emitted: one negotiation step against
-/// another faction. The argument is that faction.
-pub const COMMAND_TRADE: u8 = 5;
-
-/// The kind of command the controller emitted: the carriers of every contract
-/// the faction owes a quantity on. The argument is how many units it assigned.
-pub const COMMAND_CARRY: u8 = 6;
-
-/// The command number of the order that takes the zoned projects.
-pub const COMMAND_PROJECT: u8 = 7;
-
-/// The command number of the order that queues one unit at a site. The
-/// argument is the row of the unit type table that the order names.
-pub const COMMAND_QUEUE: u8 = 8;
-
-/// The command number of the crossing order.
-pub const COMMAND_CROSS: u8 = 9;
-/// The command number of the order that founds a city from the settlers of
-/// the faction. The argument is zero, because the verb takes the whole set.
-pub const COMMAND_SETTLE: u8 = 10;
-
 /// The step the controller moves a relation by when its draw says so. It is
 /// one step toward war, and the drift is what brings the pair back.[^1]
 ///
@@ -437,22 +400,53 @@ pub const RELATION_STEP: i32 = -1;
 pub struct ControllerCommand {
     /// The tick the controller emitted it on.
     pub tick: Tick,
-    /// The faction it was emitted for.
-    pub faction: FactionId,
-    /// The kind of command: a gather order or a build order.
-    pub kind: u8,
-    /// The resource kind of a gather order, or the upgrade kind of a build
-    /// order.
-    pub argument: u8,
+    /// The whole action, as the action table of the world numbers it.
+    ///
+    /// **This row carries the whole action, so no field of it lives
+    /// anywhere else.**[^1] The verb and every argument decode from this
+    /// integer by arithmetic over the action schema.[^2] A controller
+    /// choice and a learner action reach this one column in one encoding,
+    /// so a reader that counts one counts both.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D1. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+    pub action: u32,
     /// The draw index that produced it. Commands apply in the order of
     /// faction and then sequence.
     pub sequence: u32,
+    /// The faction it was emitted for.
+    ///
+    /// **The two-byte faction sits after the four-byte columns on purpose.**
+    /// A narrow field between two wide ones would make the compiler insert
+    /// padding that this row does not declare, and undeclared bytes reach
+    /// the state hash uninitialised.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+    pub faction: FactionId,
     /// One when the verb took the command for at least one unit, zero when
     /// it refused every unit.
     pub applied: u8,
     /// Declared padding, always zero.
-    pub padding: [u8; 7],
+    pub padding: [u8; 5],
 }
+
+/// How many bytes one row of the command log holds.
+///
+/// The row is plain data with declared padding, and a state hash reads its
+/// bytes. **A field added or reordered must keep the padding declared.** The
+/// assertion below fails when the compiler inserts a byte this row does not
+/// name, because an undeclared byte reaches the hash uninitialised.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+pub const CONTROLLER_COMMAND_BYTES: usize = 24;
+
+const _: () = assert!(core::mem::size_of::<ControllerCommand>() == CONTROLLER_COMMAND_BYTES);
 
 /// What one evaluation chose.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -542,29 +536,47 @@ pub enum Choice {
 }
 
 impl Choice {
-    /// Returns the kind number and the argument number of the choice.
+    /// Returns the verb of the action table that this choice selects, and
+    /// the arguments that verb declares.
     ///
-    /// The argument of a relation move is the other faction. The faction
-    /// ceiling is below the range of the column, so the narrowing loses
-    /// nothing. The argument of a campaign is the objective kind, and the
-    /// campaign log holds the tile.
+    /// **A choice and a learner action reach one encoding.**[^1] A verb
+    /// whose content the engine resolves at the tick the command applies
+    /// declares no argument, so a campaign and a crossing carry none: the
+    /// engine chose the objective and the tile, and it chooses them again
+    /// for a learner.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
     #[must_use]
-    pub const fn numbers(self) -> (u8, u8) {
+    pub const fn verb(self) -> (Verb, Option<u32>) {
         match self {
-            Self::Gather(kind) => (COMMAND_GATHER, kind.to_u8()),
-            Self::Build(kind) => (COMMAND_BUILD, kind.to_u8()),
-            Self::Relation(other) => (COMMAND_RELATION, other.0 as u8),
-            Self::Campaign { kind, .. } => (COMMAND_CAMPAIGN, kind),
-            Self::Advertise => (COMMAND_ADVERTISE, 0),
-            Self::Trade => (COMMAND_TRADE, 0),
-            Self::Carry => (COMMAND_CARRY, 0),
-            Self::Project => (COMMAND_PROJECT, 0),
-            Self::Queue(unit_type) => (COMMAND_QUEUE, unit_type.0),
-            // The argument column is one byte and a tile index is four, so
-            // the tile does not fit. The command log holds the kind, and the
-            // send verb holds the tile.
-            Self::Cross(_) => (COMMAND_CROSS, 0),
-            Self::Settle => (COMMAND_SETTLE, 0),
+            Self::Gather(kind) => (Verb::Gather, Some(kind.to_u8() as u32)),
+            Self::Build(kind) => (Verb::Build, Some(kind.to_u8() as u32)),
+            Self::Relation(other) => (Verb::Relation, Some(other.0 as u32)),
+            Self::Campaign { .. } => (Verb::Campaign, None),
+            Self::Advertise => (Verb::Advertise, None),
+            Self::Trade => (Verb::Trade, None),
+            Self::Carry => (Verb::Carry, None),
+            Self::Project => (Verb::Project, None),
+            Self::Queue(unit_type) => (Verb::Queue, Some(unit_type.0 as u32)),
+            Self::Cross(_) => (Verb::Cross, None),
+            Self::Settle => (Verb::Settle, None),
+        }
+    }
+
+    /// Returns the action integer of this choice, under one action schema.
+    ///
+    /// Returns `None` when the argument of the choice is at or above the
+    /// bound the schema states for it. A relation move against a faction
+    /// the world does not hold is the one case that reaches it.
+    #[must_use]
+    pub fn action(self, schema: &ActionSchema) -> Option<u32> {
+        let (verb, argument) = self.verb();
+        match argument {
+            Some(value) => schema.encode(verb, &[value]),
+            None => schema.encode(verb, &[]),
         }
     }
 }

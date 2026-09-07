@@ -18,10 +18,11 @@
 //! [^3]: Testing rules, section 2. `.agents/rules/testing.md`
 //! [^4]: Testing policy. `docs/TESTING.md`
 
-use cachette_core::controller::{self, FactionWeights, COMMAND_RELATION, WEIGHT_HIGH, WEIGHT_LOW};
+use cachette_core::controller::{self, FactionWeights, WEIGHT_HIGH, WEIGHT_LOW};
 use cachette_core::holding::Holder;
 use cachette_core::relation::RelationError;
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, LEADER, WORKER, WORKER_ROW};
+use cachette_core::Verb;
 use cachette_core::{
     Axial, Entity, FactionId, Fix32, Influence, MoveRelationError, Tick, World, WorldConfig,
 };
@@ -495,10 +496,13 @@ fn the_controller_moves_a_relation_through_the_verb() {
             .iter()
             .find(|(name, _)| *name == "relation_moves")
             .map_or(0, |(_, count)| *count);
+        let schema = world.action_schema();
         let by_b = world
             .controller_log()
             .iter()
-            .filter(|command| command.kind == COMMAND_RELATION && command.faction == B)
+            .filter(|command| {
+                schema.verb_of(command.action) == Some(Verb::Relation) && command.faction == B
+            })
             .count();
         if spoke {
             continue;
