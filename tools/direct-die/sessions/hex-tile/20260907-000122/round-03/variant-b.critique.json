@@ -1,0 +1,8 @@
+{
+  "faults": [
+    "Replace the generic triangular trees with a shape that reads as a pine (e.g., a stacked triangle or a triangle with a flat top) to match the specific subject matter.",
+    "Increase the contrast between the tree fill and the base fill; the current dark green is too close to the base, making the shapes look muddy rather than distinct at 64 pixels."
+  ],
+  "score": 75,
+  "verdict": "The candidate reads clearly as a forest at the display size and follows the geometry and colour rules, but the shapes are too generic to match the specific 'pine' subject."
+}

@@ -20,15 +20,24 @@
 //! reader. A running field for each of the three would remove the pass, and
 //! the field holds none today.
 //!
-//! When the caller sets a pointer, the panel reads the air and the ground at
-//! the cell that covers the pointed tile. Each is one array read through the
-//! cell of the tile.[^3]
+//! **The panel names the fastest wind of the lattice.** The wind is what
+//! decides whether a storm travels, and the water totals alone cannot tell a
+//! field that carries from one that sits. The reading is a scan of the wind
+//! plane, which costs the lattice and not the world.[^4]
+//!
+//! When the caller sets a pointer, the panel reads the air, the ground and
+//! the wind at the cell that covers the pointed tile. Each is one array read
+//! through the cell of the tile.[^3]
 //!
 //! # References
 //!
 //! [^1]: The panel standard. `crates/cachette-view/src/panel/mod.rs`
 //! [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
 //! [^3]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+//! [^4]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+
+use cachette_core::hex::NEIGHBOURS;
+use cachette_core::Wind;
 
 use super::{Line, Panel, View};
 use crate::hud::grouped;
@@ -76,6 +85,33 @@ impl Panel for Weather {
             grouped(u64::from(field.wet_cells())),
         ));
 
+        // **The wind is what decides whether a storm travels.** A watcher who
+        // reads the water totals alone cannot tell a field that carries from
+        // one that sits, so the panel names the fastest cell of the
+        // lattice.[^1]
+        //
+        // [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+        lines.push(Line::row("fastest wind", steps(i64::from(field.fastest()))));
+
+        // **The temperature is what makes the weather travel.** A season
+        // moves a warm band across the lattice, the band turns the wind, and
+        // the wind carries the water. The panel names the coldest and the
+        // warmest cell, so a watcher can see the band go past as a number and
+        // not only as a wash.[^2]
+        //
+        // [^2]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+        // The reading crops the margin away, so the panel names a cell that
+        // a watcher can point at.
+        let plane = field.warmth_over_world();
+        lines.push(Line::row(
+            "coldest cell",
+            degrees(plane.iter().copied().min().unwrap_or(0)),
+        ));
+        lines.push(Line::row(
+            "warmest cell",
+            degrees(plane.iter().copied().max().unwrap_or(0)),
+        ));
+
         lines.push(Line::Rule);
         lines.push(Line::heading("POINTED CELL"));
         match view.pointer {
@@ -87,6 +123,24 @@ impl Panel for Weather {
                         format!("q {}  r {}", pointer.q, pointer.r),
                     ));
                     lines.push(Line::row("in the air", drops(air)));
+                    // **The air alone does not say whether the sky is grey.**
+                    // Warm air holds a lot of water and cold air holds very
+                    // little, so a polar cell reads a small figure and still
+                    // stands overcast. The panel names the capacity of the
+                    // cell and the share of it that the air fills, which is
+                    // what the cloud overlay paints.
+                    if let Some(cell) = world
+                        .grid()
+                        .index_of(pointer)
+                        .and_then(|tile| world.weather_cell_of(tile))
+                    {
+                        let field = world.weather();
+                        lines.push(Line::row(
+                            "the sky holds",
+                            drops(field.capacity_at_cell(cell).0),
+                        ));
+                        lines.push(Line::row("cloud", sky(field.cloud_share_at(cell))));
+                    }
                     lines.push(Line::row("on the ground", drops(ground)));
                     lines.push(Line::row(
                         "wet",
@@ -94,6 +148,21 @@ impl Panel for Weather {
                             "yes"
                         } else {
                             "no"
+                        },
+                    ));
+                    lines.push(Line::row(
+                        "temperature",
+                        degrees(world.temperature_at(pointer).unwrap_or(0)),
+                    ));
+                    let wind = world.wind_at(pointer).unwrap_or(Wind::STILL);
+                    lines.push(Line::row("wind", steps(i64::from(wind.speed()))));
+                    lines.push(Line::row(
+                        "blowing",
+                        match wind.heading() {
+                            None => "nowhere".to_string(),
+                            Some(heading) => {
+                                format!("q {}  r {}", NEIGHBOURS[heading].q, NEIGHBOURS[heading].r)
+                            }
                         },
                     ));
                 }
@@ -106,6 +175,36 @@ impl Panel for Weather {
 
         lines
     }
+}
+
+/// Returns a speed as text.
+///
+/// **The unit is the fine step that the field counts a wind in**, and the
+/// ceiling is named beside the value so that a reader knows what the number
+/// is out of. The field counts a wind more finely than a whole lattice step,
+/// because a term that turns the wind by a part of a step needs somewhere to
+/// put that part.
+fn steps(speed: i64) -> String {
+    format!("{speed} of {}", cachette_core::weather::SPEED_CEILING)
+}
+
+/// Returns a temperature as text.
+///
+/// The unit is a whole degree on the scale of the weather field. The scale
+/// runs from zero to the heat ceiling, and the ceiling is named beside the
+/// value so that a reader knows what the number is out of.
+fn degrees(warmth: i32) -> String {
+    format!("{warmth} of {}", cachette_core::HEAT_CEILING)
+}
+
+/// Returns a share of a sky as text.
+///
+/// The unit is the 255ths that the cloud overlay paints, and the whole is
+/// named beside the value so that a reader knows what the number is out of.
+/// A cell at its own capacity reads the whole, whatever quantity of water
+/// that capacity is.
+fn sky(share: i64) -> String {
+    format!("{share} of {}", cachette_core::weather::CLOUD_SHARE_WHOLE)
 }
 
 /// Returns a count of drops as text.
@@ -122,7 +221,7 @@ fn drops(count: i64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use cachette_core::weather::{PLACES_CEILING, STRENGTH_CEILING};
+    use cachette_core::weather::{PLACES_CEILING, SPEED_CEILING, STRENGTH_CEILING};
     use cachette_core::{Axial, FactionId, World, WorldConfig};
 
     use super::*;
@@ -214,10 +313,30 @@ mod tests {
 
         let said = says(&view(&world, None), Set::EMPTY.with("weather").unwrap());
         assert!(!said.iter().any(|line| line == DRY_NOTE), "{said:?}");
-        let raised = format!("raised: {}", grouped(storm.drops as u64));
-        assert!(said.contains(&raised), "{said:?}");
-        let air = format!("in the air: {}", grouped(storm.drops as u64));
-        assert!(said.contains(&air), "{said:?}");
+        // **The sea lifts too, so the storm is not the whole of the water.**
+        // The fixture founds a city and steps, and the coast beside it fills
+        // its own sky while it does. The panel must name a total at or above
+        // the storm, not a total equal to it.
+        let raised = world.weather().raised();
+        assert!(
+            raised >= storm.drops,
+            "{raised} raised for {} drops",
+            storm.drops
+        );
+        assert!(
+            said.contains(&format!("raised: {}", grouped(raised as u64))),
+            "{said:?}"
+        );
+        let air = world.weather().air_total().0;
+        assert!(
+            air >= storm.drops,
+            "{air} in the air for {} drops",
+            storm.drops
+        );
+        assert!(
+            said.contains(&format!("in the air: {}", grouped(air as u64))),
+            "{said:?}"
+        );
     }
 
     #[test]
@@ -235,12 +354,29 @@ mod tests {
         let tile = format!("tile: q {}  r {}", place.q, place.r);
         assert!(said.contains(&tile), "{said:?}");
         // The storm fell on one cell, and the pointed tile sits in it, so the
-        // air over the tile is the whole storm. The line appears once in the
-        // totals and once for the cell.
-        let air = format!("in the air: {}", grouped(storm.drops as u64));
-        assert_eq!(
-            said.iter().filter(|line| **line == air).count(),
-            2,
+        // air over that cell holds at least the whole storm. The panel names
+        // the air of the pointed cell as well as the total, so a reader can
+        // tell the one cell from the map.
+        let cell = world
+            .grid()
+            .index_of(place)
+            .and_then(|tile| world.weather_cell_of(tile))
+            .expect("the place lies inside the world");
+        let here = world.weather().air_at(cell).0;
+        assert!(
+            here >= storm.drops,
+            "{here} over the cell for {} drops",
+            storm.drops
+        );
+        assert!(
+            said.contains(&format!("in the air: {}", grouped(here as u64))),
+            "{said:?}"
+        );
+        // The panel names the capacity of that cell beside the air, because
+        // the air alone does not say whether the sky is grey.
+        let capacity = world.weather().capacity_at_cell(cell).0;
+        assert!(
+            said.contains(&format!("the sky holds: {}", grouped(capacity as u64))),
             "{said:?}"
         );
         assert!(said.iter().any(|line| line == "wet: no"), "{said:?}");
@@ -296,6 +432,16 @@ mod tests {
             Line::row("wet cells", worst_cells),
             Line::row("tile", format!("q {}  r {}", 999_999, 999_999)),
             Line::row("wet", "yes".to_string()),
+            // The speed the engine bounds the wind at, read back from the
+            // engine rather than restated here.
+            Line::row("fastest wind", steps(i64::from(SPEED_CEILING))),
+            Line::row("wind", steps(i64::from(SPEED_CEILING))),
+            Line::row("blowing", "q -1  r  1".to_string()),
+            // The top of the temperature scale, read back from the engine
+            // rather than restated here.
+            Line::row("coldest cell", degrees(cachette_core::HEAT_CEILING)),
+            Line::row("warmest cell", degrees(cachette_core::HEAT_CEILING)),
+            Line::row("temperature", degrees(cachette_core::HEAT_CEILING)),
         ];
         for line in &lines {
             assert!(!line.is_cut(), "line was cut: {line:?}");

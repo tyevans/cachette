@@ -14,18 +14,23 @@
 //! [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
+pub mod balance;
 pub mod bridge;
 pub mod campaign;
 pub mod census;
 pub mod character;
 pub mod choose;
+pub mod climate;
 pub mod cohort;
 pub mod contest;
 pub mod controller;
 pub mod conversion;
 pub mod descent;
+pub mod effective;
 pub mod event;
 pub mod event_layout;
+pub mod faction_observation;
+pub mod faction_view;
 pub mod founding;
 pub mod growth;
 pub mod hash;
@@ -34,6 +39,8 @@ pub mod holding;
 mod household;
 pub mod influence;
 pub mod luxury;
+pub mod observation;
+pub mod padded;
 pub mod plan;
 pub mod position;
 pub mod presence;
@@ -61,6 +68,7 @@ pub mod upgrade;
 pub mod weather;
 pub mod world;
 
+pub use balance::{Balance, RENOWN_TARGET};
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
 pub use census::{census, Census, CensusError};
 pub use character::{CharacterArena, CharacterError, Sex};
@@ -86,13 +94,20 @@ pub use descent::{
     Descent, DescentError, DescentId, HouseId, Parents, DESCENT_CEILING, RELATION_DEPTH,
 };
 pub use event::{ResourceTaken, TileChanged};
-pub use founding::{Founding, FoundingError, FoundingOutcome, Provision, Survey};
+pub use faction_view::{Admit, FactionTile, Ground, MaskedSummary, SeenTile, SeenUnit, Sighting};
+pub use founding::{
+    Founding, FoundingError, FoundingOutcome, Provision, SettleError, SettleOutcome, Survey,
+};
 pub use hash::StateHash;
 pub use hex::{Axial, Grid, GridError};
 pub use holding::{FactionMask, Holder, Holding};
 pub use influence::{Conductance, Influence, InfluenceError, InfluenceField};
 pub use luxury::{
     LuxuryError, LuxuryField, LuxuryId, LuxurySet, LuxuryTile, VarietyLevel, LUXURY_CEILING,
+};
+pub use observation::{
+    array_threshold, BlockForm, Observation, SightRules, TileLayer, SIGHT_BLOCKERS_DEFAULT,
+    SIGHT_CEILING, SIGHT_RADIUS_DEFAULT, SIGHT_STEP_DEFAULT,
 };
 pub use plan::{PlanRefusal, PlanRegister, PlanRules, Project};
 pub use position::{
@@ -112,6 +127,7 @@ pub use rates::{
 pub use relation::{RelationCrossed, RelationError, RelationMatrix, RelationRules};
 pub use resource::{
     Amount, CarryLoad, DepletionLedger, LedgerEntry, RecoveryRules, ResourceField, ResourceKind,
+    TileGround,
 };
 pub use site::{
     CommodityId, SettlementArena, SettlementError, Store, StoreUpdate, COMMODITY_COUNT,
@@ -141,11 +157,12 @@ pub use upgrade::{
     UPGRADE_CATEGORY_COUNT, UPGRADE_LEVEL_COUNT,
 };
 pub use weather::{
-    Drops, Storm, WeatherError, WeatherField, COOLDOWN_TICKS, PLACES_CEILING, STRENGTH_CEILING,
-    WET_MARK,
+    CellGround, Drops, Latitudes, Storm, WeatherError, WeatherField, WeatherScale, Wind,
+    AIR_SATURATION, COOLDOWN_TICKS, HEAT_CEILING, LATITUDE_FINE, LATITUDE_POLE, PASS_CEILING,
+    PLACES_CEILING, SPEED_CEILING, STRENGTH_CEILING, WARMTH_FINE, WARMTH_FLOOR, WET_MARK,
 };
 pub use world::{
     CampaignError, CensusBasis, CensusRow, ConvertError, IdentityError, MoveRelationError,
-    Standing, StepError, World, WorldConfig, WorldError, FOUNDING_GROUP_DEFAULT,
-    LUXURY_DEPOSITS_DEFAULT, RENOWN_TARGET, STOCK_TARGET, SUBSYSTEM_CENSUS,
+    SeedError, Standing, StepError, World, WorldConfig, WorldError, FOUNDING_GROUP_DEFAULT,
+    LUXURY_DEPOSITS_DEFAULT, STOCK_CEILING_OF_ONE_SETTLEMENT, SUBSYSTEM_CENSUS,
 };

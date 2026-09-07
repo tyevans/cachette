@@ -438,18 +438,28 @@ impl RelationMatrix {
     ///
     /// **This is the one statement of the movement rule.** A holder refuses a
     /// guest of another faction when the holder is below the guest edge toward
-    /// the guest. A guest of the holder's own faction is never refused, and
-    /// nobody refuses on ground nobody holds.[^1]
+    /// the guest and at or above the war edge toward it. A guest of the
+    /// holder's own faction is never refused, and nobody refuses on ground
+    /// nobody holds.[^1]
+    ///
+    /// **A holder in the war band refuses nobody.** A refusal is a border
+    /// that a host keeps, and a host at war keeps no border against the
+    /// faction it is at war with. The tension band closes the border, and war
+    /// opens it again.[^2]
     ///
     /// # References
     ///
     /// [^1]: Balance register, the band below which a holder refuses a guest. `docs/reference/balance.md`
+    /// [^2]: ADR-0167, war opens the border that tension closes, decision D1. `docs/adrs/draft/adr-0167-war-opens-the-border-that-tension-closes.md`
     #[must_use]
     pub fn refuses_guest(&self, holder: FactionId, guest: FactionId) -> bool {
         if holder == guest {
             return false;
         }
-        matches!(self.get(holder, guest), Some(value) if value < self.rules.guest_edge)
+        matches!(
+            self.get(holder, guest),
+            Some(value) if value < self.rules.guest_edge && value >= self.rules.war_edge
+        )
     }
 
     /// Reports whether two factions may open a trade. An offer is refused

@@ -39,9 +39,11 @@ from __future__ import annotations
 import argparse
 import os
 import secrets
+import time
 from typing import TYPE_CHECKING, Protocol
 
-from cachette import Camera, World
+from cachette import Camera, ConfigError, World
+from cachette.names import Names
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -57,6 +59,7 @@ if TYPE_CHECKING:
 from cachette.demo.clock import SPEEDS, Clock, says
 from cachette.demo.settings import Settings
 from cachette.demo.surface import Surface
+from cachette.demo.toasts import Announcer
 
 # The size of the window in pixels.
 WINDOW_WIDTH = 960
@@ -64,6 +67,15 @@ WINDOW_HEIGHT = 720
 
 # The world the demonstration builds. The engine is the same engine the tests
 # exercise, and these numbers only choose which world it runs.
+# The weather lattice of the demonstration, as the side of one cell in tiles.
+#
+# **The engine default of 32 gives this world an 8 by 8 lattice**, in which the
+# deepest cell sits one cell from water. A watcher then sees no weather inland,
+# because the world holds no inland at that pitch. Eight tiles gives 32 by 32,
+# which carries a coast, an interior and a rain shadow, and costs a few
+# milliseconds a tick. A watcher who wants one cell for each tile asks for it.
+WEATHER_PITCH_DEFAULT = 8
+
 WORLD_WIDTH = 256
 WORLD_HEIGHT = 256
 FACTION_COUNT = 4
@@ -101,6 +113,21 @@ PICTURE_HEIGHT = 1400
 # for a picture of the world as it was founded.
 PICTURE_TICKS = 300
 
+# The weather cell count above which the run warns the watcher.
+#
+# **The cost of the weather stage follows the cell count.** The default pitch
+# gives the demonstration world 64 cells, which costs a small part of a tick.
+# A pitch of one tile gives it one cell for every tile, and that dominates the
+# frame. A watcher who asks for a fine pitch on a large world should read what
+# it costs before the run grinds.
+#
+# The run warns and then proceeds. The pitch is what the watcher asked for,
+# and a demonstration that refused would hide the thing it was asked to show.
+#
+# The number is a mark, not a measurement. No cost figure in this project is
+# measured, so nothing here states one.
+WEATHER_CELL_WARNING = 16384
+
 # How many times the picture may resize before it gives up.
 #
 # Resizing changes what the window paints, and a section a count switches on
@@ -110,6 +137,13 @@ RESIZES = 4
 
 # The engine steps once for each drawn frame.
 FRAMES_EACH_SECOND = 30
+
+# How many promoted people the console names on one line.
+#
+# A mature world promotes several people on one tick. A line that named every
+# one of them would run off the screen, and the count beside it already says
+# how many there were.
+NAMED_PROMOTIONS = 2
 
 # The function keys the settings hold, by name.
 #
@@ -164,6 +198,13 @@ def overlay_keys(key: object) -> list[tuple[int, str]]:
         for number in range(1, 10)
         if hasattr(key, f"_{number}")
     ]
+    # Nine digits ran out when the tenth overlay arrived, and 0 already means
+    # "show the map again". These letters carry no other action in the window.
+    free += [
+        (getattr(key, letter.upper()), letter)
+        for letter in ("y", "u", "i", "o", "p")
+        if hasattr(key, letter.upper())
+    ]
     return free[: len(World.overlay_names())]
 
 
@@ -177,12 +218,15 @@ class Demo:
 
     __slots__ = (
         "announced_end",
+        "announcer",
         "camera",
         "clock",
+        "names",
         "overlay",
         "panels",
         "pointer",
         "reference",
+        "seconds",
         "settings",
         "surface",
         "threads",
@@ -192,12 +236,20 @@ class Demo:
     def __init__(
         self,
         world: World,
+        names: Names,
         width: int = WINDOW_WIDTH,
         height: int = WINDOW_HEIGHT,
         threads: int = 0,
     ) -> None:
-        """Build the state the control plane holds between frames."""
+        """Build the state the control plane holds between frames.
+
+        The namer turns an index, an address and an identity into words. It
+        comes from the caller and not from the world, because a namer holds
+        more than a seed. The caller builds it from the seed of the world,
+        which the world now gives back, so one number reaches both.
+        """
         self.world = world
+        self.names = names
         self.surface = Surface(width, height)
         self.threads = threads if threads > 0 else min(os.cpu_count() or 1, 12)
         # The reference layer names the colours while a key is held. It holds
@@ -223,6 +275,14 @@ class Demo:
         # Whether the game end was printed. The record is written once, and
         # the line is printed once.
         self.announced_end = False
+        # The lines that appear over the map, and the reader that makes them.
+        self.announcer = Announcer(names)
+        # Where the deck reads the wall clock. **A toast lives for a number of
+        # seconds and not for a number of ticks**, because a tick lasts
+        # thirty-two times longer at the slowest speed than at the fastest,
+        # and a paused world runs no tick at all. A caller replaces this to
+        # drive the fade from a number it holds.
+        self.seconds: Callable[[], float] = time.monotonic
 
     def seed(self) -> list[FoundingReport]:
         """Seed the world from its seed, and give back what each faction got.
@@ -261,7 +321,7 @@ class Demo:
         self.camera.clamp(self.world, width, height)
 
     def announce(self, reading: FrameReading) -> None:
-        """Say when a soldier becomes a character, and what earned it.
+        """Say when a soldier becomes a character, and name the person.
 
         **The control plane reacts to one fact the engine reported.** It reads
         the count the frame gave it and prints a line. It walks no entity and
@@ -270,6 +330,11 @@ class Demo:
         A promotion happens on a small share of frames, so the line is rare
         enough to read and it names the moment rather than a total that went
         up.
+
+        The line names the people the promotion log holds, up to a few of
+        them. A mature world promotes several people on one tick, and a line
+        that named every one of them would run off the screen. The count is
+        still there, so a reader knows how many the line did not name.
         """
         if reading["promoted_now"] <= 0:
             return
@@ -282,6 +347,29 @@ class Demo:
             f"tick {reading['tick']}: {reading['promoted_now']} {who} "
             f"became {what}{earned}, {reading['characters']} in the world"
         )
+        named = self._promoted_names()
+        if named:
+            print(f"  they are {named}")
+
+    def _promoted_names(self) -> str:
+        """Give back the names of the people the last step promoted.
+
+        The log covers the last step alone. A step that promoted more people
+        than the line holds ends with a count of the rest.
+        """
+        columns = self.world.promoted_log_columns()
+        rows = len(columns["character"])
+        if rows == 0:
+            return ""
+        shown = [
+            f"{self.names.person(int(columns['character'][row]))} of "
+            f"{self.names.faction(int(columns['faction'][row]))}"
+            for row in range(min(rows, NAMED_PROMOTIONS))
+        ]
+        rest = rows - len(shown)
+        if rest > 0:
+            shown.append(f"and {rest} more")
+        return ", ".join(shown)
 
     def announce_relations(self) -> None:
         """Say who declared war on whom, and who made peace, on the last step.
@@ -301,7 +389,10 @@ class Demo:
                 columns["band_before"][row]
             )
             verb = "declares war on" if declared else "makes peace with"
-            print(f"tick {tick}: faction {speaker} {verb} faction {other}")
+            print(
+                f"tick {tick}: {self.names.faction(speaker)} {verb} "
+                f"{self.names.faction(other)}"
+            )
 
     def announce_campaigns(self) -> None:
         """Say who marched on what, and who took what, on the last step.
@@ -319,15 +410,20 @@ class Demo:
             kind = int(columns["kind"][row])
             q = int(columns["objective_q"][row])
             r = int(columns["objective_r"][row])
-            place = f"({q}, {r})"
+            # **The console keeps the address beside the name.** A watcher
+            # reads a name to follow the story and reads an address to point
+            # the camera, and the console is where the second one belongs.
+            place = f"{self.names.place(q, r)} ({q}, {r})"
+            nation = self.names.faction(faction)
             if kind == 0:
                 cohort = int(columns["cohort_size"][row])
+                army = self.names.faction_adjective(faction)
                 print(
-                    f"tick {tick}: faction {faction} marches on {place} "
+                    f"tick {tick}: a {army} army marches on {place} "
                     f"with {cohort} soldiers"
                 )
             elif kind == 1:
-                print(f"tick {tick}: faction {faction} takes {place}")
+                print(f"tick {tick}: {nation} takes {place}")
 
     def announce_trade(self) -> None:
         """Say when a contract bound and when one reached full delivery.
@@ -347,7 +443,10 @@ class Demo:
             proposer = int(columns["proposer"][row])
             responder = int(columns["responder"][row])
             verb = "binds a contract with" if act == 2 else "completes a contract with"
-            print(f"tick {tick}: faction {proposer} {verb} faction {responder}")
+            print(
+                f"tick {tick}: {self.names.faction(proposer)} {verb} "
+                f"{self.names.faction(responder)}"
+            )
 
     def announce_end(self) -> GameEnd | None:
         """Say who won, once, when the game end record first appears.
@@ -361,7 +460,8 @@ class Demo:
         self.announced_end = True
         # The engine names a path with underscores. A watcher reads words.
         path = end["path"].replace("_", " ")
-        print(f"tick {end['tick']}: faction {end['winner']} wins by {path}")
+        winner = self.names.faction(int(end["winner"]))
+        print(f"tick {end['tick']}: {winner} wins by {path}")
         return end
 
     def toggle_panel(self, name: str) -> None:
@@ -415,11 +515,16 @@ class Demo:
         below one tick for each frame a unit that moved draws between its two
         tiles, and the frame states the speed beside the tick.
         """
+        now = self.seconds()
         for _ in range(self.clock.ticks_due()):
             self.world.step(self.threads)
             self.announce_relations()
             self.announce_campaigns()
             self.announce_trade()
+            # The logs cover the last step alone, so the deck reads them here
+            # and not after the loop. A frame that ran several ticks would
+            # otherwise keep the last of them only.
+            self.announcer.after_step(self.world, now)
         self.announce_end()
         # The pace is the clock's, and the engine holds no clock. The phase
         # is the share of the current tick that has elapsed, and the frame
@@ -443,6 +548,13 @@ class Demo:
             speed_milli=self.clock.speed_milli,
         )
         self.announce(reading)
+        # The counters and the end record are state, so the deck reads them
+        # once for each drawn frame.
+        self.announcer.after_frame(self.world, now)
+        # **The toasts go on last, over the frame the engine filled.** They
+        # are chrome and not the world: nothing here reads a tile or an
+        # entity, so the two drawing paths cannot disagree about the world.
+        self.announcer.toasts.paint(self.surface, now)
         return reading
 
 
@@ -460,6 +572,7 @@ def build_world(
     extent: int = 0,
     factions: int = FACTION_COUNT,
     seed: int = WORLD_SEED,
+    weather_pitch: int = 0,
 ) -> World:
     """Build the world the demonstration runs.
 
@@ -469,6 +582,10 @@ def build_world(
     The seed chooses which world. It keeps the stated default, so a caller
     that names no seed gets one world every time. The command line draws a
     seed before it calls this.
+
+    The weather pitch is the side of one weather cell in tiles. Zero takes
+    the pitch the engine defaults to, so this function states no default of
+    its own. One gives each tile its own weather cell.
     """
     side = extent if extent > 0 else WORLD_WIDTH
     return World(
@@ -476,7 +593,39 @@ def build_world(
         height=side if extent > 0 else WORLD_HEIGHT,
         seed=seed,
         faction_count=factions,
+        weather_cell_tiles=(
+            weather_pitch if weather_pitch > 0 else WEATHER_PITCH_DEFAULT
+        ),
     )
+
+
+def weather_line(world: World) -> str:
+    """Give back the line that says what pitch the weather runs at.
+
+    **Two runs at two pitches look alike on the map.** A watcher comparing
+    them needs to read which one is on the screen, so the line names the
+    pitch in tiles and the cell count that follows from it.
+    """
+    pitch = world.weather_cell_tiles
+    cells = world.weather_cell_count
+    how = "one cell for each tile" if pitch == 1 else f"{pitch} tiles a side"
+    return f"weather: {how}, {cells} cells"
+
+
+def print_weather_pitch(world: World) -> None:
+    """Print the weather pitch, and warn when the lattice is a costly one.
+
+    The warning states the cell count against the mark and then lets the run
+    proceed. The pitch is what the watcher asked for, and a demonstration
+    that refused would hide the thing it was asked to show.
+    """
+    print(weather_line(world))
+    cells = world.weather_cell_count
+    if cells > WEATHER_CELL_WARNING:
+        print(
+            f"note: {cells} weather cells is above {WEATHER_CELL_WARNING}, "
+            "so the weather stage dominates each tick and the run is slow"
+        )
 
 
 def print_census(world: World) -> None:
@@ -495,22 +644,28 @@ def print_census(world: World) -> None:
         print(f"  {name}: {count}")
 
 
-def report(foundings: list[FoundingReport]) -> tuple[int, int]:
+def report(foundings: list[FoundingReport], names: Names) -> tuple[int, int]:
     """Print what each faction got, and give back how many were seated and fed.
 
     The loop is over factions, of which there are four. It is not a loop over
     entities, and it reads a summary the engine already made.
+
+    **The line keeps the address beside the name.** A watcher reads the name
+    to follow the story and reads the address to point the camera at the
+    place, and this report is where the second one belongs.
     """
     seated = 0
     carried = 0
     for founding in foundings:
         faction = founding["faction"]
+        nation = names.faction(faction)
         if not founding["seated"]:
-            print(f"faction {faction} found no place: {founding['refusal']}")
+            print(f"{nation} found no place: {founding['refusal']}")
             continue
         seated += 1
+        place = names.place(founding["q"], founding["r"])
         print(
-            f"faction {faction} founded at ({founding['q']}, {founding['r']}) "
+            f"{nation} founds {place} at ({founding['q']}, {founding['r']}) "
             f"with {founding['people']} people, "
             f"chosen from {founding['considered']} places"
         )
@@ -642,6 +797,16 @@ def main(argv: list[str] | None = None) -> int:
         help="how many factions the world holds",
     )
     parser.add_argument(
+        "--weather-pitch",
+        type=int,
+        default=0,
+        help=(
+            "the side of one weather cell in tiles, as a power of two from 1 "
+            "to 256; 1 gives each tile its own weather and is slow on a large "
+            "world; zero takes the pitch the demonstration chooses"
+        ),
+    )
+    parser.add_argument(
         "--seed",
         type=lambda given: int(given, 0),
         default=0,
@@ -673,8 +838,26 @@ def main(argv: list[str] | None = None) -> int:
     # keeps the height of a window.
     tall = bool(arguments.picture) and not panels
     default_height = PICTURE_HEIGHT if tall else WINDOW_HEIGHT
+    # **One number builds the world and names the things in it.** The namer
+    # now takes the seed from the world, so the number is declared once. A
+    # world built from one seed and a namer built from another would name a
+    # story that did not happen, and nothing would fail.
+    # The engine holds the rule for what describes a world, and it refuses
+    # here rather than in a traceback. A watcher who typed a weather pitch of
+    # three reads one sentence and tries again.
+    try:
+        world = build_world(
+            arguments.extent,
+            arguments.factions,
+            seed,
+            arguments.weather_pitch,
+        )
+    except ConfigError as refusal:
+        print(f"the engine refused the world: {refusal}")
+        return 2
     demo = Demo(
-        build_world(arguments.extent, arguments.factions, seed),
+        world,
+        Names(world.seed),
         width=arguments.width,
         height=arguments.height or default_height,
         threads=arguments.threads,
@@ -685,8 +868,12 @@ def main(argv: list[str] | None = None) -> int:
     # worth repeating, and the number that repeats it must already be on the
     # screen when it does.
     print(f"seed 0x{seed:016x}")
+    # The pitch comes before the founding, because a run at a fine pitch on a
+    # large world is slow from the first tick and the warning is worth
+    # nothing after it.
+    print_weather_pitch(demo.world)
     foundings = demo.seed()
-    seated, _ = report(foundings)
+    seated, _ = report(foundings, demo.names)
     if seated == 0:
         print("no faction found a place, so there is nothing to watch")
         return 1
@@ -760,8 +947,14 @@ def _overlay_key_line() -> str:
     """
     from pyglet.window import key
 
-    pairs = zip(overlay_keys(key), World.overlay_names(), strict=True)
-    named = ", ".join(f"{label} {name}" for (_, label), name in pairs)
+    keys = overlay_keys(key)
+    names = World.overlay_names()
+    named = ", ".join(f"{label} {name}" for (_, label), name in zip(keys, names))
+    # An overlay past the last free key is still real, and a watcher who cannot
+    # see it named would believe the renderer holds fewer than it does.
+    spare = names[len(keys) :]
+    if spare:
+        named += ", no key for " + ", ".join(spare)
     return f"{named}, {OVERLAY_OFF_KEY} none"
 
 
@@ -784,8 +977,9 @@ def _run_to_end(demo: Demo) -> int:
     if end is None:
         print(f"no game ended by the tick limit of {limit}")
     else:
+        winner = demo.names.faction(int(end["winner"]))
         print(
-            f"the game ended at tick {end['tick']}: faction {end['winner']} "
+            f"the game ended at tick {end['tick']}: {winner} "
             f"won by {end['path']}, holding {demo.world.score(end['winner'])} tiles"
         )
     print_census(demo.world)

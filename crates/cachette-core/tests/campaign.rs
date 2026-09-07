@@ -98,6 +98,24 @@ fn declare_war(world: &mut World) {
     assert!(world.at_war(A, B));
 }
 
+/// Puts the pair deep in the peace band, so that the relation moves the
+/// controllers make cannot reach the war edge inside the wait.
+///
+/// **A faction now builds a leader when it has none, so it moves relations
+/// and it reaches war on its own.** A pair left at the value a new world
+/// gives crosses the war edge inside the wait, and a peace test on such a
+/// pair measures the wait and not the gate. One call of the verb moves an
+/// entry by the bound at most, and the drift moves it by one step at most,
+/// so the depth is the wait times the two together.
+fn declare_peace(world: &mut World) {
+    let rules = world.relation_rules();
+    let reach = PATIENCE as i32 * (rules.move_bound + rules.drift.abs());
+    let peace = rules.war_edge + reach + 1;
+    assert!(world.set_relation(A, B, peace));
+    assert!(world.set_relation(B, A, peace));
+    assert!(!world.at_war(A, B));
+}
+
 fn census(world: &World, name: &str) -> i64 {
     world
         .subsystem_census()
@@ -128,6 +146,7 @@ const fn middling() -> FactionWeights {
         trade: 4,
         build: 4,
         renown: 4,
+        settle: 4,
     }
 }
 
@@ -204,9 +223,22 @@ fn nearest_site_takes_the_lowest_distance_and_then_the_lowest_slot() {
 fn a_faction_at_peace_raises_no_campaign() {
     let mut world = World::new(config(31)).expect("the extent describes a world");
     seat_two(&mut world);
-    assert!(!world.at_war(A, B));
+    declare_peace(&mut world);
     for _ in 0..PATIENCE {
+        // **The peace is written on every tick, not left to the drift.** The
+        // controller moves the relation toward war whenever its draw says
+        // so, so a world left alone reaches war part way through this loop
+        // and the assertion below then measures nothing.[^2]
+        //
+        // [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
+        world.set_relation(A, B, 0);
+        world.set_relation(B, A, 0);
+        assert!(!world.at_war(A, B), "the fixture holds the pair at peace");
         world.step(2).expect("the step runs");
+        // The fixture must hold the case it tests. A pair that reaches the
+        // war band inside the wait makes every line below vacuous, so the
+        // test fails here rather than passing on nothing.
+        assert!(!world.at_war(A, B), "the fixture left the peace band");
         assert!(world.campaign_log().is_empty(), "no campaign at peace");
         assert!(
             world

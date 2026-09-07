@@ -406,7 +406,12 @@ fn a_deposit_falls_and_then_rises() {
         Some(None),
         "the choice did not clear the order of a unit that chose nothing"
     );
-    for _ in 0..4 {
+    // The moisture over the tile stretches the declared period, so the test
+    // waits the period the engine will act on rather than a fixed count.
+    let period = world
+        .recovery_period_at(standing, ResourceKind::Food)
+        .expect("food recovers");
+    for _ in 0..(period * 2) {
         world.step(1).expect("the step must run");
     }
     let given_back = world

@@ -271,17 +271,26 @@ counts leased ground and closed ground as well as city-held ground.[^19]
 discs.** A watcher sees a line of colour along a road, and a disc around each
 city.
 
-**A faction erodes a border only where the two factions are at peace.** The
-movement rule refuses a guest onto ground the holder is below a stated edge
-toward.[^20] A faction at war with the holder cannot reach that ground, so it
-cannot raise a lease on it. Ground that nobody holds is open to anybody.
+**This consequence held while the guest refusal ran to the bottom of the band,
+and a later record made the refusal a window.** It said that a faction erodes a
+border only where the two factions are at peace, because a faction at war with
+the holder could not reach that ground and so could not raise a lease on
+it.[^20] **War now opens the border that tension closes**, so a faction at war
+reaches the ground of its rival and erodes it, and only a pair in the band
+between the two edges is shut out.[^24] The consequence is struck rather than
+superseded, because it follows from a rule that another record holds and not
+from a claim of this one. Ground that nobody holds is open to anybody, and that
+part stands.
 
-**A lake or a mountain range that one faction rings becomes that faction's.**
-Closure reads only the holder of a neighbour, and it asks nothing of the
-ground. **This changes the water rule of the record it amends**, which says
-that no faction holds water.[^2] A faction now holds the water it has closed,
-and it holds no water it has not. The pass count bounds how far a hole is
-swallowed, so a wide sea stays unheld in the middle.
+**A lake or a mountain range that one faction rings would become that
+faction's, and nothing does it yet.** D6 states the closure and no pass runs
+it, so this consequence is written in a tense the engine has not reached. **No
+faction holds water today, and the water rule of the record this one amends is
+therefore unchanged so far.**[^2] When the closure lands, it will read only the
+holder of a neighbour and ask nothing of the ground, a faction will hold the
+water it has closed and no water it has not, and the pass count will bound how
+far a hole is swallowed so that a wide sea stays unheld in the middle. A
+backlog item holds the work.[^25]
 
 **Traded land keeps its new holder for longer than one step in one case.** A
 land contract writes the holder of a set of tiles to the creditor.[^21] The
@@ -327,3 +336,5 @@ no trade and no fight, so an upgrade meets that question on more tiles.
 [^21]: ADR-0147, a contract consideration is a tagged kind, decision D3. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
 [^22]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^23]: Blockers register, BLK-036. `docs/BLOCKERS.md`
+[^24]: ADR-0167, war opens the border that tension closes, decision D1. `docs/adrs/draft/adr-0167-war-opens-the-border-that-tension-closes.md`
+[^25]: Backlog item 0493, fill the ground one faction has surrounded. `docs/backlog/proposed/0493-fill-the-ground-one-faction-has-surrounded.md`

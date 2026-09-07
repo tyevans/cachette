@@ -394,6 +394,225 @@ impl Default for ReachRules {
     }
 }
 
+/// How much a lease rises for each tick a unit of its own faction stands on
+/// the tile, when nobody has set another value.
+///
+/// **This is a provisional value and not a measured one.** The rules of the
+/// downstream game are not written down, so a blocker governs it.[^1] The
+/// balance register holds the row.[^2]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+/// [^2]: Balance register, the lease. `docs/reference/balance.md`
+pub const LEASE_RAISE_STEP_DEFAULT: i32 = 1;
+
+/// How much a lease falls for each tick a unit of another faction stands on
+/// the tile, when nobody has set another value.
+///
+/// **This is a provisional value and not a measured one.** It is four times
+/// the raise step, so an invader strips a lease at the bound in a quarter of
+/// the ticks the holder spent to build it. A step equal to the raise step
+/// would make a seat at the bound cost an invader as many ticks as the
+/// holder's whole run, and the seat clause of the game end would stay out of
+/// reach.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+/// [^2]: Balance register, the lease. `docs/reference/balance.md`
+pub const LEASE_LOWER_STEP_DEFAULT: i32 = 4;
+
+/// How much a lease falls on each decay tick, when nobody has set another
+/// value.
+///
+/// **This is a provisional value and not a measured one.**[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+/// [^2]: Balance register, the lease. `docs/reference/balance.md`
+pub const LEASE_DECAY_STEP_DEFAULT: i32 = 1;
+
+/// How many ticks pass between two decay ticks, when nobody has set another
+/// value.
+///
+/// **This is a provisional value and not a measured one.** A lease at the
+/// bound returns to nobody after the bound multiplied by this period, which
+/// is 6144 ticks. That is under a third of the tick limit of the harness, so
+/// ground a faction abandons early in a run returns inside the run.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+/// [^2]: Balance register, the lease. `docs/reference/balance.md`
+pub const LEASE_DECAY_PERIOD_DEFAULT: u32 = 32;
+
+/// The tick inside the decay period on which the decay runs, when nobody has
+/// set another value.
+///
+/// **This is a provisional value and not a measured one.**[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+/// [^2]: Balance register, the lease. `docs/reference/balance.md`
+pub const LEASE_DECAY_PHASE_DEFAULT: u32 = 0;
+
+/// The count a lease never passes, when nobody has set another value.
+///
+/// **This is a provisional value and not a measured one.** It is three times
+/// the claim threshold, so a faction that used one tile for a whole run holds
+/// no more claim on it than three claims, and another faction takes the tile
+/// in a stated number of ticks rather than never.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+/// [^2]: Balance register, the lease. `docs/reference/balance.md`
+pub const LEASE_BOUND_DEFAULT: i32 = 192;
+
+/// The count at or above which a lease holds the tile, when nobody has set
+/// another value.
+///
+/// **This is a provisional value and not a measured one.** A unit that merely
+/// crosses a tile stands on it for one tick, and this threshold asks for 64,
+/// so a crossing claims nothing and repeated use claims. It is far below the
+/// tick limit of the harness, so a cohort that reaches an objective and stays
+/// takes it inside the run.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+/// [^2]: Balance register, the lease. `docs/reference/balance.md`
+pub const LEASE_CLAIM_THRESHOLD_DEFAULT: i32 = 64;
+
+/// How a lease rises, falls and claims.
+///
+/// Every value is a whole number. No fraction and no floating point number
+/// reaches a lease.[^1] Each one is a balance value under one blocker.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+/// [^2]: Balance register, the lease. `docs/reference/balance.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LeaseRules {
+    raise_step: i32,
+    lower_step: i32,
+    decay_step: i32,
+    decay_period: u32,
+    decay_phase: u32,
+    bound: i32,
+    claim_threshold: i32,
+}
+
+impl LeaseRules {
+    /// The provisional values that the balance register holds.
+    pub const DEFAULT: Self = Self {
+        raise_step: LEASE_RAISE_STEP_DEFAULT,
+        lower_step: LEASE_LOWER_STEP_DEFAULT,
+        decay_step: LEASE_DECAY_STEP_DEFAULT,
+        decay_period: LEASE_DECAY_PERIOD_DEFAULT,
+        decay_phase: LEASE_DECAY_PHASE_DEFAULT,
+        bound: LEASE_BOUND_DEFAULT,
+        claim_threshold: LEASE_CLAIM_THRESHOLD_DEFAULT,
+    };
+
+    /// Builds a rule set.
+    ///
+    /// A period of zero would divide by zero, so the count is raised to one.
+    /// A claim threshold above the bound would make the lease reach nothing,
+    /// so it is held at the bound.
+    #[must_use]
+    pub const fn new(
+        raise_step: i32,
+        lower_step: i32,
+        decay_step: i32,
+        decay_period: u32,
+        decay_phase: u32,
+        bound: i32,
+        claim_threshold: i32,
+    ) -> Self {
+        let bound = if bound < 0 { 0 } else { bound };
+        Self {
+            raise_step,
+            lower_step,
+            decay_step,
+            decay_period: if decay_period == 0 { 1 } else { decay_period },
+            decay_phase,
+            bound,
+            claim_threshold: if claim_threshold > bound {
+                bound
+            } else {
+                claim_threshold
+            },
+        }
+    }
+
+    /// Returns how much a lease rises for each tick of its own faction.
+    #[must_use]
+    pub const fn raise_step(self) -> i32 {
+        self.raise_step
+    }
+
+    /// Returns how much a lease falls for each tick of another faction.
+    #[must_use]
+    pub const fn lower_step(self) -> i32 {
+        self.lower_step
+    }
+
+    /// Returns how much a lease falls on a decay tick.
+    #[must_use]
+    pub const fn decay_step(self) -> i32 {
+        self.decay_step
+    }
+
+    /// Returns how many ticks pass between two decay ticks.
+    #[must_use]
+    pub const fn decay_period(self) -> u32 {
+        self.decay_period
+    }
+
+    /// Returns the tick inside the period on which the decay runs.
+    #[must_use]
+    pub const fn decay_phase(self) -> u32 {
+        self.decay_phase
+    }
+
+    /// Returns the count a lease never passes.
+    #[must_use]
+    pub const fn bound(self) -> i32 {
+        self.bound
+    }
+
+    /// Returns the count at or above which a lease holds the tile.
+    #[must_use]
+    pub const fn claim_threshold(self) -> i32 {
+        self.claim_threshold
+    }
+
+    /// Returns whether the decay runs on this tick.
+    ///
+    /// The schedule is fixed. No convergence test, no time budget and no wall
+    /// clock ends it, because a run must give one answer at any thread count
+    /// and on any machine.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    #[must_use]
+    pub const fn decays_on(self, tick: u64) -> bool {
+        tick % self.decay_period as u64 == self.decay_phase as u64 % self.decay_period as u64
+    }
+}
+
+impl Default for LeaseRules {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 /// The holding of a world.
 ///
 /// It holds the holder of each tile, the list of tiles that somebody holds,
@@ -447,6 +666,44 @@ pub struct Holding {
     ///
     /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D2 and D3. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
     rules: ReachRules,
+    /// The faction each tile's lease names, or nobody.
+    ///
+    /// A lease is one faction and one count, and no column of it is indexed
+    /// by the faction. One tile names one faction, so the storage refuses a
+    /// second one.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D1. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    lease_holder: Vec<Holder>,
+    /// The count of each tile's lease.
+    ///
+    /// The type is signed, so that a subtraction below zero is representable
+    /// and the overflow gate does not fire on the ordinary case. The rule
+    /// then reads the sign and writes a value at or above zero.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D1. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    lease_count: Vec<i32>,
+    /// The tiles whose lease count is above zero, in ascending tile order.
+    ///
+    /// The decay walks this rather than the world, so the cost of the decay
+    /// follows the ground in use.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D4. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    leased: Vec<TileIdx>,
+    /// How a lease rises, falls and claims.
+    ///
+    /// The lease pass reads these on every step, so they enter the state hash
+    /// beside the columns they decide.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D7. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    lease_rules: LeaseRules,
 }
 
 impl Holding {
@@ -462,6 +719,10 @@ impl Holding {
             block_masks: vec![FactionMask::EMPTY; layout.block_count() as usize],
             block_census: vec![0; layout.block_count() as usize * MASK_BITS as usize],
             rules: ReachRules::DEFAULT,
+            lease_holder: vec![Holder::NOBODY; tiles],
+            lease_count: vec![0; tiles],
+            leased: Vec::new(),
+            lease_rules: LeaseRules::DEFAULT,
         }
     }
 
@@ -474,6 +735,138 @@ impl Holding {
     /// Sets how far a city reaches, and what extends the reach.
     pub const fn set_rules(&mut self, rules: ReachRules) {
         self.rules = rules;
+    }
+
+    /// Returns how a lease rises, falls and claims.
+    #[must_use]
+    pub const fn lease_rules(&self) -> LeaseRules {
+        self.lease_rules
+    }
+
+    /// Sets how a lease rises, falls and claims.
+    pub const fn set_lease_rules(&mut self, rules: LeaseRules) {
+        self.lease_rules = rules;
+    }
+
+    /// Returns the lease of one tile: the faction it names and the count.
+    ///
+    /// Returns `None` when the address lies outside the world.
+    #[must_use]
+    pub fn lease(&self, address: Axial) -> Option<(Holder, i32)> {
+        let tile = self.layout.grid().index_of(address)?;
+        let index = tile.0 as usize;
+        Some((
+            *self.lease_holder.get(index)?,
+            *self.lease_count.get(index)?,
+        ))
+    }
+
+    /// Returns the tiles whose lease count is above zero, in tile order.
+    #[must_use]
+    pub fn leased(&self) -> &[TileIdx] {
+        &self.leased
+    }
+
+    /// Moves the lease of every tile that carries a unit, then decays the
+    /// rest on a fixed schedule.
+    ///
+    /// The caller gives one entry for each tile that carries at least one
+    /// unit: the tile, and the faction that has the most units on it. The
+    /// list must be in ascending tile order and must name each tile once.
+    /// The tie between two factions with equal counts belongs to the caller,
+    /// because the caller holds the units.[^1]
+    ///
+    /// For each entry:
+    ///
+    /// - when the lease names the faction present, the count gains the raise
+    ///   step, and it stops at the bound;
+    /// - when the lease names another faction, the count loses the lower
+    ///   step, and a result at or below zero gives the lease to the faction
+    ///   present with the amount by which the result passed zero;
+    /// - when the lease names nobody, the lease names the faction present and
+    ///   the count becomes the raise step.
+    ///
+    /// **The rule reads no holder.** The holder of a tile therefore never
+    /// decides the lease of that tile.[^1]
+    ///
+    /// The decay then runs on a fixed period and phase. It subtracts the
+    /// decay step from every tile whose count is above zero. A count that
+    /// reaches zero stops there, and the lease then names nobody. No
+    /// convergence test and no clock ends the decay.[^2]
+    ///
+    /// The call runs on the calling thread. Its cost follows the tiles that
+    /// carry a unit and the tiles whose count is above zero. It never follows
+    /// the world.
+    ///
+    /// Returns how many tiles changed their lease faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decisions D2 and D3. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    /// [^2]: ADR-0153, a tile's lease follows the units that stand on it, decision D4. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    pub fn advance_leases(&mut self, occupancy: &[(TileIdx, FactionId)], tick: u64) -> usize {
+        let rules = self.lease_rules;
+        let mut turned = 0usize;
+        let mut touched: Vec<TileIdx> = Vec::with_capacity(occupancy.len());
+        for (tile, faction) in occupancy {
+            let index = tile.0 as usize;
+            let Some(lease) = self.lease_holder.get_mut(index) else {
+                continue;
+            };
+            let present = Holder::of(*faction);
+            let count = &mut self.lease_count[index];
+            if *lease == present {
+                *count = count.saturating_add(rules.raise_step()).min(rules.bound());
+            } else if lease.is_nobody() {
+                *lease = present;
+                *count = rules.raise_step().min(rules.bound());
+                turned += 1;
+            } else {
+                let lowered = count.saturating_sub(rules.lower_step());
+                if lowered <= 0 {
+                    *lease = present;
+                    // The amount by which the result passed zero carries
+                    // into the new lease, so a change of hands drops
+                    // nothing.
+                    *count = lowered.saturating_neg().min(rules.bound());
+                    turned += 1;
+                } else {
+                    *count = lowered;
+                }
+            }
+            if self.lease_count[index] > 0 {
+                touched.push(*tile);
+            } else {
+                self.lease_holder[index] = Holder::NOBODY;
+            }
+        }
+
+        if rules.decays_on(tick) {
+            for tile in &self.leased {
+                let index = tile.0 as usize;
+                let count = &mut self.lease_count[index];
+                if *count <= 0 {
+                    continue;
+                }
+                *count = count.saturating_sub(rules.decay_step()).max(0);
+                if *count == 0 {
+                    self.lease_holder[index] = Holder::NOBODY;
+                }
+            }
+        }
+
+        // The live list is the union of the list this call started with and
+        // the tiles this call touched, less the tiles that reached zero. The
+        // merge sorts by the tile index, which is a stable key, so the list
+        // is the same whatever order the caller gave the occupancy in.[^1]
+        //
+        // [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+        touched.extend_from_slice(&self.leased);
+        touched.sort_unstable();
+        touched.dedup();
+        touched.retain(|tile| self.lease_count[tile.0 as usize] > 0);
+        self.leased = touched;
+        turned
     }
 
     /// Returns the block partition the holding indexes by.
@@ -578,9 +971,25 @@ impl Holding {
             .fold(hash, |hash, count| hash.write_u64(*count as u64));
         // The rewrite reads the three reach values on every step, so they are
         // inputs of the column above and they enter the hash with it.
-        hash.write_u64(u64::from(self.rules.base()))
+        let hash = hash
+            .write_u64(u64::from(self.rules.base()))
             .write_u64(u64::from(self.rules.upgrades_per_step()))
-            .write_u64(u64::from(self.rules.cap()))
+            .write_u64(u64::from(self.rules.cap()));
+        // **The lease is simulated state, so both of its columns fold.** The
+        // step reads the lease on every tick and writes it on every tick. A
+        // value the step reads and that the hash does not fold lets two
+        // worlds that differ in it hash the same and then diverge.[^1]
+        //
+        // [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D7. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+        let hash = hash.write(bytemuck::cast_slice(&self.lease_holder));
+        let hash = hash.write(bytemuck::cast_slice(&self.lease_count));
+        hash.write_u64(self.lease_rules.raise_step() as u64)
+            .write_u64(self.lease_rules.lower_step() as u64)
+            .write_u64(self.lease_rules.decay_step() as u64)
+            .write_u64(u64::from(self.lease_rules.decay_period()))
+            .write_u64(u64::from(self.lease_rules.decay_phase()))
+            .write_u64(self.lease_rules.bound() as u64)
+            .write_u64(self.lease_rules.claim_threshold() as u64)
     }
 
     /// Rewrites the holder column from the cities and returns the number of
@@ -653,6 +1062,11 @@ impl Holding {
             .expect("the candidate list is not empty, so it needs at least one slot");
         let holders = &self.holders[..];
         let cities = &cities[..];
+        let lease = Lease {
+            holders: &self.lease_holder[..],
+            counts: &self.lease_count[..],
+            claim_threshold: self.lease_rules.claim_threshold(),
+        };
         let decide_span = stage::open(Stage::HoldingDecide);
         std::thread::scope(|scope| {
             let mut handles = Vec::new();
@@ -660,7 +1074,7 @@ impl Holding {
                 handles.push(scope.spawn(move || {
                     let mut changes = Vec::new();
                     for tile in chunk {
-                        let decided = decide(grid, terrain, cities, *tile);
+                        let decided = decide(grid, terrain, cities, lease, *tile);
                         #[cfg(feature = "census-holding")]
                         census::record_decide(
                             cities.len() as u64,
@@ -784,8 +1198,14 @@ impl Holding {
     /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D3. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
     fn candidates(&self, cities: &[City]) -> Vec<TileIdx> {
         let grid = self.layout.grid();
-        let mut candidates: Vec<TileIdx> = Vec::with_capacity(self.held.len());
+        let mut candidates: Vec<TileIdx> = Vec::with_capacity(self.held.len() + self.leased.len());
         candidates.extend_from_slice(&self.held);
+        // A tile whose lease is live can change holder even when no city
+        // reaches it and nobody holds it now, so the leased list joins the
+        // candidates.[^2]
+        //
+        // [^2]: ADR-0153, a tile's lease follows the units that stand on it, decision D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+        candidates.extend_from_slice(&self.leased);
         for city in cities {
             let reach = city.reach as i32;
             for dq in -reach..=reach {
@@ -1099,9 +1519,25 @@ pub struct City {
     pub reach: u32,
 }
 
-/// Returns the holder of one tile, decided from the cities alone.
+/// What the holder decision reads of the lease.
 ///
-/// The nearest city within reach wins. Two cities at one distance resolve by
+/// The two columns and the threshold travel together, because the test of the
+/// decision reads all three.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+#[derive(Clone, Copy)]
+struct Lease<'a> {
+    holders: &'a [Holder],
+    counts: &'a [i32],
+    claim_threshold: i32,
+}
+
+/// Returns the holder of one tile, decided from the lease and the cities.
+///
+/// A lease at or above the claim threshold wins. Otherwise the nearest city
+/// within reach wins. Two cities at one distance resolve by
 /// the lower settlement slot, and the list is in slot order, so the strict
 /// comparison below keeps the first of them. A tile that no city reaches is
 /// held by nobody, and ground that admits no unit is held by nobody whatever
@@ -1120,7 +1556,13 @@ pub struct City {
 ///
 /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 /// [^2]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
-fn decide(grid: Grid, terrain: Terrain, cities: &[City], tile: TileIdx) -> Holder {
+fn decide(
+    grid: Grid,
+    terrain: Terrain,
+    cities: &[City],
+    lease: Lease<'_>,
+    tile: TileIdx,
+) -> Holder {
     let Some(address) = grid.address_of(tile) else {
         return Holder::NOBODY;
     };
@@ -1129,6 +1571,18 @@ fn decide(grid: Grid, terrain: Terrain, cities: &[City], tile: TileIdx) -> Holde
     // a tile that breaks it.
     if !terrain.kind(address).is_some_and(TileKind::is_passable) {
         return Holder::NOBODY;
+    }
+    // **The lease is tested before the city.** A lease at or above the claim
+    // threshold holds the tile, whatever city reaches it. That is what lets a
+    // faction take ground by using it, and it is what lets a seat change
+    // hands.[^3]
+    //
+    // [^3]: ADR-0153, a tile's lease follows the units that stand on it, decision D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    let index = tile.0 as usize;
+    if let (Some(holder), Some(count)) = (lease.holders.get(index), lease.counts.get(index)) {
+        if !holder.is_nobody() && *count >= lease.claim_threshold {
+            return *holder;
+        }
     }
     let mut best: Option<(u32, FactionId)> = None;
     for city in cities {

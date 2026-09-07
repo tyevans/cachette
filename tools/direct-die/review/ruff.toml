@@ -1,0 +1,10 @@
+# The review tool is a side project. It is not in any engine gate: the gate
+# runs the linter over `python` and `tests` only. This file exists so that a
+# person who runs the linter here gets the same rules as the repository, with
+# one exception for the test module.
+extend = "../../../pyproject.toml"
+
+[lint.per-file-ignores]
+# A test module documents itself in its own docstring. Each test function
+# carries its statement in its name.
+"test_review.py" = ["D103"]

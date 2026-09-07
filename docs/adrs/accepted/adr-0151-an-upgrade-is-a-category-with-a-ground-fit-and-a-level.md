@@ -53,9 +53,10 @@ when no row fits.**
 ### D1. The upgrade table is data, one row for each category and level
 
 The table has one row for each pair of a category and a level. A row holds the
-ground it fits, the work that finishes it, and the columns a pass reads. Today
-those columns are the yield bonus and the capacity. A column exists when a pass
-reads it, and not before.[^13] A row with a category that fits no ground and a
+ground it fits, the work that finishes it, and the columns a pass reads. **This
+sentence named the columns of the day, and the set has grown since.** A column
+exists when a pass reads it, and not before, and the balance register holds one
+row for each of them.[^13] [^17] A row with a category that fits no ground and a
 level that no row reaches cannot be written, because the fit and the level are
 part of the key.
 
@@ -113,11 +114,16 @@ next row, so a builder cannot bank surplus past a level.[^21] At the top level
 there is no next row, so the clamp is zero and a builder there adds nothing.
 
 **Repair comes before a raise.** The wear work gives an entry a condition, and
-the build order on a worn entry raises the condition first.[^8] The work
-reaches the next level only from full condition. One order therefore means one
-thing at every state of the entry: make this tile better. The condition and
-the work done are two fields, because they answer two questions, and each has
-its own clamp.
+the build order on a worn entry raises the condition first.[^8] **This clause
+said that the work reaches the next level only from full condition, and a later
+record changes it.**[^26] Under that reading a site under any wear at all spends
+every tick on maintenance, the wear takes the same amount back in the same tick,
+and the level never rises again. A repair is now priced at the gap it closes, so
+a level rises below full condition and heavy wear still stops a build.
+
+One order therefore means one thing at every state of the entry: make this tile
+better. The condition and the work done are two fields, because they answer two
+questions, and each has its own clamp.
 
 Destroying an upgrade removes the entry, at whatever level it stood.[^22] The
 tile returns to the ground the generator made.
@@ -236,7 +242,7 @@ table for the demonstration and the balance register holds its rows.[^17]
 [^5]: Decisions register, DEC-143. `docs/DECISIONS.md`
 [^6]: Backlog item 0348. `docs/backlog/complete/0348-make-the-upgrade-catalogue-a-table-the-world-is-built-with.md`
 [^7]: PRD-0055, a god raises the ground its people hold, and sees what stands there. `docs/product/shaped/prd-0055-a-god-raises-the-ground-its-people-hold-and-sees-what-stands-there.md`
-[^8]: Backlog item 0475. `docs/backlog/proposed/0475-give-an-upgrade-a-condition-that-armies-wear-and-workers-repair.md`
+[^8]: Backlog item 0475. `docs/backlog/complete/0475-give-an-upgrade-a-condition-that-armies-wear-and-workers-repair.md`
 [^9]: Backlog item 0479. `docs/backlog/complete/0479-end-the-game-on-domination-wealth-wonder-or-renown.md`
 [^10]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
 [^11]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
@@ -254,3 +260,4 @@ table for the demonstration and the balance register holds its rows.[^17]
 [^23]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
 [^24]: ADR-0067, the viewer reads the world and never writes to it, decision D1. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 [^25]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+[^26]: ADR-0169, an upgrade holds a condition that wear takes and work mends, decision D3. `docs/adrs/draft/adr-0169-an-upgrade-holds-a-condition-that-wear-takes-and-work-mends.md`

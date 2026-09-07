@@ -1,0 +1,19 @@
+{# The session switcher. It shows every session under the sessions root. #}
+<nav class="sessions">
+  <h2>Sessions</h2>
+  {% if not sessions %}
+    <p class="gap">No session is on disk yet.</p>
+  {% else %}
+    <ul>
+      {% for item in sessions %}
+        <li{% if session is defined and session.key == item.key %} class="current"{% endif %}>
+          <a href="/s/{{ item.asset }}/{{ item.session_id }}">
+            <span class="asset">{{ item.asset }}</span>
+            <span class="sid">{{ item.session_id }}</span>
+          </a>
+          <span class="count">{{ item.rounds | length }} round{{ "" if item.rounds | length == 1 else "s" }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</nav>

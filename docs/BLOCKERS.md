@@ -25,7 +25,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-151**
+**Next number: BLK-153**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -81,15 +81,44 @@ engine has none.
 **Work continues.** The engine states the first answer plainly and a record
 gives the reasoning.[^BLK123A] A change of rule changes the apply function and
 its tests.
+### BLK-151 — Nobody has said whether a worn lodging takes back its housing
+
+**Owner:** the project owner. **Blocks:** the wear path of the housing column
+of a settlement.
+
+A finished lodging level raises the housing of the settlement on its tile or on
+one of the six tiles beside it. The raise is written once, when the level
+rises, and the settlement stores it. Nothing lowers it. A lodging that wears
+away therefore leaves every place it gave, and a site keeps a housing that no
+built thing supports.
+
+Two rules are possible and the project cannot choose between them without a
+ruling. A worn level may take back what it gave, which makes a dwelling
+something a faction maintains. A worn level may leave the housing where it is,
+which makes a dwelling a thing that is built once. The first rule needs an
+answer about the people who no longer have a place: whether they leave, whether
+they stay above the bound, or whether the site never falls below its residents.
+
+A finding holds the measurement that opened this row.[^BLK151A]
+
 ### BLK-150 — Nobody has said what raises and lowers renown
 
 **Owner:** the project owner. **Blocks:** wiring the renown column to any
 simulation pass.
 
-Every character carries a renown, and the arena hashes the column. No pass in
-the engine writes it and no pass reads it. The creation sets it to zero, and it
-stays there unless a caller writes it. A finding holds the
-measurement.[^BLK150A]
+Every character carries a renown, and the arena hashes the column. **The
+paragraph that stood here said no pass writes it and no pass reads it, and a
+pass now does both.** The contest gives the champion of a faction a share of
+renown for each unit that faction fells, and the win reader compares the highest
+renown among the live characters of a faction against a target. A finding holds
+the measurement that this row was opened on.[^BLK150A]
+
+**The row stays open, and the engine has moved ahead of it.** A rule was chosen
+under a blocker that says nobody has chosen one, because a win path with no
+source could never fire and a quantity that only a reader touches states a
+capability the engine does not have. The rule and its share are provisional and
+the balance register holds the row. The owner may replace both without
+superseding anything, because a share is a parameter.
 
 Renown is what a game ranks two people by. A record that names somebody in
 charge needs a way to say who matters, and it names a small fixed set of
@@ -101,38 +130,76 @@ rule on records forbids inventing a value that an unanswered question governs,
 so the engine holds the column and changes nothing until this row
 closes.[^BLK110C]
 
-**What the project does meanwhile.** The control plane writes the column and
-reads it back. A game built on this engine makes its own rule from it, outside
-the simulation. The doc comment of the write says that nothing in the engine
-reads the column, so a caller is not told that a mechanism exists.
+**What the project does meanwhile.** The engine writes the column from the
+contest and reads it in the win path, at a provisional share. The control plane
+may still write the column and read it back, and a game built on this engine may
+make its own rule from it. What is still missing is everything the row asks
+beyond a source: what lowers renown, and whether it falls on its own. Nothing
+lowers it today.
+### BLK-152 — Nobody has said where the heat base of the world should stand
+
+**Owner:** the project owner. **Blocks:** the mean temperature of every world,
+and therefore every climate class the map holds.
+
+**The field now declares a temperature scale, and it reads cold against it.**
+The weather holds an abstract warmth count for each cell, and every published
+curve needs a temperature, so the field declares one linear map from the count
+to degrees Celsius.[^BLK152A] Nothing could read that map before, so nothing
+could notice where the field stood.
+
+Four terms drive the warmth of a cell: the mean height, the open water share,
+the sun and the cloud. A base stands under them, and the four were balanced so
+that they reach the bottom of the scale together and the top of it
+together.[^BLK152B]
+
+**The sun term can no longer reach the swing it reserves.** Its two parts are
+the belt of a latitude and the season around that belt, and the published
+geometry never peaks both at one place at one moment. The belt peaks at the
+equator, where the season is near nothing, and the season peaks at the middle
+latitudes, where the belt is near nothing.[^BLK152C] So the top of the scale is
+out of reach, and a probe over a whole planet grades most of its land as ice
+cap. The commit body holds the readings and the command that produced them.
+
+**What would close this.** A statement of what the mean temperature of a world
+should be, or of which class shares a map should hold. Two levers reach it: the
+base under the four terms, and the divisor that holds the ground term down. A
+third lever is the amount that a full sky takes away, which is larger here than
+the published radiative effect of cloud.
+
+**What the project does meanwhile.** The engine holds the base and the divisor
+as named constants beside the rule that reads each one, and the two build
+checks that bound them still fail the build when they disagree. The record rule
+forbids inventing a value that an unanswered question governs, so no record
+states either.[^BLK110C]
+
 ### BLK-130 — Nobody has said what weather should be worth
 
 **Owner:** the project owner. **Blocks:** every quantity that the weather
 system carries.
 
-The world now makes weather, and a god now puts weather on a place. Eight
-values decide what either one is worth, and no measurement and no owner chose
-any of them.
+The world now makes weather, and a god now puts weather on a place. **This
+paragraph held a count of the values, and the count decayed.** It named eight,
+and the subsystem has since gained a wind, a temperature, a season, a
+deflection and a lattice pitch, each with values of its own. The balance
+register holds one row for each, and the register is the list.[^BLK130D]
 
-The engine holds a value for each. How much water the sea lifts at once, how
-often it lifts, how much of the air falls in one solve, how much of the ground
-dries in one solve, the quantity at which ground counts as wet, how much extra
-a gatherer takes from wet ground, how strong one storm may be, and how long a
-faction waits between storms.[^BLK130A] [^BLK130B]
+No measurement and no owner chose any of them. Each is a named constant in the
+engine beside the rule that reads it.[^BLK130A] [^BLK130B]
 
 **What would close this.** A statement of what the downstream game wants a
 storm to be worth: how long a storm should last in ticks, how much of the map
 one should cover, and how much a wet season should change what a congregation
-gathers. Three numbers close six of the eight.
+gathers. Those three answers reach most of the rows the register holds.
 
-**One of the eight now has a measurement.** A readability report reads the
-ground water of every level 1 cell of the demonstration world at four
-stops.[^BLK130C] Every cell is wet at every reading. The wet mark is 64 drops,
-and the driest cell holds 124 drops before a storm and 251 drops a hundred
-ticks after it. The wet bonus therefore applies everywhere, and wetness
-separates no cell from another. The measurement says what the current mark
-does. It does not say what the mark should be, and that is the question this
-row holds.
+**The wet mark now has a measurement, and the reading this row held is
+stale.** A readability report once found every cell of the demonstration world
+wet at every stop, so the wet bonus applied everywhere and wetness separated no
+cell from another.[^BLK130C] The field was rewritten since: water now rides the
+wind and falls where the air cools, and a probe over the same world finds most
+of a tick's cells wet and a real share of them dry, with a further share
+changing between ticks. The balance register holds the reading. **A measurement
+says what a mark does. It does not say what the mark should be**, and that is
+the question this row holds.
 
 **What the project does meanwhile.** The engine carries the values above as
 named constants beside the rule that reads each one. No decision record states
@@ -733,3 +800,9 @@ normally.
 [^BLK130A]: ADR-0142, a god inflicts weather only on ground its own faction holds, decisions D2 and D4. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
 [^BLK130B]: ADR-0143, wet ground yields more to a gatherer, decision D2. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
 [^BLK130C]: Research report 24, demonstration readability, resources and weather, section 2.1. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+[^BLK130D]: Balance register, the weather. `docs/reference/balance.md`
+
+[^BLK151A]: Findings register, FND-575. `docs/FINDINGS.md`
+[^BLK152A]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+[^BLK152B]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+[^BLK152C]: Research report 30, the published atmospheric math, section 4.3. `docs/research/reports/30-the-published-atmospheric-math.md`

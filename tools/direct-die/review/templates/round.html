@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% set base = "/s/" ~ session.asset ~ "/" ~ session.session_id %}
+{% set shown = round.present_variants %}
+{% block title %}{{ session.asset }} · {{ round.name }}{% endblock %}
+
+{% block bar %}
+  <span class="crumb">
+    <a href="{{ base }}">{{ session.asset }} / {{ session.session_id }}</a>
+    / {{ round.name }}
+  </span>
+{% endblock %}
+
+{% block main %}
+  <div class="split">
+    {% include "_sessions.html" %}
+    <div class="body">
+      {% if saved %}
+        <p class="saved">The feedback of this round is written.</p>
+      {% endif %}
+
+      <h1>{{ round.name }}</h1>
+      <dl class="meta">
+        <dt>Prompt</dt><dd>{{ round.prompt_summary or "—" }}</dd>
+        <dt>Parent</dt>
+        <dd>
+          {% if round.parent %}
+            <a href="{{ base }}/{{ round.parent.split('/')[0] }}">{{ round.parent }}</a>
+          {% else %}
+            —
+          {% endif %}
+        </dd>
+      </dl>
+      {% if round.meta is none %}
+        <p class="gap">This round has no meta.json yet.</p>
+      {% endif %}
+
+      <nav class="rounds strip">
+        {% for entry in session.rounds %}
+          <a
+            href="{{ base }}/{{ entry.name }}"
+            class="{{ 'current' if entry.name == round.name else '' }}"
+          >{{ entry.name }}</a>
+        {% endfor %}
+      </nav>
+
+      {% if not shown %}
+        <p class="gap">
+          This round holds no variant yet. The generation loop writes the SVG,
+          the two renders, and the critique at different moments.
+        </p>
+      {% endif %}
+
+      <form method="post" action="{{ base }}/{{ round.name }}/feedback">
+        <div class="variants">
+          {% for variant in shown %}
+            {% set file_base = "/f/" ~ session.asset ~ "/" ~ session.session_id ~ "/" ~ round.name %}
+            <section class="variant{{ ' picked' if round.choice == variant.letter else '' }}">
+              <label class="pick">
+                <input
+                  type="radio"
+                  name="choice"
+                  value="{{ variant.letter }}"
+                  {{ 'checked' if round.choice == variant.letter else '' }}
+                >
+                <span class="letter">{{ variant.letter }}</span>
+              </label>
+
+              <div class="display">
+                {% if variant.display_png %}
+                  <img
+                    class="checker"
+                    src="{{ file_base }}/{{ variant.display_png }}"
+                    alt="variant {{ variant.letter }} at display size"
+                  >
+                {% else %}
+                  <p class="gap">No display render yet.</p>
+                {% endif %}
+              </div>
+
+              <details>
+                <summary>Inspect</summary>
+                {% if variant.large_png %}
+                  <img
+                    class="checker large"
+                    src="{{ file_base }}/{{ variant.large_png }}"
+                    alt="variant {{ variant.letter }} at inspection size"
+                  >
+                {% else %}
+                  <p class="gap">No inspection render yet.</p>
+                {% endif %}
+                {% if variant.svg %}
+                  <p><a href="{{ file_base }}/{{ variant.svg }}">Open the SVG source</a></p>
+                {% else %}
+                  <p class="gap">No SVG yet.</p>
+                {% endif %}
+              </details>
+
+              <div class="critique">
+                {% if variant.critique is none %}
+                  <p class="gap">No critique yet.</p>
+                {% else %}
+                  <p class="verdict">
+                    {{ variant.verdict or "no verdict" }}
+                    {% if variant.score is not none %}
+                      <span class="score">{{ variant.score }}</span>
+                    {% endif %}
+                  </p>
+                  {% if variant.faults %}
+                    <ul class="faults">
+                      {% for fault in variant.faults %}
+                        <li>{{ fault }}</li>
+                      {% endfor %}
+                    </ul>
+                  {% else %}
+                    <p class="gap">The model listed no fault.</p>
+                  {% endif %}
+                {% endif %}
+              </div>
+            </section>
+          {% endfor %}
+        </div>
+
+        <div class="submit">
+          <label class="none">
+            <input
+              type="radio"
+              name="choice"
+              value=""
+              {{ 'checked' if round.choice is none else '' }}
+            >
+            Pick none of them
+          </label>
+          <label class="text">
+            Feedback on this round
+            <textarea
+              name="text"
+              rows="5"
+              placeholder="Say what to keep and what to change."
+            >{{ round.feedback_text }}</textarea>
+          </label>
+          <button type="submit">Write the feedback</button>
+          {% if round.feedback is not none %}
+            <p class="written">
+              Written at {{ round.feedback.get("at") or "an unrecorded time" }}.
+              Submitting again replaces it.
+            </p>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+  </div>
+{% endblock %}

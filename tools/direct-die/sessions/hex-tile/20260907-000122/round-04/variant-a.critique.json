@@ -1,0 +1,7 @@
+{
+  "faults": [
+    "Add a darker base band or shadow shape at the bottom of the hexagon to match the isometric depth cue seen in the accepted grassland and water exemplars."
+  ],
+  "score": 85,
+  "verdict": "The candidate reads clearly as a forest at the display size and follows the geometry and flat-fill rules, but it lacks the isometric depth cues present in the accepted exemplars."
+}

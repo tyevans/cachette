@@ -54,10 +54,11 @@
 //! [^5]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^6]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 
+use cachette_core::hex::NEIGHBOUR_COUNT;
 use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::TerrainTile;
 use cachette_core::upgrade::UPGRADE_LEVEL_COUNT;
-use cachette_core::weather::Drops;
+use cachette_core::weather::{Drops, CLOUD_SHARE_WHOLE};
 use cachette_core::{Axial, FactionId, Holder, World};
 
 use crate::paint::faction_colour;
@@ -93,6 +94,17 @@ const MOISTURE_COLOUR: u32 = 0x0034_8fd8;
 
 /// The colour of the air overlay.
 const AIR_COLOUR: u32 = 0x00d8_e8f8;
+
+/// The colour of the temperature overlay.
+///
+/// The warm cells paint at full strength and the cold ones paint at none, so
+/// the warm band of the season reads as a bright stripe that crosses the map
+/// over a run.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+const TEMPERATURE_COLOUR: u32 = 0x00ff_8c42;
 
 /// The colour of the food overlay.
 const FOOD_COLOUR: u32 = 0x008e_d94a;
@@ -226,10 +238,12 @@ pub trait Layer: Sync {
     /// answer does not follow the window.
     fn span(&self, world: &World) -> Span;
 
-    /// Reports whether the value lives on the level 1 cell lattice.
+    /// Reports whether the value lives on the weather cell lattice.
     ///
     /// A cell value paints as a field. The drawing interpolates between the
     /// four nearest cell centres, so the map does not draw a grid of blocks.
+    /// **The drawing reads a cell one tile wide flat instead**, because a
+    /// field at the pitch of the screen is already smooth.
     fn on_cells(&self) -> bool {
         false
     }
@@ -266,7 +280,7 @@ impl Layer for Moisture {
     }
 
     fn span(&self, world: &World) -> Span {
-        Span::new(0, highest(world.weather().ground_plane()))
+        Span::new(0, highest(&world.weather().ground_over_world()))
     }
 
     fn on_cells(&self) -> bool {
@@ -278,24 +292,50 @@ impl Layer for Moisture {
     }
 }
 
-/// The water in the air above the cell that covers each tile.
-struct Air;
+/// The cloud in the sky above the cell that covers each tile.
+///
+/// **Cloud is the air held against what that air can hold, and not the air
+/// held against one mark that every cell shares.** Warm air holds a lot of
+/// water and cold air holds very little, so a polar sky holds a small
+/// quantity of water and still stands grey. An overlay that painted the drops
+/// alone would paint that sky black, because the drops are a small part of
+/// what a tropical sky carries. A watcher would then see cloud only over
+/// water and near the equator, which is not what the field holds.
+struct Cloud;
 
-impl Layer for Air {
+impl Layer for Cloud {
     fn name(&self) -> &'static str {
-        "air"
+        "cloud"
     }
 
     fn unit(&self) -> &'static str {
-        "drops in the air"
+        "of the sky the cell can fill, in 255ths"
     }
 
     fn value(&self, at: At<'_>) -> i64 {
-        at.world.air_at(at.address).unwrap_or(0)
+        let Some(tile) = at.world.grid().index_of(at.address) else {
+            return 0;
+        };
+        let Some(cell) = at.world.weather_cell_of(tile) else {
+            return 0;
+        };
+        at.world.weather().cloud_share_at(cell)
     }
 
-    fn span(&self, world: &World) -> Span {
-        Span::new(0, highest(world.weather().air_plane()))
+    /// Returns the ramp of the cloud, which a whole sky tops.
+    ///
+    /// **The top is a constant of the field, not the largest cell of the
+    /// frame.** A ramp that takes the largest cell moves with that cell. One
+    /// full cell then sets the top for the whole map, every other cell paints
+    /// at a small share of it, and the brightness of the whole picture
+    /// changes between one frame and the next as the largest cell moves. A
+    /// watcher reads that as shimmering rather than as weather.
+    ///
+    /// A whole sky paints white and half a sky paints half. Brightness then
+    /// means the same thing in every frame, in every world, and at every
+    /// latitude.
+    fn span(&self, _world: &World) -> Span {
+        Span::new(0, CLOUD_SHARE_WHOLE)
     }
 
     fn on_cells(&self) -> bool {
@@ -304,6 +344,136 @@ impl Layer for Air {
 
     fn colour(&self, _value: i64) -> u32 {
         AIR_COLOUR
+    }
+}
+
+/// The temperature of the cell that covers each tile.
+///
+/// **The temperature is what makes the weather travel, so a watcher must be
+/// able to see it.** The season moves a warm band across the lattice, the band
+/// turns the wind, and the wind carries the water. A watcher who reads the
+/// water alone sees the result and never the cause.[^1]
+///
+/// The overlay reads the cell of the tile flat and does not interpolate.
+///
+/// # References
+///
+/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+struct Temperature;
+
+impl Layer for Temperature {
+    fn name(&self) -> &'static str {
+        "temperature"
+    }
+
+    fn unit(&self) -> &'static str {
+        "degrees over the cell"
+    }
+
+    fn value(&self, at: At<'_>) -> i64 {
+        at.world.temperature_at(at.address).map_or(0, i64::from)
+    }
+
+    fn span(&self, world: &World) -> Span {
+        // The span runs between the coldest and the warmest cell of this
+        // frame. A span fixed to the whole scale would wash the map flat
+        // whenever the field sits in the middle of it, which it usually does.
+        // The reading crops the margin away. The lattice is larger than the
+        // world, and a span taken from a cell outside the frame would set the
+        // colour of every cell inside it.
+        let plane = world.weather().warmth_over_world();
+        let low = plane.iter().copied().min().unwrap_or(0);
+        let high = plane.iter().copied().max().unwrap_or(0);
+        // The low sits one degree under the coldest cell, so the coldest cell
+        // still paints. A span that started at the coldest would paint it as
+        // nothing, and nothing is what an overlay shows for a cell it cannot
+        // read.
+        Span::new(i64::from(low) - 1, i64::from(high))
+    }
+
+    fn on_cells(&self) -> bool {
+        true
+    }
+
+    fn colour(&self, _value: i64) -> u32 {
+        TEMPERATURE_COLOUR
+    }
+}
+
+/// The colour of each of the six wind directions, in the direction order.
+///
+/// **A direction is a thing and not a quantity**, so each one takes its own
+/// colour rather than a strength on one colour. The six run around the colour
+/// wheel in the same order that the six lattice steps run around the cell, so
+/// a watcher reads a turning wind as a turning hue and a front as a band of
+/// one colour crossing the map.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+const WIND_COLOURS: [u32; NEIGHBOUR_COUNT] = [
+    0x00ff_6b4a,
+    0x00ff_c94a,
+    0x009b_ff4a,
+    0x004a_d8ff,
+    0x006b_4aff,
+    0x00ff_4ac9,
+];
+
+/// The base the wind overlay packs a speed against.
+///
+/// The value of the overlay carries the speed and the direction together,
+/// because the deck gives one integer for one tile. The base is above the six
+/// directions, so the two never run into each other.
+const WIND_PACK: i64 = 8;
+
+/// Which way the wind blows over the cell that covers each tile, and how fast.
+///
+/// **The colour names the direction and the strength gives the speed.** A
+/// field a watcher cannot see is a field the project owner cannot judge, and
+/// the wind is the quantity that decides whether a storm travels at all.
+///
+/// The overlay reads the cell of the tile flat and does not interpolate. The
+/// value packs a direction, and a direction between two cells is not the mean
+/// of the two numbers that name them.
+struct WindLayer;
+
+impl Layer for WindLayer {
+    fn name(&self) -> &'static str {
+        "wind"
+    }
+
+    fn unit(&self) -> &'static str {
+        "the speed, coloured by direction"
+    }
+
+    fn value(&self, at: At<'_>) -> i64 {
+        let Some(wind) = at.world.wind_at(at.address) else {
+            return 0;
+        };
+        let Some(heading) = wind.heading() else {
+            return 0;
+        };
+        i64::from(wind.speed()) * WIND_PACK + heading as i64
+    }
+
+    fn span(&self, world: &World) -> Span {
+        // The span runs to the fastest cell of this frame, so a slow field
+        // still reads rather than painting one flat wash near nothing.
+        Span::new(0, i64::from(world.weather().fastest()))
+    }
+
+    fn colour(&self, value: i64) -> u32 {
+        WIND_COLOURS[(value % WIND_PACK) as usize % NEIGHBOUR_COUNT]
+    }
+
+    fn strength(&self, value: i64, span: Span) -> u8 {
+        // A still cell paints nothing. Every other cell paints its direction
+        // at the strength of its speed.
+        if value < WIND_PACK {
+            return 0;
+        }
+        span.strength(value / WIND_PACK)
     }
 }
 
@@ -506,7 +676,9 @@ impl Layer for Crowding {
 pub fn registered() -> &'static [&'static (dyn Layer + 'static)] {
     &[
         &Moisture,
-        &Air,
+        &Cloud,
+        &WindLayer,
+        &Temperature,
         &Stock {
             kind: ResourceKind::Food,
             name: "food",
@@ -578,8 +750,16 @@ pub fn value_of(
             ground,
         });
     }
-    let layout = world.pyramid().layout();
+    // **Every cell overlay is a weather overlay**, so the pitch comes from
+    // the weather lattice and not from the level 1 lattice. The two agree
+    // only when the world takes the level 1 weather pitch, and a drawing
+    // that read the level 1 pitch would interpolate between the wrong
+    // centres at every other pitch.
+    let layout = world.weather_layout();
     let edge = layout.block_edge();
+    // **A cell one tile wide needs no interpolation.** The field then varies
+    // at the pitch the screen draws at, so a flat read already gives a smooth
+    // picture and the four extra reads would only blur it.
     if edge <= 1 {
         return layer.value(At {
             world,
@@ -598,8 +778,8 @@ pub fn value_of(
     let down = (address.r as f32 + 0.5) / side - 0.5;
     let left = across.floor();
     let top = down.floor();
-    let share_across = across - left;
-    let share_down = down - top;
+    let share_across = eased(across - left);
+    let share_down = eased(down - top);
     let column = left as i64;
     let row = top as i64;
 
@@ -620,6 +800,33 @@ pub fn value_of(
     let lower = at_centre(column, row + 1) * (1.0 - share_across)
         + at_centre(column + 1, row + 1) * share_across;
     (upper * (1.0 - share_down) + lower * share_down).round() as i64
+}
+
+/// Bends a share so that the reconstruction is smooth at a cell edge.
+///
+/// **A straight share draws a herringbone.** A straight share makes the value
+/// a bilinear surface over each cell of the lattice. Such a surface is
+/// continuous at a cell edge but its slope is not, so the drawing holds a
+/// crease along every edge. The creases meet at the cell corners, and over a
+/// field that changes by much in one cell they read as a repeating pattern of
+/// chevrons at one angle and one period. The pattern covers the whole map,
+/// it does not follow the flow, and it looks the same over water as over
+/// land, because the lattice makes it and not the weather.
+///
+/// This share is zero and one at the same two ends, so the value at a cell
+/// centre is still that cell's own value and nothing is invented. Its slope
+/// is zero at both ends, so the two surfaces that meet at an edge agree in
+/// slope as well as in height and the crease goes.
+///
+/// The arithmetic is the viewer's, not the simulation's. It reads the world
+/// and writes nothing to it.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D4. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+fn eased(share: f32) -> f32 {
+    let share = share.clamp(0.0, 1.0);
+    share * share * (3.0 - 2.0 * share)
 }
 
 /// What the drawing pass painted of one overlay.

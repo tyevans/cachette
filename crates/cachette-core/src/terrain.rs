@@ -25,6 +25,7 @@
 //! [^3]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 //! [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 
+use crate::climate::Climate;
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
 use crate::rng;
@@ -77,7 +78,7 @@ const HALF: Fix32 = Fix32(1 << (FIX_FRACTIONAL_BITS - 1));
 const CONTRAST: Fix32 = Fix32(114_688);
 
 /// The height below which a tile holds water.
-const HEIGHT_WATER: Fix32 = Fix32(26_214);
+pub const HEIGHT_WATER: Fix32 = Fix32(26_214);
 
 /// The height below which a tile is level ground.
 const HEIGHT_LEVEL: Fix32 = Fix32(40_632);
@@ -134,7 +135,8 @@ impl TileKind {
         self as u8
     }
 
-    /// Reports whether a unit may stand on a tile of this kind.
+    /// Reports whether a unit that carries no water crossing may stand on a
+    /// tile of this kind.
     ///
     /// The answer is the capacity being greater than zero. Ground that holds
     /// nobody admits nobody, so this reader states no rule of its own and it
@@ -150,7 +152,28 @@ impl TileKind {
     /// [^1]: Decisions register, DEC-017. `docs/DECISIONS.md`
     #[must_use]
     pub const fn is_passable(self) -> bool {
-        admits_a_unit(self.capacity())
+        self.is_passable_for(NO_WATER_CROSSING)
+    }
+
+    /// Reports whether a unit of a given water crossing may stand on a tile
+    /// of this kind.
+    ///
+    /// The argument is the water crossing column of the unit type table, and
+    /// zero means that the type does not cross water.[^1]
+    ///
+    /// The answer is still the capacity being greater than zero, and the
+    /// capacity still comes from the one table. **The crossing changes what
+    /// the table answers. It is not a rule beside the table.** A second
+    /// passability rule here would be one fact in two places, and nothing
+    /// would fail when the two disagreed.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn is_passable_for(self, water_crossing: u32) -> bool {
+        admits_a_unit(self.capacity_for(water_crossing))
     }
 
     /// Returns the factor that scales the step cost of a tile of this kind.
@@ -203,8 +226,8 @@ impl TileKind {
     /// reader derives its answer from this table. The match is exhaustive over
     /// the kinds, so the compiler refuses a kind that states no capacity.
     ///
-    /// The values come from the scale constants table.[^2] No crossing
-    /// terrain exists yet, so no kind carries the crossing capacity.
+    /// The values come from the scale constants table.[^2] No kind carries
+    /// the crossing capacity of a made way.
     ///
     /// # References
     ///
@@ -212,12 +235,84 @@ impl TileKind {
     /// [^2]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
     #[must_use]
     pub const fn capacity(self) -> u32 {
+        self.capacity_for(NO_WATER_CROSSING)
+    }
+
+    /// Returns the number of units of a given water crossing that may stand
+    /// on a tile of this kind.
+    ///
+    /// **This is the one declaration of which ground admits a unit.** The
+    /// argument is the water crossing column of the unit type table, and zero
+    /// means that the type does not cross water.[^1] A unit that crosses
+    /// water reads the same table as a unit that does not, and the table
+    /// answers differently for the one kind whose admission the crossing
+    /// governs.
+    ///
+    /// Open water holds nobody at all until a unit carries the crossing, so
+    /// the world of a type that carries none is the world this table
+    /// described before the column existed.
+    ///
+    /// The water capacity is smaller than the ordinary capacity, so a strait
+    /// carries fewer units at once than the ground on either side of it.
+    ///
+    /// The match is exhaustive over the kinds, so the compiler refuses a kind
+    /// that states no capacity.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    #[must_use]
+    pub const fn capacity_for(self, water_crossing: u32) -> u32 {
         match self {
-            Self::Water => 0,
+            Self::Water => {
+                if water_crossing == 0 {
+                    0
+                } else {
+                    WATER_CAPACITY
+                }
+            }
             Self::Plain | Self::Forest | Self::Hill | Self::Mountain => ORDINARY_CAPACITY,
         }
     }
 }
+
+/// The water crossing of a type that does not cross water.
+///
+/// Zero means cannot, so this is zero. It is named because a caller that asks
+/// the capacity table about the ground alone reads better than a caller that
+/// passes a bare zero.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+pub const NO_WATER_CROSSING: u32 = 0;
+
+/// The number of units that stand on one tile of open water.
+///
+/// A unit stands here only when its type carries a water crossing. The value
+/// is half the ordinary capacity, so a strait is a narrower way than the
+/// ground it joins and a crossing is a thing an enemy can block.
+///
+/// **The value is derived, not measured.** No measurement exists on the
+/// target platform, and one blocker governs every cost figure this project
+/// holds.[^1]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+pub const WATER_CAPACITY: u32 = ORDINARY_CAPACITY / 2;
+
+/// A water crossing that admits a unit to open water.
+///
+/// Zero means cannot, so every value above zero admits and the smallest of
+/// them is enough. A caller that must ask the capacity table what a water
+/// tile holds for a unit that crosses passes this, rather than a bare one or
+/// a value it read from a type row.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+pub const SOME_WATER_CROSSING: u32 = 1;
 
 /// The number of units that stand on a tile of ordinary ground.
 ///
@@ -229,7 +324,7 @@ impl TileKind {
 /// # References
 ///
 /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
-const ORDINARY_CAPACITY: u32 = 8;
+pub const ORDINARY_CAPACITY: u32 = 8;
 
 /// The number of units that stand on a tile that a unit crosses quickly.
 ///
@@ -439,6 +534,38 @@ impl Terrain {
         Some(self.tile(address)?.height)
     }
 
+    /// Returns the tile at an address, under a climate.
+    ///
+    /// **The climate changes the moisture and never the height.** The height
+    /// is what the seed drew, so the water line, the hills and the mountains
+    /// stand where the seed put them and the climate chooses only between the
+    /// kinds that the moisture selects.
+    ///
+    /// That restraint is what breaks the loop between the ground and the
+    /// weather. The weather reads the mean height of a cell and its open water
+    /// share, and neither moves under a climate, so a ground array folded from
+    /// a climate-shaped world equals one folded from the base world.[^1]
+    ///
+    /// The tile is still generated. Nothing here is stored for each tile, and
+    /// the climate field holds one entry for each weather cell rather than one
+    /// for each tile.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: The climate field. [`crate::climate`]
+    /// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    #[must_use]
+    pub fn tile_under(self, address: Axial, climate: Climate) -> Option<TerrainTile> {
+        let base = self.tile(address)?;
+        Some(under(base, climate))
+    }
+
+    /// Returns the kind of the tile at an address, under a climate.
+    #[must_use]
+    pub fn kind_under(self, address: Axial, climate: Climate) -> Option<TileKind> {
+        Some(self.tile_under(address, climate)?.kind)
+    }
+
     /// Folds every tile of the ground into the state hash.
     ///
     /// The ground is part of the world, and the record hashes the whole
@@ -487,6 +614,53 @@ fn generate(seed: u64, address: Axial) -> TerrainTile {
         height,
         moisture,
         kind: classify(height, moisture),
+    }
+}
+
+/// Returns a generated tile as the climate over it leaves it.
+///
+/// The moisture takes the offset of the climate and stays inside the unit
+/// range. The height passes through unchanged. The kind then follows from the
+/// two fields through the one classifier, so the climate states no rule of its
+/// own about which kind a tile takes.[^1]
+///
+/// A cold cell is dry ground whatever its moisture says, because water that
+/// does not fall as rain grows no forest. So the cold offset is applied to the
+/// moisture as well, and the classifier is still the one place that names a
+/// kind.
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[must_use]
+pub fn under(base: TerrainTile, climate: Climate) -> TerrainTile {
+    let mut offset = climate.moisture_offset;
+    if climate.is_cold() {
+        offset = sim_math::sub(offset, COLD_DRYING);
+    }
+    let moisture = clamp_to_unit(sim_math::add(base.moisture, offset));
+    TerrainTile {
+        height: base.height,
+        moisture,
+        kind: classify(base.height, moisture),
+    }
+}
+
+/// What a cold cell takes from the moisture of the tiles under it.
+///
+/// The value is an eighth of the unit range. Cold ground carries less standing
+/// water than warm ground at the same rainfall, so a cold cell grows less
+/// forest than a temperate cell that is equally wet.
+const COLD_DRYING: Fix32 = Fix32(1 << (FIX_FRACTIONAL_BITS - 3));
+
+/// Holds a field value inside the unit range.
+const fn clamp_to_unit(value: Fix32) -> Fix32 {
+    if value.0 >= Fix32::ONE.0 {
+        Fix32(Fix32::ONE.0 - 1)
+    } else if value.0 < 0 {
+        Fix32::ZERO
+    } else {
+        value
     }
 }
 

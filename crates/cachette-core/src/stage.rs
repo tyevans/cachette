@@ -106,9 +106,9 @@ macro_rules! declare_stages {
 
             /// Returns how many times one frame opens this stage.
             ///
-            /// The step calls the bridge refresh three times, at three
-            /// separate positions, and each position is its own stage. Every
-            /// other stage runs once. A test drives one frame and compares
+            /// The step calls the bridge refresh at several separate
+            /// positions, and each position is its own stage. Every other
+            /// stage runs once. A test drives one frame and compares
             /// the table against this column, so a stage that loses its span
             /// fails rather than reporting zero in silence.
             ///
@@ -160,6 +160,8 @@ declare_stages! {
     DepletionRecover,         "depletion_recover",          false, 1, false;
     Gather,                   "gather",                     true,  1, false;
     Build,                    "build",                      true,  1, false;
+    UpgradeWear,              "upgrade_wear",               false, 1, false;
+    HoldingLease,             "holding_lease",              true,  1, false;
     HoldingSpread,            "holding_spread",             true,  1, false;
     HoldingCandidates,        "holding_candidates",         true,  1, true;
     HoldingDecide,            "holding_decide",             true,  1, true;
@@ -179,8 +181,10 @@ declare_stages! {
     Convert,                  "convert",                    true,  1, false;
     WeatherSolve,             "weather_solve",              true,  1, false;
     PresenceFold,             "presence_fold",              true,  1, false;
+    Observe,                  "observe",                    true,  1, false;
     RelationDrift,            "relation_drift",             false, 1, false;
     Controller,               "controller",                 false, 1, false;
+    BridgeRefreshClosing,     "bridge_refresh_closing",     false, 1, false;
 }
 
 /// What one stage cost, and how many times the step ran it.

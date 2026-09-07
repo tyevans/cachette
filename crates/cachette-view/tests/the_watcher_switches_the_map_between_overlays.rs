@@ -61,6 +61,12 @@ const BUILDING_TICKS: u32 = 4;
 /// The ticks a storm is given to fall out of the air onto the ground.
 const FALLING_TICKS: u32 = 60;
 
+/// How far the fixture looks for a tile that nobody holds.
+///
+/// The reach stays inside the window the camera shows, so the site it finds
+/// is drawn.
+const UNHELD_REACH: i32 = 20;
+
 /// The strength of the storm the fixture inflicts.
 const STRENGTH: u8 = 4;
 
@@ -103,10 +109,45 @@ fn a_stormed_world() -> (World, Axial) {
         "the faction holds nothing, so the fixture supplies no held ground",
     );
 
+    // The tile the camera centres on, and the tile the crowd goes on.
+    let place = a_held_tile(&world, FactionId(0));
+
+    // **A site on held ground is not enough for the upgrade overlay.** The
+    // holder colour takes its share of a tile after the overlay is mixed
+    // into the ground, so a held tile shows the holder and not the wash. The
+    // fixture therefore builds one site on ground that nobody holds, near
+    // the tile the camera centres on.
+    //
+    // The fixture built no such site before, and the test passed on whatever
+    // the demonstration controller happened to draw. A change to the
+    // category set moved that draw and the test went red.[^5]
+    //
+    // [^5]: Testing Rules, section 2a. `.agents/rules/testing.md`
+    let free = an_unheld_tile(&world, place);
+    let outsider = world
+        .spawn_soldier(free, FactionId(0))
+        .expect("the ground admits a unit");
+    world
+        .zone_project(FactionId(0), free, UpgradeCategory::ALL[0])
+        .expect("a way is zoned on ground nobody holds");
+    world
+        .order_build(outsider, UpgradeCategory::ALL[0])
+        .expect("the ground fits a way");
+    for _ in 0..BUILDING_TICKS {
+        world
+            .order_build(outsider, UpgradeCategory::ALL[0])
+            .expect("the ground fits a way");
+        world.step(1).expect("the step must run");
+    }
+    assert!(
+        world.upgrade_at(free).is_some(),
+        "the fixture built nothing on unheld ground, so the upgrade overlay \
+         paints nowhere the holder does not cover",
+    );
+
     // A crowd and a site under work, so the crowding overlay and the upgrade
     // overlay each have something to paint. The units go on one tile the
     // faction already holds.
-    let place = a_held_tile(&world, FactionId(0));
     let mut crowd: Vec<Entity> = Vec::new();
     while world.admits_a_unit(place) {
         match world.spawn_soldier(place, FactionId(0)) {
@@ -156,6 +197,34 @@ fn a_held_tile(world: &World, faction: FactionId) -> Axial {
         }
     }
     panic!("the faction holds no tile, so the fixture supplies no held ground");
+}
+
+/// Returns a tile that nobody holds, near one the camera shows.
+///
+/// The search runs outward from the centre in rows, so it takes the nearest
+/// such tile of the window and never a tile the camera cuts off.
+fn an_unheld_tile(world: &World, near: Axial) -> Axial {
+    for reach in 1..UNHELD_REACH {
+        for dr in -reach..=reach {
+            for dq in -reach..=reach {
+                let address = Axial::new(near.q + dq, near.r + dr);
+                if !world.grid().contains(address) {
+                    continue;
+                }
+                if world
+                    .tile_holder(address)
+                    .and_then(cachette_core::Holder::faction)
+                    .is_some()
+                {
+                    continue;
+                }
+                if world.admits_a_unit(address) && world.upgrade_at(address).is_none() {
+                    return address;
+                }
+            }
+        }
+    }
+    panic!("no tile near the camera centre is free of a holder");
 }
 
 /// Returns the world after the storm has fallen onto the ground.
@@ -271,7 +340,7 @@ fn a_cell_value_paints_as_a_field_and_not_as_a_block() {
         edge >= 4,
         "a cell of {edge} tiles is too small for this test"
     );
-    let air = overlay::named("air").expect("the deck registers the air overlay");
+    let cloud = overlay::named("cloud").expect("the deck registers the cloud overlay");
 
     // The centre tile of a cell carries the value of that cell.
     let centre = |cell_column: u32, cell_row: u32| -> Axial {
@@ -300,8 +369,8 @@ fn a_cell_value_paints_as_a_field_and_not_as_a_block() {
                  them one value",
             );
             assert_ne!(
-                overlay::value_of(air, &stormy, near, None),
-                overlay::value_of(air, &stormy, far, None),
+                overlay::value_of(cloud, &stormy, near, None),
+                overlay::value_of(cloud, &stormy, far, None),
                 "two tiles far apart in one cell painted one value at \
                  {near:?} and {far:?}, so the cell still paints as a rectangle",
             );

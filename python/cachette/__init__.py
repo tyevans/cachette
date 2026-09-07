@@ -50,6 +50,8 @@ from cachette._core import (
     VerbError,
     ViewError,
     World,
+    faction_colours,
+    stock_ceiling_of_one_settlement,
     version,
 )
 
@@ -66,6 +68,8 @@ __all__ = [
     "ViewError",
     "World",
     "__version__",
+    "faction_colours",
+    "stock_ceiling_of_one_settlement",
     "version",
 ]
 

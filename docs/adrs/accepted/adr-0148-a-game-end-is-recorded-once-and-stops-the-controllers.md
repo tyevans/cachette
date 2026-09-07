@@ -66,12 +66,15 @@ a balance value and lives in the reference tables.[^5]
 
 The readers run in the order domination, territory, wealth or wonder, renown.
 Two readers that fire on one tick resolve by that order. A path that has no
-reader yet is skipped, and the order of the others does not change.
+reader is skipped, and the order of the others does not change.
 
-**One reader exists today, and it is the territory reader.** It fires at the
-tick limit, and the faction with the most held tiles wins. The held tile count
-is a running total the engine already keeps.[^6] A path that gains a reader
-later takes its place in the order above and changes nothing in this record.
+**Which paths have a reader is a fact of the engine and not a claim of this
+record.** The registry carries it, and a record that gives a path a reader or
+takes one away names this one. The territory reader is the shape the others
+take: it fires at the tick limit, the faction with the most held tiles wins,
+and the held tile count is a running total the engine already keeps.[^6] A
+path that gains or loses a reader keeps its place in the order above and
+changes nothing here.
 
 A reviewer finds a violation when a reader runs at another stage, when a
 reader starts a pass, or when a reader breaks a tie by anything other than the

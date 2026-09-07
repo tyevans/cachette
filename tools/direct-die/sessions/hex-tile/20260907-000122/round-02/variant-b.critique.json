@@ -1,0 +1,9 @@
+{
+  "faults": [
+    "Clip the tree shapes so they do not extend outside the hexagon boundary; the guide states 'Nothing goes outside the hexagon'.",
+    "Redraw the trees as a top-down canopy view (e.g., overlapping circles or a textured block) rather than a side-view silhouette, as the guide requires 'The view is flat and from above' and 'Do not draw a horizon'.",
+    "Increase the lightness difference between the base fill and the tree shapes; the current dark green on medium green is too low-contrast to read clearly at 64 pixels, violating the rule that shapes must differ in lightness."
+  ],
+  "score": 25,
+  "verdict": "The candidate fails because the dark tree shapes extend beyond the hexagon boundary, and the flat, top-down perspective is broken by a side-view horizon."
+}

@@ -20,7 +20,8 @@ use cachette_core::holding::ReachRules;
 use cachette_core::resource::{Amount, ResourceKind};
 use cachette_core::terrain::TileKind;
 use cachette_core::upgrade::{
-    BuildRefusal, UpgradeCategory, UpgradeRow, DEFAULT_UPGRADE_TABLE, UPGRADE_LEVEL_COUNT,
+    BuildRefusal, UpgradeCategory, UpgradeRow, CONDITION_FULL, DEFAULT_UPGRADE_TABLE,
+    UPGRADE_LEVEL_COUNT,
 };
 use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
 
@@ -325,6 +326,63 @@ fn a_level_rises_in_place_and_the_entry_count_does_not_grow() {
     );
     assert_eq!(field.upgrade_level(address), 2);
     assert!(field.check_invariants());
+}
+
+/// A level rises while the weather wears what stands under it.
+///
+/// **This is the case that the repair arm can take away.** A worker on a
+/// damaged site buys condition before it raises anything, so a repair that
+/// took the whole of a worker's tick would hold every level on wearing ground
+/// where it is for ever. The wear of one tick is a very small part of a
+/// level, and a gap worth less than one unit of work asks for no work.
+///
+/// The fixture asserts that it reached the case rather than assuming it: the
+/// tile goes under the weather while the second level is under construction,
+/// and the condition falls below full. The defect was put back under this
+/// test and the test went red, which is the only proof that the fixture
+/// reaches the case.[^1]
+///
+/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+#[test]
+fn a_level_rises_while_the_weather_wears_what_stands_there() {
+    let mut field = world(SEED);
+    let address = island(&field);
+    builder(&mut field, address, UpgradeCategory::ROAD);
+    let first = DEFAULT_UPGRADE_TABLE
+        .row(UpgradeCategory::ROAD, 1)
+        .expect("the default table holds the first level");
+    let second = DEFAULT_UPGRADE_TABLE
+        .row(UpgradeCategory::ROAD, 2)
+        .expect("the default table holds the second level");
+    step_until_level(&mut field, address, 1, u64::from(first.work) + 4);
+
+    let mut wet_ticks = 0u32;
+    let mut worn = false;
+    for _ in 0..u64::from(second.work) + 4 {
+        field.step(1).expect("the step must run");
+        if field.ground_is_wet(address) == Some(true) {
+            wet_ticks += 1;
+        }
+        if field
+            .upgrade_condition(address)
+            .is_some_and(|held| held < CONDITION_FULL)
+        {
+            worn = true;
+        }
+        if field.upgrade_level(address) >= 2 {
+            break;
+        }
+    }
+    assert!(
+        wet_ticks > 0,
+        "the fixture never put the tile under the weather"
+    );
+    assert!(worn, "the weather never took condition from the level");
+    assert_eq!(
+        field.upgrade_level(address),
+        2,
+        "the wear held the level where it was"
+    );
 }
 
 #[test]

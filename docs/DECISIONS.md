@@ -23,9 +23,134 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-274**
+**Next number: DEC-278**
 
 ## Open
+
+### DEC-276 — What does a remembered place answer about what was built there?
+
+**Open. The project owner owns it.**
+
+An accepted record says that a faction reads a place it saw once and receives
+the ground of that place as the faction last saw it.[^DEC276A] The remembered
+layer stores membership alone. It records that a faction saw a tile, and it
+stores no value.[^DEC276B]
+
+Most of the ground is recoverable without a stored snapshot. The kind, the
+height and the stock a tile started with are pure functions of the seed and the
+address, so a reader derives them at any tick.[^DEC68B] [^DEC276D] **An upgrade
+is not one of them.** An upgrade is the difference between the generated world
+and the built world, so a rival that builds on a tile after the watcher marched
+away leaves that watcher with no stored answer.[^DEC201C] The holder of a tile
+has the same shape.
+
+The reader answers no upgrade and no holder for a remembered place today. That
+understates the memory and never overstates it, so the reader leaks nothing
+while this row is open.
+
+**Option A. A memory is the generated ground, and nothing that was built.**
+Costs nothing. The reader is built this way now. A faction that watched a rival
+raise a city, and then marched away, forgets the city at once. That reads as
+wrong to a player.
+
+**Option B. The remembered layer stores what the faction last saw.** The layer
+stops being a set of tiles and becomes a map from a tile to a value. The cost
+follows the observed area rather than the world, so the shape the record chose
+survives. Every stored byte enters the state hash and every golden file, and
+the state that a faction carries grows with what it has walked past.[^DEC276F]
+
+**Option C. A second sparse layer stores the built difference alone.** The
+membership layer stays as it is. A faction remembers an upgrade only where the
+world holds one, and the upgrade store is already sparse for the same
+reason.[^DEC201C] This costs the upgrades a faction has seen, which is far below
+the tiles it has seen. It adds a second thing the rebuild must write.
+
+**A recommendation.** Option C, if the answer to option A reads as wrong. It
+keeps the cost on the observed area and it reuses the shape the upgrade store
+already has. Option B pays for every tile to fix a case that only upgrades and
+holders raise.
+
+**Nothing is stopped.** The reader states option A in its own documentation, and
+a test holds it. A change to option B or option C changes the layer, the state
+hash and every golden file, so it is cheaper to settle before the learner reads
+the memory.
+
+**The learner now reads the memory, which sharpens the question.** The flat
+observation array carries one row for each cell of the lattice, and a
+remembered cell of it holds the ground and no upgrade.[^DEC276G] A player who
+watched a rival raise a city sees the city on the map and remembers it. A policy
+trained on this array cannot, so the array understates what a player of that
+faction knows. The array itself needs no change under any of the three options,
+because it reads the tile reader and the masked summary rather than the layer.
+Option B or option C therefore changes the layer and the state hash, and it
+changes no position of the observation.
+
+### DEC-275 — Does the territory reader compare a share of the tiles?
+
+**Open. The project owner owns it.**
+
+The territory reader fires at the tick limit and gives the game to the faction
+that holds the most tiles. It compares no share. A faction that leads by one tile
+at the limit wins in the same way as one that holds the world.[^DEC275A]
+
+The project owner wants each win path to take a comparable share of a seed
+set.[^DEC275B] The other three paths each have a value a caller sets, so a search
+can move when each fires.[^DEC275C] Territory has only the tick limit, and the
+limit is global: raising it gives every other path more time to fire first. So a
+search can make territory take less, and it cannot make territory take more
+except by pushing every other path out of reach.
+
+There is a second reading behind this. A territory win at a low limit was
+measured to be a truncated renown win rather than a separate outcome.[^DEC275D]
+A reader that fires only at the limit reports the path that ran out of time.
+
+**Option A. Leave it. Territory is the outcome when nothing else decided.**
+The path is the draw rule of the game, and a draw does not need a bar.
+
+**Option B. Give the reader a share, so that it fires early.** A faction that
+holds a stated share of the passable tiles wins on the tick it reaches the share.
+The share becomes a threshold a caller sets, in the way the renown target is.
+
+**Option C. Give the reader a share and keep the limit clause.** The reader fires
+early on the share, and at the limit on the lead, so a run always ends.
+
+**Recommendation. Option C, when a measurement says territory is unreachable
+otherwise.** Option B alone removes the rule that every run ends. Option A is
+correct while nobody asks territory to win on its own terms, and the project
+owner has now asked for exactly that. Do not take an option before the tuner has
+run, because the search may reach the wanted shares with the four values that
+exist.
+
+**What decides it.** A search over the values that exist, reporting the share
+each path takes. If no setting gives territory a comparable share, the reader
+needs one of its own.
+
+### DEC-274 — Does a held builder starve before it finishes its project?
+
+**Open. Engineering owns it.**
+
+A unit under a build order now stays on the tile it builds until the work is
+done.[^DEC274A] A held unit walks to no food while it builds. Its need falls at
+the rate the need record states, and a unit whose deficit passes the threshold
+ends.[^DEC274B]
+
+**Option A. Leave it. A faction that builds far from food loses the builder.**
+The loss is the cost of the plan, and the plan is the thing a faction may
+change.
+
+**Option B. Release a held unit when its need crosses a threshold.** The unit
+walks to food and returns when its cell chooses again.
+
+**Option C. Let a site feed a builder within its reach.** The store of the site
+pays for the work.
+
+**Recommendation. Take no option until a reading says the case arises.** A
+sweep of the demonstration world at 800 ticks finishes many projects, so the
+builders of that world do not all die. A shorter reach between food and plan
+would show it, and no such reading exists.
+
+**What decides it.** A run that counts how many held units end while they are
+held, against how many finish the site they stand on.
 
 ### DEC-224 — Does a log the bindings expose hold more than the last step?
 
@@ -1822,6 +1947,44 @@ concluded, and it called that argument its weakest.
 
 ## Closed
 
+### DEC-277 — Is the map a region of a planet, or a planet?
+
+**Closed. Option B. The map is a planet, the tile edge is a game unit, and a
+world states its own latitude span.**
+
+The project held two readings of its own map. The scale register fixes the tile
+edge and the world extent, which make the world about three degrees of
+latitude.[^SCALE] The weather read the row axis as a latitude that runs from
+one pole to the other. A research report found both readings, judged both
+defensible, and said the project must choose.[^DEC277B]
+
+**The two readings demand opposite models.** Across three degrees the annual
+mean energy from the sun changes by about four percent, which produces no
+climate zones, so the climate comes from the ground and the sea alone. Across a
+globe the same geometry produces poles, a banded circulation, a desert belt and
+an equatorial rain belt.[^DEC277B]
+
+**Option A. The map is a region.** Delete the latitude term and the banded
+circulation, and keep the season as a whole-map swing.
+
+**Option B. The map is a planet.** Keep the latitude, and read the tile edge as
+a game unit rather than a measurement.
+
+**Why B.** The project owner ruled on 6 September 2026. A world with real
+poles, trade winds, subtropical deserts and an equatorial rain belt is the
+interesting world, and that is the rule the owner asked the work to follow.
+
+**How it is held.** The report recommended a third form, and the engine takes
+it: a world states a centre latitude and a span, and a world that states
+neither spans the globe. The two readings then differ by one constant rather
+than by a model, and a narrow span flattens every latitude term at no
+cost.[^DEC277B] A record holds the constraint.[^DEC277C]
+
+**What it costs.** Every crossing time, dwell and march figure in the scale
+register still derives from the tile edge, and each is still consistent with
+the others. The edge no longer says how far apart two climates stand. The scale
+register says so in place.[^SCALE]
+
 ### DEC-273 — Does the world seeder always give a playable world, or may it refuse a seed?
 
 **Closed. Option B. The seeder may refuse, the refusal is a named and tested
@@ -3104,6 +3267,14 @@ must carry from the first day rather than a case somebody adds later.
 count. One tick is a fixed span of simulated time, and the register holds
 that constant.[^SCALE] A period given in ticks alone would go stale if the
 tick span ever moved.
+
+**That paragraph is now reversed, and a record holds the reversal.** The period
+is declared in ticks. The rate the owner asked for is below one unit in a
+simulated day, and a rate expressed as a whole count of units in a day cannot
+reach it without a period of zero, which means never. The risk this paragraph
+named is real and the project accepts it: a change to the span of a tick is a
+change to every period, and every period lives in one declaration, so it is one
+edit and not a sweep.[^DEC049TICKS]
 
 **What holds it back.** Nothing. Work can start under option 1 with the two
 periods as parameters, and the parameters carry the same name in the engine
@@ -4397,6 +4568,10 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC117A]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
 [^DEC130A]: Research report 20, what the Python interface should be, section 5. `docs/research/reports/20-the-python-interface.md`
 [^DEC130B]: ADR-0040, Python is a control plane, not a data plane, the context section. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+[^DEC275A]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+[^DEC275B]: Balance register, the win-path share. `docs/reference/balance.md`
+[^DEC275C]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D1. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+[^DEC275D]: Findings register, FND-563. `docs/FINDINGS.md`
 [^DEC131A]: Interface review of the published reference, section 6a, 3 September 2026. `~/cachette-reader-rounds/round-1-interface.md`
 [^DEC131B]: Project orientation, the hard invariants. `CLAUDE.md`
 [^DEC133A]: Findings register, FND-352. `docs/FINDINGS.md`
@@ -4459,8 +4634,18 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC238A]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
 [^D143A]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D6. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^D143B]: Backlog item 0486. `docs/backlog/complete/0486-turn-the-upgrade-kind-into-a-table-of-category-ground-fit-and-level.md`
+[^DEC274A]: ADR-0168, a build order holds a unit on its tile, and the hold is derived and never stored, decision D1. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
+[^DEC274B]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decisions D1 and D4. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
 [^DEC273SA]: The demonstration, which draws a seed when the watcher names none. `python/cachette/demo/app.py`
 [^DEC273SB]: The tests of a playable seeded world. `crates/cachette-core/tests/a_seeded_world_is_playable.rs`
 [^DEC273SC]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
 [^DEC273SD]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 [^DEC273SF]: Findings register, FND-544. `docs/FINDINGS.md`
+[^DEC049TICKS]: ADR-0170, a recovery period is a base for the kind that the ground and the improvement scale, decision D2. `docs/adrs/draft/adr-0170-a-recovery-period-is-a-base-that-the-ground-and-the-improvement-scale.md`
+[^DEC276A]: ADR-0059, fog storage grows with observed area, not with world area, decision D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+[^DEC276B]: ADR-0059, fog storage grows with observed area, not with world area, decision D2. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+[^DEC276D]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^DEC276F]: ADR-0059, fog storage grows with observed area, not with world area, decision D5. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+[^DEC276G]: Backlog item 0516, give a faction one flat observation array, and declare its layout in a schema. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
+[^DEC277B]: Research report 30, the published atmospheric math, section 9. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^DEC277C]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`

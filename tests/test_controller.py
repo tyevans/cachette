@@ -94,11 +94,11 @@ def test_a_world_seeds_itself_once_and_the_seeding_verbs_still_serve() -> None:
 
 
 def test_the_faction_weights_are_whole_numbers_from_the_seed() -> None:
-    """The vector has four whole weights, and a wrong faction number raises."""
+    """The vector has five whole weights, and a wrong faction number raises."""
     world = World(width=EXTENT, height=EXTENT, seed=SEED, faction_count=FACTIONS)
     same = World(width=EXTENT, height=EXTENT, seed=SEED, faction_count=FACTIONS)
     weights = world.faction_weights(0)
-    assert set(weights) == {"war", "trade", "build", "renown"}
+    assert set(weights) == {"war", "trade", "build", "renown", "settle"}
     assert all(isinstance(value, int) and value > 0 for value in weights.values())
     assert weights == same.faction_weights(0)
     with pytest.raises(VerbError):
@@ -172,9 +172,14 @@ def test_the_demonstration_runs_to_the_end_and_prints_the_census(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """The headless run names the winner once and prints every census row."""
+    # The seed is named. The demonstration draws its own seed when none is
+    # given, so a test that leaves it out builds a different world on every
+    # run, and some of those worlds seat no faction at all.
     status = main(
         [
             "--run-to-end",
+            "--seed",
+            hex(SEED),
             "--extent",
             str(EXTENT),
             "--factions",
@@ -188,8 +193,13 @@ def test_the_demonstration_runs_to_the_end_and_prints_the_census(
     assert status == 0
     out = capsys.readouterr().out
     lines = out.splitlines()
+    # The demonstration names a faction, so the line carries a name and not
+    # the word "faction". The test asserts the shape of the line and that
+    # exactly one appears, because the run must name the winner once.
     wins = [line for line in lines if "wins by territory" in line]
-    assert wins == ["tick 4: faction " + wins[0].split("faction ")[1]]
+    assert len(wins) == 1, f"the run must name the winner once, and it gave {wins}"
+    assert wins[0].startswith("tick 4: ")
+    assert wins[0].endswith(" wins by territory")
     assert any(line.startswith("the game ended at tick 4:") for line in lines)
     assert any(line.startswith("census of the run at tick 4") for line in lines)
     for name in CENSUS_NAMES:
@@ -204,6 +214,7 @@ def test_the_standing_of_a_faction_names_every_path_and_the_paths_are_four() -> 
     assert list(standing) == [
         "held_tiles",
         "seats_held",
+        "live_units",
         "store_total",
         "best_renown",
         "wonder_progress",
@@ -230,7 +241,9 @@ def test_a_character_at_the_renown_target_ends_the_game_by_renown() -> None:
     world.spawn_soldiers([address], faction=0)
     world.spawn_soldiers([address], faction=1)
     person = world.create_characters(faction=1, count=1)[0]
-    target = 100 << 16
+    # The engine states the target, and this test reads it. A copy here went
+    # stale the day the project owner raised the bar.
+    target = world.renown_target
     world.set_character_renown([int(person)], target - 1)
     world.step(1)
     assert world.game_end() is None

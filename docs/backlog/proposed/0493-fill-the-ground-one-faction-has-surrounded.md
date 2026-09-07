@@ -86,7 +86,7 @@ Filled in when the item moves to `complete/`.
 [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^2]: PRD-0054, a god's ground is the ground around its cities. `docs/product/shaped/prd-0054-a-gods-ground-is-the-ground-around-its-cities.md`
 [^3]: ADR-0153, a tile's lease follows the units that stand on it, decisions D6 and D7. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
-[^4]: Backlog item 0492, let repeated use move the border, and let disuse return it. `docs/backlog/proposed/0492-let-repeated-use-move-the-border-and-let-disuse-return-it.md`
+[^4]: Backlog item 0492, let repeated use move the border, and let disuse return it. `docs/backlog/complete/0492-let-repeated-use-move-the-border-and-let-disuse-return-it.md`
 [^5]: ADR-0147, a contract consideration is a tagged kind, decision D3. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
 [^6]: The holding module of the core crate. `crates/cachette-core/src/holding.rs`
 [^7]: ADR-0111, the presence relation is derived at the end of the step and never stored as a fact, decision D1. `docs/adrs/draft/adr-0111-the-presence-relation-is-derived-at-the-end-of-the-step.md`

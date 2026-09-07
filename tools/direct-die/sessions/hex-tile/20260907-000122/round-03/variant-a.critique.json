@@ -1,0 +1,9 @@
+{
+  "faults": [
+    "Increase the size of the three triangular shapes so that each is at least 5 units wide in the 64-unit space, as required by rule 3.",
+    "Increase the lightness difference between the base fill and the tree shapes so the contrast is visible at the display size, as required by rule 2.",
+    "Add a secondary shape (such as a shadow or a ground patch) to match the visual complexity and depth of the accepted exemplars."
+  ],
+  "score": 45,
+  "verdict": "The candidate reads as a forest at the display size, but the shapes are too small and the color contrast is too low to match the exemplars."
+}

@@ -13,10 +13,15 @@
 //! Every test here drives the step. None calls the consumption pass.[^3]
 //!
 //! **The fixture is built for these tests.** It does not copy the world of the
-//! demonstration binary.[^4] It holds a site whose store covers a stated
-//! fraction of what its people ask for, because the whole behaviour under test
-//! is what happens at that fraction, and the demonstration world supplies
+//! demonstration binary.[^4] It holds a site that earns whole rations for a
+//! stated number of its people on each tick, because the whole behaviour under
+//! test is what happens at that fraction, and the demonstration world supplies
 //! whatever the ground happened to generate.
+//!
+//! The rate the fixture states carries the upkeep of the residents as well as
+//! the rations. The rate pass takes that bill out of the store before the
+//! cohort draws, so a rate that stated the rations alone would hand the cohort
+//! less than the fixture named.[^5]
 //!
 //! # References
 //!
@@ -24,8 +29,11 @@
 //! [^2]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decisions D1 and D2. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
 //! [^3]: Testing rules, section 5. `.claude/rules/testing.md`
 //! [^4]: Testing rules, section 2a. `.claude/rules/testing.md`
+//! [^5]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
 
 use cachette_core::cohort::{NeedRule, NEED_FULL};
+use cachette_core::effective::RESIDENT_SHARE_OF_RATION;
+use cachette_core::sim_math;
 use cachette_core::{Axial, CommodityId, Entity, FactionId, Fix32, World, WorldConfig};
 
 /// The extent of every fixture world.
@@ -56,13 +64,19 @@ fn rule() -> NeedRule {
     .expect("every rate is at or above zero")
 }
 
-/// Builds a world with one site, a group homed to it, and a store that covers
-/// the given fraction of one application of the ration.
+/// Builds a world with one site, a group homed to it, and a rate that earns
+/// whole rations for exactly `fed` of the group on each tick.
 ///
-/// The store is written directly, so the test names the shortage rather than
-/// arranging a ground that produces one.
+/// **The site earns the shortage, and it starts with an empty store.** A
+/// store written once would empty after one application and the whole cohort
+/// would starve, which measures a world with no food rather than a world with
+/// too little.
+///
+/// The rate carries the bill of the residents as well as the rations, so the
+/// cohort draws against exactly `fed` rations on every tick. The store lands
+/// back at zero after each draw, so it owes nothing for what it holds.
 fn short_cohort(fed: u32) -> (World, Entity, Vec<Entity>) {
-    short_cohort_under(rule(), fed)
+    short_cohort_under(rule(), fed, 1)
 }
 
 /// The rule the key tests run, which nobody starves under.
@@ -83,8 +97,9 @@ fn gentle_rule() -> NeedRule {
     .expect("every rate is at or above zero")
 }
 
-/// Builds the fixture under a stated rule.
-fn short_cohort_under(rule: NeedRule, fed: u32) -> (World, Entity, Vec<Entity>) {
+/// Builds the fixture under a stated rule, and settles it at a stated thread
+/// count.
+fn short_cohort_under(rule: NeedRule, fed: u32, threads: usize) -> (World, Entity, Vec<Entity>) {
     let mut world = World::new(WorldConfig {
         width: EXTENT,
         height: EXTENT,
@@ -102,6 +117,23 @@ fn short_cohort_under(rule: NeedRule, fed: u32) -> (World, Entity, Vec<Entity>) 
     let site = world
         .found_settlement(place, FactionId(0))
         .expect("the ground admits a settlement");
+    // **The fixture states the housing of its site, and it seats the group in
+    // all of it.** The pipeline takes a share of the rate away for the places
+    // a site holds empty, so a site with more housing than people earns less
+    // than its stated rate.[^1] The whole behaviour under test is what a
+    // cohort does at a stated fraction of its rations, so the fixture holds
+    // the pipeline at one and the founding housing of the world governs
+    // nothing here.
+    //
+    // A full site also has no free place, so nobody is born into the group
+    // and the headcount the tests count stays at what this loop seats.[^2]
+    //
+    // [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    // [^2]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    assert!(
+        world.set_site_housing(site, GROUP),
+        "the founding returned a live site"
+    );
     let mut units = Vec::new();
     for _ in 0..GROUP {
         let unit = world
@@ -110,15 +142,71 @@ fn short_cohort_under(rule: NeedRule, fed: u32) -> (World, Entity, Vec<Entity>) 
         assert!(world.set_home_site(unit, Some(site)));
         units.push(unit);
     }
-    // **The site earns whole rations for exactly `fed` of the group on each
-    // tick, and it starts with none.** A store written once would empty after
-    // one application and the whole cohort would starve, which measures a
-    // world with no food rather than a world with too little.
+    // **One settle frame runs before the fixture states its rate.** The pass
+    // that counts the residents of a site runs after the rate pass, so the
+    // rate pass reads the count that the frame before it derived. That count
+    // is zero on the first frame of a world, and a site with no resident owes
+    // no bill and loses a quarter of its scale to its empty housing. A test
+    // that measured the first frame would measure neither state.
+    //
+    // The settle frame earns more than the group asks for, so it leaves every
+    // unit whole and the group uniform. What it did not spend does not carry,
+    // because the line below empties the store.
+    let plenty = Fix32(rule.ration().0 * (GROUP * 2) as i32);
+    world
+        .set_production_rate(site, FOOD, plenty)
+        .expect("the rate is at or above zero and the commodity is in the set");
+    world.step(threads).expect("the settle frame must run");
+    world
+        .set_settlement_store(site, FOOD, Fix32::ZERO)
+        .expect("the commodity is inside the set");
+
+    let bill = resident_bill(rule);
+    assert_eq!(
+        world.site_residents(site),
+        Some(GROUP),
+        "the settle frame must seat the whole group"
+    );
+    assert_eq!(
+        world.production_scale(site),
+        Some(Fix32::ONE),
+        "the fixture must hold the pipeline at one, or the rate below earns \
+         another number"
+    );
+    assert_eq!(
+        world.effective_upkeep_rate(site, FOOD),
+        Some(bill),
+        "the fixture must owe the bill of its residents and nothing else"
+    );
+    assert_eq!(
+        distinct(&needs(&world, &units)),
+        1,
+        "the settle frame must leave the group uniform"
+    );
+
     let supply = Fix32(rule.ration().0 * fed as i32);
     world
-        .set_production_rate(site, FOOD, supply)
+        .set_production_rate(site, FOOD, sim_math::add(supply, bill))
         .expect("the rate is at or above zero and the commodity is in the set");
     (world, site, units)
+}
+
+/// Returns what the site owes each tick for the people who live on it.
+///
+/// The upkeep of a site holds a share of the ration of every resident, and
+/// the rate pass takes that bill before the cohort draws.[^1] A rate that
+/// stated the rations alone would therefore hand the cohort what the bill
+/// left, and the fixture would be short by a number that nobody stated.
+///
+/// The share reads the same constant that the pipeline reads, so the two
+/// cannot drift apart.
+///
+/// # References
+///
+/// [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+fn resident_bill(rule: NeedRule) -> Fix32 {
+    let each = sim_math::mul(rule.ration(), RESIDENT_SHARE_OF_RATION);
+    Fix32(each.0 * GROUP as i32)
 }
 
 /// Returns the first address whose ground admits a unit.
@@ -236,24 +324,28 @@ fn the_served_set_depends_on_the_frame() {
     // [^1]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decision D2. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
     // [^2]: Findings register, FND-318. `docs/FINDINGS.md`
     const FRAMES: usize = 12;
-    // The site earns nothing, so the store holds exactly what the line below
-    // writes into it and the draw is the only thing that decides who eats.
-    let (mut world, site, units) = short_cohort_under(gentle_rule(), 0);
+    // **The site earns one ration on every tick, and it holds nothing over.**
+    // The rate pays the bill of the residents and one ration, the draw takes
+    // that ration, and the store lands back at zero. The supply of one frame
+    // is therefore exactly the supply of the next, and the draw is the only
+    // thing that decides who eats.
+    let (mut world, _site, units) = short_cohort_under(gentle_rule(), 1, 1);
     let mut served = Vec::new();
     for _ in 0..FRAMES {
-        // **The store is written before each frame rather than earned.** The
-        // rate pass and the draw run on one schedule and the store carries
-        // what a frame did not spend, so the supply of one frame is not
-        // exactly the supply of the next. This test is about which units the
-        // draw names, so the fixture holds the supply still.
-        world
-            .set_settlement_store(site, FOOD, gentle_rule().ration())
-            .expect("the commodity is inside the set");
         let before = needs(&world, &units);
         world.step(1).expect("the step must run");
         let after = needs(&world, &units);
+        assert_eq!(
+            after.len(),
+            GROUP as usize,
+            "the fixture lost a unit, so the readings no longer line up"
+        );
         let who = who_ate(&before, &after);
-        assert!(!who.is_empty(), "the fixture served nobody on a frame");
+        assert_eq!(
+            who.len(),
+            1,
+            "the fixture must serve exactly one unit on each frame"
+        );
         served.push(who);
     }
     assert!(
@@ -276,17 +368,20 @@ fn a_cohort_serves_exactly_as_many_rations_as_its_share_covered() {
     // [^2]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decision D2. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
     const FRAMES: usize = 24;
     for covered in [1u32, 3, 7, GROUP / 2] {
-        // The site earns nothing, so the store holds exactly what the line
-        // below writes and the served count is a stated number.
-        let (mut world, site, units) = short_cohort_under(gentle_rule(), 0);
-        let supply = Fix32(gentle_rule().ration().0 * covered as i32);
+        // The site earns whole rations for exactly this many units on every
+        // tick, and it holds nothing over, so the served count is a stated
+        // number rather than whatever a carried store reaches.
+        let (mut world, _site, units) = short_cohort_under(gentle_rule(), covered, 1);
         for frame in 0..FRAMES {
-            world
-                .set_settlement_store(site, FOOD, supply)
-                .expect("the commodity is inside the set");
             let before = needs(&world, &units);
             world.step(1).expect("the step must run");
             let after = needs(&world, &units);
+            assert_eq!(
+                after.len(),
+                GROUP as usize,
+                "the fixture lost a unit on frame {frame}, so the readings no \
+                 longer line up"
+            );
             assert_eq!(
                 who_ate(&before, &after).len(),
                 covered as usize,
@@ -301,7 +396,7 @@ fn a_cohort_serves_exactly_as_many_rations_as_its_share_covered() {
 fn a_short_cohort_gives_one_answer_at_every_thread_count() {
     let mut answers = Vec::new();
     for threads in THREAD_COUNTS {
-        let (mut world, _, units) = short_cohort(GROUP / 2);
+        let (mut world, _, units) = short_cohort_under(rule(), GROUP / 2, threads);
         for _ in 0..40 {
             world.step(threads).expect("the step must run");
         }

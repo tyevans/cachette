@@ -1,0 +1,7 @@
+{
+  "faults": [
+    "Add a subtle, darker base shape or shadow at the bottom of the hexagon to match the depth cues found in the accepted grassland and water exemplars."
+  ],
+  "score": 85,
+  "verdict": "The candidate is a clear, readable forest tile that matches the style guide's geometry and flat-fill requirements, but it lacks the subtle depth cues (like the base shadow) present in the accepted exemplars."
+}

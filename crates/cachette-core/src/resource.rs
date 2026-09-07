@@ -30,6 +30,7 @@ use bytemuck::{Pod, Zeroable};
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
 use crate::rng;
+use crate::sim_math;
 use crate::terrain::{Terrain, TileKind, KIND_COUNT as TERRAIN_KIND_COUNT};
 use crate::types::{Accum, Tick, TileIdx};
 
@@ -418,20 +419,183 @@ pub const fn ledger_key(tile: TileIdx, kind: ResourceKind) -> u64 {
 /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 pub const TICKS_IN_A_SIMULATED_DAY: u32 = 600;
 
-/// How long each kind takes to regain one unit of stock, in simulated days.
+/// The ticks that one depleted deposit takes to regain one unit, at the best
+/// moisture, on ground nobody improved.
 ///
 /// A kind that holds `None` does not recover at all. Stone holds `None`,
 /// because stone is not alive and does not grow back.[^1]
 ///
-/// **This is the only declaration of the recovery period.** A caller replaces
-/// the whole rule set rather than one value, so no second site holds a period
-/// and no check is needed to keep two copies in step.[^2]
+/// **This is the only declaration of the recovery rate.** The moisture curve
+/// and the improvement speedup below bend this period. Neither states a rate
+/// of its own, so no second site holds one and no check is needed to keep two
+/// copies in step.[^2]
+///
+/// # Why the period is this long
+///
+/// A gatherer takes four units of one tile in one tick, and the richest food
+/// tile the generator makes holds twelve.[^3] Ground the generator made is
+/// therefore stripped in three ticks and returns one unit in this many. A
+/// faction that forages unimproved ground eats once and then waits, so
+/// foraging is what a faction does before it has built anything.
+///
+/// The comparison that fixes the number is the price of the improvement that
+/// replaces foraging. One builder finishes the first level of a terrace in
+/// the work that row states, and the terrace makes the same ground return a
+/// unit several times faster.[^4] A stripped food tile is worth one gatherer
+/// tick again after four of these periods, which is many times the work the
+/// terrace costs. Building always beats waiting.
 ///
 /// # References
 ///
 /// [^1]: Decisions register, DEC-049. `docs/DECISIONS.md`
-/// [^2]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-const RECOVERY_DAYS: [Option<u32>; RESOURCE_KIND_COUNT] = [Some(1), Some(4), None];
+/// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D2. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+/// [^4]: Balance register, the terrace recovery by level. `docs/reference/balance.md`
+const RECOVERY_TICKS_FOR_ONE_UNIT: [Option<u32>; RESOURCE_KIND_COUNT] =
+    [Some(240), Some(300), None];
+
+// A period of zero says that nothing was ever taken. The check fails at
+// compile time rather than at the first call of the rule builder.
+const _: () = {
+    let mut index = 0;
+    while index < RESOURCE_KIND_COUNT {
+        if let Some(period) = RECOVERY_TICKS_FOR_ONE_UNIT[index] {
+            assert!(period > 0, "a recovery period of zero states no rule");
+        }
+        index += 1;
+    }
+};
+
+/// The number of moisture bands that the recovery curve holds.
+pub const MOISTURE_BAND_COUNT: usize = 7;
+
+/// The water on the ground that each moisture band stops at, in drops.
+///
+/// A band holds every tile from the entry below it up to its own entry. The
+/// last band has no ceiling and holds everything above the last entry.
+///
+/// The steps widen as they climb, because the weather field is skewed. Most
+/// cells sit near the dry end and a few carry many times the median.[^1] Even
+/// steps would put almost every tile in one band, and the curve would then
+/// say nothing.
+///
+/// # References
+///
+/// [^1]: Balance register, the moisture bands. `docs/reference/balance.md`
+pub const MOISTURE_BAND_CEILING: [i64; MOISTURE_BAND_COUNT - 1] = [16, 48, 96, 192, 384, 768];
+
+/// The scale that a moisture band applies to the recovery period, in
+/// sixteenths.
+///
+/// **Sixteen means that the band is the best the kind gets.** A larger entry
+/// is a longer period, so it is slower growth. The curve of each kind has one
+/// peak and falls away on both sides, and the two kinds peak in different
+/// bands.
+///
+/// Food wants steady moisture. It peaks where the ground is damp but not wet,
+/// and it suffers quickly at both ends. Parched ground grows almost nothing,
+/// and drowned ground grows almost nothing.
+///
+/// Wood tolerates wet far better than dry. Its peak sits two bands further
+/// along than the peak of food, it holds a plateau over the wet middle, and
+/// it collapses only in the parched band. A watcher who reads the moisture
+/// overlay can therefore predict the map. Food grows along the damp middle,
+/// forest grows on the wet side, and parched ground grows neither.
+///
+/// Stone holds no curve that anything reads, because stone does not recover
+/// at all. The row holds the neutral scale, so that no entry of the table
+/// looks like a rate.
+const MOISTURE_PERIOD_SCALE: [[u32; MOISTURE_BAND_COUNT]; RESOURCE_KIND_COUNT] = [
+    // Food.
+    [128, 48, 16, 32, 96, 160, 256],
+    // Wood.
+    [256, 64, 24, 16, 16, 24, 48],
+    // Stone. It does not recover, so no entry of this row is ever read.
+    [16; MOISTURE_BAND_COUNT],
+];
+
+/// The scale at which a moisture band changes nothing.
+const NEUTRAL_SCALE: u32 = 16;
+
+/// Returns the moisture band of a quantity of water on the ground.
+///
+/// The answer is a whole number from zero to one less than the band count.
+#[must_use]
+pub const fn moisture_band(drops: i64) -> usize {
+    let mut band = 0;
+    while band < MOISTURE_BAND_COUNT - 1 {
+        if drops < MOISTURE_BAND_CEILING[band] {
+            return band;
+        }
+        band += 1;
+    }
+    MOISTURE_BAND_COUNT - 1
+}
+
+/// Everything about one tile, beside the kind, that shapes how fast it grows
+/// back.
+///
+/// The caller reads these three from where each of them lives, and the
+/// recovery rule turns them into a period. The rule holds the whole of the
+/// arithmetic, so no pass can apply the moisture one way and the improvement
+/// another.[^1]
+///
+/// The bare value describes dry ground that carries nothing.
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct TileGround {
+    /// The water on the ground over the tile, in drops.
+    pub moisture: i64,
+    /// The recovery column of the upgrade that stands on the tile.
+    ///
+    /// Zero and one both say that nothing there changes the rate.
+    pub improvement: u32,
+    /// The condition of that upgrade, out of the full condition.
+    pub condition: i64,
+}
+
+impl TileGround {
+    /// Dry ground that carries nothing.
+    pub const BARE: Self = Self {
+        moisture: 0,
+        improvement: 0,
+        condition: 0,
+    };
+
+    /// Returns how many times faster the ground here grows back.
+    ///
+    /// **A worn level bends the rate less.** The speedup runs from the whole
+    /// column at the full condition down to one at no condition, so a
+    /// neglected improvement falls back toward the rate of unimproved ground
+    /// and reaches it exactly.[^1]
+    ///
+    /// The share is exact whole-number arithmetic and it truncates towards
+    /// zero.[^2] The answer is never below one, so an improvement never slows
+    /// the ground down.
+    ///
+    /// # References
+    ///
+    /// [^1]: The condition of an upgrade site, and the wear that lowers it. `crates/cachette-core/src/upgrade.rs`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    #[must_use]
+    pub fn speedup(self) -> u32 {
+        if self.improvement <= 1 || self.condition <= 0 {
+            return 1;
+        }
+        let above = i64::from(self.improvement - 1);
+        let sound = self.condition.min(crate::upgrade::CONDITION_FULL);
+        let kept = sim_math::share(
+            Accum(above),
+            Accum(sound),
+            Accum(crate::upgrade::CONDITION_FULL),
+        )
+        .map_or(0, |gained| gained.0);
+        u32::try_from(1 + kept).unwrap_or(1).max(1)
+    }
+}
 
 /// How fast each kind of deposit recovers.
 ///
@@ -452,17 +616,8 @@ pub struct RecoveryRules {
 
 impl RecoveryRules {
     /// The rules that the content table above states.
-    pub const DEFAULT: Self = {
-        let mut periods = [None; RESOURCE_KIND_COUNT];
-        let mut index = 0;
-        while index < RESOURCE_KIND_COUNT {
-            periods[index] = match RECOVERY_DAYS[index] {
-                Some(days) => Some(days * TICKS_IN_A_SIMULATED_DAY),
-                None => None,
-            };
-            index += 1;
-        }
-        Self { periods }
+    pub const DEFAULT: Self = Self {
+        periods: RECOVERY_TICKS_FOR_ONE_UNIT,
     };
 
     /// The rules under which no kind recovers.
@@ -494,12 +649,52 @@ impl RecoveryRules {
         Some(Self { periods })
     }
 
-    /// Returns the period of one kind, in ticks.
+    /// Returns the period of one kind at its best moisture, on ground nobody
+    /// improved, in ticks.
+    ///
+    /// **This is the rate before the ground bends it.** A pass that reads a
+    /// period for a tile calls the reader that takes the ground. This one
+    /// answers what the rule set declares, and a caller that has no tile in
+    /// hand reads it.
     ///
     /// Returns `None` when the kind does not recover.
     #[must_use]
     pub const fn period_of(self, kind: ResourceKind) -> Option<u32> {
         self.periods[kind.index()]
+    }
+
+    /// Returns the period of one kind on one tile, in ticks.
+    ///
+    /// **This is the whole rule.** Three things shape it, and all three
+    /// arrive here. The kind gives the declared period. The moisture over the
+    /// tile scales that period by the curve of the kind. What stands on the
+    /// tile divides it, by as much as the condition of that thing has
+    /// kept.[^1]
+    ///
+    /// The order of the arithmetic is fixed. The multiply happens before the
+    /// divide, so a small period does not truncate to nothing on the way
+    /// through. Every term is a whole number, so two callers get one
+    /// answer.[^2]
+    ///
+    /// The answer is never below one tick. A period of zero would return the
+    /// whole take in one tick, which is a second way to say that a deposit
+    /// was never depleted.[^1]
+    ///
+    /// Returns `None` when the kind does not recover. Stone answers `None`
+    /// whatever stands on it and whatever the weather does.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    #[must_use]
+    pub fn period_for(self, kind: ResourceKind, ground: TileGround) -> Option<u32> {
+        let declared = self.periods[kind.index()]?;
+        let scale = MOISTURE_PERIOD_SCALE[kind.index()][moisture_band(ground.moisture)];
+        let slowed = u64::from(declared) * u64::from(scale);
+        let divisor = u64::from(NEUTRAL_SCALE) * u64::from(ground.speedup());
+        let period = slowed / divisor;
+        Some(u32::try_from(period).unwrap_or(u32::MAX).max(1))
     }
 
     /// Absorbs the rule set into the state hash.
@@ -600,15 +795,22 @@ fn aged(entry: LedgerEntry, tick: Tick, period: Option<u32>) -> LedgerEntry {
     }
 }
 
-/// Returns the recovery period of the kind that a ledger key names.
+/// Returns the tile that a ledger key names.
+#[must_use]
+pub const fn key_tile(key: u64) -> TileIdx {
+    TileIdx((key >> 2) as u32)
+}
+
+/// Returns the recovery period of the kind that a ledger key names, on the
+/// ground that the key names.
 ///
 /// Returns `None` when the kind does not recover, and when the key names no
 /// kind. A key that named no kind would be a broken ledger, and the
 /// conservation check is what reports that.
 #[must_use]
-fn period_of_key(rules: RecoveryRules, key: u64) -> Option<u32> {
+fn period_of_key(rules: RecoveryRules, key: u64, ground: TileGround) -> Option<u32> {
     match ResourceKind::from_u8((key & 0b11) as u8) {
-        Some(kind) => rules.period_of(kind),
+        Some(kind) => rules.period_for(kind, ground),
         None => None,
     }
 }
@@ -706,16 +908,26 @@ impl DepletionLedger {
     /// The pass leaves an entry that reached nothing owed in place. Removing
     /// such an entry is a separate change.
     ///
+    /// **The caller supplies the ground of each tile.** The period of one
+    /// entry depends on the moisture over its tile and on what stands there,
+    /// and both of those live outside the ledger. The caller reads them and
+    /// the rule combines them, so the whole rate stays in one place.[^3]
+    ///
+    /// The reader answers from stored state that this frame has already
+    /// settled, so the pass reads no value that it writes.
+    ///
     /// # References
     ///
     /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     /// [^2]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
-    pub fn recover(&mut self, tick: Tick) {
+    /// [^3]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    pub fn recover(&mut self, tick: Tick, ground: &impl Fn(TileIdx) -> TileGround) {
         let rules = self.rules;
         let mut visits = 0u64;
         for entry in &mut self.entries {
             visits += 1;
-            let after = aged(*entry, tick, period_of_key(rules, entry.key));
+            let here = ground(key_tile(entry.key));
+            let after = aged(*entry, tick, period_of_key(rules, entry.key, here));
             if let Some(kind) = ResourceKind::from_u8((entry.key & 0b11) as u8) {
                 self.returned[kind.index()] += i64::from(entry.taken - after.taken);
             }
@@ -752,10 +964,18 @@ impl DepletionLedger {
     /// it changes nothing, so two readers at one tick get one answer and a
     /// reader never moves the world forward.
     #[must_use]
-    pub fn taken_at(&self, tile: TileIdx, kind: ResourceKind, tick: Tick) -> Amount {
+    pub fn taken_at(
+        &self,
+        tile: TileIdx,
+        kind: ResourceKind,
+        tick: Tick,
+        ground: TileGround,
+    ) -> Amount {
         let key = ledger_key(tile, kind);
         match self.entries.binary_search_by_key(&key, |entry| entry.key) {
-            Ok(at) => Amount(aged(self.entries[at], tick, self.rules.period_of(kind)).taken),
+            Ok(at) => {
+                Amount(aged(self.entries[at], tick, self.rules.period_for(kind, ground)).taken)
+            }
             Err(_) => Amount::ZERO,
         }
     }
@@ -788,7 +1008,12 @@ impl DepletionLedger {
     /// The caller states the order and the merge relies on it. A run out of
     /// order would silently produce an unsorted result, and every later lookup
     /// would then read the wrong tile.
-    pub fn merge_ascending(&mut self, run: &[(u64, u32)], tick: Tick) {
+    pub fn merge_ascending(
+        &mut self,
+        run: &[(u64, u32)],
+        tick: Tick,
+        ground: &impl Fn(TileIdx) -> TileGround,
+    ) {
         debug_assert!(
             run.windows(2).all(|pair| pair[0].0 < pair[1].0),
             "a merged run must be sorted by key and hold each key once"
@@ -813,7 +1038,8 @@ impl DepletionLedger {
                 // take added to a stale amount would carry the ticks that
                 // passed before it into its own recovery, and the deposit
                 // would then return the new take faster than the rule says.
-                let current = aged(mine, tick, period_of_key(rules, mine.key));
+                let under = ground(key_tile(mine.key));
+                let current = aged(mine, tick, period_of_key(rules, mine.key, under));
                 if let Some(kind) = ResourceKind::from_u8((mine.key & 0b11) as u8) {
                     self.returned[kind.index()] += i64::from(mine.taken - current.taken);
                 }

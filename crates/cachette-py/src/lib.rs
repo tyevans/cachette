@@ -13,13 +13,16 @@
 //! [^2]: ADR-0042, the interpreter is released for the whole step. `docs/adrs/REGISTRY.md`
 
 mod columns;
+pub mod logs;
 
 use crate::columns::columns_of;
+use crate::logs::{log_names, log_of, unknown_log_message};
 use cachette_core::campaign::{CampaignEvent, CampaignRow};
 use cachette_core::census::{census, CensusError};
 use cachette_core::character::CharacterArena;
 use cachette_core::descent::{DescentId, DESCENT_CEILING};
 use cachette_core::event_layout::declared_event_layouts;
+use cachette_core::faction_view::{Admit, FactionTile};
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::luxury::{LuxuryId, LUXURY_CEILING};
@@ -32,8 +35,8 @@ use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
 use cachette_core::TileIdx;
 use cachette_core::{Advert, Consideration, KIND_LAND, KIND_RELATION, KIND_RESOURCE};
 use cachette_core::{
-    Axial, CommodityId, Entity, FactionId, Fix32, Holder, Influence, ResourceKind,
-    World as CoreWorld, WorldConfig,
+    Axial, CommodityId, Entity, FactionId, FactionWeights, Fix32, Holder, Influence, ResourceKind,
+    WeatherScale, World as CoreWorld, WorldConfig, WEIGHT_HIGH, WEIGHT_LOW,
 };
 use cachette_view::panel::Set as PanelSet;
 use cachette_view::{
@@ -41,9 +44,9 @@ use cachette_view::{
 };
 use numpy::{PyArray1, PyReadwriteArray1, ToPyArray};
 use pyo3::create_exception;
-use pyo3::exceptions::PyException;
+use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::prelude::*;
-use pyo3::types::PyDict;
+use pyo3::types::{PyDict, PyList};
 use pyo3::PyTypeInfo;
 
 // ADR-0046: one root exception type holds the whole hierarchy. The
@@ -244,6 +247,23 @@ produce it.** The binding library catches a panic and raises its own
 /// reserves as much unit storage as a large one. That reservation is what
 /// `spawn_soldiers` means by a full arena.
 ///
+/// **The weather runs on a lattice of its own, and `weather_cell_tiles`
+/// states its pitch.** The number is the side of one weather cell in tiles.
+/// It must be a power of two from 1 to 256. One gives each tile its own
+/// weather. `None` takes the pitch the engine defaults to, which is the
+/// level 1 block.
+///
+/// The cost of the weather stage follows the cell count, and the cell count
+/// is the tile count divided by the square of the pitch. A pitch of one on a
+/// large world therefore costs the frame. Read `weather_cell_count` for how
+/// many cells of the world a built world holds.
+///
+/// **The engine steps more cells than the world holds.** It simulates a margin
+/// of cells around the world, so that the border of the world has real upwind
+/// rather than an edge that nothing crosses. The margin is a distance, so the
+/// share it adds to the cost falls as the world grows. No reader sees a margin
+/// cell, and every weather array covers the world alone.
+///
 /// The constructor raises `ConfigError` when the arguments do not describe a
 /// world. A side of zero and a faction count above the ceiling are the two
 /// cases a caller meets first.
@@ -252,6 +272,27 @@ produce it.** The binding library catches a panic and raises its own
 ///
 /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 /// [^2]: Findings register, FND-325. `docs/FINDINGS.md`
+/// Turns a weather cell side in tiles into the scale the engine takes.
+///
+/// **A watcher states a pitch in tiles, not as a logarithm.** The engine
+/// carries the base-two logarithm of the side, because the lattice geometry
+/// needs a shift. A caller of the control plane should not have to know that,
+/// so the conversion happens once, here.
+///
+/// # Errors
+///
+/// Raises `ConfigError` when the side is zero, when it is not a power of two,
+/// or when it is above the largest side the engine carries.
+fn scale_of_tiles(tiles: u32) -> PyResult<WeatherScale> {
+    if tiles == 0 || !tiles.is_power_of_two() {
+        return Err(ConfigError::new_err(format!(
+            "the weather cell side {tiles} is not a power of two"
+        )));
+    }
+    WeatherScale::from_bits(tiles.trailing_zeros())
+        .map_err(|error| ConfigError::new_err(error.to_string()))
+}
+
 #[pyclass(name = "World", module = "cachette._core", frozen)]
 pub struct PyWorld {
     inner: std::sync::Mutex<CoreWorld>,
@@ -303,22 +344,46 @@ impl PyWorld {
     /// # Errors
     ///
     /// Raises `ConfigError` when the arguments do not describe a world. A side
-    /// of zero and a faction count above 63 are the two cases a caller meets
-    /// first.
+    /// of zero, a faction count above 63, and a weather pitch that is not a
+    /// power of two are the cases a caller meets first.
     ///
     /// # References
     ///
     /// [^1]: Findings register, FND-325. `docs/FINDINGS.md`
     #[new]
-    #[pyo3(signature = (width = 64, height = 64, seed = 0x0123_4567_89ab_cdef, faction_count = 4))]
-    fn new(width: u32, height: u32, seed: u64, faction_count: u16) -> PyResult<Self> {
-        let world = CoreWorld::new(WorldConfig {
-            width,
-            height,
-            seed,
-            faction_count,
-            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
-        })
+    #[pyo3(signature = (
+        width = 64,
+        height = 64,
+        seed = 0x0123_4567_89ab_cdef,
+        faction_count = 4,
+        weather_cell_tiles = None,
+    ))]
+    fn new(
+        width: u32,
+        height: u32,
+        seed: u64,
+        faction_count: u16,
+        weather_cell_tiles: Option<u32>,
+    ) -> PyResult<Self> {
+        // **The default lives in the engine and nowhere else.** A caller that
+        // states no pitch gets whatever the engine calls its default, so this
+        // binding holds no second copy of that number.[^3]
+        //
+        // [^3]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+        let scale = match weather_cell_tiles {
+            None => WeatherScale::DEFAULT,
+            Some(tiles) => scale_of_tiles(tiles)?,
+        };
+        let world = CoreWorld::with_weather_scale(
+            WorldConfig {
+                width,
+                height,
+                seed,
+                faction_count,
+                unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            },
+            scale,
+        )
         .map_err(|error| ConfigError::new_err(error.to_string()))?;
         Ok(Self {
             inner: std::sync::Mutex::new(world),
@@ -349,6 +414,33 @@ impl PyWorld {
         self.lock().grid().height()
     }
 
+    /// The seed the world was built from, as an integer.
+    ///
+    /// This is the value the constructor took for `seed`. It never changes.
+    /// The value is an unsigned 64-bit number.
+    ///
+    /// **A run can record which world it ran.** A caller that draws a seed
+    /// held that number twice before this reader existed, once for the world
+    /// and once for whatever else needed it, and nothing failed when the two
+    /// copies disagreed.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[getter]
+    fn seed(&self) -> u64 {
+        self.lock().config().seed
+    }
+
+    /// The number of factions the world holds, as an integer.
+    ///
+    /// This is the value the constructor took for `faction_count`. It never
+    /// changes. A faction identifier runs from zero to one below it.
+    #[getter]
+    fn faction_count(&self) -> u16 {
+        self.lock().faction_count()
+    }
+
     /// The number of steps the world has run, as an integer.
     ///
     /// A new world is at tick zero. Each `step` call adds one.
@@ -363,6 +455,41 @@ impl PyWorld {
     #[getter]
     fn tile_count(&self) -> usize {
         self.lock().tile_count()
+    }
+
+    /// The side of one weather cell in tiles, as an integer.
+    ///
+    /// This is the value the constructor took for `weather_cell_tiles`, or
+    /// the engine default when the caller stated none. One means that each
+    /// tile carries its own weather. It never changes.
+    #[getter]
+    fn weather_cell_tiles(&self) -> u32 {
+        self.lock().weather_layout().block_edge()
+    }
+
+    /// The number of weather cell columns across the world, as an integer.
+    ///
+    /// **A weather array is in weather cell order, not in level 1 cell
+    /// order.** A watcher takes `index % weather_cells_wide` for the column
+    /// of a cell and `index // weather_cells_wide` for its row. The two
+    /// lattices agree only when the world takes the level 1 weather pitch.
+    #[getter]
+    fn weather_cells_wide(&self) -> u32 {
+        self.lock().weather_layout().blocks_wide()
+    }
+
+    /// The number of weather cells in the world, as an integer.
+    ///
+    /// Read it before a long run at a fine pitch, because a fine pitch on a
+    /// large world holds one cell for every tile.
+    ///
+    /// **The engine steps more cells than this.** It simulates a margin of
+    /// cells around the world, and the cost of the stage follows the count
+    /// with the margin in it. This count is what a weather array holds.
+    #[getter]
+    fn weather_cell_count(&self) -> u64 {
+        let layout = self.lock().weather_layout();
+        u64::from(layout.blocks_wide()) * u64::from(layout.blocks_high())
     }
 
     /// The number of tile change events the last step emitted, as an integer.
@@ -527,6 +654,73 @@ impl PyWorld {
     fn event_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
         columns_of(python, world.event_log())
+    }
+
+    /// Returns the name of every event log, as a `list` of `str`.
+    ///
+    /// **This is how a caller finds out what the engine publishes.** A log
+    /// added to the engine appears here with no new method on this class, no
+    /// new entry in the type stub and no new name for a caller to learn. Hand
+    /// any name from this list to `log` and to `log_count`.
+    ///
+    /// The name of a log is the name its event declares, and `event_schema`
+    /// gives the columns of every one of them under the same names.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0163, an event declares its layout once and the binding derives every column. `docs/adrs/draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md`
+    fn log_names(&self) -> Vec<&'static str> {
+        log_names()
+    }
+
+    /// Returns one event log, as a `dict` of NumPy arrays.
+    ///
+    /// The name is one of the names `log_names` gives. The keys are the
+    /// column names the event declares, and `event_schema` states them and
+    /// their element types. Every array has one entry for each record, and
+    /// all of them are the same length. That length is `log_count` of the
+    /// same name.
+    ///
+    /// **A log holds what happened since the last step began.** The step
+    /// clears it before any system runs, so a caller reads it after each step
+    /// and a caller that misses a step misses the events. This is the rule for
+    /// every log, and it is not the rule for `subsystem_census`, whose rows
+    /// are marked as a running total or as a count of what stands.
+    ///
+    /// No element type is a floating point type. A fixed-point column crosses
+    /// as its raw integer.[^2]
+    ///
+    /// This method copies each column. The log of one step is small next to
+    /// the world.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ValueError` when no log has the given name. The message lists
+    /// every name.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0163, an event declares its layout once and the binding derives every column. `docs/adrs/draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^3]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn log<'py>(&self, python: Python<'py>, name: &str) -> PyResult<Bound<'py, PyDict>> {
+        let entry = log_of(name).ok_or_else(|| PyValueError::new_err(unknown_log_message(name)))?;
+        let world = self.lock();
+        (entry.read)(python, &world)
+    }
+
+    /// Returns how many records one event log holds, as an integer.
+    ///
+    /// The name is one of the names `log_names` gives. The count covers the
+    /// events since the last step began, in the same way `log` does.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ValueError` when no log has the given name.
+    fn log_count(&self, name: &str) -> PyResult<usize> {
+        let entry = log_of(name).ok_or_else(|| PyValueError::new_err(unknown_log_message(name)))?;
+        let world = self.lock();
+        Ok((entry.count)(&world))
     }
 
     /// Returns the gather log of the last step, as a `dict` of NumPy arrays.
@@ -1078,6 +1272,49 @@ impl PyWorld {
         Ok(())
     }
 
+    /// Founds a city from every settler the identities name.
+    ///
+    /// The units are a sequence of identities, or the NumPy array of
+    /// `numpy.uint64` that `spawn_soldiers` returned.
+    ///
+    /// A settler is a unit whose type row holds a settle column above zero.
+    /// The verb founds a settlement on the tile the unit stands on, for the
+    /// faction of the unit, and it seats the group the column names. **The
+    /// founding spends the settler**, and the group takes its place.[^1]
+    ///
+    /// The verb refuses a unit whose settle column is zero, a tile any
+    /// faction holds, a tile that already carries a settlement, ground that
+    /// admits no unit, and a place inside the founding distance of a city
+    /// that stands.[^2] A refused unit changes nothing and keeps its life.
+    ///
+    /// **The set is not all or nothing.** Each unit is answered on its own,
+    /// because a set of settlers stands in several places and one refusal
+    /// says nothing about the rest. The call returns the number of cities it
+    /// founded.
+    ///
+    /// The call founds. Step the world for the holding pass to give the new
+    /// city its ground, then read `settlement_count` and `standing`.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when an identity names no live soldier.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D5. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    /// [^2]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
+    fn order_settle(&self, units: Vec<u64>) -> PyResult<usize> {
+        let mut world = self.lock();
+        let mut resolved = Vec::with_capacity(units.len());
+        for unit in &units {
+            resolved.push(resolve(&world, *unit)?);
+        }
+        // The set form is the one path the controller takes too, so one loop
+        // serves both callers.
+        let outcomes = world.settle_set(&resolved);
+        Ok(outcomes.iter().filter(|outcome| outcome.founded()).count())
+    }
+
     /// Writes one row of the shared unit type table.
     ///
     /// A unit type is an index into this table. The table is data that the
@@ -1089,7 +1326,7 @@ impl PyWorld {
     /// names no row. A new soldier carries row zero, which the world builds
     /// as the worker row.
     ///
-    /// **The call takes the whole row.** A row is eight capability columns,
+    /// **The call takes the whole row.** A row is nine capability columns,
     /// and a zero in a column means that the type cannot do what the column
     /// names. There is no two-column form, because a caller that gave two
     /// columns would leave the rest at zero and would define a unit that
@@ -1123,6 +1360,12 @@ impl PyWorld {
     /// - `weather_reach`. A whole count. Nonzero means the faction may
     ///   inflict weather while it holds the unit. **No pass reads this
     ///   column yet.**
+    /// - `water_crossing`. A whole count. Nonzero means the unit may stand on
+    ///   a water tile, and the terrain table states how many such units one
+    ///   water tile holds. Zero refuses the unit at the shoreline.
+    /// - `settle_group`. A whole count. Zero means the type founds no city,
+    ///   and `order_settle` refuses the unit. A count above zero is the
+    ///   group the founding seats at the new city.
     ///
     /// **An attacker whose attack does not exceed the defender's armour
     /// contributes exactly zero, however many attackers stand there.** The
@@ -1159,6 +1402,8 @@ impl PyWorld {
         move_cost_scale,
         command_reach,
         weather_reach,
+        water_crossing,
+        settle_group,
     ))]
     #[allow(clippy::too_many_arguments)]
     fn define_unit_type(
@@ -1172,6 +1417,8 @@ impl PyWorld {
         move_cost_scale: i32,
         command_reach: u32,
         weather_reach: u32,
+        water_crossing: u32,
+        settle_group: u32,
     ) -> PyResult<()> {
         let mut world = self.lock();
         let row = UnitTypeRow {
@@ -1183,6 +1430,8 @@ impl PyWorld {
             move_cost_scale: Fix32(move_cost_scale),
             command_reach,
             weather_reach,
+            water_crossing,
+            settle_group,
         };
         world
             .define_unit_type(unit_type, row)
@@ -1619,8 +1868,10 @@ impl PyWorld {
         ground_fit,
         work,
         yield_change,
+        recovery_change,
         capacity_change,
         capacity_of_store_change,
+        housing_change,
         victory_claim,
         own_ground_required,
     ))]
@@ -1632,8 +1883,10 @@ impl PyWorld {
         ground_fit: u32,
         work: u32,
         yield_change: u32,
+        recovery_change: u32,
         capacity_change: u32,
         capacity_of_store_change: u32,
+        housing_change: u32,
         victory_claim: u32,
         own_ground_required: u32,
     ) -> PyResult<()> {
@@ -1642,8 +1895,10 @@ impl PyWorld {
             ground_fit,
             work,
             yield_change,
+            recovery_change,
             capacity_change,
             capacity_of_store_change,
+            housing_change,
             victory_claim,
             own_ground_required,
         };
@@ -1925,14 +2180,16 @@ impl PyWorld {
     /// `numpy.uint64` that `spawn_soldiers` returned. Returns `None`.
     ///
     /// The category is a row group of the upgrade table, as an integer. A
-    /// road is zero, a terrace is one, a wonder is two, a store is three and
-    /// a wall is four. The argument has no default. A road lets more units
+    /// road is zero, a terrace is one, a wonder is two, a store is three, a
+    /// wall is four and a lodging is five. The argument has no default. A road lets more units
     /// stand on the tile. A terrace lets a unit take more from the tile in
     /// one step. A wonder asks for a large amount of work, and its completion
     /// wins the game for the faction that holds the ground under it.[^6] A
     /// store raises the store capacity of a settlement on or beside its tile,
     /// and **nothing in the engine reads that raise today**. Read
-    /// `site_economy` for the sum.
+    /// `site_economy` for the sum. A lodging raises the housing of a
+    /// settlement on or beside its tile, so the site holds more people. Read
+    /// `site_housing` for what stands.
     ///
     /// **The order names no level.** The engine reads the ground under each
     /// tile and the level that stands there, and it resolves the row of the
@@ -2069,8 +2326,9 @@ impl PyWorld {
     /// array that `spawn_soldiers` returned.
     ///
     /// The result is the upgrade category that `order_build` took: a road is
-    /// zero, a terrace is one, a wonder is two, a store is three and a wall
-    /// is four. The result is `None` when the soldier builds nothing.
+    /// zero, a terrace is one, a wonder is two, a store is three, a wall is
+    /// four and a lodging is five. The result is `None` when the soldier
+    /// builds nothing.
     ///
     /// **This read stays singular while the write verbs take a set.** A set
     /// form must choose. It fails the whole call for one dead identity, or
@@ -2153,7 +2411,8 @@ impl PyWorld {
     /// The faction is a faction number of this world. The addresses are a
     /// sequence of `(q, r)` pairs of integers. The category is an upgrade
     /// category, as an integer: a road is zero, a terrace is one, a wonder is
-    /// two, a store is three and a wall is four. Returns `None`.
+    /// two, a store is three, a wall is four and a lodging is five. Returns
+    /// `None`.
     ///
     /// **A plan says where a unit may build.** A category whose row asks for
     /// no held ground, such as a road, is laid only inside a project. That is
@@ -2861,6 +3120,348 @@ impl PyWorld {
         Ok(fields)
     }
 
+    /// Returns what one faction may read about one tile, as a `dict`.
+    ///
+    /// **No argument asks for the truth.** The engine applies the sight rule
+    /// inside the reader, so a caller cannot ask past the fog.[^1] A caller
+    /// that wants the truth of the world calls `tile_report`, which names no
+    /// faction and serves a developer who watches the engine.[^2]
+    ///
+    /// - `q` and `r`, integers. The address the call took.
+    /// - `faction`, an integer. The faction the call took.
+    /// - `sighting`, a string. One of `never`, `remembered` and `seen`.
+    ///
+    /// A `never` answer carries no other value. Every ground key is `None`,
+    /// so a caller tells that answer from a place that holds nothing.
+    ///
+    /// A `remembered` answer carries the ground of the place and no more.
+    /// The `kind`, `passable`, `height` and `generated` keys hold values, and
+    /// every other key is `None` or zero. **The reader answers no unit, no
+    /// holder and no upgrade**, because each of those is a fact of the
+    /// present frame.[^3]
+    ///
+    /// A `seen` answer carries the present frame as well.
+    ///
+    /// - `value`, an integer. The value of the tile. **A raw Q16.16 value.**
+    /// - `capacity`, an integer. How many units the tile admits.
+    /// - `stock`, a list of integers. What each resource kind holds now.
+    /// - `holder`, an integer or `None`. Who holds the tile now.
+    /// - `upgrade`, an integer or `None`. The category that stands there.
+    /// - `upgrade_level`, an integer. The level that stands there.
+    /// - `units`, an integer. How many units stand on the tile.
+    ///
+    /// The `height` and `generated` keys hold the ground that the seed and
+    /// the address fix, so a remembered answer and a seen answer agree on
+    /// them.[^4]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    /// Raises `ViewError` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D3. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: ADR-0059, fog storage grows with observed area, not with world area, decision D6. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    /// [^3]: ADR-0059, fog storage grows with observed area, not with world area, decision D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    /// [^4]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    fn faction_tile_report<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+        q: i32,
+        r: i32,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        if faction >= world.faction_count() {
+            return Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
+        }
+        let read = world
+            .faction_tile(FactionId(faction), Axial::new(q, r))
+            .ok_or_else(|| ViewError::new_err(format!("({q}, {r}) lies outside this world")))?;
+
+        let report = PyDict::new(python);
+        report.set_item("q", q)?;
+        report.set_item("r", r)?;
+        report.set_item("faction", faction)?;
+        report.set_item(
+            "sighting",
+            match read {
+                FactionTile::Never => "never",
+                FactionTile::Remembered(_) => "remembered",
+                FactionTile::Seen(_) => "seen",
+            },
+        )?;
+        match read.ground() {
+            Some(ground) => {
+                report.set_item("kind", ground.kind.to_u8())?;
+                report.set_item("passable", ground.kind.is_passable())?;
+                report.set_item("height", ground.height.0)?;
+                report.set_item(
+                    "generated",
+                    ground
+                        .generated
+                        .iter()
+                        .map(|amount| amount.0)
+                        .collect::<Vec<u32>>(),
+                )?;
+            }
+            None => {
+                report.set_item("kind", python.None())?;
+                report.set_item("passable", python.None())?;
+                report.set_item("height", python.None())?;
+                report.set_item("generated", python.None())?;
+            }
+        }
+        match read {
+            FactionTile::Seen(seen) => {
+                report.set_item("value", seen.value.0)?;
+                report.set_item("capacity", seen.capacity)?;
+                report.set_item(
+                    "stock",
+                    seen.stock
+                        .iter()
+                        .map(|amount| amount.0)
+                        .collect::<Vec<u32>>(),
+                )?;
+                match seen.holder {
+                    Some(holder) => report.set_item("holder", holder.0)?,
+                    None => report.set_item("holder", python.None())?,
+                }
+                match seen.upgrade {
+                    Some(site) => {
+                        report.set_item("upgrade", site.category.to_u8())?;
+                        report.set_item("upgrade_level", site.level)?;
+                    }
+                    None => {
+                        report.set_item("upgrade", python.None())?;
+                        report.set_item("upgrade_level", 0u8)?;
+                    }
+                }
+                report.set_item("units", seen.units)?;
+            }
+            FactionTile::Never | FactionTile::Remembered(_) => {
+                report.set_item("value", python.None())?;
+                report.set_item("capacity", python.None())?;
+                report.set_item("stock", python.None())?;
+                report.set_item("holder", python.None())?;
+                report.set_item("upgrade", python.None())?;
+                report.set_item("upgrade_level", 0u8)?;
+                report.set_item("units", 0u32)?;
+            }
+        }
+        Ok(report)
+    }
+
+    /// Returns the summary of one cell, over the tiles one faction may read.
+    ///
+    /// The cell is the cell that covers the address, and it is the cell that
+    /// `region_summary` reads. **This reader combines only the tiles the
+    /// sight rule admits**, so a cell cannot state what its tiles hide.[^1]
+    ///
+    /// The `admit` argument names which of the two rules the call took, and
+    /// neither one widens the answer past the fog.[^2] It takes `now` for
+    /// the tiles the faction sees this frame, and `ever` for the tiles it
+    /// has ever seen. It defaults to `now`.
+    ///
+    /// - `q`, `r`, `faction` and `admit`. The arguments the call took.
+    /// - `admitted`, an integer. How many tiles of the cell the rule
+    ///   admitted.
+    /// - `withheld`, an integer. How many tiles of the cell the rule
+    ///   withheld. A zero here means that the faction reads the whole cell.
+    /// - `tiles`, `open_tiles`, `units`, `held_tiles`, `value_total`,
+    ///   `height_total` and `food_total`. The fields `region_summary`
+    ///   reports, over the admitted tiles alone.
+    ///
+    /// **A tile the faction saw once and does not see now adds the ground
+    /// alone.** It adds no unit, no held tile and no value, because each of
+    /// those is a fact of the present frame.[^1]
+    ///
+    /// **The call walks the tiles of the cell.** The rebuilt cell counts
+    /// tiles the faction has not seen, so the reader cannot use it. The cost
+    /// follows the tiles of one cell and never the world.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world, or
+    /// when the `admit` argument names neither rule. Raises `ViewError` when
+    /// the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    /// [^2]: ADR-0059, fog storage grows with observed area, not with world area, decision D6. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    #[pyo3(signature = (faction, q, r, admit = "now"))]
+    fn faction_region_summary<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+        q: i32,
+        r: i32,
+        admit: &str,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let rule = match admit {
+            "now" => Admit::SeenNow,
+            "ever" => Admit::SeenEver,
+            other => {
+                return Err(VerbError::new_err(format!(
+                    "{other} names no admission rule of this reader"
+                )))
+            }
+        };
+        let world = self.lock();
+        if faction >= world.faction_count() {
+            return Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
+        }
+        let masked = world
+            .faction_summary_covering(FactionId(faction), Axial::new(q, r), rule)
+            .ok_or_else(|| ViewError::new_err(format!("({q}, {r}) names no cell of this world")))?;
+        let summary = masked.summary();
+        let fields = PyDict::new(python);
+        fields.set_item("q", q)?;
+        fields.set_item("r", r)?;
+        fields.set_item("faction", faction)?;
+        fields.set_item("admit", admit)?;
+        fields.set_item("admitted", masked.admitted())?;
+        fields.set_item("withheld", masked.withheld())?;
+        fields.set_item("tiles", summary.tiles())?;
+        fields.set_item("open_tiles", summary.open_tiles())?;
+        fields.set_item("units", summary.units())?;
+        fields.set_item("held_tiles", summary.held_tiles())?;
+        fields.set_item("value_total", summary.value_total().0)?;
+        fields.set_item("height_total", summary.height_total().0)?;
+        fields.set_item("food_total", summary.food_total().0)?;
+        Ok(fields)
+    }
+
+    /// Returns the observation of one faction, as one NumPy `int64` array.
+    ///
+    /// **The array holds what that faction observes, and nothing else.** No
+    /// argument widens the answer. A caller that wants the truth of the
+    /// world calls a reader that names no faction.[^1]
+    ///
+    /// `observation_schema` declares where every field of the array sits, and
+    /// it is the only declaration of that layout. **Do not write an offset,
+    /// a length or a bound into a file outside the engine.** Read the schema
+    /// and decode by arithmetic over it.[^2]
+    ///
+    /// The length is a function of the world parameters, and never of the
+    /// population.[^3] A faction that loses every unit reads an array of the
+    /// same length as a faction that holds a million.
+    ///
+    /// No position holds a floating point number. A fixed-point value crosses
+    /// as its raw integer, and the caller scales it.[^4]
+    ///
+    /// A cell the faction has never seen a tile of reads as zero in every
+    /// position. The `cell_seen_now` and `cell_seen_ever` fields of that cell
+    /// state that the faction holds none of it, so a caller tells an
+    /// unobserved cell from an empty one.
+    ///
+    /// This method copies the array.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    /// Raises `ViewError` when the derived unit structure does not describe
+    /// the units.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D3. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D1. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^3]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D2. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^4]: ADR-0002, state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    fn faction_observation<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+    ) -> PyResult<Bound<'py, PyArray1<i64>>> {
+        let world = self.lock();
+        if faction >= world.faction_count() {
+            return Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
+        }
+        let values = world
+            .faction_observation(FactionId(faction))
+            .ok_or_else(|| ViewError::new_err("the world cannot describe its own units"))?;
+        Ok(values.to_pyarray(python))
+    }
+
+    /// Returns the declared layout of the observation array, as a `dict`.
+    ///
+    /// **This is the only declaration of that layout.** The engine builds the
+    /// schema and the array from one field list, so a caller that decodes by
+    /// arithmetic over this schema cannot disagree with the array. No file
+    /// outside the engine may state a position, a length or a bound.[^1]
+    ///
+    /// The dictionary holds three keys.
+    ///
+    /// - `version`, an integer. The version of the layout. A field added,
+    ///   removed, relengthened or rebounded changes the meaning of a stored
+    ///   weight file, so a learner that loads a policy under another version
+    ///   must stop.[^2]
+    /// - `length`, an integer. How many positions the whole array holds. It
+    ///   is the length `faction_observation` returns.
+    /// - `fields`, a list of `dict`. One entry for each field, in the order
+    ///   the array holds them.
+    ///
+    /// Each field entry holds six keys.
+    ///
+    /// - `name`, a string. The name of the field.
+    /// - `start`, an integer. The position the field starts at.
+    /// - `positions`, an integer. How many positions the field holds. A field
+    ///   is contiguous, so position `n` of it sits at `start + n`.
+    /// - `dtype`, a string. The NumPy element type of every position.
+    /// - `low` and `high`, integers. The lowest and the highest value any
+    ///   position of the field may hold.
+    ///
+    /// A field whose bounds are the whole range of the element type has no
+    /// tighter bound that the world parameters give. The engine states no
+    /// measured figure, because a blocker governs every measured figure of
+    /// this project.[^3]
+    ///
+    /// A field whose name starts with `cell_` holds one position for each
+    /// cell of the block lattice, in ascending cell order. That is the same
+    /// lattice the fog layer and the summary level divide the world over, and
+    /// it carries no margin.[^4] [^5]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the interpreter refuses to hold the dictionary.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D1. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^3]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+    /// [^4]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    /// [^5]: Findings register, FND-569. `docs/FINDINGS.md`
+    fn observation_schema<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let schema = world.observation_schema();
+        let fields = PyList::empty(python);
+        for row in schema.rows() {
+            let entry = PyDict::new(python);
+            entry.set_item("name", row.name())?;
+            entry.set_item("start", row.start)?;
+            entry.set_item("positions", row.positions)?;
+            entry.set_item("dtype", row.kind().numpy_name())?;
+            entry.set_item("low", row.low)?;
+            entry.set_item("high", row.high)?;
+            fields.append(entry)?;
+        }
+        let out = PyDict::new(python);
+        out.set_item("version", schema.version())?;
+        out.set_item("length", schema.length())?;
+        out.set_item("fields", fields)?;
+        Ok(out)
+    }
+
     /// Returns what one site earns, holds and owes, as a `dict`.
     ///
     /// The site is one settlement identity, as a Python integer. The
@@ -3016,6 +3617,62 @@ impl PyWorld {
                 .site_free_places(entity)
                 .expect("the identity resolved to a live site above"),
         )?;
+        Ok(report)
+    }
+
+    /// Returns what one settlement produces now, as a `dict`.
+    ///
+    /// The keys are:
+    ///
+    /// - `base`. The stored rate, as its raw Q16.16 integer. The founding
+    ///   writes it once, from the food the survey measured, and nothing else
+    ///   moves it.[^1]
+    /// - `scale`. What the pipeline gives the site now, as its raw Q16.16
+    ///   integer. One is 65536. The pipeline reads the ground the site
+    ///   reaches, the moisture over it, the terraces on it, and the residents
+    ///   in it.
+    /// - `effective`. The base scaled, which is what the next application
+    ///   earns. This is the value that varies over a run.
+    ///
+    /// **The scale and the effective rate are derived.** The engine stores
+    /// neither, and neither enters the state hash. Both are read again from
+    /// the world on every call.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the identity names no live settlement.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D1. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    /// [^2]: ADR-0164, every stored value the step reads enters the state hash, decision D2. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    #[pyo3(signature = (site, commodity = 0))]
+    fn site_production<'py>(
+        &self,
+        python: Python<'py>,
+        site: u64,
+        commodity: u16,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let entity = resolve_site(&world, site)?;
+        let goods = CommodityId(commodity);
+        let slot = world
+            .settlements()
+            .slot_of(entity)
+            .expect("the identity resolved to a live site above");
+        let base = world.rates().production(slot, goods).ok_or_else(|| {
+            VerbError::new_err(format!("{commodity} names no commodity of this world"))
+        })?;
+        let scale = world
+            .production_scale(entity)
+            .expect("the identity resolved to a live site above");
+        let effective = world
+            .effective_production_rate(entity, goods)
+            .expect("the slot and the commodity both resolved above");
+        let report = PyDict::new(python);
+        report.set_item("base", base.0)?;
+        report.set_item("scale", scale.0)?;
+        report.set_item("effective", effective.0)?;
         Ok(report)
     }
 
@@ -3265,7 +3922,7 @@ impl PyWorld {
     /// - `upgrade`, an integer or `None`. The category the tile carries,
     ///   standing or under construction, and `None` for a tile that carries
     ///   none. A road is zero, a terrace is one, a wonder is two, a store is
-    ///   three and a wall is four.
+    ///   three, a wall is four and a lodging is five.
     /// - `upgrade_level`, an integer. The level that stands on the tile, and
     ///   zero when nothing stands there yet.
     /// - `upgrade_progress`, an integer. The work that has gone into the next
@@ -3532,12 +4189,18 @@ impl PyWorld {
 
     /// Returns the weight vector of one faction, as a `dict`.
     ///
-    /// The faction is a number. The keys are `war`, `trade`, `build` and
-    /// `renown`, and every value is a whole number inside the range the
-    /// balance register holds.[^1] The vector is drawn from the seed when the
-    /// world is built, so two worlds with one seed hold one vector. Only the
-    /// build weight is read today: it biases the controller toward a build
-    /// order over a gather order.
+    /// The faction is a number. The keys are `war`, `trade`, `build`,
+    /// `renown` and `settle`, and every value is a whole number inside the
+    /// range the balance register holds.[^1] The seeding draws the vector
+    /// when the world is built, so two worlds with one seed start on one
+    /// vector. `set_faction_weights` writes it after that.
+    ///
+    /// The renown weight is the one weight that no pass reads today. Every
+    /// other weight biases one controller evaluation.
+    ///
+    /// **The vector is the policy of the faction, and it is simulated
+    /// state.**[^2] It enters the state hash, so two worlds that differ in a
+    /// weight part on the next tick.
     ///
     /// # Errors
     ///
@@ -3546,6 +4209,7 @@ impl PyWorld {
     /// # References
     ///
     /// [^1]: Balance register, the weight vector range. `docs/reference/balance.md`
+    /// [^2]: ADR-0156, a faction's option weights are policy, set through one verb, decision D1. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
     fn faction_weights<'py>(
         &self,
         python: Python<'py>,
@@ -3560,7 +4224,73 @@ impl PyWorld {
         report.set_item("trade", weights.trade)?;
         report.set_item("build", weights.build)?;
         report.set_item("renown", weights.renown)?;
+        report.set_item("settle", weights.settle)?;
         Ok(report)
+    }
+
+    /// Writes the whole weight vector of one faction.
+    ///
+    /// **The weight a faction gives each option is that faction's policy, and
+    /// this is the one verb that writes it.**[^1] A Python caller calls it.
+    /// The built-in controller calls it. A learner calls it. No second path
+    /// exists, so a learner may write the weights the built-in controller
+    /// would never write, and that is the game played correctly.
+    ///
+    /// The verb writes the whole vector and never a part of it. Read the
+    /// vector with `faction_weights`, change what you want, and write it
+    /// back. One write and one read then hold one shape, so no caller has to
+    /// know which weights the vector holds.
+    ///
+    /// **A weight is simulated state and it enters the state hash.**[^2] The
+    /// verb takes no floating point value: every weight is a whole
+    /// number.[^3]
+    ///
+    /// **The verb states no preference.** It says where a weight lives and
+    /// who writes it. It says nothing about which option a faction should
+    /// favour.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world, or
+    /// when a weight lies outside the range the balance register holds.[^4]
+    /// A refused write changes nothing.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0156, a faction's option weights are policy, set through one verb, decision D3. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+    /// [^2]: ADR-0156, a faction's option weights are policy, set through one verb, decision D1. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+    /// [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^4]: Balance register, the weight vector range. `docs/reference/balance.md`
+    #[pyo3(signature = (faction, *, war, trade, build, renown, settle))]
+    fn set_faction_weights(
+        &self,
+        faction: u16,
+        war: u8,
+        trade: u8,
+        build: u8,
+        renown: u8,
+        settle: u8,
+    ) -> PyResult<()> {
+        let weights = FactionWeights {
+            war,
+            trade,
+            build,
+            renown,
+            settle,
+        };
+        if !weights.is_inside_bound() {
+            return Err(VerbError::new_err(format!(
+                "every weight must lie between {WEIGHT_LOW} and {WEIGHT_HIGH}"
+            )));
+        }
+        let mut world = self.lock();
+        if world.set_faction_weights(FactionId(faction), weights) {
+            Ok(())
+        } else {
+            Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )))
+        }
     }
 
     /// Says whether an external caller controls a faction.
@@ -3642,19 +4372,178 @@ impl PyWorld {
         self.lock().set_tick_limit(tick_limit);
     }
 
+    /// Sets the renown at which the renown reader fires.
+    ///
+    /// The argument is a raw Q16.16 integer. Multiply a whole number of
+    /// renown points by 65536 to reach it.
+    ///
+    /// **This is a threshold.** It decides when the renown reader fires and
+    /// changes nothing else that the simulation does. The value is state
+    /// that every tick reads, so two worlds that differ in it hash
+    /// differently.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decisions D1 and D2. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+    fn set_renown_target(&self, raw: i32) {
+        self.lock().set_renown_target(raw);
+    }
+
+    /// Sets the renown that one felled unit gives the champion of the faction
+    /// that felled it.
+    ///
+    /// The argument is a raw Q16.16 integer. Multiply a whole number of
+    /// renown points by 65536 to reach it.
+    ///
+    /// **This is a rate.** The renown column is state that a later frame
+    /// reads, so a change to this value changes what the simulation
+    /// does.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D2. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+    fn set_renown_per_fell(&self, raw: i32) {
+        self.lock().set_renown_per_fell(raw);
+    }
+
+    /// Sets the work that finishes a wonder.
+    ///
+    /// The work is a column of the upgrade table row that holds the wonder.
+    /// This writes that column and leaves every other column of the row where
+    /// it is.
+    ///
+    /// **This is a rate.** A wonder that costs more work takes longer to
+    /// build, so the value changes what the simulation does.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the table holds no wonder row.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D2. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+    fn set_wonder_work(&self, work: u32) -> PyResult<()> {
+        if self.lock().set_wonder_work(work) {
+            Ok(())
+        } else {
+            Err(VerbError::new_err("the table holds no wonder row"))
+        }
+    }
+
+    /// Sets the victory claim that the wonder row carries.
+    ///
+    /// The claim is a column of the upgrade table row that holds the wonder.
+    /// This writes that column and leaves every other column of the row where
+    /// it is.
+    ///
+    /// **This is a threshold.** The wonder reader fires for the faction that
+    /// holds a standing claim above zero, so a claim of zero takes the wonder
+    /// path out of the game and changes nothing else.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the table holds no wonder row.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D2. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+    fn set_wonder_victory_claim(&self, claim: u32) -> PyResult<()> {
+        if self.lock().set_wonder_victory_claim(claim) {
+            Ok(())
+        } else {
+            Err(VerbError::new_err("the table holds no wonder row"))
+        }
+    }
+
+    /// Sets whether the game end readers run.
+    ///
+    /// While they do not run, no reader records a game end, `game_end`
+    /// returns `None`, and the world runs to the tick limit.
+    ///
+    /// **A run with the readers off holds the same event log as a run with
+    /// the readers on that never fires.** A reader decides when the step
+    /// stops watching, and it changes nothing else. One run to the limit with
+    /// the readers off therefore gives the trajectory that scores any set of
+    /// thresholds, and a second run is not necessary.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D3. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+    fn set_win_readers_enabled(&self, enabled: bool) {
+        self.lock().set_win_readers_enabled(enabled);
+    }
+
+    /// The renown at which the renown reader fires, as a raw Q16.16 integer.
+    ///
+    /// A world that nobody configures holds the constant that names the
+    /// default. Divide by 65536 for whole renown points.
+    #[getter]
+    fn renown_target(&self) -> i32 {
+        self.lock().balance().renown_target()
+    }
+
+    /// The renown one felled unit gives the champion of the faction that
+    /// felled it, as a raw Q16.16 integer.
+    #[getter]
+    fn renown_per_fell(&self) -> i32 {
+        self.lock().balance().renown_per_fell().0
+    }
+
+    /// Whether the game end readers run, as a `bool`.
+    #[getter]
+    fn win_readers_enabled(&self) -> bool {
+        self.lock().balance().win_readers_enabled()
+    }
+
+    /// The work that finishes a wonder, as an integer.
+    ///
+    /// The value is the work column of the upgrade table row that holds the
+    /// wonder. Returns `None` when the table holds no wonder row.
+    #[getter]
+    fn wonder_work(&self) -> Option<u32> {
+        self.lock()
+            .upgrade_table()
+            .row(
+                cachette_core::upgrade::UpgradeCategory::WONDER,
+                cachette_core::upgrade::WONDER_LEVEL,
+            )
+            .map(|row| row.work)
+    }
+
+    /// The victory claim the wonder row carries, as an integer.
+    ///
+    /// The wonder reader fires for the faction that holds a standing claim
+    /// above zero. Returns `None` when the table holds no wonder row.
+    #[getter]
+    fn wonder_victory_claim(&self) -> Option<u32> {
+        self.lock()
+            .upgrade_table()
+            .row(
+                cachette_core::upgrade::UpgradeCategory::WONDER,
+                cachette_core::upgrade::WONDER_LEVEL,
+            )
+            .map(|row| row.victory_claim)
+    }
+
     /// Returns the game end record, as a `dict`, or `None` while no game has
     /// ended.
     ///
     /// The keys are `winner`, an integer naming the faction; `path`, a `str`
-    /// naming the way it won, one of `domination`, `territory`,
-    /// `wealth_or_wonder` and `renown`; and `tick`, the tick the reader
-    /// fired on. **The record is written once.** After it the controller
-    /// emits nothing and every other pass continues, so the world keeps
-    /// stepping and the picture keeps moving.[^1]
+    /// naming the way it won, one of `domination`, `territory`, `wonder` and
+    /// `renown`; and `tick`, the tick the reader fired on. **The record is
+    /// written once.** After it the controller emits nothing and every other
+    /// pass continues, so the world keeps stepping and the picture keeps
+    /// moving.[^1] [^2]
+    ///
+    /// **The method returns `None` while the readers are off.** A caller
+    /// that turns them off asks the world to run to the tick limit and to
+    /// record no end.[^3]
     ///
     /// # References
     ///
     /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^2]: ADR-0174, a wonder is a win path and a stock total is not, decisions D1 and D3. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
+    /// [^3]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D3. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
     fn game_end<'py>(&self, python: Python<'py>) -> PyResult<Option<Bound<'py, PyDict>>> {
         let end = self.lock().game_end();
         let Some(path) = end.win_path() else {
@@ -3690,13 +4579,20 @@ impl PyWorld {
     /// `dict`.
     ///
     /// The keys are `held_tiles`, the tiles the faction holds; `seats_held`,
-    /// the seats it holds, its own and every rival's; `store_total`, the sum
-    /// of every store of every settlement of the faction **as a raw Q16.16
-    /// integer**; `best_renown`, the highest renown of any live character of
-    /// the faction, **as a raw Q16.16 integer**; and `wonder_progress`, the
-    /// most work any wonder on ground the faction holds has reached. Each
-    /// value is the one the matching reader compares, so a caller can watch
-    /// a path approach its end.[^1]
+    /// the seats it holds, its own and every rival's; `live_units`, the units
+    /// of the faction that are alive; `store_total`, the sum of every store
+    /// of every settlement of the faction **as a raw Q16.16 integer**;
+    /// `best_renown`, the highest renown of any live character of the
+    /// faction, **as a raw Q16.16 integer**; and `wonder_progress`, the most
+    /// work any wonder on ground the faction holds has reached.
+    ///
+    /// Every key except `store_total` feeds a reader, so a caller can watch
+    /// each path approach its end.[^1] `held_tiles` feeds territory,
+    /// `seats_held` and `live_units` feed domination, `best_renown` feeds
+    /// renown, and `wonder_progress` is how far the furthest unfinished
+    /// wonder has come. **`store_total` feeds no reader**, because a stock
+    /// total wins no game. It is reported so that a caller may watch a
+    /// faction grow rich.[^2]
     ///
     /// # Errors
     ///
@@ -3705,6 +4601,7 @@ impl PyWorld {
     /// # References
     ///
     /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D1. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^2]: ADR-0174, a wonder is a win path and a stock total is not, decisions D2 and D4. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
     fn standing<'py>(&self, python: Python<'py>, faction: u16) -> PyResult<Bound<'py, PyDict>> {
         let standing = self.lock().standing(FactionId(faction)).ok_or_else(|| {
             VerbError::new_err(format!("{faction} names no faction of this world"))
@@ -3712,6 +4609,7 @@ impl PyWorld {
         let report = PyDict::new(python);
         report.set_item("held_tiles", standing.held_tiles)?;
         report.set_item("seats_held", standing.seats_held)?;
+        report.set_item("live_units", standing.live_units)?;
         report.set_item("store_total", standing.store_total)?;
         report.set_item("best_renown", standing.best_renown)?;
         report.set_item("wonder_progress", standing.wonder_progress)?;
@@ -4835,12 +5733,19 @@ impl PyWorld {
     ///   the world was built.
     /// - `raised`, an integer. The water that has entered the air since the
     ///   world was built, from the sea and from every god.
-    /// - `wet_cells`, an integer. How many level 1 cells hold at least
-    ///   `weather_wet_mark` drops on the ground.
+    /// - `wet_cells`, an integer. How many weather cells of the world hold at
+    ///   least `weather_wet_mark` drops on the ground.
     ///
     /// **The account is exact.** The sum of `air`, `ground` and `evaporated`
     /// equals `raised` at every moment. A pass moves water and never scales
     /// it.[^1]
+    ///
+    /// **`air` and `ground` cover the whole weather lattice, and that lattice
+    /// is larger than the world.** The engine simulates a margin of cells
+    /// around the world so that the border of the world has real upwind. The
+    /// margin holds water, and the account balances only when the totals hold
+    /// it too. `wet_cells` counts the world alone, and so do the weather
+    /// arrays.
     ///
     /// # References
     ///
@@ -4871,9 +5776,25 @@ impl PyWorld {
     /// The array is empty when no water has entered the world yet.
     fn weather_ground<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i64>> {
         let world = self.lock();
+        // **The reading crops the margin away.** The weather lattice is
+        // larger than the world, and a watcher indexes this array by the cell
+        // columns of the world.
         let plane: Vec<i64> = world
             .weather()
-            .ground_plane()
+            .ground_over_world()
+            .iter()
+            .map(|drops| drops.0)
+            .collect();
+        plane.to_pyarray(python)
+    }
+
+    /// The water in the air over every level 1 cell, as a NumPy array.
+    fn weather_air<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i64>> {
+        let world = self.lock();
+        // The reading crops the margin away, as the ground reading does.
+        let plane: Vec<i64> = world
+            .weather()
+            .air_over_world()
             .iter()
             .map(|drops| drops.0)
             .collect();
@@ -4882,9 +5803,9 @@ impl PyWorld {
 
     /// The number of level 1 cells across the world, as an integer.
     ///
-    /// A weather array is in cell index order, so a watcher takes
-    /// `index % cells_wide` for the column of a cell and
-    /// `index // cells_wide` for its row.
+    /// **This is the level 1 pitch, and the weather has a pitch of its own.**
+    /// Read `weather_cells_wide` to index a weather array. The two agree only
+    /// when the world takes the level 1 weather pitch.
     #[getter]
     fn cells_wide(&self) -> u32 {
         self.lock().pyramid().layout().blocks_wide()
@@ -4977,6 +5898,65 @@ impl PyWorld {
         let columns = PyDict::new(python);
         columns.set_item("unit", unit.to_pyarray(python))?;
         columns.set_item("tile", tile.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// Returns every unit one faction sees now, as a `dict` of arrays.
+    ///
+    /// A faction sees a unit when it sees the tile that unit stands on. It
+    /// therefore reads its own units on the ground its own units watch, and
+    /// it reads a rival that walks into that ground.[^1]
+    ///
+    /// **No argument asks for the truth.** A caller that wants every unit of
+    /// one faction, seen or not, calls `faction_units`, which reports the
+    /// units of the faction it names and nothing else.
+    ///
+    /// The three arrays hold one entry for each unit, at one index.
+    ///
+    /// - `unit`, `numpy.uint64`. The identity of the unit.
+    /// - `tile`, `numpy.uint32`. The tile the unit stands on.
+    /// - `faction`, `numpy.uint16`. The faction the unit belongs to.
+    ///
+    /// **The order is fixed.** The walk runs over the factions in faction
+    /// order, and over the units of each faction in slot order, so two runs
+    /// return one answer.[^2]
+    ///
+    /// **This answers the present frame and never a memory.** A remembered
+    /// place reports no unit, so a unit that walked out of sight leaves this
+    /// array.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn faction_visible_units<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        if faction >= world.faction_count() {
+            return Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
+        }
+        let seen = world.units_seen_by(FactionId(faction));
+        let mut unit: Vec<u64> = Vec::with_capacity(seen.len());
+        let mut tile: Vec<u32> = Vec::with_capacity(seen.len());
+        let mut owner: Vec<u16> = Vec::with_capacity(seen.len());
+        for row in seen {
+            unit.push(row.unit.to_bits());
+            tile.push(row.tile.0);
+            owner.push(row.faction.0);
+        }
+        let columns = PyDict::new(python);
+        columns.set_item("unit", unit.to_pyarray(python))?;
+        columns.set_item("tile", tile.to_pyarray(python))?;
+        columns.set_item("faction", owner.to_pyarray(python))?;
         Ok(columns)
     }
 
@@ -7583,6 +8563,28 @@ fn event_schema(python: Python<'_>) -> PyResult<Bound<'_, PyDict>> {
     Ok(schema)
 }
 
+/// Returns the colours the viewer paints the factions in, as a `list`.
+///
+/// Each entry is a colour as one integer, red in the highest byte, then
+/// green, then blue. The entry at index `n` is the colour of faction `n`. A
+/// faction beyond the end of the list wraps to a colour it shares, which is
+/// a display limit and not a simulation one.
+///
+/// **The viewer states this table once, and a caller reads it here.** A
+/// script that wrote its own copy painted a faction in a colour the viewer no
+/// longer used, and nothing failed.[^1]
+///
+/// The colours belong to the viewer. The simulated state holds no colour.[^2]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+#[pyfunction]
+fn faction_colours() -> Vec<u32> {
+    cachette_view::paint::faction_colours().to_vec()
+}
+
 /// Returns the version of the `cachette` package, as a `str`.
 ///
 /// The value is the version of the compiled extension module. The package
@@ -7592,10 +8594,28 @@ fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
 }
 
+/// Returns the stock one settlement can hold, as an `int`.
+///
+/// The value is a raw Q16.16 quantity summed over every commodity of one
+/// settlement: the ceiling of a fixed-point store times the commodity count.
+/// A faction that holds one settlement never reports more than this. The
+/// ceiling is the reason no bar could put the wealth path out of reach, and
+/// the reason the path has no reader today.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0173, the wealth or wonder path has no reader, decision D1. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
+#[pyfunction]
+fn stock_ceiling_of_one_settlement() -> i64 {
+    cachette_core::STOCK_CEILING_OF_ONE_SETTLEMENT
+}
+
 /// The compiled core of the Cachette simulation engine.
 ///
-/// The module holds the `World` class, the `Camera` class, the `version`
-/// function and the error classes. The `cachette` package re-exports all of
+/// The module holds the `World` class, the `Camera` class, the module
+/// functions and the error classes. This sentence does not list them,
+/// because a list here is a second statement of the interface and the
+/// generated reference is the first.[^7] The `cachette` package re-exports
 /// them, so import from `cachette` rather than from here.
 ///
 /// **This module is for a programmer who drives a simulation from Python.**
@@ -7704,13 +8724,16 @@ fn version() -> &'static str {
 /// [^4]: Decisions register, DEC-120. `docs/DECISIONS.md`
 /// [^5]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D2. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 /// [^6]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+/// [^7]: ADR-0107, the Python reference is generated from the compiled module, decision D1. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
 #[pymodule]
 #[pyo3(name = "_core")]
 fn cachette_core_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyWorld>()?;
     module.add_class::<PyCamera>()?;
     module.add_function(wrap_pyfunction!(version, module)?)?;
+    module.add_function(wrap_pyfunction!(stock_ceiling_of_one_settlement, module)?)?;
     module.add_function(wrap_pyfunction!(event_schema, module)?)?;
+    module.add_function(wrap_pyfunction!(faction_colours, module)?)?;
     add_error::<CachetteError>(module, "CachetteError")?;
     add_error::<StepError>(module, "StepError")?;
     add_error::<FrameError>(module, "FrameError")?;

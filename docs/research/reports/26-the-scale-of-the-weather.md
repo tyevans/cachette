@@ -260,4 +260,4 @@ belong in the balance register rather than in a record.
 [^5]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^6]: Research report 24, demonstration readability, resources and weather, sections 2.3 and 7. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
 [^7]: The weather module, `WET_MARK`. `crates/cachette-core/src/weather.rs`
-[^8]: The weather module, `cell_lifts`, `LIFT_DROPS` and `LIFT_PERIOD`. `crates/cachette-core/src/weather.rs`
+[^8]: The weather module, `cell_lifts`, `LIFT_OF_ROOM_NUMERATOR`, `LIFT_OF_ROOM_DENOMINATOR` and `LIFT_PERIOD`. `crates/cachette-core/src/weather.rs`

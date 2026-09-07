@@ -1952,6 +1952,7 @@ pub const fn upgrade_name(kind: cachette_core::upgrade::UpgradeCategory) -> &'st
         cachette_core::upgrade::UpgradeCategory::WONDER => "wonder",
         cachette_core::upgrade::UpgradeCategory::STORE => "store",
         cachette_core::upgrade::UpgradeCategory::WALL => "wall",
+        cachette_core::upgrade::UpgradeCategory::LODGING => "lodging",
         cachette_core::upgrade::UpgradeCategory::OPEN => "open category, no row",
         _ => "upgrade",
     }

@@ -56,3 +56,13 @@ test = false
 name = "exit_locality"
 harness = false
 test = false
+
+[[bench]]
+name = "masked_summary"
+harness = false
+test = false
+
+[[bench]]
+name = "faction_observation"
+harness = false
+test = false

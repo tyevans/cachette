@@ -222,6 +222,24 @@ pub const fn divide_by_count(total: Accum, count: u32) -> Option<Fix32> {
     Some(Fix32(saturate_i32(total.0 / (count as i64))))
 }
 
+/// Narrows an accumulator into the fixed-point range, saturating.
+///
+/// A pass that sums a per-item quantity over a whole count holds the total in
+/// an accumulator, because the accumulator is the width that a sum over the
+/// world cannot overflow.[^1] A pass that then writes the total into a
+/// fixed-point column needs this one narrowing, and it must saturate rather
+/// than wrap, because a wrap turns a large value into a large negative
+/// one.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+/// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D3. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[must_use]
+pub const fn narrow(total: Accum) -> Fix32 {
+    Fix32(saturate_i32(total.0))
+}
+
 /// Clamps a 128-bit value into the accumulator range.
 const fn saturate_i64(value: i128) -> i64 {
     if value > i64::MAX as i128 {
@@ -263,4 +281,156 @@ pub const fn offset_by_count(step: i32, count: u32) -> i32 {
     } else {
         product as i32
     }
+}
+
+/// The steps the sine table holds in one quarter turn.
+///
+/// The table holds one more entry than this, because the quarter ends on the
+/// top of the wave and the interpolation reads the entry after the one it
+/// starts from.
+const SINE_QUARTER: i64 = 64;
+
+/// The steps in one whole turn of the sine.
+pub const SINE_STEPS: i64 = 4 * SINE_QUARTER;
+
+/// A quarter turn of the sine, in Q16.16.
+///
+/// Entry `i` holds the sine of `i` steps of a turn of [`SINE_STEPS`] steps.
+/// The first entry is zero and the last is one. The other three quarters of
+/// the wave are this quarter reflected and negated, so the table states the
+/// shape once.
+///
+/// **The table is data and not a polynomial**, because a reader can see the
+/// shape without simulating it and because the same index always gives the
+/// same value on every target.
+const SINE_TABLE: [i32; 65] = [
+    0, 1608, 3216, 4821, 6424, 8022, 9616, 11204, 12785, 14359, 15924, 17479, 19024, 20557, 22078,
+    23586, 25080, 26558, 28020, 29466, 30893, 32303, 33692, 35062, 36410, 37736, 39040, 40320,
+    41576, 42806, 44011, 45190, 46341, 47464, 48559, 49624, 50660, 51665, 52639, 53581, 54491,
+    55368, 56212, 57022, 57798, 58538, 59244, 59914, 60547, 61145, 61705, 62228, 62714, 63162,
+    63572, 63944, 64277, 64571, 64827, 65043, 65220, 65358, 65457, 65516, 65536,
+];
+
+/// Returns the sine at a whole step of the turn.
+///
+/// The step runs from zero to [`SINE_STEPS`]. The three quarters after the
+/// first read the table backwards, or negated, or both.
+const fn sine_at_step(step: i64) -> i32 {
+    let step = step.rem_euclid(SINE_STEPS);
+    if step <= SINE_QUARTER {
+        SINE_TABLE[step as usize]
+    } else if step <= 2 * SINE_QUARTER {
+        SINE_TABLE[(2 * SINE_QUARTER - step) as usize]
+    } else if step <= 3 * SINE_QUARTER {
+        -SINE_TABLE[(step - 2 * SINE_QUARTER) as usize]
+    } else {
+        -SINE_TABLE[(4 * SINE_QUARTER - step) as usize]
+    }
+}
+
+/// Returns the sine of a phase, in Q16.16.
+///
+/// The phase is a position in a turn and the period is the length of that
+/// turn, both in whatever unit the caller counts in. So `sine(0, period)` is
+/// zero, `sine(period / 4, period)` is one, and the answer repeats every
+/// period. A phase outside one turn wraps, and a negative phase wraps the
+/// other way.
+///
+/// **The answer comes from a table of a quarter turn, interpolated between
+/// two entries.** It holds no floating point value, it reads no library, and
+/// the same phase gives the same answer on every target.[^1]
+///
+/// Returns `None` when the period is not positive. A period of zero is a
+/// caller error, and this module does not panic on it.
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decisions D1 and D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[must_use]
+pub const fn sine(phase: i64, period: i64) -> Option<Fix32> {
+    if period <= 0 {
+        return None;
+    }
+    let turned = phase.rem_euclid(period);
+    // The position in the turn, in table steps with a fixed-point tail. The
+    // product is 128 bits wide, so a long period costs no accuracy.
+    let fine = 1i64 << FIX_FRACTIONAL_BITS;
+    let scaled =
+        ((turned as i128) * (SINE_STEPS as i128) * (fine as i128) / (period as i128)) as i64;
+    let step = scaled >> FIX_FRACTIONAL_BITS;
+    let part = scaled - (step << FIX_FRACTIONAL_BITS);
+    let low = sine_at_step(step) as i64;
+    let high = sine_at_step(step + 1) as i64;
+    Some(Fix32(saturate_i32(low + (high - low) * part / fine)))
+}
+
+/// Returns the angle whose cosine is the value, as a phase in table steps.
+///
+/// The answer is a position in a turn of [`SINE_STEPS`] steps, held in the
+/// same fixed-point form as every other value here. So an answer of zero is
+/// a cosine of one, and an answer of half a turn is a cosine of minus one.
+/// The answer never leaves the first half turn, which is the range over
+/// which the cosine falls once and takes each value once.
+///
+/// **The answer comes from the same table the sine reads.** The cosine of a
+/// step is the sine of that step a quarter turn later, and that quarter turn
+/// of the table falls from one to minus one over the half turn. So a search
+/// over the table inverts the cosine without a second table and without a
+/// polynomial, and the same value gives the same answer on every target.[^1]
+///
+/// A value outside the range from minus one to one saturates at the end of
+/// the range it passes.
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decisions D1 and D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[must_use]
+pub const fn arc_cosine_steps(value: Fix32) -> i64 {
+    let one = 1i64 << FIX_FRACTIONAL_BITS;
+    let target = value.0 as i64;
+    if target >= one {
+        return 0;
+    }
+    let half = 2 * SINE_QUARTER;
+    if target <= -one {
+        return half << FIX_FRACTIONAL_BITS;
+    }
+    // The cosine of a whole step, read as the sine a quarter turn later. It
+    // falls over the half turn, so a bisection brackets the answer between
+    // two neighbouring steps.
+    let mut low = 0i64;
+    let mut high = half;
+    while high - low > 1 {
+        let middle = (low + high) / 2;
+        if (sine_at_step(middle + SINE_QUARTER) as i64) > target {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    let above = sine_at_step(low + SINE_QUARTER) as i64;
+    let below = sine_at_step(high + SINE_QUARTER) as i64;
+    if above == below {
+        return low << FIX_FRACTIONAL_BITS;
+    }
+    // The part of the way from the step above the target to the step below
+    // it. Both ends come from the table, so the interpolation is the same
+    // one the sine itself uses.
+    let part = ((above - target) << FIX_FRACTIONAL_BITS) / (above - below);
+    (low << FIX_FRACTIONAL_BITS) + part
+}
+
+/// Returns the sine of a phase held in table steps.
+///
+/// The phase is a position in a turn of [`SINE_STEPS`] steps, in the same
+/// fixed-point form that [`arc_cosine_steps`] returns. So the two are
+/// inverses of one another, up to the accuracy of the table.
+#[must_use]
+pub const fn sine_of_steps(phase: i64) -> Fix32 {
+    let fine = 1i64 << FIX_FRACTIONAL_BITS;
+    let step = phase >> FIX_FRACTIONAL_BITS;
+    let part = phase - (step << FIX_FRACTIONAL_BITS);
+    let low = sine_at_step(step) as i64;
+    let high = sine_at_step(step + 1) as i64;
+    Fix32(saturate_i32(low + (high - low) * part / fine))
 }

@@ -1,0 +1,9 @@
+{
+  "faults": [
+    "The single triangle reads as a mountain or a generic geometric shape rather than a 'dense pine forest'; replace it with a cluster of overlapping triangular tree canopies to convey density.",
+    "The tile lacks the two-tone depth (base vs. foreground) seen in the accepted exemplars; add a darker foreground shape or a second layer of trees to create visual depth.",
+    "The composition is too sparse and centered; distribute the tree shapes across the hexagon to better fill the space and match the visual weight of the grassland and water exemplars."
+  ],
+  "score": 55,
+  "verdict": "The candidate is a flat, single-shape tile that reads as a generic mountain or triangle rather than a dense forest, and it lacks the depth cues present in the accepted exemplars."
+}

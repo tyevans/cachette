@@ -26,6 +26,21 @@ because it has only one thing.
 This is a placeholder that reads as a rule. A contributor who opens the table
 sees a map and assumes it means something.
 
+**It also closes the whole trade subsystem, and that was not known when this
+item was written.** A sweep of 16 seeds of the demonstration world, each played
+to 20000 ticks, recorded zero offers, zero contracts and zero bound carriers in
+every seed.[^2] The chain is short. A faction writes its board from the total
+it holds of each of the three goods, and all three goods read the same total
+because all three map onto the one commodity. A faction offers a good it holds
+more of than the surplus mark and wants a good it holds less of, so every
+faction offers all three goods at the same quantity and wants none. A match
+needs one faction to want what another offers, and none ever does.
+
+**No value in the balance register opens it.** A surplus mark above the store
+makes every faction want all three goods instead, and a match still needs the
+two sides. The mark cannot make the four factions different from each other,
+and only a difference makes a trade.
+
 ## What the work does
 
 1. Give the store of a site more than one commodity, or state why it holds
@@ -48,3 +63,4 @@ Filled in when the item moves to `complete/`.
 ## References
 
 [^1]: Decisions register, DEC-073. `docs/DECISIONS.md`
+[^2]: Findings register, FND-549. `docs/FINDINGS.md`

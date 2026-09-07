@@ -53,6 +53,13 @@ import numpy.typing as npt
 # identities passes that. Both are one crossing, so both are allowed.
 Identities = Sequence[int] | npt.NDArray[np.uint64]
 
+# What ``World.log`` gives back for any log the register holds.
+#
+# The keys are the column names of the event. The element type of each array
+# follows the field, and ``event_schema`` states it. A caller that knows which
+# log it asked for narrows this to the typed dictionary of that event.
+EventColumns = dict[str, npt.NDArray[np.generic]]
+
 class TileChangedColumns(TypedDict):
     """One column for each field of the tile change event.
 
@@ -70,6 +77,67 @@ class TileChangedColumns(TypedDict):
     value: npt.NDArray[np.int32]
     holder: npt.NDArray[np.uint16]
     kind: npt.NDArray[np.uint8]
+    # End of the generated block.
+
+class UpgradeCollapsedColumns(TypedDict):
+    """One column for each field of the upgrade collapse event.
+
+    An upgrade has two sinks, and both write this event. The wear pass takes
+    the last of its condition, and a caller orders the destruction. The entry
+    is then removed and the tile returns to the ground the generator made, so
+    this event is the only record that anything stood there.
+
+    The cause column says what ended it. One is the weather, two is a hostile
+    army, three is both, and four is an order from a caller.
+
+    The holder column names the faction that held the tile, or 65535 for
+    nobody.
+    """
+
+    # Generated from the engine by scripts/generate_event_stubs.py.
+    tick: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    holder: npt.NDArray[np.uint16]
+    category: npt.NDArray[np.uint8]
+    level: npt.NDArray[np.uint8]
+    cause: npt.NDArray[np.uint8]
+    # End of the generated block.
+
+class UpgradeFinishedColumns(TypedDict):
+    """One column for each field of the upgrade level event.
+
+    The event says that a level of an upgrade finished and now stands on the
+    tile. A level of one means that the first level finished, so something
+    stands on ground that carried nothing.
+
+    The category column carries the category number. A wonder is category
+    two, so a reader finds a finished wonder in this log and needs no second
+    reader for it.
+    """
+
+    # Generated from the engine by scripts/generate_event_stubs.py.
+    tick: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    holder: npt.NDArray[np.uint16]
+    category: npt.NDArray[np.uint8]
+    level: npt.NDArray[np.uint8]
+    # End of the generated block.
+
+class SettlementFoundedColumns(TypedDict):
+    """One column for each field of the settlement founding event.
+
+    The settlement column holds the whole identity of the settlement. It is
+    not a slot index.
+
+    A founding made between two steps stays in the log until the next step
+    clears it.
+    """
+
+    # Generated from the engine by scripts/generate_event_stubs.py.
+    tick: npt.NDArray[np.uint64]
+    settlement: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    faction: npt.NDArray[np.uint16]
     # End of the generated block.
 
 class Storm(TypedDict):
@@ -153,6 +221,8 @@ class UnitTypeColumns(TypedDict):
     move_cost_scale: npt.NDArray[np.int64]
     command_reach: npt.NDArray[np.int64]
     weather_reach: npt.NDArray[np.int64]
+    water_crossing: npt.NDArray[np.int64]
+    settle_group: npt.NDArray[np.int64]
 
 class UpgradeColumns(TypedDict):
     """One column for each column of a row of the upgrade table.
@@ -172,8 +242,10 @@ class UpgradeColumns(TypedDict):
     ground_fit: npt.NDArray[np.int64]
     work: npt.NDArray[np.int64]
     yield_change: npt.NDArray[np.int64]
+    recovery_change: npt.NDArray[np.int64]
     capacity_change: npt.NDArray[np.int64]
     capacity_of_store_change: npt.NDArray[np.int64]
+    housing_change: npt.NDArray[np.int64]
     victory_claim: npt.NDArray[np.int64]
     own_ground_required: npt.NDArray[np.int64]
 
@@ -258,6 +330,23 @@ class PositionColumns(TypedDict):
     kind: npt.NDArray[np.uint8]
     rank: npt.NDArray[np.uint8]
     holder: npt.NDArray[np.uint64]
+
+class FactionVisibleUnitColumns(TypedDict):
+    """Every unit one faction sees now.
+
+    A faction sees a unit when it sees the tile that unit stands on. The three
+    arrays hold one entry for each unit, at one index.
+
+    The order is fixed. The walk runs over the factions in faction order, and
+    over the units of each faction in slot order.
+
+    This answers the present frame and never a memory. A unit that walked out
+    of sight leaves the arrays.
+    """
+
+    unit: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    faction: npt.NDArray[np.uint16]
 
 class FactionUnitColumns(TypedDict):
     """One column for each field of a live soldier of one faction.
@@ -367,6 +456,20 @@ class SiteHousing(TypedDict):
     residents: int
     free_places: int
 
+class SiteProduction(TypedDict):
+    """What one site produces now, for one commodity.
+
+    The base is the stored rate, as its raw Q16.16 integer. The scale is what
+    the pipeline gives the site now, where one is 65536. The effective rate is
+    the base scaled, and it is the value that varies over a run.
+
+    The engine stores neither the scale nor the effective rate. It reads both
+    again from the world on every call.
+    """
+
+    base: int
+    scale: int
+    effective: int
 
 class SiteEconomy(TypedDict):
     """What one site earns, holds and owes, for one commodity.
@@ -414,6 +517,121 @@ class ChoiceReport(TypedDict):
     best_name: str | None
     intent: int
     chooses_next_frame: bool
+
+class FactionRegionSummary(TypedDict):
+    """The summary of one cell, over the tiles one faction may read.
+
+    The reader combines only the tiles that the sight rule admits, so a cell
+    cannot state what its tiles hide.
+
+    The admit entry names the rule the call took. It holds ``now`` for the
+    tiles the faction sees this frame, and ``ever`` for the tiles it has ever
+    seen.
+
+    The admitted entry counts the tiles the rule admitted. The withheld entry
+    counts the tiles it refused. A withheld count of zero says that the
+    faction reads the whole cell.
+
+    A tile the faction saw once and does not see now adds the ground alone.
+    It adds no unit, no held tile and no value.
+
+    The value total and the height total are Q16.16 values as their raw
+    integers. The food total is a whole count of units of stock.
+    """
+
+    q: int
+    r: int
+    faction: int
+    admit: str
+    admitted: int
+    withheld: int
+    tiles: int
+    open_tiles: int
+    units: int
+    held_tiles: int
+    value_total: int
+    height_total: int
+    food_total: int
+
+class ObservationField(TypedDict):
+    """One field of the observation array of a faction.
+
+    The name entry names the field. The start entry gives the position the
+    field starts at, and the positions entry gives how many positions it
+    holds. A field is contiguous, so position ``n`` of it sits at
+    ``start + n``.
+
+    The dtype entry names the NumPy element type of every position.
+
+    The low and high entries give the lowest and the highest value any
+    position of the field may hold. A field whose bounds are the whole range
+    of the element type has no tighter bound that the world parameters give.
+
+    A field whose name starts with ``cell_`` holds one position for each cell
+    of the block lattice, in ascending cell order.
+    """
+
+    name: str
+    start: int
+    positions: int
+    dtype: str
+    low: int
+    high: int
+
+class ObservationSchema(TypedDict):
+    """The declared layout of the observation array of one world.
+
+    This is the only declaration of that layout. Decode the array by
+    arithmetic over this schema. Do not write a position, a length or a bound
+    into a file of your own.
+
+    The version entry gives the version of the layout. A field added,
+    removed, relengthened or rebounded changes the meaning of a stored weight
+    file, so a learner that loads a policy under another version must stop.
+
+    The length entry gives how many positions the whole array holds. It is
+    the length that ``faction_observation`` returns.
+
+    The fields entry lists one entry for each field, in the order the array
+    holds them.
+    """
+
+    version: int
+    length: int
+    fields: list[ObservationField]
+
+class FactionTileReport(TypedDict):
+    """What one faction may read about one tile.
+
+    The sighting entry holds ``never``, ``remembered`` or ``seen``.
+
+    A ``never`` answer carries no ground at all. Every ground entry is
+    ``None``, so a reader tells that answer from a place that holds nothing.
+
+    A ``remembered`` answer carries the ground of the place and no more. It
+    reports no unit, no holder and no upgrade, because each of those is a
+    fact of the present frame.
+
+    A ``seen`` answer carries the present frame as well. The value is a
+    Q16.16 value as its raw integer. The stock and generated entries hold one
+    amount for each kind of resource, in the order of the kind numbering.
+    """
+
+    q: int
+    r: int
+    faction: int
+    sighting: str
+    kind: int | None
+    passable: bool | None
+    height: int | None
+    generated: list[int] | None
+    value: int | None
+    capacity: int | None
+    stock: list[int] | None
+    holder: int | None
+    upgrade: int | None
+    upgrade_level: int
+    units: int
 
 class TileReport(TypedDict):
     """What one tile holds.
@@ -491,23 +709,37 @@ class FoundingReport(TypedDict, total=False):
     refusal: str
 
 class FactionWeights(TypedDict):
-    """The four weights that bias the choices of one faction.
+    """The weights that bias the choices of one faction.
 
     Every value is a whole number inside the range the balance register
-    holds. The vector is drawn from the seed when the world is built. Only the
-    build weight is read today.
+    holds. The seeding draws the vector when the world is built, and
+    ``set_faction_weights`` writes it after that. The renown weight is the one
+    weight that no pass reads today.
+
+    The vector is the policy of the faction and it is simulated state, so it
+    enters the state hash.[^1]
+
+    References
+    ----------
+    [^1]: ADR-0156, a faction's option weights are policy, set through one
+    verb, decision D1.
+    ``docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md``
     """
 
     war: int
     trade: int
     build: int
     renown: int
+    settle: int
 
 class GameEnd(TypedDict):
     """How a game ended: the winner, the path and the tick.
 
     The record is written once, at the first tick a reader fires. The path is
-    one of ``domination``, ``territory``, ``wealth_or_wonder`` and ``renown``.
+    one of ``domination``, ``territory``, ``wonder`` and ``renown``.
+
+    A stock total wins no game. The wealth clause is gone, and the wonder is a
+    path of its own with a reader of its own.
     """
 
     winner: int
@@ -518,11 +750,19 @@ class Standing(TypedDict):
     """The running value of one faction on each win path.
 
     The store total and the best renown are Q16.16 values as their raw
-    integers. Each value is the one the matching reader compares.
+    integers.
+
+    Every value except the store total feeds a reader. The held tiles feed
+    territory. The seats held and the live units feed domination. The best
+    renown feeds renown. The wonder progress is how far the furthest
+    unfinished wonder has come. The store total feeds no reader, because a
+    stock total wins no game. The engine reports it so that a caller may watch
+    a faction grow rich.
     """
 
     held_tiles: int
     seats_held: int
+    live_units: int
     store_total: int
     best_renown: int
     wonder_progress: int
@@ -846,11 +1086,22 @@ class World:
         height: int = ...,
         seed: int = ...,
         faction_count: int = ...,
+        weather_cell_tiles: int | None = ...,
     ) -> None: ...
+    @property
+    def seed(self) -> int: ...
+    @property
+    def faction_count(self) -> int: ...
     @property
     def tick(self) -> int: ...
     @property
     def tile_count(self) -> int: ...
+    @property
+    def weather_cell_tiles(self) -> int: ...
+    @property
+    def weather_cells_wide(self) -> int: ...
+    @property
+    def weather_cell_count(self) -> int: ...
     @property
     def width(self) -> int: ...
     @property
@@ -863,6 +1114,16 @@ class World:
     def found_run_for_every_faction(self, group: int = ...) -> list[FoundingReport]: ...
     def seed_world(self) -> list[FoundingReport]: ...
     def faction_weights(self, faction: int) -> FactionWeights: ...
+    def set_faction_weights(
+        self,
+        faction: int,
+        *,
+        war: int,
+        trade: int,
+        build: int,
+        renown: int,
+        settle: int,
+    ) -> None: ...
     def set_externally_controlled(self, faction: int, controlled: bool) -> None: ...
     def is_externally_controlled(self, faction: int) -> bool: ...
     @property
@@ -871,6 +1132,21 @@ class World:
     @property
     def tick_limit(self) -> int: ...
     def set_tick_limit(self, tick_limit: int) -> None: ...
+    def set_renown_target(self, raw: int) -> None: ...
+    def set_renown_per_fell(self, raw: int) -> None: ...
+    def set_wonder_work(self, work: int) -> None: ...
+    def set_wonder_victory_claim(self, claim: int) -> None: ...
+    def set_win_readers_enabled(self, enabled: bool) -> None: ...
+    @property
+    def renown_target(self) -> int: ...
+    @property
+    def renown_per_fell(self) -> int: ...
+    @property
+    def win_readers_enabled(self) -> bool: ...
+    @property
+    def wonder_work(self) -> int | None: ...
+    @property
+    def wonder_victory_claim(self) -> int | None: ...
     def game_end(self) -> GameEnd | None: ...
     def score(self, faction: int) -> int: ...
     def standing(self, faction: int) -> Standing: ...
@@ -933,6 +1209,9 @@ class World:
     def soldier_count(self) -> int: ...
     def event_log_bytes(self) -> bytes: ...
     def event_log_columns(self) -> TileChangedColumns: ...
+    def log_names(self) -> list[str]: ...
+    def log(self, name: str) -> EventColumns: ...
+    def log_count(self, name: str) -> int: ...
     def gather_log_columns(self) -> ResourceTakenColumns: ...
     def tile_values(self) -> npt.NDArray[np.int32]: ...
     def spawn_soldiers(
@@ -940,6 +1219,7 @@ class World:
     ) -> npt.NDArray[np.uint64]: ...
     def despawn_soldiers(self, units: Identities) -> None: ...
     def order_gather(self, units: Identities, kind: int) -> None: ...
+    def order_settle(self, units: Identities) -> int: ...
     def define_unit_type(
         self,
         unit_type: int,
@@ -952,6 +1232,8 @@ class World:
         move_cost_scale: int,
         command_reach: int,
         weather_reach: int,
+        water_crossing: int,
+        settle_group: int,
     ) -> None: ...
     def set_unit_types(self, units: Identities, unit_type: int) -> None: ...
     def unit_type(self, unit: int) -> int: ...
@@ -986,8 +1268,10 @@ class World:
         ground_fit: int,
         work: int,
         yield_change: int,
+        recovery_change: int,
         capacity_change: int,
         capacity_of_store_change: int,
+        housing_change: int,
         victory_claim: int,
         own_ground_required: int,
     ) -> None: ...
@@ -1032,6 +1316,7 @@ class World:
     def ground_is_wet(self, q: int, r: int) -> bool: ...
     def weather_totals(self) -> WeatherTotals: ...
     def weather_ground(self) -> npt.NDArray[np.int64]: ...
+    def weather_air(self) -> npt.NDArray[np.int64]: ...
     @property
     def cells_wide(self) -> int: ...
     @property
@@ -1046,6 +1331,9 @@ class World:
     def destination_count(self) -> int: ...
     def set_destination_count(self, count: int) -> None: ...
     def faction_units(self, faction: int) -> FactionUnitColumns: ...
+    def faction_visible_units(
+        self, faction: int
+    ) -> FactionVisibleUnitColumns: ...
     @property
     def settlement_count(self) -> int: ...
     def found_settlements(
@@ -1058,7 +1346,16 @@ class World:
     def found_group(self, group: int, faction: int) -> FoundingColumns: ...
     def founding_survey(self, group: int, faction: int) -> SurveyColumns: ...
     def region_summary(self, q: int, r: int) -> RegionSummary: ...
+    def faction_tile_report(
+        self, faction: int, q: int, r: int
+    ) -> FactionTileReport: ...
+    def faction_region_summary(
+        self, faction: int, q: int, r: int, admit: str = ...
+    ) -> FactionRegionSummary: ...
+    def faction_observation(self, faction: int) -> npt.NDArray[np.int64]: ...
+    def observation_schema(self) -> ObservationSchema: ...
     def site_economy(self, site: int, commodity: int = ...) -> SiteEconomy: ...
+    def site_production(self, site: int, commodity: int = ...) -> SiteProduction: ...
     def site_housing(self, site: int) -> SiteHousing: ...
     def set_site_housing(self, sites: Identities, housing: int) -> None: ...
     @property
@@ -1177,4 +1474,6 @@ class World:
     def set_character_renown(self, characters: Identities, renown: int) -> None: ...
 
 def version() -> str: ...
+def stock_ceiling_of_one_settlement() -> int: ...
 def event_schema() -> dict[str, list[tuple[str, str]]]: ...
+def faction_colours() -> list[int]: ...

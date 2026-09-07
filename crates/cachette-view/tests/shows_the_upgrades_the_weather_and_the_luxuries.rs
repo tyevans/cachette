@@ -49,22 +49,34 @@ const QUIET_RADIUS: u32 = 3;
 
 /// The ticks a storm is given to fall out of the air onto the ground.
 ///
-/// After this many ticks the air over every cell holds too few drops for
-/// the overlay to change a pixel, and the ground is wet. The wet ground
-/// test therefore sees the wet layer alone.
+/// After this many ticks the sky over the cell stands below the mark at which
+/// the overlay changes a pixel, and the ground is wet. The wet ground test
+/// therefore sees the wet layer alone.
+///
+/// **The count rose when the capacity of the air became the published
+/// curve.** The engine pours out whatever stands above the capacity of a cell
+/// within one step, and the cell then drizzles the rest away a share at a
+/// time. The share is the same, and the sky it empties is measured against a
+/// capacity that follows the temperature, so a warm cell takes longer to fall
+/// under the mark than it did against one ceiling for the whole plane.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
 const FALLING_TICKS: u32 = 60;
+
+/// The ticks the rest test gives a stormed sky to fall under the mark at which
+/// the overlay draws.
+///
+/// **This is longer than the fall of a storm onto the ground.** The engine
+/// pours out whatever stands above the capacity of a cell within one step, and
+/// the cell then drizzles the rest away a share at a time. The overlay reads
+/// the sky against the capacity of that cell, so the share it must cross is
+/// the same at every temperature and the drizzle alone has to carry it.
+const THINNING_TICKS: u32 = 900;
 
 /// The strength of the storm the fixture inflicts.
 const STRENGTH: u8 = 4;
-
-/// The most drops in the air over a cell that draw no overlay.
-///
-/// The overlay saturates at a count of drops the viewer chose, and it
-/// deepens in whole steps from there. Below this many drops the step is
-/// zero. The figure is a property of the fixture: the wet ground test waits
-/// until the air has fallen this far, so that the wet layer is the sole
-/// difference it sees.
-const AIR_TOO_THIN_TO_SHOW: i64 = 20;
 
 /// The size of a tile in the picture, in pixels.
 const TILE: f32 = 8.0;
@@ -269,6 +281,12 @@ fn wet_ground_gains_blue_and_holds_its_brightness() {
     let mut compared = None;
     for index in 0..grid.tile_count() {
         let address = address_of(&stormy, index);
+        // **The world makes its own weather, so the dry clone rains too.** A
+        // tile that is wet in both worlds shows no difference at all, and the
+        // longer the fixture runs the more of them there are.
+        if dry.ground_is_wet(address) != Some(false) {
+            continue;
+        }
         if stormy.ground_is_wet(address) != Some(true) {
             continue;
         }
@@ -290,22 +308,26 @@ fn wet_ground_gains_blue_and_holds_its_brightness() {
         if stood_on(&stormy) || stood_on(&dry) {
             continue;
         }
-        // The air over the cell must hold too few drops to show, so the
-        // wet layer is the sole difference. The air overlay moves all three
-        // channels toward one pale colour, and the assertion below refuses
-        // that: it holds the red and the green exactly where they were.
-        if stormy.air_at(address).unwrap_or(0) > AIR_TOO_THIN_TO_SHOW {
-            continue;
-        }
         compared = Some(address);
         break;
     }
     let address = compared.expect("the world holds a wet tile nobody holds or stands on");
     same_ground(&dry, &stormy, address);
 
-    let camera = camera_over(&dry, address);
-    let before = corner_of(&drawn(&dry, address), camera, address);
-    let after = corner_of(&drawn(&stormy, address), camera, address);
+    // **The picture is drawn below the tile width at which the air overlay
+    // runs, so the wet layer is the sole difference.** The overlay moves all
+    // three channels toward one pale colour, and the assertions below refuse
+    // that: they hold the red and the green exactly where they were. The
+    // earlier fixture waited for the sky over the cell to thin instead. It
+    // cannot any more, because the overlay reads the sky against the capacity
+    // of its own cell and a stormed cell stands at that capacity for as long
+    // as the ground under it stays wet.[^10]
+    //
+    // [^10]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    let narrow = paint::air_least_tile() - 1.0;
+    let camera = camera_at(&dry, address, narrow);
+    let before = corner_of(&drawn_at(&dry, address, narrow), camera, address);
+    let after = corner_of(&drawn_at(&stormy, address, narrow), camera, address);
     assert_ne!(
         before, after,
         "wet ground did not change the pixel at {address:?}"
@@ -378,11 +400,14 @@ fn a_storm_keeps_the_faction_that_holds_the_ground() {
     let mut settled = dry.clone();
     settled.step(1).expect("the step must run");
 
-    let air = stormy.air_at(place).unwrap_or(0);
+    // **The overlay reads the share of the sky and not the drops.** The
+    // capacity of a cell follows its temperature, so one quantity of drops
+    // fills a cold sky and leaves a warm one clear.
+    let air = stormy.cloud_share_at(place).unwrap_or(0);
     let weight = paint::air_weight(air);
     assert!(
         weight >= paint::air_least_weight(),
-        "the storm must put enough water over the tile to draw: {air} drops"
+        "the storm must put enough water over the tile to draw: {air} of a whole sky"
     );
 
     let camera = camera_over(&settled, place);
@@ -420,7 +445,7 @@ fn the_air_overlay_is_off_below_eight_pixels_a_tile() {
     stormy.step(1).expect("the step must run");
     settled.step(1).expect("the step must run");
     assert!(
-        paint::air_weight(stormy.air_at(place).unwrap_or(0)) >= paint::air_least_weight(),
+        paint::air_weight(stormy.cloud_share_at(place).unwrap_or(0)) >= paint::air_least_weight(),
         "the storm must put enough water over the tile to draw"
     );
 
@@ -465,9 +490,9 @@ fn a_cell_at_rest_draws_no_air() {
     // which the weight is above zero and below the floor, because that is
     // the band the floor exists for.
     let mut found = false;
-    for _ in 0..FALLING_TICKS {
+    for _ in 0..THINNING_TICKS {
         world.step(1).expect("the step must run");
-        let weight = paint::air_weight(world.air_at(place).unwrap_or(0));
+        let weight = paint::air_weight(world.cloud_share_at(place).unwrap_or(0));
         if weight > 0 && weight < paint::air_least_weight() {
             found = true;
             break;

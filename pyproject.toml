@@ -11,7 +11,10 @@ license = "MIT OR Apache-2.0"
 # The contributing guide sets the minimum interpreter version. Raise it only in a
 # record that supersedes that one.
 requires-python = ">=3.11"
-dependencies = ["numpy>=1.26"]
+dependencies = [
+    "numpy>=1.26",
+    "pyglet>=2.1.16",
+]
 classifiers = [
     "Programming Language :: Rust",
     "Programming Language :: Python :: Implementation :: CPython",
