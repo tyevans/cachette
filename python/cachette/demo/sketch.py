@@ -314,11 +314,14 @@ class Ground:
         "box",
         "cliff",
         "coverage",
+        "depth",
         "drawn",
         "held",
+        "held_height",
         "outline",
         "page_x",
         "page_y",
+        "rise",
         "sample",
         "shape",
         "sheet",
@@ -348,6 +351,13 @@ class Ground:
     box: tuple[int, int, int, int]
     page_x: np.ndarray
     page_y: np.ndarray
+    # The height of the ground under each point of the lifted page, and how
+    # deep the water is there. Every set of marks is a function of these two
+    # and of the place on the page, so a renderer that draws its own marks
+    # needs these and needs nothing else the build made.
+    held_height: np.ndarray
+    depth: np.ndarray
+    rise: int
 
     def __init__(
         self,
@@ -387,6 +397,14 @@ class Sketch:
         "_world",
         "view",
     )
+
+    # Whether the build draws the marks of the ground on the page.
+    #
+    # **This renderer draws them, and it is the reference for one that does
+    # not.** A renderer that composites every pixel elsewhere sets this to
+    # false, takes the page the build made, and draws the same marks there.
+    # A test holds the two together by comparing the frames they draw.
+    _marks = True
 
     def __init__(
         self,
@@ -614,6 +632,15 @@ class Sketch:
         ground.page_y = np.broadcast_to(
             np.arange(page_rows, dtype=np.float32)[:, None], (page_rows, page_cols)
         )
+        ground.held_height = held_height
+        ground.depth = depth_here
+        ground.rise = rise
+        ground.box = _box(drawn)
+        if not self._marks:
+            # A renderer that draws its own marks takes the page here. The
+            # tone, the hatch, the silhouette and the sheet are every point of
+            # the page several times over, and they are the cost of the build.
+            return ground
         ground.tone = self._tone(held_height, rise)
         ground.coverage = self._hatch(
             held_height,
@@ -635,7 +662,6 @@ class Sketch:
         # is made in and because a wash laid over ink changes the colour of
         # the ink.
         ground.sheet = self._paper(page_rows, page_cols)
-        ground.box = _box(drawn)
         return ground
 
     def _turn(
