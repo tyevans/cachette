@@ -1,8 +1,13 @@
 //! A founded group feeds itself from the ground the survey measured.
 //!
 //! A founding seats a group, gives it a store, and sets what the site
-//! produces. Nothing else fills that store today, so a founding that set no
-//! rate would seat a group that starves to the last unit.[^1]
+//! produces. A founding that set no rate would seat a group that loses most
+//! of itself.[^1]
+//!
+//! **The rate is no longer the only thing that fills the store.** A unit that
+//! is ordered to gather now reaches ground that holds the kind it wants, and
+//! it carries the load home. The ground feeds the few units that reach it,
+//! and it does not feed a whole group.[^4]
 //!
 //! These tests go through the public interface of the crate.[^2]
 //!
@@ -14,6 +19,7 @@
 //! [^1]: Findings register, FND-124. `docs/FINDINGS.md`
 //! [^2]: Testing rules, section 6. `.claude/rules/testing.md`
 //! [^3]: Findings register, FND-054. `docs/FINDINGS.md`
+//! [^4]: Findings register, FND-593. `docs/FINDINGS.md`
 
 use cachette_core::{sim_math, CommodityId, Fix32, NeedCondition, World, WorldConfig};
 
@@ -123,7 +129,7 @@ fn a_founded_group_is_alive_after_the_span_that_would_starve_it() {
 }
 
 #[test]
-fn the_same_group_starves_when_the_rate_is_taken_away() {
+fn the_same_group_loses_people_when_the_rate_is_taken_away() {
     // The rate is what the founding set. Taking it away puts the defect back,
     // and the assertion above must then fail. A test that never sees this
     // case measures the fixture rather than the engine.[^1]
@@ -158,5 +164,20 @@ fn the_same_group_starves_when_the_rate_is_taken_away() {
         .iter()
         .filter(|person| world.unit_condition(**person).is_some())
         .count();
-    assert_eq!(alive, 0, "a group with no rate feeds nobody and ends");
+    // **The claim is the exact negation of the test above, and no more.** The
+    // test above asserts that every seated person is alive after the span.
+    // This one takes the rate away and asserts that they are not, which is
+    // what makes that assertion able to fail.
+    //
+    // **The claim was that nobody lives, and the ground now feeds a few.** A
+    // unit ordered to gather reaches the tile that holds what it wants, and
+    // it carries the load home, so a store with no production rate is no
+    // longer an empty store.[^4] A count of the survivors would state a
+    // figure that the next change to the ground makes false.
+    //
+    // [^4]: Findings register, FND-593. `docs/FINDINGS.md`
+    assert!(
+        alive < people.len(),
+        "a group with no rate kept every person, so the rate decides nothing"
+    );
 }
