@@ -1391,6 +1391,12 @@ fn the_air_never_stands_above_the_capacity_of_its_own_cell() {
 /// measurement of the same world under the old rule**, which held a mean of
 /// five parts of a sky in 255 and left 97 cells in every hundred blank. The
 /// commit that made this change holds both readings.
+///
+/// **This asserts a joint property and isolates nothing.** The capacity, the
+/// lift and the water the ground gives back all reach it, and putting any one
+/// of them back alone does not always fail it. Three other tests carry the
+/// capacity rule on its own, and each of them fails when the capacity goes
+/// back to one constant.
 #[test]
 fn the_inland_high_latitudes_hold_cloud() {
     let mut world = World::with_weather_scale(
