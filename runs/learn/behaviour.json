@@ -1,0 +1,419 @@
+{
+  "land": {
+    "decisions": 600,
+    "verbs": {
+      "build": 0.863,
+      "gather": 0.053,
+      "advertise": 0.048,
+      "queue": 0.03,
+      "no_op": 0.005
+    },
+    "outcomes": [
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running"
+    ],
+    "held_tiles": [
+      232,
+      201,
+      282,
+      293,
+      250,
+      332,
+      205,
+      138,
+      166,
+      200
+    ],
+    "population": [
+      5,
+      0,
+      3,
+      8,
+      2,
+      8,
+      8,
+      3,
+      8,
+      1
+    ],
+    "live_units": [
+      5,
+      0,
+      3,
+      8,
+      2,
+      8,
+      8,
+      3,
+      8,
+      1
+    ],
+    "seats_held": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "people": {
+    "decisions": 600,
+    "verbs": {
+      "build": 0.84,
+      "settle": 0.138,
+      "queue": 0.022
+    },
+    "outcomes": [
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running"
+    ],
+    "held_tiles": [
+      198,
+      401,
+      198,
+      212,
+      177,
+      391,
+      318,
+      123,
+      130,
+      372
+    ],
+    "population": [
+      4,
+      5,
+      9,
+      20,
+      13,
+      20,
+      22,
+      3,
+      15,
+      8
+    ],
+    "live_units": [
+      4,
+      5,
+      9,
+      20,
+      13,
+      20,
+      22,
+      3,
+      15,
+      8
+    ],
+    "seats_held": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "war": {
+    "decisions": 600,
+    "verbs": {
+      "build": 0.652,
+      "gather": 0.125,
+      "queue": 0.095,
+      "settle": 0.067,
+      "no_op": 0.062
+    },
+    "outcomes": [
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running"
+    ],
+    "held_tiles": [
+      0,
+      201,
+      282,
+      265,
+      212,
+      332,
+      205,
+      123,
+      354,
+      200
+    ],
+    "population": [
+      0,
+      0,
+      5,
+      8,
+      1,
+      8,
+      8,
+      2,
+      13,
+      2
+    ],
+    "live_units": [
+      0,
+      0,
+      5,
+      8,
+      1,
+      8,
+      8,
+      2,
+      13,
+      2
+    ],
+    "seats_held": [
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "wealth": {
+    "decisions": 600,
+    "verbs": {
+      "gather": 0.93,
+      "no_op": 0.04,
+      "queue": 0.03
+    },
+    "outcomes": [
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running"
+    ],
+    "held_tiles": [
+      197,
+      185,
+      0,
+      163,
+      177,
+      215,
+      143,
+      125,
+      130,
+      200
+    ],
+    "population": [
+      3,
+      3,
+      0,
+      8,
+      1,
+      8,
+      8,
+      4,
+      8,
+      2
+    ],
+    "live_units": [
+      3,
+      3,
+      0,
+      8,
+      1,
+      8,
+      8,
+      4,
+      8,
+      2
+    ],
+    "seats_held": [
+      1,
+      1,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "untrained": {
+    "decisions": 600,
+    "verbs": {
+      "no_op": 1.0
+    },
+    "outcomes": [
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running"
+    ],
+    "held_tiles": [
+      199,
+      185,
+      199,
+      163,
+      177,
+      215,
+      143,
+      124,
+      130,
+      200
+    ],
+    "population": [
+      8,
+      6,
+      7,
+      8,
+      2,
+      8,
+      8,
+      3,
+      8,
+      5
+    ],
+    "live_units": [
+      8,
+      6,
+      7,
+      8,
+      2,
+      8,
+      8,
+      3,
+      8,
+      5
+    ],
+    "seats_held": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "random": {
+    "decisions": 595,
+    "verbs": {
+      "gather": 0.296,
+      "build": 0.242,
+      "advertise": 0.178,
+      "no_op": 0.129,
+      "queue": 0.118,
+      "relation": 0.018,
+      "trade": 0.007,
+      "campaign": 0.007,
+      "settle": 0.003,
+      "cross": 0.002
+    },
+    "outcomes": [
+      "running",
+      "running",
+      "running",
+      "running",
+      "lost",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running"
+    ],
+    "held_tiles": [
+      196,
+      184,
+      198,
+      212,
+      0,
+      215,
+      143,
+      123,
+      146,
+      199
+    ],
+    "population": [
+      3,
+      0,
+      5,
+      8,
+      0,
+      13,
+      8,
+      3,
+      8,
+      1
+    ],
+    "live_units": [
+      3,
+      0,
+      5,
+      8,
+      0,
+      13,
+      8,
+      3,
+      8,
+      1
+    ],
+    "seats_held": [
+      1,
+      1,
+      1,
+      1,
+      0,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
+  }
+}
