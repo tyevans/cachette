@@ -111,17 +111,6 @@ STRATEGIES: dict[str, tuple[EnvConfig, Weighting, str]] = {
         Weighting(terms={"held_tiles": 1.0}, won=WIN, lost=-WIN, drawn=0.0),
         "linear",
     ),
-    # Raise an army and use it. A seat is what an army takes.
-    "war": (
-        WORLD,
-        Weighting(
-            terms={"live_units": 4.0, "held_tiles": 0.5, "seats_held": 50.0},
-            won=WIN,
-            lost=-WIN,
-            drawn=0.0,
-        ),
-        "linear",
-    ),
     # Fill the stores. Ground scores a little, for the same reason.
     "wealth": (
         WORLD,
