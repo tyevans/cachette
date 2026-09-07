@@ -1,4 +1,4 @@
-# ADR-0174: An action integer is a mixed radix over the argument positions each verb declares
+# ADR-0176: An action integer is a mixed radix over the argument positions each verb declares
 
 ## Context
 

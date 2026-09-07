@@ -3,7 +3,7 @@ id: 0517
 title: Build the action table and the legality answer, and let a caller act by one integer
 status: proposed
 created: 2026-09-06
-implements: [ADR-0154 D4, ADR-0154 D5, ADR-0154 D6, ADR-0174 D1, ADR-0174 D2, ADR-0174 D3, ADR-0174 D4]
+implements: [ADR-0154 D4, ADR-0154 D5, ADR-0154 D6, ADR-0176 D1, ADR-0176 D2, ADR-0176 D3, ADR-0176 D4]
 changes: []
 creates: []
 serves: [PRD-0056]
@@ -44,7 +44,7 @@ the record alone will underestimate it.[^4]
 
 ## What is missing before this can be refined
 
-- **The record it implements is not accepted.** ADR-0174 changes ADR-0154 D4,
+- **The record it implements is not accepted.** ADR-0176 changes ADR-0154 D4,
   and it carries the status `Draft`.[^5] [^7] The work waits on the review. If a
   reviewer rejects it, this item implements a different encoding and the front
   matter of this file changes with it.
@@ -98,7 +98,7 @@ Filled in when the item moves to `complete/`.
 [^2]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^3]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^4]: Research report 31, the state of the learner surface. `docs/research/reports/31-the-state-of-the-learner-surface.md`
-[^5]: ADR-0174, an action integer is a mixed radix over the argument positions each verb declares. `docs/adrs/draft/adr-0174-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+[^5]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares. `docs/adrs/draft/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^6]: Backlog item 0495, build the observation plane and let every reader answer for one faction. `docs/backlog/proposed/0495-build-the-observation-plane-and-let-every-reader-answer-for-one-faction.md`
 [^7]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^8]: Blockers register, BLK-007. `docs/BLOCKERS.md`

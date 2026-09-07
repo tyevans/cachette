@@ -22,11 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-<<<<<<< HEAD
 **Next number: FND-568**
-=======
-**Next number: FND-566**
->>>>>>> rl-queue-and-adr-0154-repair
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13730,7 +13726,6 @@ decide which path is strong. It decides which path gets to fire.
 **Neither domination nor territory has ended a seeded game at any horizon.** The
 paths the project owner wants are still not the paths that decide a run.
 
-<<<<<<< HEAD
 ### FND-566 — A ruling about one trigger retired two paths, because one reader held both
 
 **Believed.** The wealth-or-wonder reader fired on a stock total at a target or
@@ -13785,7 +13780,6 @@ like a defect in the code.
 **A setter needs a reader for this reason, and not only for the caller.** A value
 a caller can set and cannot read back is a value that every test and every script
 must state again.
-=======
 ### FND-565 — An accepted record fixed the shape of an enumeration another record owns, and the enumeration never had that shape
 
 **Believed.** The action a learner takes factorises into a verb, a target and a
@@ -13822,13 +13816,12 @@ one decision and keeps the rest.[^F565E]
 report that found this said three choices break the factorisation, then listed
 four, and neither number matches the enumeration. Read the artefact, and take
 the count from the artefact.
->>>>>>> rl-queue-and-adr-0154-repair
 
 ## References
 
 [^F565A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D4. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F565C]: Research report 31, the state of the learner surface. `docs/research/reports/31-the-state-of-the-learner-surface.md`
-[^F565E]: ADR-0174, an action integer is a mixed radix over the argument positions each verb declares. `docs/adrs/draft/adr-0174-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+[^F565E]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares. `docs/adrs/draft/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^F552A]: The unit-to-tile bridge, the block key. `crates/cachette-core/src/bridge.rs`
 [^F494C]: Findings register, FND-486. `docs/FINDINGS.md`
 [^F542C]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
