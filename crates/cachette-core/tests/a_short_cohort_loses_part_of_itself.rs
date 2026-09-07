@@ -117,6 +117,23 @@ fn short_cohort_under(rule: NeedRule, fed: u32, threads: usize) -> (World, Entit
     let site = world
         .found_settlement(place, FactionId(0))
         .expect("the ground admits a settlement");
+    // **The fixture states the housing of its site, and it seats the group in
+    // all of it.** The pipeline takes a share of the rate away for the places
+    // a site holds empty, so a site with more housing than people earns less
+    // than its stated rate.[^1] The whole behaviour under test is what a
+    // cohort does at a stated fraction of its rations, so the fixture holds
+    // the pipeline at one and the founding housing of the world governs
+    // nothing here.
+    //
+    // A full site also has no free place, so nobody is born into the group
+    // and the headcount the tests count stays at what this loop seats.[^2]
+    //
+    // [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+    // [^2]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    assert!(
+        world.set_site_housing(site, GROUP),
+        "the founding returned a live site"
+    );
     let mut units = Vec::new();
     for _ in 0..GROUP {
         let unit = world
