@@ -26,6 +26,11 @@ two. A register holds each case with its evidence.[^1] [^2]
 The second change moved the field set, so it moved the layout version. Section
 2 measures the field set as it stood before the change.
 
+**Section 2.1 says that no decision record carries the number 0184. The
+registry has since allocated that number**, to a record on how a verb narrows
+the set it acts on.[^3] The statement in section 2.1 describes the moment it
+measured, and the number was free then.
+
 ## 1 Method, and the moment this measures
 
 The author read the engine, the binding and the learner package. The author
@@ -36,16 +41,16 @@ as measured came from that run.
 **Every count in this report measures one moment.** The moment is the tip of
 the main branch on 7 September 2026. A count belongs in a research report,
 because a report is fixed to a moment. The same count in a decision record
-decays.[^3]
+decays.[^4]
 
 The author ran no test suite and no full check.
 
 ## 2 The interface, as the engine publishes it
 
 The engine publishes the observation as one flat array of signed integers, and
-one schema that names each field.[^4] It publishes the action as one integer
-over a mixed radix table, and one schema that names each verb.[^5] Two
-accepted records fix both shapes.[^6] [^7]
+one schema that names each field.[^5] It publishes the action as one integer
+over a mixed radix table, and one schema that names each verb.[^6] Two
+accepted records fix both shapes.[^7] [^8]
 
 One world of the training shape gives these lengths. The shape is 48 tiles
 wide, 48 tiles high, and three factions.
@@ -63,15 +68,15 @@ wide, 48 tiles high, and three factions.
 
 The brief that commissioned this report states that the observation holds 45
 fields. It holds 28 fields and 176 positions. The field list in the module is
-the whole layout, and it names 28 entries.[^4]
+the whole layout, and it names 28 entries.[^5]
 
 The brief also cites ADR-0184 as a draft that widens the verb set. **No
 decision record carries the number 0184.** The registry allocates no such
-row.[^8] A completed backlog item carries that number, and it is about scoring
-a forage option against food.[^9] Nothing in the tree widens the verb set.
+row.[^9] A completed backlog item carries that number, and it is about scoring
+a forage option against food.[^10] Nothing in the tree widens the verb set.
 
 An earlier report audited this surface and found that no source file cited the
-three records that specify it.[^10] That report is fixed to 6 September 2026.
+three records that specify it.[^11] That report is fixed to 6 September 2026.
 The surface is now built. The observation module, the action module and the
 world all cite the records by number.
 
@@ -83,15 +88,15 @@ to. It is a property of the interface. No policy causes it.
 The built-in controller emits several commands for one faction on one tick. It
 makes a fixed number of evaluations, and each evaluation emits one gather
 order or one build order. It then emits up to nine further commands, each
-gated by its own keyed draw or by a schedule.[^11]
+gated by its own keyed draw or by a schedule.[^12]
 
 The learner emits **one** action for one decision, and the environment then
-runs the world for the decision interval.[^12] The shipped interval is five
+runs the world for the decision interval.[^13] The shipped interval is five
 ticks.
 
 A measurement fixes the ratio. One world of the training shape ran 300 ticks
 with the learner seat under external control. The engine counted 1227
-controller commands over the two remaining factions.[^13] That is 2.045
+controller commands over the two remaining factions.[^14] That is 2.045
 commands for one faction on one tick.
 
 | Actor | Commands for one faction on one tick |
@@ -105,7 +110,7 @@ the best interval the environment offers, a rival still takes twice as many.
 No policy class recovers a factor of ten in decision count.
 
 **This is a real handicap and not a fair contest.** The baseline the project
-calls strongest runs the built-in controller in the learner's own seat.[^12]
+calls strongest runs the built-in controller in the learner's own seat.[^13]
 That baseline acts at the controller rate. The learner does not.
 
 ## 4 The strategic areas
@@ -117,7 +122,7 @@ them, and the legibility of the signal.
 ### 4.1 Choosing and pursuing a win path
 
 The engine holds four win paths, and one reader for each. The readers run in a
-fixed order: domination, territory, wonder, renown.[^13]
+fixed order: domination, territory, wonder, renown.[^14]
 
 **What a player must decide.** Which path to pursue. When to switch. Whether a
 rival is closer to a path than the player is. Whether to race a rival to a
@@ -135,8 +140,8 @@ wonder or to break the wonder instead.
 The array carries no field for any rival's standing on any path. It carries no
 renown target, so the renown field has no scale beside it. The array carries
 `tick` and `tick_limit`. That pair is the matching threshold of the territory
-path. The omission is therefore an asymmetry and not a rule.[^14] A findings
-row already records it.[^15]
+path. The omission is therefore an asymmetry and not a rule.[^15] A findings
+row already records it.[^16]
 
 The domination path is the one path a policy can read to a conclusion. It sees
 `seats_held`, and the relation field holds one position for each faction, so
@@ -149,7 +154,7 @@ policy pursues territory through `settle` and `project`, the wonder through
 
 **Is the signal legible?** Partly. The reward reads the observation array, and
 it weighs a change in `held_tiles`, `seats_held`, `wonder_progress`,
-`wonder_claim` and `best_renown`.[^16]
+`wonder_claim` and `best_renown`.[^17]
 
 Every one of those is an own-side quantity. Take two players that each gained
 twenty tiles. A rival of the first gained fifty, and a rival of the second
@@ -161,7 +166,7 @@ ground around them. The observation should therefore say who holds the tiles a
 faction observes, for each cell. The encoding must be relative to the
 observing faction. Such an encoding holds four positions: own, allied, hostile
 and unheld. It therefore satisfies the record that refuses a field indexed by
-faction.[^17]
+faction.[^18]
 
 ### 4.2 Expansion, and holding ground
 
@@ -188,8 +193,8 @@ which of them is rich.
 **Can the policy act on it?** The `settle` verb founds a city from every
 settler that stands on ground a city may take. **The verb names no place.**
 The engine resolves the set, and the founding rule refuses a place too near an
-existing city.[^13] The `cross` verb sends water-crossing units at the tile
-the engine surveys, and it names no tile either.[^5]
+existing city.[^14] The `cross` verb sends water-crossing units at the tile
+the engine surveys, and it names no tile either.[^6]
 
 The policy therefore chooses whether to expand. It never chooses where. Where
 a settler walks is decided by the engine.
@@ -203,7 +208,7 @@ field that describes the ground of a site.
 
 The engine holds seven upgrade categories. They are road, terrace, wonder,
 store, wall, lodging and one open row. The default table leaves the open row
-empty.[^18] The `build` verb declares one category position, so the policy
+empty.[^19] The `build` verb declares one category position, so the policy
 chooses among all seven.
 
 **What a player must decide.** What to build, where, and in what order.
@@ -215,18 +220,18 @@ Whether to repair what wears.
 and `wonder_claim`. It carries no field for any other category. It carries no
 count of standing upgrades, no condition, and no project list.
 
-The plan solver writes a bounded list of projects for each faction.[^19] The
-`project` verb sends idle units to them.[^20] **No observation field describes
+The plan solver writes a bounded list of projects for each faction.[^20] The
+`project` verb sends idle units to them.[^21] **No observation field describes
 the plan.** The policy cannot see whether the plan is full, empty, or about to
 be taken.
 
 **Can the policy act on it?** It can name a category. It cannot name a tile,
 and it cannot zone a project. The Python interface holds `zone_projects` and
-`clear_projects`, and neither is a verb of the action table.[^21]
+`clear_projects`, and neither is a verb of the action table.[^22]
 
 A second limit is severe. **A build order reaches every live unit of the
 faction.** The verb takes the whole unit set and orders each of them to build
-the named category.[^13] There is no selector. The policy cannot build a road
+the named category.[^14] There is no selector. The policy cannot build a road
 with half its workers and a terrace with the other half.
 
 **Is the signal legible?** For the wonder, yes: `wonder_progress` moves. For
@@ -238,7 +243,7 @@ caused them.
 
 ### 4.4 Economy
 
-The engine holds three gatherable resource kinds: food, wood and stone.[^22]
+The engine holds three gatherable resource kinds: food, wood and stone.[^23]
 The `gather` verb declares one resource position.
 
 **What a player must decide.** Which good to gather, and in what proportion.
@@ -246,7 +251,7 @@ Whether a shortage is coming. Whether to trade for a good rather than gather
 it. Where to gather.
 
 **Can the policy see it?** One scalar. `store_total` sums every commodity of
-every live settlement of the faction, as one raw fixed-point number.[^13]
+every live settlement of the faction, as one raw fixed-point number.[^14]
 **The policy cannot see which good it lacks.**
 
 One indirect channel exists. The five board fields hold every faction's trade
@@ -254,7 +259,7 @@ board. One board row states a good and a quantity. It also states whether the
 faction offers the good or wants it.
 
 A faction writes its board from its own site stores, against a surplus
-mark.[^11] The board therefore reveals the per-good position of whoever wrote
+mark.[^12] The board therefore reveals the per-good position of whoever wrote
 it. The board is public state by decision, so reading a rival's board breaks
 no fog rule.
 
@@ -268,7 +273,7 @@ nothing at all before a faction first advertises.
 build, the order reaches every live unit, so no division of labour is
 possible. It cannot set a production ratio, and no verb takes one. The Python
 interface holds `prefer_at_sites` and `spend_at_sites`, and neither is a
-verb.[^21]
+verb.[^22]
 
 **Is the signal legible?** Barely. A reward on `store_total` rises when any
 good accumulates. It cannot reward gathering the scarce good over the abundant
@@ -282,9 +287,9 @@ a player would not have. That is three positions on the present catalogue.
 ### 4.5 People and growth
 
 A site proposes a birth at a rate its store sets. The free places of the site
-admit the proposal.[^23] A site at its housing bound grows nobody, whatever
+admit the proposal.[^24] A site at its housing bound grows nobody, whatever
 food it holds. The production queue is the only consumer of people. The
-`queue` verb puts one entry of one unit type into the queue of a site.[^5]
+`queue` verb puts one entry of one unit type into the queue of a site.[^6]
 
 **What a player must decide.** Whether to grow or to spend. Which unit types
 to make. Whether lodging is needed before more people are worth having. Which
@@ -299,17 +304,17 @@ absent.
 
 The policy also cannot see what unit types it holds. The type table holds
 eight rows, and the worker, soldier, merchant, leader, mariner and settler
-rows carry distinct capabilities.[^24] No observation field reports the
+rows carry distinct capabilities.[^25] No observation field reports the
 composition of the faction's units.
 
 **Can the policy act on it?** Yes, and this is the verb with the most
 strategic content in the table. The `queue` verb declares a unit type position
 over all eight rows. Queuing a settler enables expansion. Queuing a soldier
 enables a campaign. Queuing a leader enables the relation verb, which refuses
-a faction with no unit that carries command reach.[^13]
+a faction with no unit that carries command reach.[^14]
 
 **The verb names no site.** The engine takes the lowest-slot site of the
-faction whose queue has room.[^13] A player with many cities cannot direct
+faction whose queue has room.[^14] A player with many cities cannot direct
 production.
 
 **Is the signal legible?** For growth, yes: `population` moves. For
@@ -318,12 +323,12 @@ composition, no. Queuing a settler and queuing a soldier both raise
 
 ### 4.6 Military
 
-A campaign is one row of faction, objective and cohort.[^25] The `campaign`
+A campaign is one row of faction, objective and cohort.[^26] The `campaign`
 verb raises one against the objective the engine resolves, and it declares no
-argument position.[^5]
+argument position.[^6]
 
 A site changes hands when a besieger presses long enough. The taker keeps a
-site it can supply and burns one it cannot, and burning costs more.[^26] The
+site it can supply and burns one it cannot, and burning costs more.[^27] The
 engine decides which of the two happens. No verb offers the choice.
 
 **What a player must decide.** Whom to attack, and where. When to attack.
@@ -342,13 +347,13 @@ a force to commit. When to stop.
 **Can the policy act on it?** It raises a campaign, or it does not. The engine
 chooses the objective. The chooser prefers a site of the faction whose ground
 a war rival now holds. It otherwise takes the nearest observed site of a war
-rival.[^13] Defence and offence are therefore both engine choices.
+rival.[^14] Defence and offence are therefore both engine choices.
 
 The reader is correctly fogged: it filters the candidate sites to those the
-faction has observed.[^13]
+faction has observed.[^14]
 
 The cohort size is a world parameter, not an argument, so the policy cannot
-choose a force size.[^25]
+choose a force size.[^26]
 
 **Is the signal legible?** Poorly. A campaign that succeeds raises
 `held_tiles` and `seats_held` many decisions later. A campaign that fails
@@ -361,7 +366,7 @@ reports what a campaign achieved.**
 ### 4.7 Diplomacy and trade
 
 A relation is one signed integer for each ordered pair of factions. A band is
-a threshold: alliance, peace and war.[^27] [^28]
+a threshold: alliance, peace and war.[^28] [^29]
 
 **What a player must decide.** Whom to fight and whom to leave alone. When to
 make peace. Whom to trade with, and on what terms. Whether to honour a
@@ -380,18 +385,18 @@ whether it is being delivered.
 
 **The relation verb moves a relation in one direction only.** The step the
 verb applies is a constant, and its value is negative one, which is one step
-toward war.[^11] [^13] **No verb makes peace, and no verb forms an alliance.**
+toward war.[^12] [^14] **No verb makes peace, and no verb forms an alliance.**
 A learner can declare war on anybody. It can never end one.
 
 The engine returns a pair to peace only through the drift schedule. That
-schedule moves each entry one step toward the peace band on a timer.[^27] A
+schedule moves each entry one step toward the peace band on a timer.[^28] A
 player therefore has no agency over reconciliation at all.
 
 The `trade` verb takes one negotiation step against the faction the engine
 resolves. **It names neither a partner nor terms.** The engine answers a
 pending offer when one exists. It otherwise opens an offer against the first
-board match it finds.[^13] The price is a midpoint, and no draw decides
-it.[^11]
+board match it finds.[^14] The price is a midpoint, and no draw decides
+it.[^12]
 
 The `advertise` verb rewrites the whole board from the site stores against the
 surplus mark. It takes no argument, so the policy cannot state what it wants.
@@ -404,7 +409,7 @@ event moves that field too.
 ### 4.8 Hazards
 
 The world holds wildfire. A fire is a sparse set of burning tiles, and it
-burns to a conclusion on its own.[^29] The census counts `fires_started` and
+burns to a conclusion on its own.[^30] The census counts `fires_started` and
 `fires_doused`, so both sides of the mechanic are live.
 
 **What a player must decide.** Whether to send units to fight a fire, and
@@ -415,7 +420,7 @@ anywhere.** A burning tile is visible to a player who watches it, so this is
 not a fog constraint. It is an omission.
 
 **Can the policy act on it?** No. The Python interface holds `order_douse` and
-`stop_dousing`.[^21] Neither is a verb of the action table. **A learner cannot
+`stop_dousing`.[^22] Neither is a verb of the action table. **A learner cannot
 fight a fire.**
 
 **Is the signal legible?** No. A fire that burns a faction's ground reaches
@@ -433,7 +438,7 @@ section.
 **Every verb that reaches units reaches all of them.** The `gather` verb takes
 the whole live unit set of the faction. So does the `build` verb. The `settle`
 verb takes every settler that stands on legal ground. The `project` verb takes
-every idle unit.[^13]
+every idle unit.[^14]
 
 The design principle that a set-valued command permits a cheaper algorithm is
 correct and is not in question. The gap is that **no verb takes a subset**. A
@@ -450,8 +455,8 @@ controller wins. It explains the ceiling on both.
 ## 5 The 48-tile world blinds the policy to space
 
 The engine partitions the world into blocks of a fixed edge. The block edge
-exponent is five, so a block is 32 tiles by 32 tiles.[^30] The observation
-lattice, the fog layer and the summary level share that one lattice.[^6]
+exponent is five, so a block is 32 tiles by 32 tiles.[^31] The observation
+lattice, the fog layer and the summary level share that one lattice.[^7]
 
 A world 48 tiles on a side therefore holds two blocks on each axis, and four
 cells in total. The four cells cover 1024, 512, 512 and 256 tiles, because the
@@ -470,7 +475,7 @@ buckets and one of them holds nearly half the world.
 
 The founding rule ties the two together. The engine asserts that a settler's
 reach must exceed one cell edge. A target inside the settler's own cell steers
-nobody.[^13] The same argument applies to a policy. A signal that cannot name
+nobody.[^14] The same argument applies to a policy. A signal that cannot name
 a place finer than one cell cannot direct movement within one.
 
 ### 5.2 It also blocks the stated goal
@@ -478,7 +483,7 @@ a place finer than one cell cannot direct movement within one.
 The goal is a general playability model that plays from any seat. The
 observation length is a function of the cell count. The cell count is a
 function of the world size. A weight matrix has the shape actions by
-features.[^31] A policy trained on one world therefore states nothing about
+features.[^32] A policy trained on one world therefore states nothing about
 another.
 
 **This paragraph first said that such a load succeeds and computes the wrong
@@ -516,8 +521,8 @@ Two fixes exist and both are cheap to state.
 2. **Give the observation its own lattice pitch, finer than the block.** This
    is the stronger fix and the more expensive one. It contradicts the record
    that says the observation shares the fog and summary lattice, so it needs a
-   record.[^6] A findings row already warns that a second address space over
-   the same world samples the wrong cells and fails nowhere.[^32]
+   record.[^7] A findings row already warns that a second address space over
+   the same world samples the wrong cells and fails nowhere.[^33]
 
 The author recommends the first fix now. Take the second as a deliberate
 decision. It buys resolution at the price of a second address space.
@@ -525,7 +530,7 @@ decision. It buys resolution at the price of a second address space.
 ## 6 The action mask carries information the array does not
 
 The engine answers, for one faction, one byte for each row of the action
-table.[^13] A measured position gave 18 legal rows of 29.
+table.[^14] A measured position gave 18 legal rows of 29.
 
 That answer is a substantial observation channel, and it is fogged correctly.
 The engine computes it from the readers that answer for one faction. It tells
@@ -542,7 +547,7 @@ the policy, among other things:
 
 **The policy does not receive it as input.** Both shipped policies apply the
 mask as a filter over the action scores, after the scores are computed. The
-feature encoder reads the observation array alone.[^31]
+feature encoder reads the observation array alone.[^32]
 
 Feeding the mask into the features costs 29 extra features on the training
 world. It changes no engine code. It hands the policy several facts that no
@@ -593,22 +598,22 @@ The lead allocates the numbers.
    section 3 is a decision nobody has recorded. Either the learner acts at the
    controller rate, or the baseline is handicapped to the learner's rate, or
    the project accepts the asymmetry and says why. The record that says a
-   controller acts only through the caller's verbs is the one this joins.[^33]
+   controller acts only through the caller's verbs is the one this joins.[^34]
 2. **Whether a verb may name a subset of the units.** This is the largest
    design question in the report. It touches the principle that a set-valued
    command permits a cheaper algorithm, and it touches the action table
-   record.[^7] A selector expressed as a bounded argument position, rather than
+   record.[^8] A selector expressed as a bounded argument position, rather than
    as a list, would keep both.
 3. **Whether the observation lattice may differ from the block lattice.** The
-   present record says they are one lattice.[^6] Section 5 gives the case for
+   present record says they are one lattice.[^7] Section 5 gives the case for
    parting them and the cost of doing so.
 4. **What a policy may see of a rival.** Section 4 proposes an encoding
    relative to the observing faction, which is compatible with the record that
-   refuses a field indexed by faction.[^17] Somebody must decide what a player
+   refuses a field indexed by faction.[^18] Somebody must decide what a player
    is entitled to know.
 
 One existing blocker governs several rows above. The rules of the downstream
-game are not written down, and every reward weight is unset under it.[^34] A
+game are not written down, and every reward weight is unset under it.[^35] A
 reward that cannot weigh a term is one problem. An observation that cannot
 carry a term is another. Section 4 is about the second.
 
@@ -627,48 +632,49 @@ These are marked unverified. The author did not confirm them.
   reasoning in section 4 is from the code. Nobody has measured how often a
   board is stale.
 - **Whether an eliminated faction is legible to a policy.** A faction that
-  holds no site and no unit leaves the game under a draft record.[^35] The
+  holds no site and no unit leaves the game under a draft record.[^36] The
   author did not check whether the observation reports the departure.
 
 One minor defect surfaced during the reading, and it is reported rather than
 fixed. The doc comment on the wonder upgrade category states that its
 completion ends no game. It cites the draft record that removed the
-reader.[^18] A wonder reader now exists and fires.[^13] The comment is false.
+reader.[^19] A wonder reader now exists and fires.[^14] The comment is false.
 
 ## References
 
 [^1]: Findings register, FND-631. `docs/FINDINGS.md`
 [^2]: Findings register, FND-632. `docs/FINDINGS.md`
-[^3]: Decision Record Scope, section 4.3. `.agents/rules/adr-scope.md`
-[^4]: The faction observation module. `crates/cachette-core/src/faction_observation.rs`
-[^5]: The action table module. `crates/cachette-core/src/action.rs`
-[^6]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-[^7]: ADR-0176, an action integer is a mixed radix over the positions a verb declares. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
-[^8]: ADR Registry. `docs/adrs/REGISTRY.md`
-[^9]: Backlog item 0184, score the forage option against food. `docs/backlog/complete/0184-score-the-forage-option-against-food.md`
-[^10]: Report 31, the state of the learner surface. `docs/research/reports/31-the-state-of-the-learner-surface.md`
-[^11]: The controller module. `crates/cachette-core/src/controller.rs`
-[^12]: The learner environment. `python/cachette/learn/env.py`
-[^13]: The world module. `crates/cachette-core/src/world.rs`
-[^14]: The balance table, the renown target. `crates/cachette-core/src/balance.rs`
-[^15]: Findings register, FND-582. `docs/FINDINGS.md`
-[^16]: The reward module. `python/cachette/learn/reward.py`
-[^17]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
-[^18]: The upgrade module. `crates/cachette-core/src/upgrade.rs`
-[^19]: The plan module. `crates/cachette-core/src/plan.rs`
-[^20]: ADR-0152, a faction plans its roads and zones with one solver. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
-[^21]: The Python binding crate. `crates/cachette-py/src/lib.rs`
-[^22]: The resource module. `crates/cachette-core/src/resource.rs`
-[^23]: The growth module. `crates/cachette-core/src/growth.rs`
-[^24]: The unit type module. `crates/cachette-core/src/unit_type.rs`
-[^25]: The campaign module. `crates/cachette-core/src/campaign.rs`
-[^26]: ADR-0180, a site changes hands or the taker destroys it. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
-[^27]: The relation module. `crates/cachette-core/src/relation.rs`
-[^28]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
-[^29]: The fire module. `crates/cachette-core/src/fire.rs`
-[^30]: The block layout. `crates/cachette-core/src/bridge.rs`
-[^31]: The policy module. `python/cachette/learn/policy.py`
-[^32]: Findings register, FND-569. `docs/FINDINGS.md`
-[^33]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-[^34]: Blockers register, BLK-050. `docs/BLOCKERS.md`
-[^35]: ADR-0181, a faction that holds no site and no unit leaves the game. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
+[^3]: ADR-0184, a verb narrows the set it acts on by a bounded categorical position. `docs/adrs/draft/adr-0184-a-verb-narrows-its-set-by-a-bounded-categorical-position.md`
+[^4]: Decision Record Scope, section 4.3. `.agents/rules/adr-scope.md`
+[^5]: The faction observation module. `crates/cachette-core/src/faction_observation.rs`
+[^6]: The action table module. `crates/cachette-core/src/action.rs`
+[^7]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^8]: ADR-0176, an action integer is a mixed radix over the positions a verb declares. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+[^9]: ADR Registry. `docs/adrs/REGISTRY.md`
+[^10]: Backlog item 0184, score the forage option against food. `docs/backlog/complete/0184-score-the-forage-option-against-food.md`
+[^11]: Report 31, the state of the learner surface. `docs/research/reports/31-the-state-of-the-learner-surface.md`
+[^12]: The controller module. `crates/cachette-core/src/controller.rs`
+[^13]: The learner environment. `python/cachette/learn/env.py`
+[^14]: The world module. `crates/cachette-core/src/world.rs`
+[^15]: The balance table, the renown target. `crates/cachette-core/src/balance.rs`
+[^16]: Findings register, FND-582. `docs/FINDINGS.md`
+[^17]: The reward module. `python/cachette/learn/reward.py`
+[^18]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+[^19]: The upgrade module. `crates/cachette-core/src/upgrade.rs`
+[^20]: The plan module. `crates/cachette-core/src/plan.rs`
+[^21]: ADR-0152, a faction plans its roads and zones with one solver. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+[^22]: The Python binding crate. `crates/cachette-py/src/lib.rs`
+[^23]: The resource module. `crates/cachette-core/src/resource.rs`
+[^24]: The growth module. `crates/cachette-core/src/growth.rs`
+[^25]: The unit type module. `crates/cachette-core/src/unit_type.rs`
+[^26]: The campaign module. `crates/cachette-core/src/campaign.rs`
+[^27]: ADR-0180, a site changes hands or the taker destroys it. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+[^28]: The relation module. `crates/cachette-core/src/relation.rs`
+[^29]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+[^30]: The fire module. `crates/cachette-core/src/fire.rs`
+[^31]: The block layout. `crates/cachette-core/src/bridge.rs`
+[^32]: The policy module. `python/cachette/learn/policy.py`
+[^33]: Findings register, FND-569. `docs/FINDINGS.md`
+[^34]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+[^35]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+[^36]: ADR-0181, a faction that holds no site and no unit leaves the game. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
