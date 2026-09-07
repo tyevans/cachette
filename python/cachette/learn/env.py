@@ -469,7 +469,7 @@ class VectorEnv:
         ]
         self._live = list(range(self._count))
         self.world_ticks = 0
-        self._batch = Batch([env._require_world() for env in self._envs])
+        self._batch = Batch([env._require_world() for env in self._envs], self._workers)
         return np.stack(rows)
 
     def action_masks(self) -> np.ndarray:
@@ -510,11 +510,13 @@ class VectorEnv:
         # the vector. The order of a result never comes from which worker
         # finished.
         if live != self._live:
-            self._batch = Batch([self._envs[index]._require_world() for index in live])
+            self._batch = Batch(
+                [self._envs[index]._require_world() for index in live], self._workers
+            )
             self._live = live
         self.world_ticks += len(live) * self._config.decision_interval
         for _ in range(self._config.decision_interval):
-            rows = self._batch.step(self._workers, self._config.threads)
+            rows = self._batch.step(self._config.threads)
             for row in rows:
                 if row.error is not None:
                     failed = live[row.index]

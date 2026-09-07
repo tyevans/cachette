@@ -27,5 +27,13 @@ numpy = "0.29.0"
 # so a wheel built from it runs on a machine that has no display.
 cachette-view = { path = "../cachette-view", version = "0.0.0", default-features = false }
 
+# A test-only switch. The batch fixes the order of its results by sorting on
+# the index of the world. This feature removes that sort, so a build that
+# carries it reports in the order the workers hold their worlds. It exists to
+# prove that the order test can fail, and nothing else enables it.
+# Testing Rules, section 1.
+[features]
+perturb-batch-report-order = []
+
 [lints]
 workspace = true

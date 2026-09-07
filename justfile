@@ -59,6 +59,18 @@ test-python:
     uv sync
     uv run pytest
 
+# Prove that the batch order test can fail.
+#
+# The batch fixes the order of its results by sorting on the index of the
+# world. The feature below removes that sort, so the batch reports in the
+# order its workers hold their worlds. The order test must then go red. A
+# determinism test with no proven failure mode is decoration.
+#
+# The recipe leaves the perturbed build installed. Run `just setup` after it.
+prove-batch-order:
+    uv run maturin develop --features perturb-batch-report-order
+    ! uv run --no-sync pytest tests/test_batch_step.py -q
+
 # The window draws cards, which hold what changes moment to moment. Hold tab
 # to name the colours. Run `just inspect` for every number it does not show.
 #

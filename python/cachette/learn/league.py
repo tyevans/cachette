@@ -390,7 +390,7 @@ class SeatedVector:
             game.reset(int(seed)) for game, seed in zip(self._games, seeds, strict=True)
         ]
         self._live = list(range(len(self._games)))
-        self._batch = Batch(worlds)
+        self._batch = Batch(worlds, self._workers)
         self.world_ticks = 0
 
     def step(self, actions: Sequence[Sequence[int]]) -> list[dict[int, float]]:
@@ -407,11 +407,13 @@ class SeatedVector:
             self._games[index].apply(actions[index])
 
         if live != self._live:
-            self._batch = Batch([self._games[index].world for index in live])
+            self._batch = Batch(
+                [self._games[index].world for index in live], self._workers
+            )
             self._live = live
         self.world_ticks += len(live) * self._config.decision_interval
         for _ in range(self._config.decision_interval):
-            rows = self._batch.step(self._workers, self._config.threads)
+            rows = self._batch.step(self._config.threads)
             for row in rows:
                 if row.error is not None:
                     failed = live[row.index]
