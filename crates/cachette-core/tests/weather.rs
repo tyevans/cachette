@@ -1430,13 +1430,22 @@ fn the_inland_high_latitudes_hold_cloud() {
         world.step(4).expect("the step must run");
     }
     let field = world.weather();
-    let cells = field.cells();
-    let high = cells.height();
+    // **The walk goes over the world and not over the whole lattice.** The
+    // lattice carries a margin of cells that no watcher sees, and a plane is
+    // indexed by the whole lattice. A walk that reads a plane at a world
+    // address therefore reads the wrong cell by the margin width, and it
+    // counts margin cells as polar land.
+    let lattice = field.lattice();
+    let inner = lattice.inner();
+    let high = inner.height();
     // A polar band is the outer tenth of the rows at each end. The sun swings
     // along the row axis, so the first row and the last row are the poles.
     let mut polar: Vec<i64> = Vec::new();
-    for cell in 0..field.air_plane().len() as u32 {
-        let Some(address) = cells.address_of(cachette_core::TileIdx(cell)) else {
+    for index in 0..inner.tile_count() {
+        let Some(address) = inner.address_of(cachette_core::TileIdx(index)) else {
+            continue;
+        };
+        let Some(cell) = lattice.whole_of_inner(index) else {
             continue;
         };
         let row = address.r.max(0) as u32;

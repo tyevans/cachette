@@ -23,15 +23,25 @@ use cachette_core::hex::{Axial, NEIGHBOUR_COUNT};
 use cachette_core::{TileIdx, WeatherScale, World, WorldConfig};
 
 fn argument(position: usize, fallback: u64) -> u64 {
+    // A seed reads better in hexadecimal, so the probe accepts both forms.
     std::env::args()
         .nth(position)
-        .and_then(|text| text.parse::<u64>().ok())
+        .and_then(|text| match text.strip_prefix("0x") {
+            Some(rest) => u64::from_str_radix(rest, 16).ok(),
+            None => text.parse::<u64>().ok(),
+        })
         .unwrap_or(fallback)
 }
 
 /// Returns the water tile count and the tile count of every weather cell.
 fn ground_of(world: &World, extent: u32, bits: u32, count: usize) -> (Vec<i64>, Vec<i64>) {
-    let grid = world.weather().cells();
+    // **A world address names an inner cell, and the planes are indexed by
+    // the whole lattice.** The margin sits between the two, so the walk goes
+    // through the lattice rather than through the whole grid. Without this
+    // step the probe reads the ground of one cell against the air of
+    // another, and every band it prints is shifted by the margin.
+    let lattice = world.weather().lattice();
+    let inner = lattice.inner();
     let mut water = vec![0i64; count];
     let mut tiles = vec![0i64; count];
     for row in 0..extent {
@@ -41,12 +51,15 @@ fn ground_of(world: &World, extent: u32, bits: u32, count: usize) -> (Vec<i64>, 
                 continue;
             };
             let cell = Axial::new((column >> bits) as i32, (row >> bits) as i32);
-            let Some(at) = grid.index_of(cell) else {
+            let Some(at) = inner.index_of(cell) else {
                 continue;
             };
-            tiles[at.0 as usize] += 1;
+            let Some(whole) = lattice.whole_of_inner(at.0) else {
+                continue;
+            };
+            tiles[whole as usize] += 1;
             if !tile.kind.is_passable() {
-                water[at.0 as usize] += 1;
+                water[whole as usize] += 1;
             }
         }
     }
@@ -183,19 +196,23 @@ fn main() {
     .expect("the settings describe a world");
 
     let cells = world.weather().cells();
+    let lattice = world.weather().lattice();
     let count = cells.tile_count() as usize;
     let (water, tiles) = ground_of(&world, extent, bits, count);
     let distance = distance_from_water(&world, &water);
-    let high = cells.height();
+    // The bands run over the rows of the world, not over the rows of the
+    // whole lattice. The margin holds no latitude of its own.
+    let high = world.weather().lattice().inner().height();
     // Ten bands of rows. Band zero is the north pole and band nine is the
     // south pole, because the season swings along the row axis.
     let bands = 10u32;
 
     println!("extent {extent} seed {seed:#x} ticks {ticks} scale bits {bits}");
     println!(
-        "lattice {} by {} cells, inland means {inland_from} cells or more from any water",
-        cells.width(),
-        high
+        "world {} by {} cells, margin {}, inland means {inland_from} cells or more from any water",
+        lattice.inner().width(),
+        high,
+        lattice.ring()
     );
 
     for tick in 1..=ticks {
@@ -212,7 +229,9 @@ fn main() {
         let mut land: Vec<Band> = (0..bands).map(|_| Band::new()).collect();
         let mut inland: Vec<Band> = (0..bands).map(|_| Band::new()).collect();
         for index in 0..count {
-            let Some(address) = cells.address_of(TileIdx(index as u32)) else {
+            // The row is the row of the world. A ring cell has no world row,
+            // and it holds no ground either, so the ground test drops it.
+            let Some(address) = lattice.inner_address_of(index as u32) else {
                 continue;
             };
             if tiles[index] == 0 {

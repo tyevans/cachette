@@ -832,6 +832,48 @@ A test that asserted more border water after the margin was written and it
 failed. The test in the tree asserts the neighbour property, which is the thing
 the margin buys and which fails at margin zero.
 
+### FND-568 — The polar cloud failure was read as a margin defect, and it was a test that indexed a plane at a world address
+
+**Believed.** Two branches that were each correct alone met and broke the
+poles. One branch gave the weather lattice a margin of mirrored cells on all
+four sides. The other made the capacity of the air fall with the temperature.
+Together they left the polar land at a mean of 8 parts of a sky in 255, against
+a bar of 16. The reading was that the pole gained the power to export water at
+the moment its capacity collapsed, and that the mirror beyond the pole is a
+sink that never gives anything back. Forcing the margin to zero made the test
+pass, which was read as proof.
+
+**True.** The margin costs the poles almost nothing. The test walked the whole
+lattice, took the whole-lattice address of each cell as a world address, and
+read the cloud plane at that index. The margin sits between the two, so the
+walk was wrong by the margin width in both axes. It sampled cells beyond the
+north pole as polar land, and it lost most of the southern band, because a
+world address test rejects a row past the world. The margin-to-zero measurement
+did not test the field. It made the wrong walk correct again.
+
+**Evidence.** The latitude probe carried the same defect and was repaired
+first. Repaired, it read the polar bands at 36 parts of a sky over all cells
+and 25 over the inland cells with the margin present, and at 38 and 27 with the
+margin forced to zero. A reflecting edge at the north and the south moved
+neither figure. The acceptance test then passed with the walk repaired and no
+change to the field at all. The commit body holds the three probe tables and
+the commands.
+
+**Follows.** Three things.
+
+**A plane over a padded lattice has two address spaces, and nothing fails when
+a reader confuses them.** The lattice offers one map between them, and every
+reader must go through it. This is the redundant declaration shape: one
+position held in two coordinate systems with no check that they agree.[^38]
+
+**A repair that makes a test pass is not a diagnosis.** Setting the margin to
+zero changed the field and the test's own arithmetic at the same time. When one
+switch moves two things, it names neither.
+
+**Measure a claim about a band with an instrument that reads that band.** The
+probe and the test shared the defect, so the probe could not have caught it.
+Repair the instrument before you trust what it says about the subject.
+
 
 ## C. Defects found in specified rules
 
