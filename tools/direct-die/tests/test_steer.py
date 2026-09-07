@@ -100,3 +100,114 @@ def test_a_field_of_the_wrong_type_is_dropped():
     assert found.likes == ()
     assert found.denies == ()
     assert found.note is None
+
+
+from direct_die import session  # noqa: E402
+
+
+def _store(tmp_path):
+    return session.Session("hex-tile", "s1", root=tmp_path)
+
+
+def _feedback(store, index, **fields):
+    session.write_json(store.round_path(index) / "feedback.json", {"round": index, **fields})
+
+
+def _critique(store, index, letter, score, faults=()):
+    session.write_json(
+        store.round_path(index) / f"variant-{letter}.critique.json",
+        {"verdict": "x", "faults": list(faults), "score": score},
+    )
+
+
+def test_the_first_round_has_no_steer(tmp_path):
+    found = steer.collect(_store(tmp_path), 0)
+    assert found.parents == ()
+    assert found.denied == ()
+    assert found.note is None
+
+
+def test_every_like_becomes_a_parent_in_the_order_the_person_gave(tmp_path):
+    store = _store(tmp_path)
+    _feedback(store, 0, likes=["b", "d"], order=["d", "b"])
+    found = steer.collect(store, 1)
+    assert found.parents == ("round-00/variant-d", "round-00/variant-b")
+
+
+def test_the_faults_of_each_parent_come_back_under_its_reference(tmp_path):
+    store = _store(tmp_path)
+    _critique(store, 0, "b", 50, ["raise the contrast"])
+    _critique(store, 0, "d", 40, ["cut a shape"])
+    _feedback(store, 0, likes=["b", "d"], order=["b", "d"])
+    found = steer.collect(store, 1)
+    assert found.faults["round-00/variant-b"] == ["raise the contrast"]
+    assert found.faults["round-00/variant-d"] == ["cut a shape"]
+
+
+def test_a_refusal_in_the_first_round_is_still_refused_two_rounds_later(tmp_path):
+    store = _store(tmp_path)
+    _feedback(store, 0, likes=["b"], denies=["a"])
+    _feedback(store, 1, likes=["c"], denies=["d"])
+    found = steer.collect(store, 2)
+    assert found.denied == ("round-00/variant-a", "round-01/variant-d")
+
+
+def test_the_standing_note_comes_from_the_newest_round_that_holds_one(tmp_path):
+    store = _store(tmp_path)
+    _feedback(store, 0, likes=["a"], note="keep the palette flat")
+    _feedback(store, 1, likes=["a"])
+    _feedback(store, 2, likes=["a"], note="use fewer shapes")
+    found = steer.collect(store, 3)
+    assert found.note == "use fewer shapes"
+
+
+def test_a_round_with_no_note_does_not_clear_the_standing_note(tmp_path):
+    store = _store(tmp_path)
+    _feedback(store, 0, likes=["a"], note="keep the palette flat")
+    _feedback(store, 1, likes=["a"])
+    found = steer.collect(store, 2)
+    assert found.note == "keep the palette flat"
+
+
+def test_the_round_note_comes_from_the_round_below_only(tmp_path):
+    store = _store(tmp_path)
+    _feedback(store, 0, likes=["a"], text="darker base")
+    _feedback(store, 1, likes=["a"])
+    found = steer.collect(store, 2)
+    assert found.text is None
+
+
+def test_the_best_score_of_every_round_wins_when_nobody_liked_anything(tmp_path):
+    store = _store(tmp_path)
+    _critique(store, 0, "a", 45)
+    _critique(store, 1, "a", 75, ["add depth at the bottom"])
+    _critique(store, 2, "a", 45)
+    found = steer.collect(store, 3)
+    assert found.parents == ("round-01/variant-a",)
+    assert found.faults["round-01/variant-a"] == ["add depth at the bottom"]
+
+
+def test_a_later_round_wins_a_tie_so_the_loop_still_moves(tmp_path):
+    store = _store(tmp_path)
+    _critique(store, 0, "a", 60)
+    _critique(store, 1, "c", 60)
+    found = steer.collect(store, 2)
+    assert found.parents == ("round-01/variant-c",)
+
+
+def test_a_refused_drawing_is_never_the_parent_whatever_it_scored(tmp_path):
+    store = _store(tmp_path)
+    _critique(store, 0, "a", 95)
+    _critique(store, 0, "c", 30)
+    _feedback(store, 0, denies=["a"])
+    found = steer.collect(store, 1)
+    assert found.parents == ("round-00/variant-c",)
+
+
+def test_a_round_below_the_index_is_read_and_a_round_above_it_is_not(tmp_path):
+    store = _store(tmp_path)
+    _feedback(store, 0, likes=["b"])
+    _feedback(store, 2, likes=["d"], denies=["a"])
+    found = steer.collect(store, 1)
+    assert found.parents == ("round-00/variant-b",)
+    assert found.denied == ()
