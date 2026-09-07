@@ -66,8 +66,12 @@ def paper_share(pixels: np.ndarray) -> float:
     return float(near.mean())
 
 
-def test_the_demonstration_opens_on_the_engine_renderer() -> None:
-    """A watcher who asks for nothing gets the map the engine draws.
+def test_the_state_of_a_run_opens_on_the_engine_renderer() -> None:
+    """A run built by hand draws the map, until a caller puts a renderer in.
+
+    The sketch needs a graphics device, and this class opens no window, so the
+    caller builds the renderer and hands it over. The command line is what
+    opens a run on the sketch, and another test drives that.
 
     The frame the engine draws is a map of the world. The sketch draws on
     paper, so the share of the frame that is paper tells the two apart
@@ -200,10 +204,10 @@ def test_the_page_lifts_the_ground_the_engine_reports() -> None:
     assert first_q <= highest % world.width < last_q
 
 
-def test_the_flag_chooses_the_sketch_and_the_default_does_not(
+def test_a_run_opens_on_the_sketch_and_the_flag_asks_for_the_engine(
     tmp_path: object,
 ) -> None:
-    """The flag selects the renderer, and the run without it draws the map.
+    """The sketch draws a run that asks for nothing, and a flag goes back.
 
     The test drives the command line, because the flag is the thing under
     test and a caller that built the renderer itself would not exercise it.
@@ -227,9 +231,9 @@ def test_the_flag_chooses_the_sketch_and_the_default_does_not(
         hex(SEED),
     ]
     shared[1] = plain
-    assert main(list(shared)) == 0
+    assert main([*shared, "--no-sketch"]) == 0
     shared[1] = drawn
-    assert main([*shared, "--sketch"]) == 0
+    assert main(list(shared)) == 0
     first = Surface(WIDTH, HEIGHT)
     second = Surface(WIDTH, HEIGHT)
     read_png(plain, first)

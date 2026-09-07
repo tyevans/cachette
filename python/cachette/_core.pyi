@@ -589,6 +589,46 @@ class ObservationField(TypedDict):
     low: int
     high: int
 
+class ActionPosition(TypedDict):
+    """One argument position of one verb of the action table.
+
+    The candidate names what the position chooses. The bound is how many
+    choices it holds, and the stride is what one step of it adds to the action
+    number.
+    """
+
+    candidate: str
+    bound: int
+    stride: int
+
+class ActionVerb(TypedDict):
+    """One verb of the action table, and the block of rows it holds.
+
+    The first entry is the action number of the first row of the verb. The
+    rows entry is how many rows it holds, which is the product of the bound of
+    each position. A verb the engine resolves by itself declares no position
+    and holds one row.
+    """
+
+    name: str
+    first: int
+    rows: int
+    positions: list[ActionPosition]
+
+class ActionSchema(TypedDict):
+    """The whole action table, as the engine publishes it.
+
+    The version moves whenever a change moves a row. A stored set of weights
+    pins the version it was trained against and refuses a mismatch.
+
+    The length is the number of rows, and it is the length of the array that
+    the legality reader gives back.
+    """
+
+    version: int
+    length: int
+    verbs: list[ActionVerb]
+
 class ObservationSchema(TypedDict):
     """The declared layout of the observation array of one world.
 
@@ -1348,9 +1388,7 @@ class World:
     def destination_count(self) -> int: ...
     def set_destination_count(self, count: int) -> None: ...
     def faction_units(self, faction: int) -> FactionUnitColumns: ...
-    def faction_visible_units(
-        self, faction: int
-    ) -> FactionVisibleUnitColumns: ...
+    def faction_visible_units(self, faction: int) -> FactionVisibleUnitColumns: ...
     @property
     def settlement_count(self) -> int: ...
     def found_settlements(
@@ -1371,6 +1409,9 @@ class World:
     ) -> FactionRegionSummary: ...
     def faction_observation(self, faction: int) -> npt.NDArray[np.int64]: ...
     def observation_schema(self) -> ObservationSchema: ...
+    def action_schema(self) -> ActionSchema: ...
+    def legal_actions(self, faction: int) -> npt.NDArray[np.uint8]: ...
+    def act(self, faction: int, action: int) -> bool: ...
     def site_economy(self, site: int, commodity: int = ...) -> SiteEconomy: ...
     def site_production(self, site: int, commodity: int = ...) -> SiteProduction: ...
     def site_housing(self, site: int) -> SiteHousing: ...
