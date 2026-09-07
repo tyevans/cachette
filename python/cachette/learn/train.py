@@ -33,6 +33,7 @@ import time
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import NotRequired, TypedDict
 
 import numpy as np
 
@@ -76,6 +77,30 @@ class TrainConfig:
     seed: int = 0
 
 
+class TrainResult(TypedDict):
+    """What one training run reports when it ends.
+
+    **The shape is declared here and nowhere else.** A caller that read this
+    from a mapping of loose values would state the shape a second time, and
+    the two statements would part company at the first change.
+
+    The holdout entry is absent when the run ends. The report writer plays
+    the stored centre against the held-out seeds and adds it, because only a
+    held-out measurement is evidence of what the run learned.
+    """
+
+    name: str
+    kind: str
+    history: list[dict[str, float | None]]
+    weights: str
+    latest_weights: str
+    parameters: int
+    best_generation: int
+    best_validation: float | None
+    validation_seeds: list[int]
+    holdout: NotRequired[dict[str, dict[str, float]]]
+
+
 def field_starts(env: Env) -> dict[str, int]:
     """Return the start position of each field the report names."""
     schema = env.world.observation_schema()
@@ -88,11 +113,14 @@ def run_population(
     policies: Sequence[Policy],
     seeds: list[int],
     workers: int,
-) -> tuple[np.ndarray, list[dict[str, float]]]:
+) -> tuple[np.ndarray, list[dict[str, float]], int]:
     """Play every policy on every seed, and return the returns and the readings.
 
     The world at index ``candidate * len(seeds) + seed`` belongs to that pair.
     The batch reports in index order, so the mapping holds for every step.
+
+    The third value is how many world ticks the batch ran, which the trainer
+    reports as the sample cost of a generation.
     """
     pairs = [(c, s) for c in range(len(policies)) for s in range(len(seeds))]
     vector = VectorEnv(config, weighting, count=len(pairs), workers=workers)
@@ -178,7 +206,7 @@ def train(
     resume: bool = False,
     validation: list[int] | None = None,
     validate_every: int = 3,
-) -> dict[str, object]:
+) -> TrainResult:
     """Train one policy, and return what each generation scored.
 
     The kind entry names the policy the run trains. A linear policy scores
@@ -265,10 +293,17 @@ def train(
         # stored network is the network this run would build.
         stored, meta = load_policy(latest_path)
         policy = policy.rebuild(np.asarray(stored.flat()))
-        first_generation = int(meta.get("generation", -1)) + 1
+        # A weight file states what it holds, and the reader gives back what
+        # the file held. A file written by an older run can therefore be
+        # missing a key, so each read names the type it needs and falls back
+        # to the value a fresh run would start at.
+        written = meta.get("generation")
+        if isinstance(written, (int, float)):
+            first_generation = int(written) + 1
         if best_path.exists():
-            score = float(load_policy(best_path)[1].get("best_score", -np.inf))
-            resumed_best = score
+            score = load_policy(best_path)[1].get("best_score")
+            if isinstance(score, (int, float)):
+                resumed_best = float(score)
         print(
             f"  {name} resumes from {latest_path} at generation {first_generation}",
             flush=True,
@@ -465,6 +500,7 @@ def write_report(path: Path, payload: Mapping[str, object]) -> None:
 __all__ = [
     "REPORT_FIELDS",
     "TrainConfig",
+    "TrainResult",
     "asdict",
     "evaluate",
     "field_starts",

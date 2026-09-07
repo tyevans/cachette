@@ -90,7 +90,9 @@ def test_the_latest_file_names_the_generation_and_the_spread(
     _, meta = load_policy(tmp_path / "t-latest.npz")
     assert "generation" in meta
     assert "spread" in meta
-    assert np.isfinite(float(meta["spread"]))
+    spread = meta["spread"]
+    assert isinstance(spread, float)
+    assert np.isfinite(spread)
     # The versions still travel, so a stale file fails loudly rather than
     # acting on the wrong columns.
     assert meta["action_version"] == 1
