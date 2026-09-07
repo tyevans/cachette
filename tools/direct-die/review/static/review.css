@@ -294,3 +294,24 @@ table.grid.pack img.checker { max-width: 5rem; }
   padding: .4rem .7rem;
   font-size: .9rem;
 }
+
+/* A refused drawing stays on the page. A person compares it with the drawing
+   they liked, and the loop puts its source into the next prompt. */
+.variant.refused {
+  opacity: 0.55;
+  border-color: #a33;
+}
+
+.variant .mark {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 0.85rem;
+}
+
+.variant .parent {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  margin: 0.25rem 0 0;
+}

@@ -210,54 +210,62 @@ def test_a_submit_writes_a_well_formed_feedback_file(
 ) -> None:
     response = client.post(
         f"/s/{PARTIAL}/round-00/feedback",
-        data={"choice": "c", "text": "C reads at tile size."},
+        data={"mark-c": "like", "text": "C reads at tile size."},
         follow_redirects=False,
     )
     assert response.status_code == 303
     written = read_feedback(root, PARTIAL, "round-00")
-    assert set(written) == {"choice", "text", "at"}
-    assert written["choice"] == "c"
+    assert set(written) == {"round", "likes", "denies", "order", "note", "text", "at"}
+    assert isinstance(written["round"], int)
+    assert written["likes"] == ["c"]
     assert written["text"] == "C reads at tile size."
     parsed = datetime.datetime.fromisoformat(written["at"].replace("Z", "+00:00"))
     assert parsed.tzinfo is not None
 
 
 def test_a_submit_can_pick_none(client: TestClient, root: Path) -> None:
-    # Write a letter first, so that a server which ignores the submit cannot
-    # pass this by leaving an earlier `null` in place.
+    # Like a variant first, so that a server which ignores the submit cannot
+    # pass this by leaving the earlier mark in place.
     client.post(
         f"/s/{PARTIAL}/round-01/feedback",
-        data={"choice": "a", "text": "a for now"},
+        data={"mark-a": "like", "text": "a for now"},
         follow_redirects=False,
     )
-    assert read_feedback(root, PARTIAL, "round-01")["choice"] == "a"
+    assert read_feedback(root, PARTIAL, "round-01")["likes"] == ["a"]
     client.post(
         f"/s/{PARTIAL}/round-01/feedback",
-        data={"choice": "", "text": "None of these."},
+        data={
+            "mark-a": "none",
+            "mark-b": "none",
+            "mark-c": "none",
+            "mark-d": "none",
+            "text": "None of these.",
+        },
         follow_redirects=False,
     )
-    assert read_feedback(root, PARTIAL, "round-01")["choice"] is None
+    written = read_feedback(root, PARTIAL, "round-01")
+    assert written["likes"] == []
+    assert written["denies"] == []
 
 
-def test_a_letter_outside_the_contract_becomes_none(
-    client: TestClient, root: Path
-) -> None:
-    # Write a letter first. A server that refuses the bad letter and writes
-    # nothing then leaves `"a"` on disk, and this test sees the difference.
+def test_a_bad_mark_value_becomes_no_mark(client: TestClient, root: Path) -> None:
+    # Like a variant first. A server that refuses the bad value and writes
+    # nothing then leaves the earlier like on disk, and this test sees that.
     client.post(
         f"/s/{PARTIAL}/round-02/feedback",
-        data={"choice": "a", "text": "a for now"},
+        data={"mark-a": "like", "text": "a for now"},
         follow_redirects=False,
     )
-    assert read_feedback(root, PARTIAL, "round-02")["choice"] == "a"
+    assert read_feedback(root, PARTIAL, "round-02")["likes"] == ["a"]
     client.post(
         f"/s/{PARTIAL}/round-02/feedback",
-        data={"choice": "z", "text": "bad letter"},
+        data={"mark-a": "maybe", "text": "bad mark"},
         follow_redirects=False,
     )
     written = read_feedback(root, PARTIAL, "round-02")
-    assert written["choice"] is None
-    assert written["text"] == "bad letter"
+    assert written["likes"] == []
+    assert written["denies"] == []
+    assert written["text"] == "bad mark"
 
 
 def test_a_submit_to_a_missing_round_writes_nothing(
@@ -265,7 +273,7 @@ def test_a_submit_to_a_missing_round_writes_nothing(
 ) -> None:
     response = client.post(
         f"/s/{PARTIAL}/round-77/feedback",
-        data={"choice": "a", "text": ""},
+        data={"mark-a": "like", "text": ""},
         follow_redirects=False,
     )
     assert response.status_code == 200
@@ -278,7 +286,7 @@ def test_the_write_leaves_no_temporary_file(client: TestClient, root: Path) -> N
     # never reads half a file. Nothing may survive the rename.
     client.post(
         f"/s/{PARTIAL}/round-03/feedback",
-        data={"choice": "a", "text": "x"},
+        data={"mark-a": "like", "text": "x"},
         follow_redirects=False,
     )
     directory = root / PARTIAL / "round-03"
@@ -393,3 +401,111 @@ def test_a_round_with_an_analysis_gives_it(root: Path) -> None:
     current = store.load_round(asset, session_id, "round-01")
     assert current.analysis is not None
     assert current.analysis["order"]
+
+
+# -- the round form ----------------------------------------------------------
+
+
+def test_the_form_writes_the_likes_and_the_refusals(
+    client: TestClient, root: Path
+) -> None:
+    response = client.post(
+        f"/s/{HEALTHY}/round-02/feedback",
+        data={
+            "mark-a": "deny",
+            "mark-b": "like",
+            "mark-c": "none",
+            "mark-d": "like",
+            "order": "d,b",
+            "note": "keep the palette flat",
+            "text": "raise the contrast",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    asset, session_id = HEALTHY.split("/")
+    written = json.loads(
+        (root / asset / session_id / "round-02" / "feedback.json").read_text()
+    )
+    assert written["likes"] == ["b", "d"]
+    assert written["denies"] == ["a"]
+    assert written["order"] == ["d", "b"]
+    assert written["note"] == "keep the palette flat"
+    assert written["text"] == "raise the contrast"
+
+
+def test_an_order_the_person_left_blank_takes_the_like_order(
+    client: TestClient, root: Path
+) -> None:
+    client.post(
+        f"/s/{HEALTHY}/round-02/feedback",
+        data={"mark-b": "like", "mark-d": "like", "order": "", "note": "", "text": ""},
+        follow_redirects=False,
+    )
+    asset, session_id = HEALTHY.split("/")
+    written = json.loads(
+        (root / asset / session_id / "round-02" / "feedback.json").read_text()
+    )
+    assert written["order"] == ["b", "d"]
+
+
+def test_an_order_that_names_a_refused_letter_is_dropped(
+    client: TestClient, root: Path
+) -> None:
+    client.post(
+        f"/s/{HEALTHY}/round-02/feedback",
+        data={
+            "mark-a": "deny",
+            "mark-b": "like",
+            "order": "a,b",
+            "note": "",
+            "text": "",
+        },
+        follow_redirects=False,
+    )
+    asset, session_id = HEALTHY.split("/")
+    written = json.loads(
+        (root / asset / session_id / "round-02" / "feedback.json").read_text()
+    )
+    assert written["order"] == ["b"]
+    assert written["denies"] == ["a"]
+
+
+def test_a_form_that_marks_nothing_writes_two_empty_lists(
+    client: TestClient, root: Path
+) -> None:
+    client.post(
+        f"/s/{HEALTHY}/round-02/feedback",
+        data={"order": "", "note": "", "text": "nothing yet"},
+        follow_redirects=False,
+    )
+    asset, session_id = HEALTHY.split("/")
+    written = json.loads(
+        (root / asset / session_id / "round-02" / "feedback.json").read_text()
+    )
+    assert written["likes"] == []
+    assert written["denies"] == []
+    assert written["text"] == "nothing yet"
+
+
+def test_the_round_page_shows_the_three_marks_for_each_variant(
+    client: TestClient,
+) -> None:
+    response = client.get(f"/s/{HEALTHY}/round-01")
+    assert response.status_code == 200
+    for letter in ("a", "b", "c", "d"):
+        assert f'name="mark-{letter}"' in response.text
+    assert 'name="note"' in response.text
+    assert 'name="order"' in response.text
+
+
+def test_the_round_page_marks_the_saved_like_and_refusal(client: TestClient) -> None:
+    response = client.get(f"/s/{HEALTHY}/round-01")
+    assert "refused" in response.text.lower()
+    assert "liked" in response.text.lower()
+
+
+def test_the_round_page_names_the_parent_of_each_variant(client: TestClient) -> None:
+    response = client.get(f"/s/{HEALTHY}/round-01")
+    assert "round-00/variant-b" in response.text
+    assert "round-00/variant-d" in response.text

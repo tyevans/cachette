@@ -354,18 +354,48 @@ def create_app(
         )
 
     @app.post("/s/{asset}/{session_id}/{round_name}/feedback")
-    def submit_feedback(
-        request: Request,
-        asset: str,
-        session_id: str,
-        round_name: str,
-        choice: str = Form(default=""),
-        text: str = Form(default=""),
+    async def submit_feedback(
+        request: Request, asset: str, session_id: str, round_name: str
     ) -> Response:
-        """Write the feedback of one round, then show the round again."""
-        letter = choice if choice in VARIANT_LETTERS else None
+        """Write the feedback of one round, then show the round again.
+
+        Each variant carries one radio group named `mark-<letter>`, whose
+        value is `like`, `deny` or `none`. A drawing is liked, refused, or
+        neither, and those are exclusive, so a radio group is the honest
+        control.
+
+        The order field holds the liked letters, best first, separated by
+        commas. A blank order takes the letters in the order of the page.
+        """
+        form = await request.form()
+        likes: list[str] = []
+        denies: list[str] = []
+        for letter in VARIANT_LETTERS:
+            mark = form.get(f"mark-{letter}")
+            if mark == "like":
+                likes.append(letter)
+            elif mark == "deny":
+                denies.append(letter)
+
+        ranked = [
+            item.strip()
+            for item in str(form.get("order") or "").split(",")
+            if item.strip() in likes
+        ]
+        ranked = list(dict.fromkeys(ranked))
+        ranked.extend(letter for letter in likes if letter not in ranked)
+
         try:
-            store.write_feedback(asset, session_id, round_name, letter, text)
+            store.write_feedback(
+                asset,
+                session_id,
+                round_name,
+                likes,
+                denies,
+                ranked,
+                str(form.get("note") or ""),
+                str(form.get("text") or ""),
+            )
         except ContractError as error:
             return page("error.html", request, message=str(error))
         target = f"/s/{asset}/{session_id}/{round_name}?saved=1"

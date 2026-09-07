@@ -198,7 +198,7 @@ def test_a_new_choice_moves_the_pick(
     assert pack_module.pick_for(store, "cartoon", "forest").letter == "b"
     client.post(
         f"/s/{CHOSEN}/round-01/feedback",
-        data={"choice": "d", "text": "d after all"},
+        data={"mark-d": "like", "text": "d after all"},
         follow_redirects=False,
     )
     assert pack_module.pick_for(store, "cartoon", "forest").letter == "d"

@@ -41,14 +41,6 @@
         <dt>Subject</dt><dd>{{ session.subject or "—" }}</dd>
         <dt>Asset name</dt><dd>{{ slug or "not named" }}</dd>
         <dt>Prompt</dt><dd>{{ round.prompt_summary or "—" }}</dd>
-        <dt>Parent</dt>
-        <dd>
-          {% if round.parent %}
-            <a href="{{ base }}/{{ round.parent.split('/')[0] }}">{{ round.parent }}</a>
-          {% else %}
-            —
-          {% endif %}
-        </dd>
       </dl>
       {% if round.meta is none %}
         <p class="gap">
@@ -77,16 +69,31 @@
         <div class="variants">
           {% for variant in shown %}
             {% set file_base = "/f/" ~ session.asset ~ "/" ~ session.session_id ~ "/" ~ round.name %}
-            <section class="variant{{ ' picked' if round.choice == variant.letter else '' }}">
-              <label class="pick">
-                <input
-                  type="radio"
-                  name="choice"
-                  value="{{ variant.letter }}"
-                  {{ 'checked' if round.choice == variant.letter else '' }}
-                >
+            <section class="variant{{ ' picked' if round.winner == variant.letter else '' }}{{ ' refused' if variant.letter in round.denies else '' }}">
+              <div class="mark">
                 <span class="letter">{{ variant.letter }}</span>
-              </label>
+                <label>
+                  <input type="radio" name="mark-{{ variant.letter }}" value="like"
+                    {{ 'checked' if variant.letter in round.likes else '' }}>
+                  Liked
+                </label>
+                <label>
+                  <input type="radio" name="mark-{{ variant.letter }}" value="deny"
+                    {{ 'checked' if variant.letter in round.denies else '' }}>
+                  Refused
+                </label>
+                <label>
+                  <input type="radio" name="mark-{{ variant.letter }}" value="none"
+                    {{ 'checked' if variant.letter not in round.likes and variant.letter not in round.denies else '' }}>
+                  No mark
+                </label>
+              </div>
+              {% if round.parents.get(variant.letter) %}
+                <p class="parent">
+                  Revised from
+                  <a href="{{ base }}/{{ round.parents[variant.letter].split('/')[0] }}">{{ round.parents[variant.letter] }}</a>
+                </p>
+              {% endif %}
 
               <div class="display">
                 {% if variant.display_png %}
@@ -144,20 +151,32 @@
         </div>
 
         <div class="submit">
-          <label class="none">
+          <label class="text">
+            The order of the liked drawings, best first
             <input
-              type="radio"
-              name="choice"
-              value=""
-              {{ 'checked' if round.choice is none else '' }}
+              type="text"
+              name="order"
+              value="{{ round.order | join(',') }}"
+              placeholder="d,b"
             >
-            Pick none of them
+            <span class="note">
+              Leave it blank to take the order of the page. The first drawing
+              stands for the asset in a pack.
+            </span>
           </label>
           <label class="text">
-            Feedback on this round
+            The standing note. Every later round of this session reads it.
+            <textarea
+              name="note"
+              rows="3"
+              placeholder="Say what holds for the whole session."
+            >{{ round.note }}</textarea>
+          </label>
+          <label class="text">
+            The note for the next round only
             <textarea
               name="text"
-              rows="5"
+              rows="4"
               placeholder="Say what to keep and what to change."
             >{{ round.feedback_text }}</textarea>
           </label>
