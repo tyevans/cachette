@@ -617,12 +617,23 @@ fn a_contract_binds_and_a_carrier_delivers() {
         let before = delivered(&world);
         world.step(1).expect("the step runs");
         // Every carrier the controller assigned is a live unit of the faction
-        // that owes, its type carries, and it is sent on the plane of its
-        // faction. A carrier that failed any of those would be a row that the
-        // engine wrote and nothing acted on.
+        // that owes, and its type carries. A carrier that failed either would
+        // be a row that the engine wrote and nothing acted on.
+        //
+        // **A carrier holds the plane of its faction until it arrives.** The
+        // engine releases a unit that reaches a seed tile of the plane it
+        // climbs, so an arrived carrier holds no plane, and an assertion that
+        // demanded one would refuse the arrival the test waits for.[^1]
+        //
+        // [^1]: Findings register, FND-576. `docs/FINDINGS.md`
         for (unit, _, faction) in world.carrier_units() {
             assert_eq!(world.soldiers().faction(unit), Some(faction));
-            assert_eq!(world.sent_to(unit), Some(Some(faction.0)));
+            assert!(
+                matches!(world.sent_to(unit), Some(Some(plane)) if plane == faction.0)
+                    || world.sent_to(unit) == Some(None),
+                "a carrier holds the plane of its faction or none: {:?}",
+                world.sent_to(unit)
+            );
             let unit_type = world.soldiers().unit_type(unit).expect("the unit is live");
             assert!(
                 world.unit_types().row(unit_type).carry_capacity > 0,
