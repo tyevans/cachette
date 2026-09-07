@@ -595,11 +595,10 @@ class GameEnd(TypedDict):
     """How a game ended: the winner, the path and the tick.
 
     The record is written once, at the first tick a reader fires. The path is
-    one of ``domination``, ``territory``, ``wealth_or_wonder`` and ``renown``.
+    one of ``domination``, ``territory``, ``wonder`` and ``renown``.
 
-    No live run ends on ``wealth_or_wonder``, because that path has no
-    reader. The name stays because a record stored before the path was
-    retired still carries it.
+    A stock total wins no game. The wealth clause is gone, and the wonder is a
+    path of its own with a reader of its own.
     """
 
     winner: int
@@ -607,21 +606,22 @@ class GameEnd(TypedDict):
     tick: int
 
 class Standing(TypedDict):
-    """The running value of one faction on each win path, and on the path
-    that no reader watches.
+    """The running value of one faction on each win path.
 
     The store total and the best renown are Q16.16 values as their raw
     integers.
 
-    The held tiles, the seats held and the best renown are the values the
-    territory, domination and renown readers compare. The store total and the
-    wonder progress feed no reader, because the wealth-or-wonder path has no
-    reader. The engine reports them so that a caller may watch a faction grow
-    rich or finish a great work. Neither wins a game.
+    Every value except the store total feeds a reader. The held tiles feed
+    territory. The seats held and the live units feed domination. The best
+    renown feeds renown. The wonder progress is how far the furthest
+    unfinished wonder has come. The store total feeds no reader, because a
+    stock total wins no game. The engine reports it so that a caller may watch
+    a faction grow rich.
     """
 
     held_tiles: int
     seats_held: int
+    live_units: int
     store_total: int
     best_renown: int
     wonder_progress: int
@@ -981,6 +981,21 @@ class World:
     @property
     def tick_limit(self) -> int: ...
     def set_tick_limit(self, tick_limit: int) -> None: ...
+    def set_renown_target(self, raw: int) -> None: ...
+    def set_renown_per_fell(self, raw: int) -> None: ...
+    def set_wonder_work(self, work: int) -> None: ...
+    def set_wonder_victory_claim(self, claim: int) -> None: ...
+    def set_win_readers_enabled(self, enabled: bool) -> None: ...
+    @property
+    def renown_target(self) -> int: ...
+    @property
+    def renown_per_fell(self) -> int: ...
+    @property
+    def win_readers_enabled(self) -> bool: ...
+    @property
+    def wonder_work(self) -> int | None: ...
+    @property
+    def wonder_victory_claim(self) -> int | None: ...
     def game_end(self) -> GameEnd | None: ...
     def score(self, faction: int) -> int: ...
     def standing(self, faction: int) -> Standing: ...
@@ -1297,7 +1312,6 @@ class World:
     def set_character_renown(self, characters: Identities, renown: int) -> None: ...
 
 def version() -> str: ...
-def stock_target() -> int: ...
 def stock_ceiling_of_one_settlement() -> int: ...
 def event_schema() -> dict[str, list[tuple[str, str]]]: ...
 def faction_colours() -> list[int]: ...

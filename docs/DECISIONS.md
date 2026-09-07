@@ -23,9 +23,49 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-275**
+**Next number: DEC-276**
 
 ## Open
+
+### DEC-275 — Does the territory reader compare a share of the tiles?
+
+**Open. The project owner owns it.**
+
+The territory reader fires at the tick limit and gives the game to the faction
+that holds the most tiles. It compares no share. A faction that leads by one tile
+at the limit wins in the same way as one that holds the world.[^DEC275A]
+
+The project owner wants each win path to take a comparable share of a seed
+set.[^DEC275B] The other three paths each have a value a caller sets, so a search
+can move when each fires.[^DEC275C] Territory has only the tick limit, and the
+limit is global: raising it gives every other path more time to fire first. So a
+search can make territory take less, and it cannot make territory take more
+except by pushing every other path out of reach.
+
+There is a second reading behind this. A territory win at a low limit was
+measured to be a truncated renown win rather than a separate outcome.[^DEC275D]
+A reader that fires only at the limit reports the path that ran out of time.
+
+**Option A. Leave it. Territory is the outcome when nothing else decided.**
+The path is the draw rule of the game, and a draw does not need a bar.
+
+**Option B. Give the reader a share, so that it fires early.** A faction that
+holds a stated share of the passable tiles wins on the tick it reaches the share.
+The share becomes a threshold a caller sets, in the way the renown target is.
+
+**Option C. Give the reader a share and keep the limit clause.** The reader fires
+early on the share, and at the limit on the lead, so a run always ends.
+
+**Recommendation. Option C, when a measurement says territory is unreachable
+otherwise.** Option B alone removes the rule that every run ends. Option A is
+correct while nobody asks territory to win on its own terms, and the project
+owner has now asked for exactly that. Do not take an option before the tuner has
+run, because the search may reach the wanted shares with the four values that
+exist.
+
+**What decides it.** A search over the values that exist, reporting the share
+each path takes. If no setting gives territory a comparable share, the reader
+needs one of its own.
 
 ### DEC-274 — Does a held builder starve before it finishes its project?
 
@@ -4432,6 +4472,10 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC117A]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
 [^DEC130A]: Research report 20, what the Python interface should be, section 5. `docs/research/reports/20-the-python-interface.md`
 [^DEC130B]: ADR-0040, Python is a control plane, not a data plane, the context section. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+[^DEC275A]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+[^DEC275B]: Balance register, the win-path share. `docs/reference/balance.md`
+[^DEC275C]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D1. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+[^DEC275D]: Findings register, FND-563. `docs/FINDINGS.md`
 [^DEC131A]: Interface review of the published reference, section 6a, 3 September 2026. `~/cachette-reader-rounds/round-1-interface.md`
 [^DEC131B]: Project orientation, the hard invariants. `CLAUDE.md`
 [^DEC133A]: Findings register, FND-352. `docs/FINDINGS.md`

@@ -911,7 +911,7 @@ fn hash_sequence(config: WorldConfig, population: Population, frames: u64) -> St
         let end = world.game_end();
         assert_eq!(
             end.win_path(),
-            Some(WinPath::WealthOrWonder),
+            Some(WinPath::Wonder),
             "the wonder scenario did not end on the wonder"
         );
         assert!(end.tick.0 < frames, "the file holds no frame after the end");

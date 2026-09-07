@@ -1,30 +1,32 @@
-//! Three readers end a game, in one fixed order, once.
+//! Four readers end a game, in one fixed order, once.
 //!
 //! Each reader fires on a fixture at its extreme. Domination fires for a
 //! faction whose rivals hold no unit, and for a faction that holds every
-//! seat while a rival still lives. Renown fires at the renown target and not
-//! below. Two paths true on one tick record the earlier path of the fixed
-//! order, and a path that becomes true later changes nothing.[^1]
+//! seat while a rival still lives. The wonder fires when a finished wonder
+//! stands on ground its faction holds, and not one unit of work short.
+//! Renown fires at the renown target and not below. Two paths true on one
+//! tick record the earlier path of the fixed order, and a path that becomes
+//! true later changes nothing.[^1]
 //!
-//! **The wealth-or-wonder path has no reader, so no fixture here ends a game
-//! on it.**[^2] Three tests hold that rule at the extremes the old reader
-//! fired at: a stock total above the target, a stock total that overflows a
-//! 32-bit accumulator, and a wonder finished on ground its faction holds.
-//! Each of them steps the world and asserts that the record stays empty,
-//! while the standing still reports the quantity.
+//! **A stock total wins no game.** The wealth clause is gone, and the wonder
+//! is a path of its own.[^2] Three tests hold that rule at the extremes the
+//! old clause fired at: a stock total at the ceiling of one store, a stock
+//! total that overflows a 32-bit accumulator, and the accumulator at the
+//! target scale. Each of them steps the world and asserts that the record
+//! stays empty, while the standing still reports the quantity.
 //!
 //! # References
 //!
 //! [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
-//! [^2]: ADR-0173, the wealth or wonder path has no reader, decision D1. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
+//! [^2]: ADR-0174, a wonder is a win path and a stock total is not, decisions D1 and D2. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
 
 use cachette_core::choose;
 use cachette_core::sim_math::combine;
 use cachette_core::site::CommodityId;
 use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
 use cachette_core::{
-    Accum, Axial, Entity, FactionId, Fix32, World, WorldConfig, RENOWN_TARGET,
-    STOCK_CEILING_OF_ONE_SETTLEMENT, STOCK_TARGET,
+    Accum, Axial, Entity, FactionId, Fix32, WinPath, World, WorldConfig, RENOWN_TARGET,
+    STOCK_CEILING_OF_ONE_SETTLEMENT,
 };
 
 const THREADS: usize = 2;
@@ -288,53 +290,6 @@ fn arm_both_factions(world: &mut World) {
         .expect("the ground admits a second unit");
 }
 
-/// The store of one settlement, filled to the top, and the rest of the bar.
-///
-/// The first amount is the ceiling of one `Fix32` store. The second is what
-/// the bar asks for beyond it, less one raw unit, so the pair sits one raw
-/// unit below the bar.
-fn one_below_the_bar() -> [i32; 2] {
-    let rest = STOCK_TARGET - 1 - STOCK_CEILING_OF_ONE_SETTLEMENT;
-    [
-        i32::MAX,
-        i32::try_from(rest).expect("the rest of the bar fits one store"),
-    ]
-}
-
-#[test]
-fn a_stock_total_at_the_target_does_not_end_the_game() {
-    // **This is the rule this test states.** The old reader ended the game
-    // here. The path has no reader now, so the fixture that used to win must
-    // lose, and the world must keep running with an empty record.
-    let mut world = world(2, 34, 48);
-    arm_both_factions(&mut world);
-    let amounts = one_below_the_bar();
-    let (sites, put_in) = settle_and_fill(&mut world, FactionId(1), &amounts);
-    assert_eq!(put_in, STOCK_TARGET - 1);
-    step(&mut world);
-    assert!(!world.game_end().is_set(), "one raw unit below the target");
-    // One more raw unit in the second store crosses the bar. Nothing reads
-    // the bar, so nothing happens.
-    world
-        .set_settlement_store(sites[1], CommodityId(0), Fix32(amounts[1] + 1))
-        .expect("the commodity exists");
-    for _ in 0..4 {
-        step(&mut world);
-        assert!(
-            !world.game_end().is_set(),
-            "a stock total at the target ends no game"
-        );
-    }
-    // The quantity is still reported, and it stands at the target.
-    assert_eq!(
-        world
-            .standing(FactionId(1))
-            .expect("faction 1 exists")
-            .store_total,
-        STOCK_TARGET
-    );
-}
-
 #[test]
 fn one_settlement_filled_to_the_ceiling_of_its_store_wins_nothing() {
     // A store is a `Fix32`, so one settlement of one commodity stops here
@@ -364,7 +319,7 @@ fn one_settlement_filled_to_the_ceiling_of_its_store_wins_nothing() {
 }
 
 #[test]
-fn two_settlements_above_the_bar_end_no_game_and_the_total_does_not_wrap() {
+fn two_settlements_at_the_top_of_the_range_end_no_game_and_the_total_does_not_wrap() {
     let mut world = world(2, 37, 48);
     arm_both_factions(&mut world);
     // Two stores at the top of the 32-bit range. Their sum wraps to a
@@ -376,7 +331,6 @@ fn two_settlements_above_the_bar_end_no_game_and_the_total_does_not_wrap() {
         put_in > i64::from(i32::MAX),
         "the fixture reaches the overflow"
     );
-    assert!(put_in > STOCK_TARGET, "the fixture stands above the bar");
     assert_eq!(
         world
             .standing(FactionId(0))
@@ -388,7 +342,7 @@ fn two_settlements_above_the_bar_end_no_game_and_the_total_does_not_wrap() {
         step(&mut world);
         assert!(
             !world.game_end().is_set(),
-            "a stock total above the bar ends no game"
+            "however large, a stock total ends no game"
         );
     }
 }
@@ -421,7 +375,7 @@ fn the_stock_total_does_not_saturate_at_the_target_scale() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn a_wonder_finished_on_held_ground_ends_no_game() {
+fn a_wonder_finished_on_held_ground_ends_the_game_and_one_short_does_not() {
     let mut world = world(2, 102, 192);
     // The choice pass replaces the build order of a unit whose cell chooses
     // on that frame. The fixture keeps the choice away from the run.
@@ -505,12 +459,16 @@ fn a_wonder_finished_on_held_ground_ends_no_game() {
         "the builders hold the ground"
     );
     // **This is the rule this test states.** The wonder completes, on ground
-    // its own faction holds, and the game does not end. The old reader ended
-    // it on this tick.
-    assert!(!world.game_end().is_set(), "a finished wonder ends no game");
+    // its own faction holds, and the game ends on the wonder path.
+    let end = world.game_end();
+    assert!(end.is_set(), "a finished wonder ends the game");
+    assert_eq!(end.win_path(), Some(WinPath::Wonder));
+    assert_eq!(end.winner, FactionId(0));
+    // The record is written once, so a later step leaves it where it is.
+    let tick = end.tick;
     for _ in 0..4 {
         step(&mut world);
-        assert!(!world.game_end().is_set(), "and the record stays empty");
+        assert_eq!(world.game_end().tick, tick, "the record is written once");
     }
     let census = world.subsystem_census();
     let count = |name: &str| {

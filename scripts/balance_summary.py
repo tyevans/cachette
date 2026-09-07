@@ -17,15 +17,19 @@ import json
 import pathlib
 import sys
 
-from cachette import stock_target
+from cachette import stock_ceiling_of_one_settlement
 
 WONDER_WORK = 2400
 
-# The engine states the wealth bar, and this script reads it. A copy here
-# reported a share against a bar the engine no longer held.[^1]
+# A stock total wins no game, so there is no wealth bar to read a share
+# against. The engine states the stock one settlement can hold, and this
+# script reads that as the scale of the column. A copy here reported a share
+# against a bar the engine no longer held.[^1] [^2]
 #
 # [^1]: Findings register, FND-551. ``docs/FINDINGS.md``
-STOCK_TARGET_RAW = stock_target()
+# [^2]: ADR-0174, a wonder is a win path and a stock total is not, decision D2.
+#       ``docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md``
+STOCK_SCALE_RAW = stock_ceiling_of_one_settlement()
 
 
 def quantiles(values: list[int]) -> tuple[int, int, int, int, int]:
@@ -69,8 +73,8 @@ def main(argv: list[str] | None = None) -> int:
         line("largest held tiles", [max(s["held"]) for s in last]),
         line("smallest held tiles", [min(s["held"]) for s in last]),
         line(
-            "best wealth, percent",
-            [max(s["store"]) * 100 // STOCK_TARGET_RAW for s in last],
+            "best store, percent",
+            [max(s["store"]) * 100 // STOCK_SCALE_RAW for s in last],
         ),
         line(
             "best wonder, percent",

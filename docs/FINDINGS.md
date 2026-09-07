@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-564**
+**Next number: FND-566**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13689,6 +13689,62 @@ decide which path is strong. It decides which path gets to fire.
 
 **Neither domination nor territory has ended a seeded game at any horizon.** The
 paths the project owner wants are still not the paths that decide a run.
+
+### FND-564 — A ruling about one trigger retired two paths, because one reader held both
+
+**Believed.** The wealth-or-wonder reader fired on a stock total at a target or
+on a finished wonder. The project owner objected that the path ended every game
+early and arbitrarily. A record read the ruling as a ruling about the path, and
+retired both triggers. It considered keeping the wonder clause and rejected the
+idea, on the ground that a wonder end would be arbitrary for the same reason at a
+lower rate.[^F564A]
+
+**True.** The ruling was about the stock clause alone. The project owner has
+since stated that a store passing a number is not a way to win a war, and that a
+wonder is an achievement the game should end on, because a wonder costs work and
+stands on ground the faction holds. The wonder is now a win path with a reader of
+its own, and the stock clause stays retired.[^F564B]
+
+**Evidence.** The ruling of the project owner of 6 September 2026, and the record
+that carries it. No measurement was needed, because the disagreement was about
+what the earlier ruling meant and not about what the engine does.
+
+**What follows.** **One reader that fires on two unrelated statements cannot be
+ruled on, tuned or retired one clause at a time.** The reader hid which of the
+two triggers the objection was about, and a record then acted on the whole path.
+Split a reader whose two clauses could be accepted separately, in the way a
+record is split when it holds two claims.
+
+**A rejected alternative that returns is the most common reason to read an old
+record, and this is that case.** The earlier record named "keep the wonder clause
+and drop the stock clause" among its rejected alternatives, with its reasoning.
+That paragraph is what made the reversal cheap to state.
+
+### FND-565 — A test held its own copy of the renown target and went stale
+
+**Believed.** A boundary test asserted that a character at the renown target ends
+the game. It stated the target as its own literal, a hundred whole units in the
+raw fixed-point scale.
+
+**True.** The project owner raised the renown target tenfold, to a thousand whole
+units. The test then wrote a renown a tenth of the target, the reader did not
+fire, and the test failed. Nothing connected the two sites, so the raise passed
+every check and left a red test behind it.
+
+**Evidence.** The failure of the boundary controller test on the integration
+branch, before this work touched it. The engine constant and the test literal
+disagreed by a factor of ten.
+
+**What follows.** This is the redundant declaration site shape, in a test.[^F526A]
+The repair was not to update the literal. It was to read the target back from the
+engine, which the boundary now exposes beside the setter. A test that states a
+value the engine also states goes stale, and a test is the place where that looks
+like a defect in the code.
+
+**A setter needs a reader for this reason, and not only for the caller.** A value
+a caller can set and cannot read back is a value that every test and every script
+must state again.
+
 ## References
 
 [^F552A]: The unit-to-tile bridge, the block key. `crates/cachette-core/src/bridge.rs`
@@ -13709,6 +13765,8 @@ paths the project owner wants are still not the paths that decide a run.
 [^F548D]: ADR-0165, the wealth bar stands above what one settlement can hold. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
 [^F548E]: Findings register, FND-542. `docs/FINDINGS.md`
 [^F549B]: The sweep summary. `scripts/balance_summary.py`
+[^F564A]: ADR-0173, the wealth or wonder path has no reader, the alternatives it rejects. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
+[^F564B]: ADR-0174, a wonder is a win path and a stock total is not, decisions D1 and D2. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
 
 [^F498B]: The controller log, the refusal count and the stage that empties them. `crates/cachette-core/src/controller.rs`
 [^F498D]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
