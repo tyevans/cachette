@@ -42,6 +42,16 @@ rule refuse an order on a tile the faction zones for another category. The plan
 figures barely moved.[^1] The plan still saturates, and the seed set is still
 written once.
 
+**This item now holds the last step of the way between two settlements.** The
+solver plans that way, and a probe of the demonstration world over four seeds
+at six hundred ticks reports about forty road projects for each faction that
+holds two settlements, where the branch that planned them could not run
+before.[^7] The same probe reports no pair of settlements that a standing road
+joins, at six hundred ticks and at fifteen hundred. A fixture that removes the
+competing controller draw finishes such a way and the road stands on every tile
+of it, so the mechanism completes and the run does not. The two causes above
+are why: the plan saturates, and the send is aimed once.
+
 ## What is missing before this is refined
 
 A refiner answers these before this item leaves `proposed/`.
@@ -89,3 +99,4 @@ Filled in when the item moves to `complete/`.
 [^4]: The carrying test. `crates/cachette-core/tests/carrying_a_load_home.rs`
 [^5]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^6]: Backlog item 0504. `docs/backlog/complete/0504-find-why-one-seed-of-eight-finishes-no-project.md`
+[^7]: The road join probe. `crates/cachette-core/examples/road_join_probe.rs`

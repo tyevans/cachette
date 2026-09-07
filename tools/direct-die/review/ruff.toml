@@ -8,3 +8,4 @@ extend = "../../../pyproject.toml"
 # A test module documents itself in its own docstring. Each test function
 # carries its statement in its name.
 "test_review.py" = ["D103"]
+"test_frontend.py" = ["D103"]

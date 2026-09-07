@@ -756,6 +756,26 @@ fn colour_card(readout: &Readout) -> Card {
             grouped(u64::from(*count)),
         ));
     }
+    // **Six colours cannot separate sixty-three factions.** The world holds
+    // up to sixty-three, the colour table holds six, and a faction past the
+    // table shares a colour with an earlier one. The count beside a row is
+    // therefore the sum of every faction of that colour, and the rows are
+    // fewer than the factions.
+    //
+    // A watcher who reads six rows in a world of ten cannot tell a whole
+    // list from a short one, and cannot tell the count of one faction from
+    // the sum of two. The card states both, rather than showing six of ten
+    // in silence.
+    if usize::from(readout.factions()) > COLOURED_FACTIONS {
+        rows.push(Row::new(
+            "factions in the world",
+            grouped(u64::from(readout.factions())),
+        ));
+        rows.push(Row::new(
+            "each faction row counts",
+            "every faction of its colour".to_string(),
+        ));
+    }
     for (ordinal, count) in readout.by_kind().iter().enumerate() {
         let kind = KINDS[ordinal];
         rows.push(Row::coloured(

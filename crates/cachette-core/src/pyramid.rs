@@ -1492,6 +1492,31 @@ pub const AT_SEED: u8 = NEIGHBOUR_COUNT as u8;
 /// [^1]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
 pub const APPROACH_PASSES_PER_EDGE: u32 = 2;
 
+/// The passes the approach relaxation makes when it steers a unit to stock.
+///
+/// **The count is not the block edge, because the reach a unit needs is not
+/// the block.** A destination plane must lead a sent unit from anywhere in
+/// the block to one named tile, so its reach must cover the block. Stock is
+/// not one tile: a block holds many stocked tiles, and the field is derived
+/// again at every frame under the unit that reads it. A unit takes one step
+/// in a frame, so a reach beyond that step is derived again before the unit
+/// walks it.[^1]
+///
+/// The count is the step the unit takes now, and a detour of the same length
+/// around ground that refuses that step. It is fixed and it is derived from
+/// the frame cadence, so no pass tests whether the reach settled.[^2]
+///
+/// A unit whose stock lies further reads no offset and takes the direction of
+/// its level 1 cell, which is the answer every unit read before this field
+/// existed. The coarse field carries it toward the cell that holds the most,
+/// and this field answers once it is close.
+///
+/// # References
+///
+/// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+/// [^2]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+pub const STOCK_PASSES: u32 = 2;
+
 /// The direction of the nearest seed tile, for each tile of a seeded block.
 ///
 /// **A field over level 1 cells steers a unit to a cell and no further.** A
@@ -1612,18 +1637,48 @@ impl ApproachField {
     /// the movement step asks of the tile it steps onto, so this states no
     /// second passability rule.[^1]
     ///
-    /// The walk is over the entries in ascending plane and then ascending
-    /// block, and over the tiles of a block in ascending offset. It runs on
-    /// the calling thread and it names no thread count.[^2]
+    /// The walk is over the entries in ascending block, then ascending
+    /// crossing, then ascending plane, and over the tiles of a block in
+    /// ascending offset. It runs on the calling thread and it names no thread
+    /// count.[^2]
     ///
     /// # References
     ///
     /// [^1]: ADR-0056, movement is tile-discrete and admitted by sort-then-admit, decision D4. `docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     pub fn derive(&mut self, terrain: Terrain, seeds: &[(u16, TileIdx)], crossing: &[u8]) {
+        let passes = self.layout.block_edge() * APPROACH_PASSES_PER_EDGE;
+        self.derive_within(terrain, seeds, crossing, passes);
+    }
+
+    /// Derives every entry from a set of seed tiles, to a stated reach.
+    ///
+    /// The relaxation carries a reach one tile further at each pass, so the
+    /// pass count is the furthest a tile may sit from a seed and still hold
+    /// an offset. A tile beyond it holds none, and the unit there reads the
+    /// coarse field.
+    ///
+    /// **The count is a caller's, and it is fixed before the walk starts.**
+    /// No pass tests whether the reach settled.[^1]
+    ///
+    /// Every rule of the derivation above holds here. The walk is over the
+    /// entries in ascending block, then ascending crossing, then ascending
+    /// plane, and over the tiles of a block in ascending offset. It runs on
+    /// the calling thread and it names no thread count.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    pub fn derive_within(
+        &mut self,
+        terrain: Terrain,
+        seeds: &[(u16, TileIdx)],
+        crossing: &[u8],
+        passes: u32,
+    ) {
         let layout = self.layout;
         let area = block_area(layout);
-        let passes = layout.block_edge() * APPROACH_PASSES_PER_EDGE;
         // The entries are the distinct plane and block pairs of the seed set,
         // in ascending order, so the entry order is a property of the set and
         // never of the order the caller named the seeds in.
@@ -1638,20 +1693,44 @@ impl ApproachField {
         entries.dedup();
         self.entries = entries;
         self.offsets = vec![NO_EXIT; self.entries.len() * area];
-        for index in 0..self.entries.len() {
+        // **The walk is over the entries in ascending block, then ascending
+        // crossing, then ascending plane.** The ground of a block and the
+        // neighbour of each of its tiles depend on the block and the
+        // crossing, and never on the plane. Two planes of one block that
+        // cross the same water therefore ask the terrain the same question,
+        // and the terrain is generated rather than stored, so the answer
+        // costs a noise evaluation each time.[^3]
+        //
+        // Each entry writes only its own slice of the offsets, so the result
+        // does not depend on this order. The order is a sort on a total key
+        // of the entry, so it names no thread and no completion order.[^2]
+        //
+        // [^3]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+        let crosses_of =
+            |plane: u16| u32::from(crossing.get(plane as usize).copied().unwrap_or(0) != 0);
+        let mut walk: Vec<usize> = (0..self.entries.len()).collect();
+        walk.sort_unstable_by_key(|index| {
+            let (plane, block) = self.entries[*index];
+            (block, crosses_of(plane), plane)
+        });
+        let mut ground: Option<(u32, u32)> = None;
+        for index in walk {
             let (plane, block) = self.entries[index];
-            let crosses = u32::from(crossing.get(plane as usize).copied().unwrap_or(0) != 0);
-            for inside in 0..area {
-                let address = block_address(layout, block, inside);
-                self.admits[inside] = address
-                    .and_then(|address| terrain.kind(address))
-                    .is_some_and(|kind| kind.is_passable_for(crosses));
-                for direction in 0..NEIGHBOUR_COUNT {
-                    let at = address
-                        .and_then(|address| layout.grid().neighbour(address, direction))
-                        .and_then(|there| inside_of(layout, block, there));
-                    self.neighbours[inside * NEIGHBOUR_COUNT + direction] =
-                        at.map_or(OUTSIDE_BLOCK, |at| at as u32);
+            let crosses = crosses_of(plane);
+            if ground != Some((block, crosses)) {
+                ground = Some((block, crosses));
+                for inside in 0..area {
+                    let address = block_address(layout, block, inside);
+                    self.admits[inside] = address
+                        .and_then(|address| terrain.kind(address))
+                        .is_some_and(|kind| kind.is_passable_for(crosses));
+                    for direction in 0..NEIGHBOUR_COUNT {
+                        let at = address
+                            .and_then(|address| layout.grid().neighbour(address, direction))
+                            .and_then(|there| inside_of(layout, block, there));
+                        self.neighbours[inside * NEIGHBOUR_COUNT + direction] =
+                            at.map_or(OUTSIDE_BLOCK, |at| at as u32);
+                    }
                 }
             }
             self.reach.iter_mut().for_each(|tile| *tile = UNREACHED);

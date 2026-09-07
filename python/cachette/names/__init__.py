@@ -180,7 +180,7 @@ class Names:
         vowels = self._tables.VOWEL_LETTERS
         if name[-1] in vowels:
             return name + "n" if name.endswith("a") else name + "an"
-        endings = [
+        endings: list[str] = [
             ending
             for ending in self._tables.CONSONANT_ADJECTIVES
             if not _repeats(name, ending, vowels)

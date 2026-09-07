@@ -12,9 +12,11 @@
 //! [^1]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/REGISTRY.md`
 //! [^2]: ADR-0042, the interpreter is released for the whole step. `docs/adrs/REGISTRY.md`
 
+mod batch;
 mod columns;
 pub mod logs;
 
+use crate::batch::{PyBatch, StepRow};
 use crate::columns::columns_of;
 use crate::logs::{log_names, log_of, unknown_log_message};
 use cachette_core::campaign::{CampaignEvent, CampaignRow};
@@ -32,11 +34,13 @@ use cachette_core::rates::RateSchedule;
 use cachette_core::site::COMMODITY_COUNT;
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow};
 use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
+use cachette_core::weather::CLOUD_SHARE_WHOLE;
 use cachette_core::TileIdx;
 use cachette_core::{Advert, Consideration, KIND_LAND, KIND_RELATION, KIND_RESOURCE};
 use cachette_core::{
-    Axial, CommodityId, Entity, FactionId, FactionWeights, Fix32, Holder, Influence, ResourceKind,
-    WeatherScale, World as CoreWorld, WorldConfig, WEIGHT_HIGH, WEIGHT_LOW,
+    Axial, CommodityId, Cyclone, CycloneSetting, Entity, FactionId, FactionWeights, Fix32, Holder,
+    Influence, ResourceKind, TileKind, WeatherScale, Wind, World as CoreWorld, WorldConfig,
+    WEIGHT_HIGH, WEIGHT_LOW,
 };
 use cachette_view::panel::Set as PanelSet;
 use cachette_view::{
@@ -1058,6 +1062,180 @@ impl PyWorld {
             .map(|holder| holder.to_bits())
             .collect();
         raw.to_pyarray(python)
+    }
+
+    /// Copies the tile height column into a new NumPy array.
+    ///
+    /// Returns a one-dimensional array of `numpy.int32`, one entry for each
+    /// tile, in row-major order. Entry `r * width + q` is the tile at the
+    /// address `(q, r)`. The order is the order that `tile_holders` uses, so
+    /// the two arrays index alike.
+    ///
+    /// **Each entry is a Q16.16 fixed-point height as its raw integer.**
+    /// Divide by 65536 to read it as a quantity. The boundary carries the raw
+    /// integer, because a float crossing would give a caller a value the
+    /// engine never held.[^1]
+    ///
+    /// **The height of a tile is a pure function of the seed and the
+    /// address**, so this answer never changes over the life of a world.[^2]
+    /// The climate leaves the height alone, so this column is the column that
+    /// the level 1 summary sums into `height_total`.
+    ///
+    /// This method copies, and it also generates. The world stores no array
+    /// of heights, so the call visits every tile.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    fn tile_heights<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i32>> {
+        let raw: Vec<i32> = python.detach(|| {
+            let world = self.lock();
+            let grid = world.grid();
+            (0..grid.tile_count())
+                .map(|index| {
+                    grid.address_of(TileIdx(index))
+                        .and_then(|address| world.tile_terrain(address))
+                        .map_or(0, |tile| tile.height.0)
+                })
+                .collect()
+        });
+        raw.to_pyarray(python)
+    }
+
+    /// Copies the terrain kind of every tile into a new NumPy array.
+    ///
+    /// Returns a one-dimensional array of `numpy.uint8`, one entry for each
+    /// tile, in row-major order. Entry `r * width + q` is the tile at the
+    /// address `(q, r)`. The order is the order that `tile_holders` uses.
+    ///
+    /// **Each entry is the same number that the `kind` key of `tile_report`
+    /// carries**, so a caller reads one tile and the whole world through one
+    /// set of numbers. The kinds are water, plain, forest, hill and mountain,
+    /// and the engine numbers them.
+    ///
+    /// The climate over a tile reaches the answer, so a cold cell reports the
+    /// kind that the classifier gives under that climate.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    fn tile_kinds<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<u8>> {
+        let raw: Vec<u8> = python.detach(|| {
+            let world = self.lock();
+            let grid = world.grid();
+            (0..grid.tile_count())
+                .map(|index| {
+                    grid.address_of(TileIdx(index))
+                        .and_then(|address| world.tile_kind(address))
+                        .map_or(0, TileKind::to_u8)
+                })
+                .collect()
+        });
+        raw.to_pyarray(python)
+    }
+
+    /// Copies the cloud share over every tile into a new NumPy array.
+    ///
+    /// Returns a one-dimensional array of `numpy.int32`, one entry for each
+    /// tile, in row-major order. Entry `r * width + q` is the tile at the
+    /// address `(q, r)`. The order is the order that `tile_holders` uses.
+    ///
+    /// **Each entry is the share of the sky that a watcher sees as cloud**,
+    /// from none to `cloud_share_whole`. It is the air held over the cell
+    /// against what that air can hold, and not the air against a mark that
+    /// every cell shares.
+    ///
+    /// **The array stands at tile resolution and the weather stands on the
+    /// level 1 cell**, so every tile of one cell reports the same share. Each
+    /// entry is the number that `air_at` answers for that tile, put through
+    /// the same share. **The engine owns the map from a tile to its weather
+    /// cell.** The weather lattice carries a margin around the world, so a
+    /// caller that indexed a weather plane by a world address would read the
+    /// wrong cell. This reader therefore takes an address and never a cell,
+    /// and it publishes no map.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-569. `docs/FINDINGS.md`
+    fn cloud_shares<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i32>> {
+        let raw: Vec<i32> = python.detach(|| {
+            let world = self.lock();
+            let grid = world.grid();
+            (0..grid.tile_count())
+                .map(|index| {
+                    grid.address_of(TileIdx(index))
+                        .and_then(|address| world.cloud_share_at(address))
+                        .and_then(|share| i32::try_from(share).ok())
+                        .unwrap_or(0)
+                })
+                .collect()
+        });
+        raw.to_pyarray(python)
+    }
+
+    /// The largest cloud share, as an integer.
+    ///
+    /// A `cloud_shares` entry runs from zero to this number. The engine
+    /// declares it, so a caller that scales the share holds no second copy of
+    /// the ceiling.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[getter]
+    fn cloud_share_whole(&self) -> i64 {
+        CLOUD_SHARE_WHOLE
+    }
+
+    /// Copies the wind over every tile into two NumPy arrays.
+    ///
+    /// Returns a `dict` with the keys `q` and `r`. Each holds a
+    /// one-dimensional array of `numpy.int32`, one entry for each tile, in
+    /// row-major order. Entry `r * width + q` is the tile at the address
+    /// `(q, r)`. The order is the order that `tile_holders` uses.
+    ///
+    /// **The wind is an integer vector over the two axes of the cell
+    /// lattice.** The lattice has three axes and two of them are free, so the
+    /// third part is `-(q + r)` and the engine stores it nowhere. The parts
+    /// are whole lattice steps and not a fixed-point value.
+    ///
+    /// **This is the wind itself and not a drawing of it.** A caller that
+    /// wants a heading or a speed derives it from the two parts. The map
+    /// overlay paints the same wind as one of six hues, and that palette is a
+    /// choice of the renderer. A second copy of it here would be one fact in
+    /// two places.[^2]
+    ///
+    /// **The array stands at tile resolution and the wind stands on the level
+    /// 1 cell**, so every tile of one cell reports the same vector. The
+    /// engine owns the map from a tile to its weather cell, in the way the
+    /// cloud reader describes.
+    ///
+    /// The wind is carried state, so a watcher who reads it reads what the
+    /// next step will read.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+    /// [^2]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    fn tile_winds<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let (along_q, along_r): (Vec<i32>, Vec<i32>) = python.detach(|| {
+            let world = self.lock();
+            let grid = world.grid();
+            (0..grid.tile_count())
+                .map(|index| {
+                    let wind = grid
+                        .address_of(TileIdx(index))
+                        .and_then(|address| world.wind_at(address))
+                        .unwrap_or(Wind::STILL);
+                    (wind.q, wind.r)
+                })
+                .unzip()
+        });
+        let axes = PyDict::new(python);
+        axes.set_item("q", along_q.to_pyarray(python))?;
+        axes.set_item("r", along_r.to_pyarray(python))?;
+        Ok(axes)
     }
 
     /// Returns the name of every panel the viewer can draw.
@@ -3462,6 +3640,171 @@ impl PyWorld {
         Ok(out)
     }
 
+    /// Returns the declared layout of the action table, as a `dict`.
+    ///
+    /// **This is the only declaration of that layout.** An action is one
+    /// integer that indexes a bounded table the engine declares, and a
+    /// caller decodes that integer by arithmetic over this schema and never
+    /// by a table it holds.[^1] No file outside the engine may state a verb
+    /// number, a position or a bound.
+    ///
+    /// The dictionary holds three keys.
+    ///
+    /// - `version`, an integer. The version of the layout. A verb added or a
+    ///   bound changed moves every row above it, and that changes the
+    ///   meaning of a stored weight file, so a learner that loads a policy
+    ///   under another version must stop.
+    /// - `length`, an integer. How many rows the whole table holds. It is
+    ///   the length `legal_actions` returns.
+    /// - `verbs`, a list of `dict`. One entry for each verb, in the order
+    ///   the table holds them.
+    ///
+    /// Each verb entry holds four keys.
+    ///
+    /// - `name`, a string. The name of the verb.
+    /// - `first`, an integer. The action integer of the first row of the
+    ///   verb.
+    /// - `rows`, an integer. How many rows of the table the verb holds. It
+    ///   is the product of the bounds of its positions, and it is one for a
+    ///   verb that declares no position.
+    /// - `positions`, a list of `dict`. The argument positions the verb
+    ///   declares, in order.
+    ///
+    /// Each position entry holds three keys.
+    ///
+    /// - `candidate`, a string. The kind of thing the candidate list of the
+    ///   position holds.
+    /// - `bound`, an integer. The ceiling on that candidate list. **No bound
+    ///   follows the population.**
+    /// - `stride`, an integer. How far one step of the position moves the
+    ///   action integer.
+    ///
+    /// A caller reads the action integer of one verb and its arguments as
+    /// `first + sum(argument * stride)`, and it reverses that by division.
+    ///
+    /// **A verb whose content the engine resolves declares no position.** A
+    /// campaign and a crossing each name a place, and the engine chooses
+    /// that place at the tick the action applies, in the way it chooses it
+    /// for the built-in controller.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the interpreter refuses to hold the dictionary.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D1. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+    /// [^2]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+    fn action_schema<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        let schema = world.action_schema();
+        let verbs = PyList::empty(python);
+        for row in schema.rows() {
+            let positions = PyList::empty(python);
+            for position in &row.positions {
+                let entry = PyDict::new(python);
+                entry.set_item("candidate", position.candidate.name())?;
+                entry.set_item("bound", position.bound)?;
+                entry.set_item("stride", position.stride)?;
+                positions.append(entry)?;
+            }
+            let entry = PyDict::new(python);
+            entry.set_item("name", row.name())?;
+            entry.set_item("first", row.first)?;
+            entry.set_item("rows", row.rows)?;
+            entry.set_item("positions", positions)?;
+            verbs.append(entry)?;
+        }
+        let out = PyDict::new(python);
+        out.set_item("version", schema.version())?;
+        out.set_item("length", schema.length())?;
+        out.set_item("verbs", verbs)?;
+        Ok(out)
+    }
+
+    /// Returns one byte for each row of the action table, as a NumPy `uint8`
+    /// array.
+    ///
+    /// The byte is one when the verb would take that row at this tick, and
+    /// zero when it would refuse it.[^1] Row zero is the no-op, and it is
+    /// always one, so the answer is never empty and a learner never learns
+    /// legality by trial.
+    ///
+    /// **The answer holds only what the faction observes.** Two verbs act on
+    /// a place, and the engine resolves each place through the readers that
+    /// answer for one faction. A byte therefore states nothing about ground
+    /// the faction has never seen.[^2]
+    ///
+    /// `action_schema` declares which row is which. This method copies the
+    /// array.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
+    fn legal_actions<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+    ) -> PyResult<Bound<'py, PyArray1<u8>>> {
+        let world = self.lock();
+        let answer = world.legal_actions(FactionId(faction)).ok_or_else(|| {
+            VerbError::new_err(format!("{faction} names no faction of this world"))
+        })?;
+        Ok(answer.to_pyarray(python))
+    }
+
+    /// Applies one action of one faction, and returns whether the verb took
+    /// it.
+    ///
+    /// The action is one integer that indexes the action table of this
+    /// world. `action_schema` declares which row is which, and
+    /// `legal_actions` says which rows the verbs would take now.
+    ///
+    /// **This runs the verb and reports what the verb did.** It does not
+    /// read the legality answer first, so a row the answer allows and the
+    /// verb then refuses is a defect rather than a silent disagreement.[^1]
+    ///
+    /// Every action goes through the same verbs a Python caller and the
+    /// built-in controller go through, so a learner reaches no store the
+    /// controller cannot reach.[^2] The engine writes one row of the
+    /// controller log for the action, whether the verb took it or refused
+    /// it, and that row carries the whole action integer.[^3]
+    ///
+    /// **Send one integer for one faction. Do not loop over entities.** A
+    /// learner is a control plane.[^4]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world,
+    /// and when the integer is at or above the length of the table.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^3]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^4]: ADR-0040, Python is a control plane, not a data plane, decision D1. `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+    fn act(&self, faction: u16, action: u32) -> PyResult<bool> {
+        let mut world = self.lock();
+        if faction >= world.faction_count().max(1) {
+            return Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
+        }
+        let length = world.action_schema().length();
+        if action >= length {
+            return Err(VerbError::new_err(format!(
+                "the action {action} is at or above the length {length} of the action table"
+            )));
+        }
+        Ok(world.act(FactionId(faction), action))
+    }
+
     /// Returns what one site earns, holds and owes, as a `dict`.
     ///
     /// The site is one settlement identity, as a Python integer. The
@@ -5430,6 +5773,125 @@ impl PyWorld {
             .map_err(|error| VerbError::new_err(error.to_string()))
     }
 
+    /// Sets a set of tiles alight, and returns how many caught.
+    ///
+    /// The tiles are a sequence of `(q, r)` addresses. The call is one command
+    /// over the whole set, so the control plane names the set and loops over
+    /// nothing.
+    ///
+    /// A tile does not catch when its ground carries no fuel, when the weather
+    /// has wetted it, when it already burns, and when it has burned already.
+    /// Open water and bare rock therefore never catch.
+    ///
+    /// The count is how many of the named tiles caught. A caller that named
+    /// one tile and got zero named ground that will not burn.
+    fn ignite(&self, tiles: Vec<(i32, i32)>) -> PyResult<usize> {
+        let mut world = self.lock();
+        let grid = world.grid();
+        let mut indices = Vec::with_capacity(tiles.len());
+        for (q, r) in &tiles {
+            let address = Axial::new(*q, *r);
+            let index = grid.index_of(address).ok_or_else(|| {
+                VerbError::new_err(format!("the address ({q}, {r}) lies outside the world"))
+            })?;
+            indices.push(index);
+        }
+        Ok(world.ignite_set(&indices))
+    }
+
+    /// The tiles that burn now, as a list of `(q, r)` addresses.
+    ///
+    /// The list is in ascending tile order. A caller hands it straight to
+    /// `send_units_to` as the seed set of a destination plane, so no caller
+    /// walks a tile of its own.
+    fn burning_tiles(&self) -> Vec<(i32, i32)> {
+        let world = self.lock();
+        let grid = world.grid();
+        world
+            .burning_tiles()
+            .into_iter()
+            .filter_map(|tile| grid.address_of(tile))
+            .map(|address| (address.q, address.r))
+            .collect()
+    }
+
+    /// The number of tiles that burn now, as an integer.
+    #[getter]
+    fn burning_tile_count(&self) -> usize {
+        self.lock().fire().burning_count()
+    }
+
+    /// The number of tiles that have burned over the life of the world.
+    ///
+    /// Ground that has burned never catches again, and that is what makes a
+    /// fire end rather than run for ever.
+    #[getter]
+    fn spent_tile_count(&self) -> usize {
+        self.lock().fire().spent().len()
+    }
+
+    /// Orders every soldier the identities name to fight the fire, and sends
+    /// the whole set at it.
+    ///
+    /// The units are a sequence of identities, or the NumPy array of
+    /// `numpy.uint64` that `spawn_soldiers` returned. The destination is the
+    /// number of the plane the engine seeds with every burning tile.
+    ///
+    /// **This is one command over a set, and it starts one field.** Every unit
+    /// then climbs that field, so no unit searches for a fire and the caller
+    /// walks nothing. Call it again on a later tick to re-aim the crew at the
+    /// fire as it moves.
+    ///
+    /// A unit under this order that stands on a burning tile stays there, it
+    /// takes intensity off the fire, and it risks its life. Returns `None`.
+    #[pyo3(signature = (units, destination = 0))]
+    fn order_douse(&self, units: Vec<u64>, destination: u16) -> PyResult<()> {
+        let mut world = self.lock();
+        let mut resolved = Vec::with_capacity(units.len());
+        for unit in &units {
+            resolved.push(resolve(&world, *unit)?);
+        }
+        world
+            .order_douse_set(&resolved, destination)
+            .map(|_| ())
+            .map_err(|error| VerbError::new_err(error.to_string()))
+    }
+
+    /// Tells every soldier the identities name to stop fighting the fire.
+    ///
+    /// The units are a sequence of identities. The order stops, and the unit
+    /// keeps whatever send it holds. Returns `None`.
+    fn stop_dousing(&self, units: Vec<u64>) -> PyResult<()> {
+        let mut world = self.lock();
+        let mut resolved = Vec::with_capacity(units.len());
+        for unit in &units {
+            resolved.push(resolve(&world, *unit)?);
+        }
+        for unit in resolved {
+            world.order_douse(unit, false);
+        }
+        Ok(())
+    }
+
+    /// The chance that lightning starts a fire on one tick, as an integer.
+    ///
+    /// The chance is stated out of one million. A world answers zero until a
+    /// caller says otherwise, so a world never catches by itself unless
+    /// somebody asks for it.
+    #[getter]
+    fn lightning_chance(&self) -> u64 {
+        self.lock().lightning_chance()
+    }
+
+    /// Sets the chance that lightning starts a fire on one tick.
+    ///
+    /// The chance is stated out of one million. A value of one thousand gives
+    /// about one strike in a thousand ticks. The engine clamps a value above
+    /// one million. Returns `None`.
+    fn set_lightning_chance(&self, chance: u64) {
+        self.lock().set_lightning_chance(chance);
+    }
+
     /// The number of destination planes the world holds, as an integer.
     ///
     /// A destination plane carries one order. The caller names the plane when
@@ -5809,6 +6271,86 @@ impl PyWorld {
     #[getter]
     fn cells_wide(&self) -> u32 {
         self.lock().pyramid().layout().blocks_wide()
+    }
+
+    /// Raises a travelling storm over one place.
+    ///
+    /// The place is a tile, as the pair `(q, r)` of integers. The storm
+    /// stands over the weather cell that covers it, and it moves, rains and
+    /// dies on its own from there.
+    ///
+    /// **The storm is imposed and it did not form.** The field holds one
+    /// layer of air, and a layer grows no low of its own, so a caller places
+    /// one and the engine carries it.
+    ///
+    /// The kind is `"tropical"` or `"severe"`. The two are one object at two
+    /// points of one parameter set, and a caller may state the three
+    /// parameters instead. **The severe kind is not a resolved tornado.** One
+    /// weather cell spans tens to hundreds of kilometres, and a tornado is
+    /// under one, so the severe kind is an intensity carried on a cell.
+    ///
+    /// The answer is a dictionary of the storm that was raised.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the place lies outside the world, when the
+    /// kind is not one this world holds, when a stated parameter lies outside
+    /// its range, and when the field already carries as many storms as it
+    /// holds.
+    #[pyo3(signature = (place, kind = "tropical", depth = None, radius = None, life = None))]
+    fn raise_cyclone<'py>(
+        &self,
+        python: Python<'py>,
+        place: (i32, i32),
+        kind: &str,
+        depth: Option<i32>,
+        radius: Option<i32>,
+        life: Option<u32>,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let mut setting = match kind {
+            "tropical" => CycloneSetting::TROPICAL,
+            "severe" => CycloneSetting::SEVERE,
+            other => {
+                return Err(VerbError::new_err(format!(
+                    "the kind {other} is not tropical and not severe"
+                )))
+            }
+        };
+        if let Some(depth) = depth {
+            setting.depth = depth;
+        }
+        if let Some(radius) = radius {
+            setting.radius = radius;
+        }
+        if let Some(life) = life {
+            setting.life = life;
+        }
+        let storm = self
+            .lock()
+            .raise_cyclone(Axial::new(place.0, place.1), setting)
+            .map_err(|error| VerbError::new_err(error.to_string()))?;
+        cyclone_report(python, storm)
+    }
+
+    /// The storms that the world is carrying, as a list of dictionaries.
+    ///
+    /// Each entry holds the identity, the cell the eye stands over, the
+    /// depth, the radius, the age and the life of one storm. The list is in
+    /// the order the storms were raised in.
+    fn cyclones<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyList>> {
+        let world = self.lock();
+        let reports: Vec<Bound<'py, PyDict>> = world
+            .cyclones()
+            .iter()
+            .map(|storm| cyclone_report(python, *storm))
+            .collect::<PyResult<_>>()?;
+        PyList::new(python, reports)
+    }
+
+    /// The storms that the field carries at once, as an integer.
+    #[getter]
+    fn cyclone_ceiling(&self) -> usize {
+        cachette_core::CYCLONE_CEILING
     }
 
     /// The largest strength that one storm may carry, as an integer.
@@ -8506,10 +9048,6 @@ fn trade_refusal(error: cachette_core::TradeError) -> PyErr {
             "the party that owes the land does not hold tile {}",
             tile.0
         ),
-        Refusal::UpgradeOnLand(tile) => format!(
-            "tile {} carries an upgrade, and whether an upgrade changes hands with the ground is open under BLK-036, so the engine refuses the trade until it is answered",
-            tile.0
-        ),
         Refusal::TooMuchLand(count, bound) => format!(
             "a land side names {count} tiles, and the bound is {bound}"
         ),
@@ -8521,6 +9059,27 @@ fn trade_refusal(error: cachette_core::TradeError) -> PyErr {
         ),
     };
     VerbError::new_err(said)
+}
+
+/// Returns one storm as a dictionary.
+///
+/// The eye is the cell of the whole weather lattice that the storm stands
+/// over, as the pair `(q, r)`. **The margin is part of that lattice**, so a
+/// storm may stand at a cell that covers no tile of the world.
+///
+/// # Errors
+///
+/// Returns an error when the interpreter refuses to hold the dictionary.
+fn cyclone_report(python: Python<'_>, storm: Cyclone) -> PyResult<Bound<'_, PyDict>> {
+    let report = PyDict::new(python);
+    let eye = storm.eye();
+    report.set_item("id", storm.id)?;
+    report.set_item("eye", (eye.q, eye.r))?;
+    report.set_item("depth", storm.depth)?;
+    report.set_item("radius", storm.radius)?;
+    report.set_item("age", storm.age)?;
+    report.set_item("life", storm.life)?;
+    Ok(report)
 }
 
 /// Returns the columns that every event log gives, as a `dict`.
@@ -8729,6 +9288,8 @@ fn stock_ceiling_of_one_settlement() -> i64 {
 #[pyo3(name = "_core")]
 fn cachette_core_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyWorld>()?;
+    module.add_class::<PyBatch>()?;
+    module.add_class::<StepRow>()?;
     module.add_class::<PyCamera>()?;
     module.add_function(wrap_pyfunction!(version, module)?)?;
     module.add_function(wrap_pyfunction!(stock_ceiling_of_one_settlement, module)?)?;

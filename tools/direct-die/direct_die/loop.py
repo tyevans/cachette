@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import guide as guide_module
 from . import render, session
+from . import steer as steer_module
 from .client import ClientError, Image, ask, ask_with_images
 
 # The four variant lenses. Each one gives a different direction and a
@@ -49,6 +51,11 @@ VARIANT_LENSES: dict[str, tuple[str, float]] = {
         1.05,
     ),
 }
+
+# How many refused drawings go into one prompt. An SVG document of this tool
+# runs about 800 tokens, and the model window is 16384. The newest refusals
+# win, because they answer the drawing that the person just saw.
+MAX_REFUSALS = 2
 
 ARTIST_SYSTEM = (
     "You are a game artist. You write SVG source and nothing else. "
@@ -105,7 +112,6 @@ class RoundResult:
     """What one round produced."""
 
     index: int
-    parent: str | None
     variants: list[VariantResult] = field(default_factory=list)
     seconds: float = 0.0
 
@@ -163,21 +169,62 @@ def parse_critique(text: str) -> dict:
     }
 
 
+def _taken_refusals(denied_sources: Sequence[str]) -> list[str]:
+    """Give the refusals that a prompt actually holds.
+
+    This is the one place that drops an empty source and caps the count at
+    `MAX_REFUSALS`. The prompt builder and the round summary both call this,
+    so they cannot disagree on how many refusals went in.
+    """
+    return [item for item in denied_sources if item and item.strip()][-MAX_REFUSALS:]
+
+
+def _refusal_block(denied_sources: Sequence[str]) -> str:
+    """Give the prompt section that shows the drawings a person refused.
+
+    Give the empty string when nobody refused anything. The section holds SVG
+    source, because the generation step sends no picture, and that is what
+    keeps the prompt inside the model window.
+    """
+    taken = _taken_refusals(denied_sources)
+    if not taken:
+        return ""
+    bodies = "\n-----\n".join(item.strip() for item in taken)
+    return (
+        "\nDRAWINGS THE ART DIRECTOR REFUSED. Do not draw like these. Do not "
+        "reuse their shapes or their palette.\n"
+        "-----\n"
+        f"{bodies}\n"
+        "-----\n"
+    )
+
+
 def build_creation_prompt(
     the_guide: guide_module.Guide,
     subject: str,
     lens: str,
     sizes: render.SizeSet,
+    denied_sources: Sequence[str] = (),
+    standing_note: str | None = None,
 ) -> str:
     """Build the prompt that makes the first drawing of an asset."""
+    standing = ""
+    if standing_note:
+        standing = (
+            "\nDIRECTION FROM THE HUMAN ART DIRECTOR. This outranks every "
+            "other note. Do what it says first.\n"
+            f"{standing_note.strip()}\n"
+        )
     return (
         f"Draw one {the_guide.asset} for a strategy game world map.\n"
         f"The subject is: {subject}\n\n"
         "The style guide follows. Obey every rule in it.\n"
         "-----\n"
         f"{the_guide.rules}\n"
-        "-----\n\n"
-        f"Your direction for this drawing: {lens}\n\n"
+        "-----\n"
+        + _refusal_block(denied_sources)
+        + standing
+        + f"\nYour direction for this drawing: {lens}\n\n"
         f"The map draws this asset at {sizes.display} pixels. A person "
         f"inspects it at {sizes.inspection} pixels. It must read at the "
         "smaller size.\n\n"
@@ -193,17 +240,26 @@ def build_revision_prompt(
     parent_svg: str,
     faults: list[str],
     human_text: str | None,
+    standing_note: str | None = None,
+    denied_sources: Sequence[str] = (),
 ) -> str:
     """Build the prompt that revises a drawing.
 
-    Human feedback goes above the model critique, and the prompt says
-    that the human outranks the model.
+    The two human notes go above the model critique, and the prompt says that
+    the human outranks the model. The standing note goes above the note for
+    this round, because it holds for the whole session.
     """
     direction = []
+    if standing_note:
+        direction.append(
+            "STANDING DIRECTION FROM THE HUMAN ART DIRECTOR. It holds for "
+            "the whole session, and it outranks every other note below it.\n"
+            f"{standing_note.strip()}"
+        )
     if human_text:
         direction.append(
-            "DIRECTION FROM THE HUMAN ART DIRECTOR. This outranks every "
-            "other note below it. Do what it says first.\n"
+            "DIRECTION FROM THE HUMAN ART DIRECTOR FOR THIS ROUND. This "
+            "outranks every model note below it. Do what it says first.\n"
             f"{human_text.strip()}"
         )
     if faults:
@@ -228,7 +284,9 @@ def build_revision_prompt(
         "This is the current SVG source.\n"
         "-----\n"
         f"{parent_svg.strip()}\n"
-        "-----\n\n"
+        "-----\n"
+        + _refusal_block(denied_sources)
+        + "\n"
         + "\n\n".join(direction)
         + f"\n\nYour direction for this variant: {lens}\n\n"
         f"The map draws this asset at {sizes.display} pixels. It must "
@@ -337,60 +395,59 @@ def produce_svg(prompt: str, temperature: float) -> tuple[str, float, int, int]:
     raise render.RenderError(f"no usable SVG came back: {last_error}")
 
 
-def choose_parent(
-    store: session.Session, index: int
-) -> tuple[str | None, list[str], str | None]:
-    """Choose the parent of the next round.
+def assign_parents(
+    parents: Sequence[str], letters: Sequence[str]
+) -> dict[str, str]:
+    """Give each variant letter the parent that it revises.
 
-    The function gives the parent reference, the fault list of that
-    parent, and the human feedback text.
-
-    A human choice wins, because the human outranks the model. When no
-    human chose, the parent is the highest scoring variant of every
-    round so far, and not only of the last round. A critique names a
-    fault even in a good drawing, and a revision that acts on that fault
-    can make the drawing worse. The loop must not walk away from its
-    best work when that happens. A later round wins a tie, so the loop
-    still moves.
+    A person can like more than one drawing. The round cycles the liked
+    parents across the variant letters, so each parent gets a spread of
+    directions rather than one direction. One parent goes to every letter,
+    which is the behaviour of a single choice.
     """
-    if index <= 0:
-        return None, [], None
-    previous = index - 1
-    feedback = store.feedback(previous)
-    human_text = None
-    chosen: tuple[int, str] | None = None
-    if feedback:
-        text = feedback.get("text")
-        if isinstance(text, str) and text.strip():
-            human_text = text.strip()
-        choice = feedback.get("choice")
-        if isinstance(choice, str) and choice in session.VARIANT_LETTERS:
-            chosen = (previous, choice)
+    if not parents:
+        return {}
+    return {
+        letter: parents[position % len(parents)]
+        for position, letter in enumerate(letters)
+    }
 
-    if chosen is None:
-        best_score = -1
-        for round_index in store.existing_rounds():
-            if round_index > previous:
-                continue
-            for candidate in session.VARIANT_LETTERS:
-                critique = store.critique(round_index, candidate)
-                if not critique:
-                    continue
-                score = critique.get("score")
-                if isinstance(score, int) and score >= best_score:
-                    best_score = score
-                    chosen = (round_index, candidate)
 
-    if chosen is None:
-        return None, [], human_text
+@dataclass(frozen=True)
+class RoundPlan:
+    """What one round revises, refuses, and reads as direction."""
 
-    round_index, letter = chosen
-    critique = store.critique(round_index, letter) or {}
-    faults = [item for item in critique.get("faults", []) if isinstance(item, str)]
-    return (
-        f"{session.round_name(round_index)}/variant-{letter}",
-        faults,
-        human_text,
+    parents: dict[str, str] = field(default_factory=dict)
+    faults: dict[str, list[str]] = field(default_factory=dict)
+    denied_sources: tuple[str, ...] = ()
+    note: str | None = None
+    text: str | None = None
+
+
+def plan_round(
+    store: session.Session, index: int, letters: Sequence[str]
+) -> RoundPlan:
+    """Read the session and give the plan of one round.
+
+    The plan names the parent of each variant letter, the faults of each
+    parent, and the SVG source of each drawing that the person refused.
+
+    A refusal whose SVG is not on disk drops out. The picture is what the
+    prompt shows, and there is nothing to show.
+    """
+    found = steer_module.collect(store, index)
+    sources: list[str] = []
+    for reference in found.denied:
+        number, letter = steer_module.split_reference(reference)
+        text = store.svg(number, letter)
+        if text and text.strip():
+            sources.append(text)
+    return RoundPlan(
+        parents=assign_parents(found.parents, letters),
+        faults=dict(found.faults),
+        denied_sources=tuple(sources),
+        note=found.note,
+        text=found.text,
     )
 
 
@@ -404,27 +461,41 @@ def run_round(
 ) -> RoundResult:
     """Run one round, and write every file that the round produces."""
     sizes = render.sizes_for(the_guide.asset)
-    parent, faults, human_text = choose_parent(store, index)
-    parent_svg = None
-    if parent:
-        previous_index = int(parent.split("/")[0][len("round-") :])
-        letter = parent.rsplit("-", 1)[1]
-        parent_svg = store.svg(previous_index, letter)
-
-    result = RoundResult(index=index, parent=parent)
     letters = session.VARIANT_LETTERS[:variants]
+    plan = plan_round(store, index, letters)
+    result = RoundResult(index=index)
     round_path = store.round_path(index)
 
     for letter in letters:
         lens, temperature = VARIANT_LENSES[letter]
         variant = VariantResult(letter=letter)
         result.variants.append(variant)
+        reference = plan.parents.get(letter)
+        parent_svg = None
+        if reference:
+            number, parent_letter = steer_module.split_reference(reference)
+            parent_svg = store.svg(number, parent_letter)
         if parent_svg:
             prompt = build_revision_prompt(
-                the_guide, subject, lens, sizes, parent_svg, faults, human_text
+                the_guide,
+                subject,
+                lens,
+                sizes,
+                parent_svg,
+                plan.faults.get(reference, []),
+                plan.text,
+                standing_note=plan.note,
+                denied_sources=plan.denied_sources,
             )
         else:
-            prompt = build_creation_prompt(the_guide, subject, lens, sizes)
+            prompt = build_creation_prompt(
+                the_guide,
+                subject,
+                lens,
+                sizes,
+                denied_sources=plan.denied_sources,
+                standing_note=plan.note,
+            )
 
         try:
             source, seconds, prompt_tokens, completion_tokens = produce_svg(
@@ -468,15 +539,18 @@ def run_round(
         )
 
     result.seconds = sum(variant.seconds for variant in result.variants)
-    summary = "first drawing" if not parent else "revision"
-    if human_text:
+    summary = "first drawing" if not plan.parents else "revision"
+    if plan.note or plan.text:
         summary += "; the human gave direction"
+    held_refusals = _taken_refusals(plan.denied_sources)
+    if held_refusals:
+        summary += f"; {len(held_refusals)} refused drawings in the prompt"
     session.write_json(
         round_path / "meta.json",
         {
             "round": index,
             "prompt_summary": f"{subject}; {summary}",
-            "parent": parent,
+            "parents": dict(plan.parents),
         },
     )
     return result

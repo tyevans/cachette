@@ -194,3 +194,21 @@ pub const SYSTEM_LUXURY: SystemId = 12;
 /// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 /// [^2]: ADR-0082, the store sets the rate of a birth and the housing admits it, decision D4. `docs/adrs/draft/adr-0082-the-store-sets-the-rate-of-a-birth-and-the-housing-admits-it.md`
 pub const SYSTEM_GROWTH: SystemId = 13;
+
+/// The system identifier of the wildfire.
+///
+/// The wildfire owns this identifier alone. It does not share the identifier
+/// of the weather field, because two systems that share an identifier draw
+/// the same value from the same frame, entity and draw index. A fire would
+/// then spread exactly where the wind of that cell was raised.[^1]
+///
+/// A spread draw keys the burning tile into the entity slot and the direction
+/// into the draw slot. A casualty draw keys the whole identity of the unit
+/// into the entity slot, which no tile index reaches, because a live
+/// generation puts an identity at or above `2^32`.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+/// [^2]: ADR-0014, entity identity is an index plus a generation, decision D6. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+pub const SYSTEM_FIRE: SystemId = 14;

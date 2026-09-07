@@ -17,21 +17,45 @@
       {% if saved %}
         <p class="saved">The feedback of this round is written.</p>
       {% endif %}
+      {% if promoted %}
+        <p class="saved">
+          The drawing is now an exemplar of {{ session.asset }}, under the
+          name {{ promoted }}. The next run reads it.
+        </p>
+      {% endif %}
+      {% if analysed %}
+        <p class="saved">The analysis is written. It is below the drawings.</p>
+      {% endif %}
+      {% if ruled %}
+        <p class="saved">
+          The rule is now in the style guide of {{ session.asset }}. The next
+          run reads it.
+        </p>
+      {% endif %}
 
       <h1>{{ round.name }}</h1>
+
+      {% if live %}
+        <p class="waiting live-line">
+          A run is writing this session now: {{ waiting }}.
+          The page keeps your typing. It offers a reload when the disk changes.
+        </p>
+      {% endif %}
+      <p class="reload" id="reload" hidden>
+        New files are on disk.
+        <a href="{{ base }}/{{ round.name }}">Reload the page</a>
+      </p>
+
       <dl class="meta">
+        <dt>Subject</dt><dd>{{ session.subject or "—" }}</dd>
+        <dt>Asset name</dt><dd>{{ slug or "not named" }}</dd>
         <dt>Prompt</dt><dd>{{ round.prompt_summary or "—" }}</dd>
-        <dt>Parent</dt>
-        <dd>
-          {% if round.parent %}
-            <a href="{{ base }}/{{ round.parent.split('/')[0] }}">{{ round.parent }}</a>
-          {% else %}
-            —
-          {% endif %}
-        </dd>
       </dl>
       {% if round.meta is none %}
-        <p class="gap">This round has no meta.json yet.</p>
+        <p class="gap">
+          This round has no meta.json yet. The loop writes it when the round
+          ends, so the drawings below arrive before it.
+        </p>
       {% endif %}
 
       <nav class="rounds strip">
@@ -54,16 +78,31 @@
         <div class="variants">
           {% for variant in shown %}
             {% set file_base = "/f/" ~ session.asset ~ "/" ~ session.session_id ~ "/" ~ round.name %}
-            <section class="variant{{ ' picked' if round.choice == variant.letter else '' }}">
-              <label class="pick">
-                <input
-                  type="radio"
-                  name="choice"
-                  value="{{ variant.letter }}"
-                  {{ 'checked' if round.choice == variant.letter else '' }}
-                >
+            <section class="variant{{ ' picked' if round.winner == variant.letter else '' }}{{ ' refused' if variant.letter in round.denies else '' }}">
+              <div class="mark">
                 <span class="letter">{{ variant.letter }}</span>
-              </label>
+                <label>
+                  <input type="radio" name="mark-{{ variant.letter }}" value="like"
+                    {{ 'checked' if variant.letter in round.likes else '' }}>
+                  Liked
+                </label>
+                <label>
+                  <input type="radio" name="mark-{{ variant.letter }}" value="deny"
+                    {{ 'checked' if variant.letter in round.denies else '' }}>
+                  Refused
+                </label>
+                <label>
+                  <input type="radio" name="mark-{{ variant.letter }}" value="none"
+                    {{ 'checked' if variant.letter not in round.likes and variant.letter not in round.denies else '' }}>
+                  No mark
+                </label>
+              </div>
+              {% if round.parents.get(variant.letter) %}
+                <p class="parent">
+                  Revised from
+                  <a href="{{ base }}/{{ round.parents[variant.letter].split('/')[0] }}">{{ round.parents[variant.letter] }}</a>
+                </p>
+              {% endif %}
 
               <div class="display">
                 {% if variant.display_png %}
@@ -73,7 +112,7 @@
                     alt="variant {{ variant.letter }} at display size"
                   >
                 {% else %}
-                  <p class="gap">No display render yet.</p>
+                  <p class="gap">The display render is not on disk yet.</p>
                 {% endif %}
               </div>
 
@@ -86,7 +125,7 @@
                     alt="variant {{ variant.letter }} at inspection size"
                   >
                 {% else %}
-                  <p class="gap">No inspection render yet.</p>
+                  <p class="gap">The inspection render is not on disk yet.</p>
                 {% endif %}
                 {% if variant.svg %}
                   <p><a href="{{ file_base }}/{{ variant.svg }}">Open the SVG source</a></p>
@@ -97,7 +136,7 @@
 
               <div class="critique">
                 {% if variant.critique is none %}
-                  <p class="gap">No critique yet.</p>
+                  <p class="gap">The critique is not on disk yet.</p>
                 {% else %}
                   <p class="verdict">
                     {{ variant.verdict or "no verdict" }}
@@ -121,20 +160,32 @@
         </div>
 
         <div class="submit">
-          <label class="none">
+          <label class="text">
+            The order of the liked drawings, best first
             <input
-              type="radio"
-              name="choice"
-              value=""
-              {{ 'checked' if round.choice is none else '' }}
+              type="text"
+              name="order"
+              value="{{ round.order | join(',') }}"
+              placeholder="d,b"
             >
-            Pick none of them
+            <span class="note">
+              Leave it blank to take the order of the page. The first drawing
+              stands for the asset in a pack.
+            </span>
           </label>
           <label class="text">
-            Feedback on this round
+            The standing note. Every later round of this session reads it.
+            <textarea
+              name="note"
+              rows="3"
+              placeholder="Say what holds for the whole session."
+            >{{ round.note }}</textarea>
+          </label>
+          <label class="text">
+            The note for the next round only
             <textarea
               name="text"
-              rows="5"
+              rows="4"
               placeholder="Say what to keep and what to change."
             >{{ round.feedback_text }}</textarea>
           </label>
@@ -147,6 +198,166 @@
           {% endif %}
         </div>
       </form>
+
+      <section class="card add-rounds">
+        <h2>Add rounds to this session</h2>
+        <p class="note">
+          This adds rounds to this session. The next round revises the
+          drawings you liked, and reads the drawings you refused as a
+          warning. Write and save your feedback first. The loop reads it
+          from disk.
+        </p>
+        <form method="post" action="{{ base }}/rounds" class="inline">
+          <label>Rounds
+            <select name="rounds">
+              {% for value in round_choices %}
+                <option value="{{ value }}" {{ 'selected' if value == 3 else '' }}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Variants
+            <select name="variants">
+              {% for value in variant_choices %}
+                <option value="{{ value }}" {{ 'selected' if value == 4 else '' }}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <button type="submit">Add rounds</button>
+        </form>
+      </section>
+
+      <section class="card analysis">
+        <h2>What the liked drawings share</h2>
+        <p class="note">
+          The analysis compares the drawings you liked with the drawings you
+          refused. It runs one model call and takes about half a minute. Mark
+          at least one drawing as liked before you ask for it.
+        </p>
+        <form method="post" action="{{ base }}/{{ round.name }}/analyse" class="inline">
+          <button type="submit">Analyse this round</button>
+        </form>
+
+        {% if round.analysis is none %}
+          <p class="gap">No analysis yet for this round.</p>
+        {% else %}
+          <p class="preference">{{ round.analysis.get("preference") }}</p>
+
+          {% if round.analysis.get("order") %}
+            <input
+              type="hidden"
+              id="analysis-order"
+              value="{{ round.analysis['order'] | join(',') }}"
+            >
+            <button type="button" id="take-analysis" class="small">
+              Take this order and this preference into the form above
+            </button>
+            <h3>The order it proposes</h3>
+            <ol class="ranking">
+              {% for letter in round.analysis["order"] %}
+                <li>
+                  <strong>{{ letter }}</strong>
+                  {{ round.analysis.get("reasons", {}).get(letter, "") }}
+                </li>
+              {% endfor %}
+            </ol>
+            <p class="note">
+              Copy this into the order field above to use it. The form is the
+              one place that writes the order.
+            </p>
+          {% endif %}
+
+          {% if round.analysis.get("guide_edit") %}
+            <h3>The rule it proposes</h3>
+            <p class="note">
+              This goes into the style guide of {{ session.asset }} under one
+              heading at the end of the file. Edit it before you accept it.
+              Every later run of every subject reads it.
+            </p>
+            <form method="post" action="/rules/{{ session.asset }}/append">
+              <input type="hidden" name="back" value="{{ base }}/{{ round.name }}">
+              <input
+                type="text"
+                name="rule"
+                class="wide"
+                value="{{ round.analysis['guide_edit'].get('rule', '') }}"
+              >
+              <button type="submit" class="small">Accept the rule</button>
+            </form>
+          {% endif %}
+        {% endif %}
+      </section>
+
+      {% if shown %}
+        <section class="card promote">
+          <h2>Make one of these an exemplar</h2>
+          <p class="note">
+            An exemplar is a picture that the critic aims at. A style with no
+            exemplar has only words to go on. This copies the SVG into the
+            style guide, under the engine asset name.
+          </p>
+          <div class="promote-row">
+            {% for variant in shown %}
+              {% if variant.svg %}
+                <form method="post" action="/promote" class="inline">
+                  <input type="hidden" name="style" value="{{ session.asset }}">
+                  <input type="hidden" name="session_id" value="{{ session.session_id }}">
+                  <input type="hidden" name="round_name" value="{{ round.name }}">
+                  <input type="hidden" name="letter" value="{{ variant.letter }}">
+                  <label class="letter">{{ variant.letter }}</label>
+                  <select name="slug">
+                    {% for name in all_slugs %}
+                      <option value="{{ name }}" {{ 'selected' if name == slug else '' }}>{{ name }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="small">Promote</button>
+                </form>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
     </div>
   </div>
+{% endblock %}
+
+{% block script %}
+  {# The page holds typed feedback, so it never reloads on its own. It asks
+     the server for a short state string, and offers a reload when that
+     string changes. #}
+  <script>
+    (function () {
+      var mark = {{ fingerprint | tojson }};
+      var where = {{ ("/api/round/" ~ session.asset ~ "/" ~ session.session_id ~ "/" ~ round.name) | tojson }};
+      var banner = document.getElementById("reload");
+      function look() {
+        fetch(where, {cache: "no-store"})
+          .then(function (answer) { return answer.json(); })
+          .then(function (state) {
+            if (state.fingerprint && state.fingerprint !== mark) {
+              banner.hidden = false;
+            }
+            if (state.running || state.fingerprint === mark) {
+              window.setTimeout(look, 6000);
+            }
+          })
+          .catch(function () { window.setTimeout(look, 15000); });
+      }
+      window.setTimeout(look, 6000);
+    })();
+  </script>
+  {% if round.analysis and round.analysis.get("order") %}
+    <script>
+      (function () {
+        var field = document.querySelector('input[name="order"]');
+        var note = document.querySelector('textarea[name="note"]');
+        var carrier = document.getElementById("analysis-order");
+        var button = document.getElementById("take-analysis");
+        if (!button || !carrier) { return; }
+        button.addEventListener("click", function () {
+          field.value = carrier.value;
+          note.value = {{ round.analysis.get("preference", "") | tojson }};
+        });
+      })();
+    </script>
+  {% endif %}
 {% endblock %}

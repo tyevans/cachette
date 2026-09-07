@@ -48,6 +48,11 @@ from cachette.names import Names
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    # How a caller fills one frame: a camera, a size, the pixels and the
+    # settings of the frame. The drawing method of the world has this shape,
+    # and so does every other renderer.
+    Renderer = Callable[..., "FrameReading"]
+
     # How a caller builds one picture: a width, a height, a byte layout, the
     # bytes and a pitch.
     MakePicture = Callable[[int, int, str, bytes, int], "Picture"]
@@ -56,10 +61,20 @@ if TYPE_CHECKING:
     # in the stub beside the compiled module and not in the module itself, so
     # importing them at run time would fail.
     from cachette._core import FoundingReport, FrameReading, GameEnd
+from cachette.demo import minimap as minimap_palettes
 from cachette.demo.clock import SPEEDS, Clock, says
-from cachette.demo.settings import Settings
+from cachette.demo.compass import Compass
+from cachette.demo.minimap import Minimap
+from cachette.demo.mouse import Controls
+from cachette.demo.player import TURN_TICKS, Seat
+from cachette.demo.settings import Settings, load_video, save_video
+from cachette.demo.sketch import RELIEF, BoundaryGap, Sketch
+from cachette.demo.sketch_gl import DeviceGap, GlSketch
 from cachette.demo.surface import Surface
 from cachette.demo.toasts import Announcer
+from cachette.demo.ui.binding import Keys
+from cachette.demo.ui.chrome import Chrome
+from cachette.demo.view import View
 
 # The size of the window in pixels.
 WINDOW_WIDTH = 960
@@ -219,19 +234,44 @@ class Demo:
     __slots__ = (
         "announced_end",
         "announcer",
-        "camera",
+        "apply_settings",
+        "chrome",
         "clock",
+        "compass",
+        "foundings",
+        "minimap",
         "names",
         "overlay",
         "panels",
         "pointer",
         "reference",
+        "renderer",
+        "seat",
         "seconds",
         "settings",
+        "sketch",
+        "stopping",
         "surface",
         "threads",
+        "turn_ticks",
+        "view",
         "world",
     )
+
+    @property
+    def camera(self) -> Camera:
+        """The engine camera the frame is drawn with.
+
+        **The view holds it, and the view is the one source of truth for where
+        the watcher stands.** This reads through to the view, so a caller that
+        held the camera before still holds the same camera.
+        """
+        return self.view.camera
+
+    @camera.setter
+    def camera(self, camera: Camera) -> None:
+        """Put another camera on the view, keeping the angles it stands at."""
+        self.view.camera = camera
 
     def __init__(
         self,
@@ -250,13 +290,22 @@ class Demo:
         """
         self.world = world
         self.names = names
+        # **The renderer fills one frame and reports what it read.** The
+        # engine is the one a watcher opens on, and a flag replaces it with
+        # another that takes the same arguments. Nothing else in the loop
+        # knows which one is here.
+        self.renderer: Renderer = world.draw
         self.surface = Surface(width, height)
         self.threads = threads if threads > 0 else min(os.cpu_count() or 1, 12)
         # The reference layer names the colours while a key is held. It holds
         # no state between frames: the keyboard says what the watcher wants,
         # and the answer lives for one frame.
         self.reference = False
-        self.camera = Camera()
+        # **The view is the one place the position of the watcher is held.**
+        # It carries the engine camera, which says where the flat map sits,
+        # and the two angles a page that stands over the ground needs. The
+        # mouse writes here and every renderer reads here.
+        self.view = View()
         # The engine tick and the wall clock are separate. The window draws at
         # its own rate and this says how far the world moves between two
         # drawings.
@@ -275,6 +324,14 @@ class Demo:
         # Whether the game end was printed. The record is written once, and
         # the line is printed once.
         self.announced_end = False
+        # The round wide view in the top right corner. It reads the summary
+        # level of the engine and paints over the frame, and it holds its own
+        # reading between frames.
+        self.minimap = Minimap()
+        # **The compass says which way the ground now lies.** The page of the
+        # sketch turns and leans under a drag, and nothing else on the frame
+        # says that it can, or how far it has.
+        self.compass = Compass()
         # The lines that appear over the map, and the reader that makes them.
         self.announcer = Announcer(names)
         # Where the deck reads the wall clock. **A toast lives for a number of
@@ -283,6 +340,29 @@ class Demo:
         # and a paused world runs no tick at all. A caller replaces this to
         # drive the fade from a number it holds.
         self.seconds: Callable[[], float] = time.monotonic
+        # **The sketch is the renderer a run opens on, and the engine stays.**
+        # The sketch is built by the caller, because it needs a graphics
+        # device and a run that opens no window has none. The instance is kept
+        # after a swap, so a watcher who goes back to the engine and returns
+        # pays for the page once.
+        self.sketch: Sketch | None = None
+        # What each faction got when the run was founded. The menu offers a
+        # place to go for each of them, and nothing else reads it.
+        self.foundings: list[FoundingReport] = []
+        # The faction a person holds, or nothing while the engine plays every
+        # faction. **This is the whole difference between the two modes.**
+        self.seat: Seat | None = None
+        # How many ticks one turn runs, for a seat this run takes later.
+        self.turn_ticks = TURN_TICKS
+        # Whether the run was asked to close the window.
+        self.stopping = False
+        # How the interface asks for the video settings to be applied. A run
+        # that opens no window holds no window to apply them to.
+        self.apply_settings: Callable[[], None] = _nothing
+        # **The interface is one object, and it is the last layer of a frame.**
+        # Every card, every key and every menu lives inside it, so this class
+        # keeps the loop and gains no menu of its own.
+        self.chrome = Chrome(self)
 
     def seed(self) -> list[FoundingReport]:
         """Seed the world from its seed, and give back what each faction got.
@@ -516,8 +596,17 @@ class Demo:
         tiles, and the frame states the speed beside the tick.
         """
         now = self.seconds()
-        for _ in range(self.clock.ticks_due()):
+        # **A turn holds the clock.** The clock says how many ticks the wall
+        # gave this frame. A person inside a turn takes as many of them as the
+        # turn has left, and a person who is choosing takes none. A run with
+        # nobody in a seat takes them all, so the watching mode is untouched.
+        due = self.clock.ticks_due()
+        if self.seat is not None:
+            due = self.seat.hold(due)
+        for _ in range(due):
             self.world.step(self.threads)
+            if self.seat is not None:
+                self.seat.tick_ran()
             self.announce_relations()
             self.announce_campaigns()
             self.announce_trade()
@@ -534,7 +623,11 @@ class Demo:
         #
         # The ticks above ran first, so the phase belongs to the tick the
         # world is now part way through.
-        reading = self.world.draw(
+        #
+        # **The renderer is a choice, and the frame is one call.** The engine
+        # is the renderer a watcher opens on. A flag puts another one here,
+        # and everything around this line stays as it was.
+        reading = self.renderer(
             self.camera,
             self.surface.width,
             self.surface.height,
@@ -554,8 +647,114 @@ class Demo:
         # **The toasts go on last, over the frame the engine filled.** They
         # are chrome and not the world: nothing here reads a tile or an
         # entity, so the two drawing paths cannot disagree about the world.
-        self.announcer.toasts.paint(self.surface, now)
+        self.announcer.toasts.paint(self.surface, now, self.chrome.clears_foot())
+        # **The minimap goes on last, and it stands down for the key.** The
+        # engine puts a card in the top right corner while the reference key
+        # is held, and two things in one corner means a watcher reads
+        # neither.
+        if not self.reference:
+            # **The disc belongs to the page it sits on.** The renderer says
+            # which page that is, and the disc reads the choice here rather
+            # than holding a second copy of it. The disc is built again when
+            # the palette changes, because the palette is part of the key.
+            self.minimap.palette = (
+                minimap_palettes.PAPER
+                if self.drawing_sketch()
+                else minimap_palettes.SCREEN
+            )
+            self.minimap.paint(self.world, self.camera, self.surface)
+        # **The compass belongs to a page that stands at an angle.** The flat
+        # map has no angle, so a compass over it would point at nothing and
+        # would advertise a gesture that does nothing.
+        if isinstance(self.renderer, Sketch) and not self.reference:
+            self.compass.paint(self.view, self.surface)
+        # **The interface goes on last, over everything.** It reads three
+        # numbers and the rows of one card, so its cost follows the card and
+        # never the world. It stands down for the reference key, which puts a
+        # card of its own on the frame.
+        if not self.reference:
+            self.chrome.paint(self.surface)
         return reading
+
+    # -- what the interface asks of the run --------------------------------
+
+    def drawing_sketch(self) -> bool:
+        """Say whether the sketch is the renderer that fills the frame."""
+        return isinstance(self.renderer, Sketch)
+
+    def choose_renderer(self, sketch: bool) -> str:
+        """Put the sketch or the engine at the frame, and say what happened.
+
+        The answer is empty when the change succeeded, and it names the reason
+        when it did not. **A machine that cannot draw the sketch must say so.**
+        A run that quietly kept the engine would report the speed of one
+        renderer while the watcher believed the other was drawing.
+
+        The camera stays where it was, so a watcher who swaps keeps the place
+        they were looking at.
+        """
+        self.settings.video.sketch = sketch
+        if not sketch:
+            self.renderer = self.world.draw
+            return ""
+        if self.sketch is None:
+            try:
+                self.sketch = GlSketch(self.world, view=self.view)
+            except (BoundaryGap, DeviceGap) as gap:
+                self.settings.video.sketch = False
+                return str(gap)
+        self.renderer = self.sketch
+        return ""
+
+    def take_seat(self, faction: int) -> None:
+        """Put one faction in the hands of the person at the keyboard.
+
+        The engine gives that faction no evaluation while the person holds it,
+        so nothing plays it but them. A seat this run already held is given
+        back first, because a person holds one faction.
+        """
+        self.leave_seat()
+        self.seat = Seat(self.world, faction, self.turn_ticks)
+        # **The turn holds time now, so the clock must not.** A person who
+        # paused the world and then took a seat would end their turn and see
+        # nothing happen, and nothing would say why.
+        self.clock.resume()
+
+    def leave_seat(self) -> None:
+        """Give the faction back to the engine controller."""
+        if self.seat is not None:
+            self.turn_ticks = self.seat.turn_ticks
+            self.seat.release()
+            self.seat = None
+
+    def faction_name(self, faction: int) -> str:
+        """Give back the name of one faction."""
+        return self.names.faction(faction)
+
+    def apply_video(self) -> None:
+        """Put the video settings on the open window, and remember them."""
+        self.apply_settings()
+
+    def drag_ground(self, across: float, down: float) -> None:
+        """Move the ground under the hand by a step across the frame.
+
+        **The renderer says how a step across the frame reaches the ground.**
+        A page that stands at an angle turns the ground and leans it, so a
+        hand that drags across the frame asks the ground to move in another
+        direction. A renderer that draws the map square to the ground answers
+        nothing, and the step reaches the camera as it was given.
+
+        The mouse therefore holds no angle of its own, and neither does this.
+        The renderer that draws the angles is the one that inverts them.
+        """
+        step = getattr(self.renderer, "ground_step", None)
+        if step is not None:
+            across, down = step(self.camera, across, down)
+        self.view.pan_by(across, down)
+
+
+def _nothing() -> None:
+    """Do nothing. A run that opens no window applies no window setting."""
 
 
 def draw_seed() -> int:
@@ -647,8 +846,10 @@ def print_census(world: World) -> None:
 def report(foundings: list[FoundingReport], names: Names) -> tuple[int, int]:
     """Print what each faction got, and give back how many were seated and fed.
 
-    The loop is over factions, of which there are four. It is not a loop over
-    entities, and it reads a summary the engine already made.
+    The loop is over the foundings, and the run makes one for each faction.
+    The caller sets the faction count, so this loop follows that count and
+    names no number of its own. It is not a loop over entities, and it reads a
+    summary the engine already made.
 
     **The line keeps the address beside the name.** A watcher reads the name
     to follow the story and reads the address to point the camera at the
@@ -704,7 +905,15 @@ def main(argv: list[str] | None = None) -> int:
         prog="python -m cachette.demo",
         description="Watch the world run, from the control plane.",
     )
-    parser.add_argument("--width", type=int, default=WINDOW_WIDTH)
+    parser.add_argument(
+        "--width",
+        type=int,
+        default=0,
+        help=(
+            "the window width; the run opens at the size it last saved by "
+            "default, and this width governs this run without saving"
+        ),
+    )
     parser.add_argument(
         "--height",
         type=int,
@@ -807,6 +1016,59 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--sketch",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=(
+            "draw the world as a pencil study in ink on paper, lifted by the "
+            "height of the ground, instead of as a flat map; it opens at an "
+            "isometric angle, and a drag with the right button turns and "
+            "leans it; it composites on the graphics device. This is what a "
+            "run opens on, and --no-sketch draws the flat map the engine "
+            "draws. Naming neither takes the renderer the last run saved"
+        ),
+    )
+    parser.add_argument(
+        "--sketch-on-processor",
+        action="store_true",
+        help=(
+            "composite the sketch on the processor instead of on the graphics "
+            "device; this is the reference the device path is tested against, "
+            "and it costs about ten times as much for each frame"
+        ),
+    )
+    parser.add_argument(
+        "--sketch-relief",
+        type=float,
+        default=0.0,
+        help=(
+            "how far the tallest ground rises in the sketch, as a share of "
+            "the width of the page; zero takes the share the sketch chooses"
+        ),
+    )
+    parser.add_argument(
+        "--sketch-sky",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="draw the cloud layer over the ground in the sketch",
+    )
+    parser.add_argument(
+        "--play",
+        type=int,
+        default=-1,
+        help=(
+            "hold this faction yourself; the engine plays the rest, time "
+            "freezes while you choose, and it runs again when you end the "
+            "turn; a number outside the world is refused"
+        ),
+    )
+    parser.add_argument(
+        "--turn-ticks",
+        type=int,
+        default=TURN_TICKS,
+        help="how many ticks one turn of the player runs",
+    )
+    parser.add_argument(
         "--seed",
         type=lambda given: int(given, 0),
         default=0,
@@ -855,13 +1117,35 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as refusal:
         print(f"the engine refused the world: {refusal}")
         return 2
+    # **A run opens in the video state the last run saved.** A file that is
+    # absent or damaged gives the opening state back, so the memory can never
+    # stop the run.
+    saved = load_video()
+    # A picture and a run to the end open no window, so the saved window state
+    # governs neither. Both keep the sizes they always had.
+    opens_window = not arguments.picture and not arguments.run_to_end
+    # **A size on the command line governs this run, and it saves nothing.**
+    # The watcher who types a size asks for one run at that size. The size the
+    # watcher last chose by hand stays in the file, and the next run without a
+    # size opens at it.
+    typed_size = arguments.width > 0 or arguments.height > 0
+    width = arguments.width or WINDOW_WIDTH
+    height = arguments.height or default_height
+    if opens_window and not typed_size:
+        # A saved size can be larger than the display of this run. The window
+        # library knows the display, and it gives no size without one.
+        display = screen_size()
+        if display is not None:
+            saved.fit_within(*display)
+        width, height = saved.size
     demo = Demo(
         world,
         Names(world.seed),
-        width=arguments.width,
-        height=arguments.height or default_height,
+        width=width,
+        height=height,
         threads=arguments.threads,
     )
+    demo.settings.video = saved
     if arguments.tick_limit > 0:
         demo.world.set_tick_limit(arguments.tick_limit)
     # The seed comes first, before any other line. A run that ends badly is
@@ -873,6 +1157,7 @@ def main(argv: list[str] | None = None) -> int:
     # nothing after it.
     print_weather_pitch(demo.world)
     foundings = demo.seed()
+    demo.foundings = foundings
     seated, _ = report(foundings, demo.names)
     if seated == 0:
         print("no faction found a place, so there is nothing to watch")
@@ -885,6 +1170,86 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.tile > 0:
         demo.camera = Camera(tile_size=arguments.tile)
         demo.open_on(opening_place(foundings))
+
+    # **The sketch is what a run opens on.** A watcher who wants the flat map
+    # the engine draws asks for it, and the choice is written to the settings
+    # file with the window state, so the next run opens the way this one did.
+    #
+    # A flag governs this run and is remembered, in the same way the window
+    # size is. A run that named neither takes the renderer the last run saved.
+    # **The saved renderer governs a window run, and no other run.** A
+    # picture and a run to the end open no window, and the saved window state
+    # governs neither of those. The renderer follows the same rule, so a
+    # picture of the sketch is the same picture on every machine.
+    if arguments.sketch is not None:
+        wants_sketch = bool(arguments.sketch)
+    elif opens_window:
+        wants_sketch = demo.settings.video.sketch
+    else:
+        wants_sketch = True
+    demo.settings.video.sketch = wants_sketch
+
+    if wants_sketch:
+        # **The sketch is a renderer, not a second demonstration.** It takes
+        # the place of the engine at the one call that fills a frame, and the
+        # clock, the panels, the keys and the window memory stay shared.
+        #
+        # **The device path is the one a watcher gets.** The processor path
+        # stays because it is the reference the device path is tested against,
+        # and a flag asks for it. It is not a fallback: a run that asked for
+        # the device and quietly got the processor would report the speed of
+        # the processor while everyone believed the device was drawing.
+        make: type[Sketch] = Sketch if arguments.sketch_on_processor else GlSketch
+        if arguments.sketch_on_processor:
+            print(
+                "the sketch draws on the processor, so one frame costs "
+                "hundreds of milliseconds and the window will feel slow"
+            )
+        try:
+            demo.sketch = make(
+                demo.world,
+                view=demo.view,
+                relief=arguments.sketch_relief or RELIEF,
+                sky=arguments.sketch_sky,
+            )
+            demo.renderer = demo.sketch
+            # **A run that opens no window asks for the device here.** The
+            # renderer opens it on its first frame, because a window run must
+            # draw in the context that the window opens later. A picture and a
+            # run to the end open no window, so nothing else would ask, and
+            # the machine that gives no context must say so before the run.
+            if isinstance(demo.renderer, GlSketch) and not opens_window:
+                demo.renderer.device  # noqa: B018
+            # **The sketch draws the whole world, so it opens on the whole
+            # world.** The engine says which size of tile fits the world in
+            # the frame. The camera then magnifies the page rather than
+            # choosing how much of it is drawn, so a view that opened part
+            # way in would hide the map the watcher asked to see.
+            demo.camera = Camera.fitting(
+                demo.world, demo.surface.width, demo.surface.height
+            )
+        except (BoundaryGap, DeviceGap) as gap:
+            # **A machine that cannot draw the sketch still shows the world.**
+            # The sketch is the renderer a run opens on rather than the only
+            # one it has, so a run that cannot build it says so and draws the
+            # flat map instead of stopping.
+            demo.sketch = None
+            demo.settings.video.sketch = False
+            print(f"the sketch renderer cannot run: {gap}")
+            print("the engine renderer draws this run; the settings hold it")
+
+    # **A person takes a seat before the first tick, or from the menu.** The
+    # flag is the way in for a run that opens already playing. The menu is the
+    # way in for a person who started watching and decided to join.
+    demo.turn_ticks = arguments.turn_ticks
+    if arguments.play >= 0:
+        if arguments.play >= demo.world.faction_count:
+            print(
+                f"the world holds {demo.world.faction_count} factions, "
+                f"so there is no faction {arguments.play}"
+            )
+            return 2
+        demo.take_seat(arguments.play)
 
     if arguments.overlay:
         demo.choose_overlay(arguments.overlay)
@@ -902,8 +1267,12 @@ def main(argv: list[str] | None = None) -> int:
         f"cachette: {demo.world.width} by {demo.world.height} tiles, "
         f"{demo.world.soldier_count} people, {demo.threads} threads"
     )
+    print("escape opens the menu, and the slash key names every key")
     print("arrow keys or WASD scroll, minus and equals zoom")
+    print("drag with the left button to move the map, the wheel zooms")
+    print("drag with the right or middle button to turn and lean the sketch")
     print("hold tab to name the colours")
+    print("m shows and hides the minimap, c the compass")
     print("space pauses, full stop steps one tick, brackets change the speed")
     print(f"the speeds are {', '.join(says(speed) for speed in SPEEDS)}")
     print(
@@ -915,7 +1284,7 @@ def main(argv: list[str] | None = None) -> int:
     print("click a tile to point at it")
     print("close the window or press escape to stop")
 
-    status = _run_window(demo, arguments.frames)
+    status = _run_window(demo, arguments.frames, restore_size=not typed_size)
     print_census(demo.world)
     return status
 
@@ -949,7 +1318,11 @@ def _overlay_key_line() -> str:
 
     keys = overlay_keys(key)
     names = World.overlay_names()
-    named = ", ".join(f"{label} {name}" for (_, label), name in zip(keys, names))
+    # The two lists may differ in length, and the line below names what is
+    # left over, so the pairing stops at the shorter of the two on purpose.
+    named = ", ".join(
+        f"{label} {name}" for (_, label), name in zip(keys, names, strict=False)
+    )
     # An overlay past the last free key is still real, and a watcher who cannot
     # see it named would believe the renderer holds fewer than it does.
     spare = names[len(keys) :]
@@ -1127,7 +1500,31 @@ def window_size(window: object, fallback: tuple[int, int]) -> tuple[int, int]:
     return fallback
 
 
-def _apply_settings(demo: Demo, window: object) -> None:
+def screen_size() -> tuple[int, int] | None:
+    """Give back the size of the display in pixels, or None without one.
+
+    The import is here and not at the top of the module, so a caller that only
+    wants a frame in memory needs no window library.
+
+    A box with no display gives None. The window library reaches the display
+    through the operating system, and it raises in several ways when there is
+    none, so this catches the failure rather than the type of it.
+    """
+    try:
+        from pyglet.display import get_display
+
+        screen = get_display().get_default_screen()
+        return (int(screen.width), int(screen.height))
+    except Exception:
+        return None
+
+
+def _apply_settings(
+    demo: Demo,
+    window: object,
+    with_size: bool = True,
+    remember: bool = True,
+) -> None:
     """Give the window the video settings, and resize the pixels to match.
 
     The surface is the memory the engine fills. A window of a new size needs a
@@ -1135,10 +1532,23 @@ def _apply_settings(demo: Demo, window: object) -> None:
 
     The surface follows the size the window reports, not the size the settings
     hold. The two differ while the window is fullscreen.
+
+    **Only a key press writes the file.** This is the one place a video setting
+    reaches the window, so it is the one place the file needs a write. A key
+    press writes the file at once, so a run that stops badly keeps the change
+    the watcher just made. No frame writes the file, because no frame comes
+    through here.
+
+    The caller that opens the window passes False for the memory. A size that
+    this display forced down, and a size that the command line named, both
+    govern this run alone. Neither replaces the size the watcher last chose by
+    hand.
     """
-    refused = demo.settings.apply_to(window)
+    refused = demo.settings.apply_to(window, with_size=with_size)
     if refused:
         print(f"the window refused: {', '.join(refused)}")
+    if remember and not save_video(demo.settings.video):
+        print("the video settings were not saved")
     width, height = window_size(window, demo.settings.video.size)
     if (width, height) != (demo.surface.width, demo.surface.height):
         demo.surface = Surface(width, height)
@@ -1231,7 +1641,7 @@ class WindowPicture:
         self.image.set_data("BGRA", self.pitch, surface.to_bytes())
 
 
-def _run_window(demo: Demo, frame_limit: int) -> int:
+def _run_window(demo: Demo, frame_limit: int, restore_size: bool = True) -> int:
     """Drives the window until it closes.
 
     The import is here and not at the top of the module, so that a caller that
@@ -1253,6 +1663,14 @@ def _run_window(demo: Demo, frame_limit: int) -> int:
         )
         return image
 
+    # The window opens at the size the caller chose, so the size is already
+    # right and only the other two settings need a call. A fullscreen window
+    # takes no size at all, and the settings order the fullscreen call before
+    # the size call for that reason.
+    _apply_settings(demo, window, with_size=restore_size, remember=False)
+    # **The interface asks for a setting, and the window applies it.** The
+    # interface holds no window, so the run gives it the one call it needs.
+    demo.apply_settings = lambda: _apply_settings(demo, window)
     picture = WindowPicture(make_image, demo.surface)
     keys = pyglet.window.key.KeyStateHandler()
     window.push_handlers(keys)
@@ -1261,33 +1679,38 @@ def _run_window(demo: Demo, frame_limit: int) -> int:
     def frame(_delta: float) -> None:
         key = pyglet.window.key
         demo.reference = keys[key.TAB]
-        across = float(keys[key.RIGHT] or keys[key.D]) - float(
-            keys[key.LEFT] or keys[key.A]
+        # **A card that is open holds the arrow keys.** The map would
+        # otherwise scroll under a person moving a caret with the same key.
+        # The letter keys still scroll, so the map is never stuck.
+        arrows = not demo.chrome.grabs_arrows()
+        across = float((keys[key.RIGHT] and arrows) or keys[key.D]) - float(
+            (keys[key.LEFT] and arrows) or keys[key.A]
         )
-        down = float(keys[key.DOWN] or keys[key.S]) - float(keys[key.UP] or keys[key.W])
+        down = float((keys[key.DOWN] and arrows) or keys[key.S]) - float(
+            (keys[key.UP] and arrows) or keys[key.W]
+        )
         zoom = int(keys[key.EQUAL]) - int(keys[key.MINUS])
         demo.steer(across, down, zoom)
         demo.advance()
         picture.update(demo.surface)
         counted[0] += 1
-        if frame_limit and counted[0] >= frame_limit:
+        if demo.stopping or (frame_limit and counted[0] >= frame_limit):
             pyglet.app.exit()
 
     def on_draw() -> None:
         window.clear()
         picture.image.blit(0, 0)
 
-    def on_mouse_press(x: int, y: int, _button: int, _modifiers: int) -> None:
-        # The window numbers its rows from the bottom and the engine numbers
-        # them from the top, so the height turns one into the other.
-        demo.point_at(float(x), float(demo.surface.height - y))
-        q, r = demo.pointer if demo.pointer is not None else (0, 0)
-        print(f"pointing at tile ({q}, {r})")
+    # **The mouse is its own layer.** It writes to the view and it draws
+    # nothing, so the window pushes it as a handler and the loop above never
+    # names a button. The methods carry the names the library calls.
+    controls = Controls(demo, print)
 
     def on_key_press(symbol: int, _modifiers: int) -> None:
         key = pyglet.window.key
-        if symbol == key.ESCAPE:
-            pyglet.app.exit()
+        if symbol == key.C:
+            shown = demo.compass.toggle()
+            print(f"the compass is {'on' if shown else 'off'}")
             return
         if symbol == key.SPACE:
             demo.clock.toggle()
@@ -1303,6 +1726,10 @@ def _run_window(demo: Demo, frame_limit: int) -> int:
         if symbol == key.BRACKETRIGHT:
             demo.clock.faster()
             print(f"speed {demo.clock.says()}")
+            return
+        if symbol == key.M:
+            shown = demo.minimap.toggle()
+            print(f"the minimap is {'on' if shown else 'off'}")
             return
         if symbol == key.F10:
             demo.settings.toggle()
@@ -1322,11 +1749,16 @@ def _run_window(demo: Demo, frame_limit: int) -> int:
     # The handlers are registered by name rather than by decorator. The
     # library ships no type information, so a decorator from it would make
     # every function it wraps untyped.
-    window.push_handlers(
-        on_draw=on_draw,
-        on_key_press=on_key_press,
-        on_mouse_press=on_mouse_press,
-    )
+    window.push_handlers(controls)
+    window.push_handlers(on_draw=on_draw, on_key_press=on_key_press)
+    # **The interface hears every event first.** A handler pushed later is
+    # asked first, and one that says it took an event stops the event there.
+    # A person inside a menu therefore never moves the map, and a click on a
+    # card never names the tile under it.
+    # The name is kept, because the library holds a handler weakly and a
+    # handler nobody else holds is collected before the first key press.
+    interface = Keys(demo.chrome, pyglet.window.key, demo.surface)
+    window.push_handlers(interface)
 
     pyglet.clock.schedule_interval(frame, 1.0 / FRAMES_EACH_SECOND)
     pyglet.app.run()

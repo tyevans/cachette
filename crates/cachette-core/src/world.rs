@@ -27,6 +27,7 @@
 //! [^4]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 //! [^5]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
+use crate::action::{ActionSchema, ActionShape, Verb};
 use crate::balance::Balance;
 use crate::bridge::{BlockLayout, BridgeError, UnitTileBridge, BLOCK_BITS_DEFAULT};
 use crate::campaign::{self, CampaignEvent, CampaignRegister, CampaignRow};
@@ -48,10 +49,11 @@ use crate::controller::{
 use crate::conversion::{self, ConversionError, Convert, UnitConverted};
 use crate::descent::{DescentId, Parents};
 use crate::event::{
-    ResourceTaken, SettlementFounded, TileChanged, UpgradeCollapsed, UpgradeFinished,
-    CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED, WEAR_CAUSE_ARMY, WEAR_CAUSE_BOTH, WEAR_CAUSE_ORDERED,
-    WEAR_CAUSE_WEATHER,
+    FactionEliminated, ResourceTaken, SettlementFounded, SiteTaken, TileChanged, UpgradeCollapsed,
+    UpgradeFinished, CHANGE_KIND_LOWERED, CHANGE_KIND_RAISED, TAKE_KIND_CAPTURED, TAKE_KIND_RAZED,
+    WEAR_CAUSE_ARMY, WEAR_CAUSE_BOTH, WEAR_CAUSE_FIRE, WEAR_CAUSE_ORDERED, WEAR_CAUSE_WEATHER,
 };
+use crate::fire::{FireEnded, FireField, FireStarted, GroundReading, UnitBurned};
 use crate::founding::{
     self, Founding, FoundingError, FoundingOutcome, SettleError, SettleOutcome, Survey,
 };
@@ -75,7 +77,7 @@ use crate::production::{
 };
 use crate::promotion::{self, PromotionError, UnitPromoted};
 use crate::pyramid::{
-    ApproachField, CellSummary, ExitField, Pyramid, ReturnField, SeededField, AT_SEED,
+    ApproachField, CellSummary, ExitField, Pyramid, ReturnField, SeededField, AT_SEED, STOCK_PASSES,
 };
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
 use crate::relation::{RelationCrossed, RelationError, RelationMatrix, RelationRules};
@@ -85,7 +87,7 @@ use crate::resource::{
 };
 use crate::rng;
 use crate::sim_math;
-use crate::site::{CommodityId, SettlementArena, SettlementError, COMMODITY_COUNT};
+use crate::site::{CommodityId, SettlementArena, SettlementError, SiegeRules, COMMODITY_COUNT};
 use crate::slots::Slots;
 use crate::soldier::{SoldierArena, SoldierError, NO_HOME};
 #[cfg(not(feature = "probe-nondeterminism"))]
@@ -111,8 +113,8 @@ use crate::upgrade::{
     UpgradeTableError,
 };
 use crate::weather::{
-    ground_over_lattice, CellGround, Ground, Latitudes, Storm, WeatherError, WeatherField,
-    WeatherScale, Wind,
+    ground_over_lattice, CellGround, Cyclone, CycloneSetting, Ground, Latitudes, Storm,
+    WeatherError, WeatherField, WeatherScale, Wind,
 };
 
 /// The reason that a value did not name a live entity.
@@ -169,6 +171,82 @@ impl core::fmt::Display for IdentityError {
 }
 
 impl std::error::Error for IdentityError {}
+
+/// The reason that the world refused an order to raze a site.
+///
+/// Each value names the thing that refused, so a caller repairs the call
+/// without guessing which part of it was wrong.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RazeError {
+    /// The identity names no live site.
+    NoSuchSite,
+    /// The razer owns the site. A faction does not raze its own city.
+    OwnSite,
+    /// No siege of the razer stands against the site.
+    ///
+    /// A raze is an order against a siege, and a siege stands only while the
+    /// razer holds the site tile against no defender.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D11. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    NotBesieging,
+}
+
+impl core::fmt::Display for RazeError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NoSuchSite => write!(formatter, "the identity names no live site"),
+            Self::OwnSite => write!(formatter, "a faction does not raze its own site"),
+            Self::NotBesieging => {
+                write!(formatter, "no siege of the razer stands against the site")
+            }
+        }
+    }
+}
+
+impl std::error::Error for RazeError {}
+
+/// What the siege pass does to one site on one tick.
+///
+/// A site falls to work and never to a moment. The pass reads the trigger
+/// for every site first, and it writes afterwards, so the answer for one
+/// site is fixed before any write moves the world.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D8. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum SiegeStep {
+    /// A unit of the owning faction stands on the site tile, so any siege
+    /// the site carried ends and its work is gone.
+    Ends,
+    /// Nobody presses the site this tick, and no unit of the owning faction
+    /// stands on its tile. A siege the site carries waits, unchanged.
+    Waits,
+    /// A siege stands and has not reached the work a capture costs.
+    Presses {
+        /// The faction that stands on the site tile.
+        besieger: FactionId,
+        /// The work the siege has done, including this tick.
+        work: i64,
+    },
+    /// A siege stands and has reached the work a capture costs.
+    Falls {
+        /// The faction that stands on the site tile.
+        besieger: FactionId,
+        /// The work the siege has done, including this tick.
+        work: i64,
+        /// The work a raze of this site costs.
+        raze_work: i64,
+        /// One when the besieging faction ordered a raze, zero otherwise.
+        ordered: u8,
+    },
+}
 
 /// The reason that the world refused to send a set of units somewhere.
 ///
@@ -822,6 +900,29 @@ pub struct World {
     /// [^1]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
     /// [^2]: Findings register, FND-315. `docs/FINDINGS.md`
     home_approaches: ApproachField,
+    /// The direction of the nearest tile that holds stock, for each tile of a
+    /// seeded block and each resource kind.
+    ///
+    /// **The exit field answers at the pitch of a level 1 cell, and the stock
+    /// of a tile is a level 0 property.** A unit that stands on barren ground
+    /// inside the cell with the most food reads that its own cell is the best
+    /// one, and nothing tells it to step two tiles sideways. It then strips
+    /// the ground it stands on and stands there.[^1]
+    ///
+    /// This field resolves the cell at the pitch of one tile. It is the same
+    /// mechanism the home approach above uses, keyed on the resource kind
+    /// instead of the faction.[^2]
+    ///
+    /// **The engine seeds it only over the blocks that a gatherer stands
+    /// in.** The set of gatherers is the whole set the field serves, so the
+    /// derivation follows that set and never the world.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-589. `docs/FINDINGS.md`
+    /// [^2]: Findings register, FND-315. `docs/FINDINGS.md`
+    /// [^3]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    stock_approaches: ApproachField,
     /// The direction of the nearest tile of a named destination, for each
     /// level 1 cell and each destination plane.
     ///
@@ -1280,6 +1381,73 @@ pub struct World {
     /// A settlement founded by a caller between two steps lands here and
     /// stays until the next step clears it. The log enters no state hash.
     founded_log: Vec<SettlementFounded>,
+    /// The sites that changed hands or were razed, since the last step began.
+    ///
+    /// A raze by a caller between two steps lands here and stays until the
+    /// next step clears it. The log enters no state hash, in the same way
+    /// that every other log does not.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0164, every stored value the step reads enters the state hash. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    taken_log: Vec<SiteTaken>,
+    /// What a site resists, and what a raze costs over a capture.
+    ///
+    /// A site falls to work and never to a moment, and these are the two
+    /// balance rows that price the work.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^2]: Balance register, the siege. `docs/reference/balance.md`
+    siege_rules: SiegeRules,
+    /// The sites that changed hands over the run, and the sites that burned.
+    ///
+    /// **These two count the acts and never the sites that stand.** A run
+    /// that keeps every city it takes and a run that burns every one differ
+    /// here and nowhere else, because the site count reports the outcome of
+    /// both. The census reports them, and no rule of the simulation reads
+    /// them, so they enter no state hash.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0164, every stored value the step reads enters the state hash, decision D1. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    sites_captured: i64,
+    /// The sites that burned over the run. See the field above.
+    sites_razed: i64,
+    /// The site ticks that a siege pressed over the run.
+    ///
+    /// One site under siege for one tick adds one. A run in which no army
+    /// ever holds a rival site reads zero here, and that is the reading
+    /// that tells a keeping run from a run with no conquest in it.
+    sieges_pressed: i64,
+    /// The sieges that a relief ended before the site fell, over the run.
+    ///
+    /// A unit of the owning faction on the site tile ends a siege and takes
+    /// its work away. A besieger that leaves ends nothing, so it adds
+    /// nothing here.
+    sieges_relieved: i64,
+    /// The factions that left the game, since the last step began.
+    ///
+    /// The log enters no state hash. The column below is the stored fact,
+    /// and the log is what a reader sees of it for one tick.
+    eliminated_log: Vec<FactionEliminated>,
+    /// One for a faction that has left the game, zero otherwise.
+    ///
+    /// **This is stored state and the step reads it, so it enters the state
+    /// hash.**[^1] The elimination pass reads it to leave a faction that has
+    /// already gone alone, and every game end reader reads it to refuse a
+    /// faction that is out.
+    ///
+    /// The column is indexed by the faction identifier, and it holds one
+    /// entry for each faction the world was built with. It is a one-byte
+    /// integer and never a boolean, because it crosses into a hash.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0164, every stored value the step reads enters the state hash. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    /// [^2]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+    eliminated: Vec<u8>,
     /// What each faction offers and wants, one fixed block of rows for each.
     ///
     /// The table holds nothing until a faction advertises. It is simulated
@@ -1365,6 +1533,42 @@ pub struct World {
     /// [^1]: The climate field. [`ClimateField`]
     /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     climate: ClimateField,
+    /// The tiles that burn, and the tiles that have burned.
+    ///
+    /// The field holds one entry for each burning tile and one for each tile
+    /// that stopped burning. It holds nothing else, so a world that nobody
+    /// set alight pays nothing for it, whatever the tile count.[^1]
+    ///
+    /// It is simulated state and it enters the state hash. Two worlds that
+    /// hold the same ground and different fires are different worlds, because
+    /// the next tick spreads from what this one left.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    /// [^2]: ADR-0164, every stored value the step reads enters the state hash, decision D1. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    fire: FireField,
+    /// The chance, out of the whole the fire module states, that lightning
+    /// starts a fire on one tick.
+    ///
+    /// **The value is a parameter of the world and never a constant of the
+    /// stage.** A world that states zero never catches by itself, and a
+    /// caller that wants a world that burns on its own raises it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+    lightning_chance: u64,
+    /// The tiles that caught fire since the last step began.
+    ///
+    /// The step clears it before any system runs, in the way every other log
+    /// works, so a tile a caller set alight between two steps survives to the
+    /// next read. The log enters no state hash.
+    fire_started_log: Vec<FireStarted>,
+    /// The tiles that stopped burning since the last step began.
+    fire_ended_log: Vec<FireEnded>,
+    /// The units the fire ended since the last step began.
+    burned_log: Vec<UnitBurned>,
     /// The mean standing water of the climate field, folded once.
     ///
     /// A terrain reader asks the climate over one address, and the climate of
@@ -1687,6 +1891,7 @@ impl World {
             exits: ExitField::new(cell_lattice),
             returns: ReturnField::new(cell_lattice, config.faction_count),
             home_approaches: ApproachField::new(layout),
+            stock_approaches: ApproachField::new(layout),
             destinations: SeededField::new(cell_lattice, config.destination_plane_count()),
             approaches: ApproachField::new(layout),
             destination_seeds: vec![Vec::new(); config.destination_plane_count() as usize],
@@ -1707,6 +1912,11 @@ impl World {
             weather_lattice,
             weather_ground: ground_over_lattice(weather_lattice, weather_layout, terrain),
             climate: ClimateField::quiet(weather_layout),
+            fire: FireField::new(),
+            lightning_chance: 0,
+            fire_started_log: Vec::new(),
+            fire_ended_log: Vec::new(),
+            burned_log: Vec::new(),
             climate_reference: 0,
             controller: Controller::new(config.seed, config.faction_count),
             balance: Balance::default(),
@@ -1769,6 +1979,14 @@ impl World {
             collapsed_log: Vec::new(),
             finished_log: Vec::new(),
             founded_log: Vec::new(),
+            taken_log: Vec::new(),
+            siege_rules: SiegeRules::DEFAULT,
+            sites_captured: 0,
+            sites_razed: 0,
+            sieges_pressed: 0,
+            sieges_relieved: 0,
+            eliminated_log: Vec::new(),
+            eliminated: vec![0u8; FACTION_CEILING as usize],
             market: MarketTable::new(config.faction_count, DEFAULT_BOARD_ROWS),
             land_list_bound: DEFAULT_LAND_LIST_BOUND,
         };
@@ -2656,6 +2874,49 @@ impl World {
 
     /// Founds a city from one settler, and spends it.
     fn settle_one(&mut self, unit: Entity) -> Result<Founding, SettleError> {
+        // **The rule lives in the check, and this verb reads it.** The
+        // legality answer reads the same check.[^lg]
+        //
+        // [^lg]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+        let (address, group, faction, survey) = self.settle_refusal(unit)?;
+        let chosen = survey
+            .candidates()
+            .first()
+            .copied()
+            .ok_or(SettleError::OutsideWorld(address))?;
+        let (settlement, people) = self.settle_group(address, group, faction)?;
+        self.provision_site(settlement, chosen.provision().food);
+        // The seat of a faction is the tile of its first founding, and a
+        // settler founds after that one. The call leaves a seat that stands.
+        self.record_seat(faction, address);
+        // The settler is spent. It leaves after the settlement stands, so a
+        // refusal above never costs the unit.[^1]
+        //
+        // [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D5. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+        self.despawn_soldier(unit);
+        Ok(Founding::new(address, settlement, people, survey))
+    }
+
+    /// Reports whether the settle verb would refuse one settler, without
+    /// founding anything.
+    ///
+    /// **This is the one statement of the rule.** The settle verb calls it
+    /// before it seats a group, and the legality answer calls it to fill one
+    /// row of the action table.[^1] Nothing here mutates. It returns the
+    /// place, the group size, the faction and the survey, so that the verb
+    /// does not read them twice.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the settle verb would return.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    pub fn settle_refusal(
+        &self,
+        unit: Entity,
+    ) -> Result<(Axial, u32, FactionId, Survey), SettleError> {
         let (Some(unit_type), Some(address), Some(faction)) = (
             self.soldiers.unit_type(unit),
             self.soldiers.address(unit),
@@ -2702,17 +2963,7 @@ impl World {
         if !chosen.is_eligible() {
             return Err(SettleError::GroundAdmitsNobody(address));
         }
-        let (settlement, people) = self.settle_group(address, group, faction)?;
-        self.provision_site(settlement, chosen.provision().food);
-        // The seat of a faction is the tile of its first founding, and a
-        // settler founds after that one. The call leaves a seat that stands.
-        self.record_seat(faction, address);
-        // The settler is spent. It leaves after the settlement stands, so a
-        // refusal above never costs the unit.[^1]
-        //
-        // [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D5. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
-        self.despawn_soldier(unit);
-        Ok(Founding::new(address, settlement, people, survey))
+        Ok((address, group, faction, survey))
     }
 
     /// Sets the food a founded site produces, from the ground it reaches.
@@ -2901,6 +3152,657 @@ impl World {
             *account = sim_math::combine(*account, Accum(-i64::from(held.0)));
         }
         true
+    }
+
+    /// Presses the siege against every site that a rival occupies
+    /// undefended, and takes or burns the ones that fall.
+    ///
+    /// **A site falls to work and never to a moment.** A faction that stands
+    /// on a site tile with no unit of the owning faction on it besieges the
+    /// site. The siege does one work for each besieging unit on the tile, on
+    /// each tick it stands. The site changes hands when the work reaches what
+    /// the site resists, and the resistance is the residents the site
+    /// holds.[^6]
+    ///
+    /// **A garrison of one refuses the siege, and a relief force ends one.**
+    /// The trigger is read again on every tick. The tick the owner puts a
+    /// unit back on the tile, or the tick the besieger leaves, the siege ends
+    /// and its work is gone. A besieger that returns starts at nothing. A
+    /// besieged city therefore has two answers: keep a unit at home, or send
+    /// one back before the work is done.[^7]
+    ///
+    /// **The occupier is the faction the occupancy list names, and that list
+    /// is built once for the tick.** The lease pass reads it to move a lease
+    /// and this pass reads it to decide a siege, so who stands on a tile is
+    /// stated once. The list names the faction with the most units on the
+    /// tile, and a tie goes to the lowest faction identifier. Two factions
+    /// that could besiege one site therefore resolve by a rule and never by
+    /// an iteration order, and the work of the faction that loses the tile is
+    /// gone.[^2] [^3]
+    ///
+    /// **What stands at a kept site passes to the taker whole.** The store,
+    /// the housing, the rates, the staff and the upgrades on the ground are
+    /// untouched, and every unit that draws from the site changes faction
+    /// with it. Only the queue is cleared, because a queue holds orders that
+    /// the taker never gave.[^4]
+    ///
+    /// **The taker keeps a city it can supply and burns one it cannot, and
+    /// burning costs more.** A city of the taker supplies the captured site
+    /// when the site stands inside the reach of that city. The reach is the
+    /// quantity the ground rule already computes for every city on every
+    /// tick, and the upgrades a faction finishes inside its own ground extend
+    /// it to a bound.[^5] A supplied site changes hands at the capture work.
+    /// A site no city of the taker reaches does not fall there: the siege
+    /// presses on to the raze work, which is a multiple of the capture work,
+    /// and the site burns when the siege reaches that.[^6]
+    ///
+    /// The pass walks the settlements in slot order, and the occupancy list
+    /// is in ascending tile order. Both are stable keys.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D3. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^2]: ADR-0153, a tile's lease follows the units that stand on it, decision D3. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^4]: ADR-0180, a site changes hands or the taker destroys it, decisions D1 and D2. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^5]: ADR-0180, a site changes hands or the taker destroys it, decision D7. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^6]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^7]: ADR-0180, a site changes hands or the taker destroys it, decision D10. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    fn capture_sites(&mut self, occupancy: &[(TileIdx, FactionId)]) {
+        // **The pass reads every site before it writes one.** A write moves
+        // the faction of a site and the faction of its residents, and a later
+        // read would then see a world that the earlier sites of this same
+        // tick had changed. The plan for each site is fixed first.
+        let mut plans: Vec<(Entity, SiegeStep)> = Vec::new();
+        let mut any_fell = false;
+        for slot in 0..self.settlements.slot_count() {
+            let Some(site) = self.settlements.entity_at(slot) else {
+                continue;
+            };
+            let step = self.siege_step(site, occupancy);
+            if matches!(step, SiegeStep::Falls { .. }) {
+                any_fell = true;
+            }
+            plans.push((site, step));
+        }
+        // **The taker keeps a city it can supply and burns one it cannot.**
+        // The reach of a city is the quantity the ground rule already
+        // computes for every city on every tick, and the upgrades a faction
+        // finishes inside its own ground are what extend it.[^8] A road
+        // between two cities therefore decides which conquests a faction can
+        // keep, and nothing here states a distance of its own.
+        //
+        // The list is built once for the tick, and only on a tick that has a
+        // site at its capture work. A tick with none pays nothing for it.
+        //
+        // [^8]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+        let cities = if any_fell {
+            self.holding.cities(&self.settlements, &self.upgrades)
+        } else {
+            Vec::new()
+        };
+        let mut moved = false;
+        for (site, step) in plans {
+            match step {
+                SiegeStep::Ends => {
+                    if self.settlements.siege(site).is_some() {
+                        self.sieges_relieved =
+                            sim_math::combine(Accum(self.sieges_relieved), Accum(1)).0;
+                    }
+                    let _ = self.settlements.clear_siege(site);
+                }
+                SiegeStep::Waits => {}
+                SiegeStep::Presses { besieger, work } => {
+                    self.sieges_pressed = sim_math::combine(Accum(self.sieges_pressed), Accum(1)).0;
+                    let _ = self.settlements.set_siege(site, besieger, work);
+                }
+                SiegeStep::Falls {
+                    besieger,
+                    work,
+                    raze_work,
+                    ordered,
+                } => {
+                    self.sieges_pressed = sim_math::combine(Accum(self.sieges_pressed), Accum(1)).0;
+                    let Some(address) = self.settlements.address(site) else {
+                        continue;
+                    };
+                    // **A faction that ordered a raze burns the site,
+                    // whatever the reach says.** The order is the one way a
+                    // caller states an intent the engine would not have
+                    // chosen, and it costs the raze work like every other
+                    // raze.
+                    if ordered == 1 {
+                        if work >= raze_work {
+                            moved |= self.burn_site(site, besieger);
+                        } else {
+                            let _ = self.settlements.set_siege(site, besieger, work);
+                        }
+                        continue;
+                    }
+                    // The site being taken still belongs to the faction that
+                    // is losing it, so the taker's own cities are the only
+                    // ones this walk sees.
+                    let mut holds_one = false;
+                    let mut supplied = false;
+                    for city in &cities {
+                        if city.faction != besieger {
+                            continue;
+                        }
+                        holds_one = true;
+                        if address.distance(city.address) <= city.reach {
+                            supplied = true;
+                            break;
+                        }
+                    }
+                    // **A taker that holds no city keeps what it takes.** The
+                    // rule asks which of the taker's cities supplies this
+                    // one, and a faction with none is not a faction that
+                    // failed to reach it. A captured city is then the only
+                    // city that faction has, and it supplies itself. Without
+                    // this the last army of a beaten faction could never take
+                    // a capital, and a faction that lost every city could
+                    // never return.
+                    if supplied || !holds_one {
+                        moved |= self.take_site(site, besieger);
+                    } else if work >= raze_work {
+                        moved |= self.burn_site(site, besieger);
+                    } else {
+                        // The taker cannot supply the site, so the siege
+                        // presses on to the raze work. The city stands, and
+                        // its owner has every tick until then to relieve it.
+                        let _ = self.settlements.set_siege(site, besieger, work);
+                    }
+                }
+            }
+        }
+        let took = moved;
+        // **A capture writes the faction of a unit, and that moves the arena
+        // past the derived structure.** The unit stands where it stood, so
+        // the rebuild gives the same structure back and only restamps the
+        // revision. A pass after this one reads the structure and refuses a
+        // stale one, so the restamp cannot wait for the next barrier.
+        if took {
+            debug_assert!(
+                self.refresh_bridge().is_ok(),
+                "the arena and the structure describe one world"
+            );
+            let _ = self.refresh_bridge();
+        }
+    }
+
+    /// Returns what the siege pass does to one site this tick.
+    ///
+    /// The call writes nothing. It reads the trigger, adds this tick's work
+    /// to the work the siege carried, and compares the total against what the
+    /// site resists.[^1]
+    ///
+    /// **The work the siege carried counts only when the same faction did
+    /// it.** The occupancy names one faction for a tile, so a site whose
+    /// besieger loses the tile starts again at nothing under whoever takes
+    /// it. Two factions that could besiege one site therefore resolve by the
+    /// rule that decides the occupier, and never by an iteration order.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D10. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^2]: ADR-0153, a tile's lease follows the units that stand on it, decision D3. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    fn siege_step(&self, site: Entity, occupancy: &[(TileIdx, FactionId)]) -> SiegeStep {
+        let Some(tile) = self.settlements.tile(site) else {
+            return SiegeStep::Waits;
+        };
+        let Some(owner) = self.settlements.faction(site) else {
+            return SiegeStep::Waits;
+        };
+        // **A garrison of one refuses the siege, and it takes the work with
+        // it.** The defence is read from the units that stand on the tile and
+        // never from the occupancy, because the occupancy names only the
+        // largest faction and a garrison of one is rarely that.
+        let factions = self.soldiers.faction_column();
+        let standing = self.bridge.on_tile_unguarded(tile);
+        if standing
+            .iter()
+            .any(|unit| factions[unit.index() as usize] == owner)
+        {
+            return SiegeStep::Ends;
+        }
+        let Ok(entry) = occupancy.binary_search_by_key(&tile.0, |(tile, _)| tile.0) else {
+            return SiegeStep::Waits;
+        };
+        let besieger = occupancy[entry].1;
+        if besieger == owner {
+            return SiegeStep::Waits;
+        }
+        // **The force is the units of the besieging faction on the tile.** A
+        // besieger does one work a tick, which is what a builder does, so a
+        // larger army takes a city sooner and one unit takes a long time.
+        let force = standing
+            .iter()
+            .filter(|unit| factions[unit.index() as usize] == besieger)
+            .count();
+        if force == 0 {
+            return SiegeStep::Waits;
+        }
+        let carried = match self.settlements.siege(site) {
+            Some((who, work)) if who == besieger => work,
+            _ => 0,
+        };
+        let work = sim_math::combine(Accum(carried), Accum(force as i64)).0;
+        let residents = self.site_residents(site).unwrap_or(0);
+        if work < self.siege_rules.capture_work(residents) {
+            return SiegeStep::Presses { besieger, work };
+        }
+        SiegeStep::Falls {
+            besieger,
+            work,
+            raze_work: self.siege_rules.raze_work(residents),
+            ordered: u8::from(
+                self.settlements.siege_intent(site) == Some(crate::site::SIEGE_INTENT_RAZE),
+            ),
+        }
+    }
+
+    /// Moves one standing site to a new faction, with everything it holds.
+    ///
+    /// **This is the one place a capture happens.** The site keeps its
+    /// identity, so a stored handle to a captured site still resolves.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    fn take_site(&mut self, site: Entity, taker: FactionId) -> bool {
+        let Some(slot) = self.settlements.slot_of(site) else {
+            return false;
+        };
+        let Some(owner) = self.settlements.faction(site) else {
+            return false;
+        };
+        let Some(tile) = self.settlements.tile(site) else {
+            return false;
+        };
+        if owner == taker || !self.settlements.set_faction(site, taker) {
+            return false;
+        }
+        // The siege ends with the thing it stood against. A site that changed
+        // hands is no longer besieged, and the work that took it is spent.
+        let _ = self.settlements.clear_siege(site);
+        // **The residents change hands with the site.** A resident is a live
+        // unit whose home names this slot, and the household is the home
+        // column read backwards. Conquest makes the taker larger, and a
+        // resident left with its old faction would be a person inside a city
+        // that is no longer its own.
+        //
+        // The walk is over the live units in slot order, which is a stable
+        // key.
+        for unit in self.soldiers.iter().collect::<Vec<_>>() {
+            if self.soldiers.home(unit) != Some(Some(slot)) {
+                continue;
+            }
+            self.soldiers.set_faction(unit, taker);
+            // **A character changes hands with the unit that carries it.** A
+            // unit names a character, and the character carries a faction of
+            // its own. A resident that changed faction while its character
+            // did not would leave the two disagreeing, and no pass reads both
+            // to notice.[^1]
+            //
+            // [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+            let bits = self.soldiers.character_column()[unit.index() as usize];
+            if let Some(character) = Entity::from_bits(bits) {
+                self.characters.set_faction(character, taker);
+            }
+        }
+        // A queue holds orders the previous faction gave. The taker gave none
+        // of them, so the block is cleared by the same call a loss uses. Work
+        // that stands on the ground is an upgrade on a tile and it is
+        // untouched, so a part-built upgrade changes hands with the ground
+        // and a part-built order does not.
+        self.queues.clear_slot(slot);
+        // The cohort table indexes the residents by site and by faction, and
+        // the faction of every resident has just changed.
+        self.cohorts.rebuild(
+            self.soldiers.home_column(),
+            self.soldiers.faction_column(),
+            self.soldiers.live_column(),
+            self.settlements.slot_count(),
+        );
+        self.sites_captured = sim_math::combine(Accum(self.sites_captured), Accum(1)).0;
+        self.taken_log.push(SiteTaken::new(
+            self.tick,
+            site.to_bits(),
+            tile,
+            owner,
+            taker,
+            TAKE_KIND_CAPTURED,
+        ));
+        true
+    }
+
+    /// Orders the siege of a faction to destroy the site rather than take
+    /// it.
+    ///
+    /// **A raze is an order and never a moment.** The order writes the
+    /// intent of a siege that already stands. The siege then presses to the
+    /// work a raze costs, and the site burns when the work reaches it. The
+    /// order therefore costs the razing faction the same time and the same
+    /// force that the engine charges every other raze.[^1]
+    ///
+    /// **This is the one thing a caller states that the engine would not.**
+    /// The engine keeps a site its own reach supplies and burns one it does
+    /// not.[^2] A caller that wants a supplied city burned orders this, and
+    /// the reach then decides nothing.
+    ///
+    /// The order lasts as long as the siege. A relief force that ends the
+    /// siege ends the order with it, and a besieger that comes back must
+    /// order again.[^3]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the identity names no live site, when the razer
+    /// owns the site, and when no siege of the razer stands against it.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decisions D9 and D11. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^2]: ADR-0180, a site changes hands or the taker destroys it, decision D7. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^3]: ADR-0180, a site changes hands or the taker destroys it, decision D10. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    pub fn order_raze(&mut self, site: Entity, razer: FactionId) -> Result<(), RazeError> {
+        let owner = self
+            .settlements
+            .faction(site)
+            .ok_or(RazeError::NoSuchSite)?;
+        if owner == razer {
+            return Err(RazeError::OwnSite);
+        }
+        match self.settlements.siege(site) {
+            Some((besieger, _)) if besieger == razer => {}
+            _ => return Err(RazeError::NotBesieging),
+        }
+        if !self
+            .settlements
+            .set_siege_intent(site, crate::site::SIEGE_INTENT_RAZE)
+        {
+            return Err(RazeError::NotBesieging);
+        }
+        Ok(())
+    }
+
+    /// Destroys a site and pays its store to the faction that took it.
+    ///
+    /// **This is the one place a raze happens.** The caller's verb and the
+    /// capture pass both go through it, and neither repeats the work. The
+    /// caller checks the trigger and refreshes the derived unit structure
+    /// afterwards, because the two callers reach this from different points
+    /// of a step.
+    ///
+    /// Returns `false` when the identity names no live site.
+    fn burn_site(&mut self, site: Entity, razer: FactionId) -> bool {
+        let Some(slot) = self.settlements.slot_of(site) else {
+            return false;
+        };
+        let Some(owner) = self.settlements.faction(site) else {
+            return false;
+        };
+        let Some(tile) = self.settlements.tile(site) else {
+            return false;
+        };
+        let store = self
+            .settlements
+            .store(site)
+            .expect("the identity resolved to a live slot");
+        // The plunder moves before the loss, because the loss subtracts what
+        // the site still holds from the account. Moving it first and clearing
+        // it leaves the account exactly as it was.
+        if let Some(receiver) = self.nearest_site_of(razer, tile) {
+            for index in 0..COMMODITY_COUNT {
+                let commodity = CommodityId(index as u16);
+                let carried = store
+                    .quantity(commodity)
+                    .expect("the index came from the commodity count");
+                let held = self
+                    .settlements
+                    .store(receiver)
+                    .expect("the nearest site is live")
+                    .quantity(commodity)
+                    .expect("the index came from the commodity count");
+                let _ =
+                    self.settlements
+                        .set_store(receiver, commodity, sim_math::add(held, carried));
+                let _ = self.settlements.set_store(site, commodity, Fix32::ZERO);
+            }
+        }
+        // The upgrades on the tile go with the site. An upgrade changes hands
+        // with the ground, so a razer that wanted the roads and the walls
+        // should have captured instead.[^3]
+        //
+        // [^3]: ADR-0180, a site changes hands or the taker destroys it, decision D2. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+        self.upgrades.remove(tile);
+        // The residents die with the site. The despawn is the one path a unit
+        // leaves the world by, so a razed resident leaves the arena, the
+        // structure and the cohorts by the route a killed one takes.
+        let residents: Vec<Entity> = self
+            .soldiers
+            .iter()
+            .filter(|unit| self.soldiers.home(*unit) == Some(Some(slot)))
+            .collect();
+        for unit in residents {
+            self.despawn_soldier(unit);
+        }
+        if !self.destroy_settlement(site) {
+            return false;
+        }
+        self.cohorts.rebuild(
+            self.soldiers.home_column(),
+            self.soldiers.faction_column(),
+            self.soldiers.live_column(),
+            self.settlements.slot_count(),
+        );
+        self.sites_razed = sim_math::combine(Accum(self.sites_razed), Accum(1)).0;
+        self.taken_log.push(SiteTaken::new(
+            self.tick,
+            site.to_bits(),
+            tile,
+            owner,
+            razer,
+            TAKE_KIND_RAZED,
+        ));
+        true
+    }
+
+    /// Returns the live site of a faction that stands nearest a tile.
+    ///
+    /// A tie between two sites at one distance goes to the lower settlement
+    /// slot, because the walk is in ascending slot order and the comparison
+    /// is strict.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn nearest_site_of(&self, faction: FactionId, tile: TileIdx) -> Option<Entity> {
+        let address = self.grid.address_of(tile)?;
+        let mut best: Option<(u32, Entity)> = None;
+        for slot in 0..self.settlements.slot_count() {
+            let Some(site) = self.settlements.entity_at(slot) else {
+                continue;
+            };
+            if self.settlements.faction(site) != Some(faction) {
+                continue;
+            }
+            let Some(seat) = self.settlements.address(site) else {
+                continue;
+            };
+            let distance = address.distance(seat);
+            if best.is_none_or(|(nearest, _)| distance < nearest) {
+                best = Some((distance, site));
+            }
+        }
+        best.map(|(_, site)| site)
+    }
+
+    /// Reports whether a faction has left the game.
+    ///
+    /// A faction outside the ceiling has never been in the game, and this
+    /// answers `false` for it.
+    #[must_use]
+    pub fn is_eliminated(&self, faction: FactionId) -> bool {
+        self.eliminated
+            .get(faction.0 as usize)
+            .is_some_and(|state| *state == 1)
+    }
+
+    /// Removes from the game every faction that holds no site and no unit.
+    ///
+    /// **A faction leaves the game when nothing of it can act and nothing of
+    /// it can grow.** A site grows people and a unit acts, so a faction with
+    /// neither has no way back into the world. It cannot found, because a
+    /// founding needs a unit. It cannot build, gather, fight or take ground.
+    /// A rule that waited for more would wait for ever.[^1]
+    ///
+    /// **A character alone does not keep a faction in play.** A character
+    /// carries no tile, so it stands nowhere. It holds no ground, it takes no
+    /// step and it fights nothing.[^2] The pass removes the characters of a
+    /// faction that leaves, so nothing outlives the faction and no stored row
+    /// names a faction that is out.
+    ///
+    /// **The ground it held is released to nobody.** The spread of the next
+    /// tick then gives each released tile to the nearest city that reaches
+    /// it, by the rule that already decides every holder, and a tile that no
+    /// city reaches stays with nobody.[^3] Nothing here states a second rule
+    /// for who inherits.
+    ///
+    /// **The pass runs once for each tick and it does not cascade.** Ground
+    /// released by one elimination reaches another faction on the next tick,
+    /// through the spread. A pass that settled until quiet would run a
+    /// variable number of times, and no pass in this engine does that.[^4]
+    ///
+    /// The walk is over the factions in ascending identifier order, which is
+    /// a stable key. Two factions that leave on one tick are recorded in that
+    /// order.[^5]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0181, a faction that holds no site and no unit leaves the game, decision D1. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
+    /// [^2]: ADR-0066, entity storage holds four fixed shapes, decision D1. `docs/adrs/accepted/adr-0066-entity-storage-holds-four-fixed-shapes.md`
+    /// [^3]: ADR-0181, a faction that holds no site and no unit leaves the game, decision D3. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
+    /// [^4]: ADR-0001, one binary gives one answer at any thread count, decision D3. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    /// [^5]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn eliminate_factions(&mut self, threads: usize) {
+        let population = *self.soldiers.population_by_faction();
+        let mut sites = [0u32; FACTION_CEILING as usize];
+        for slot in 0..self.settlements.slot_count() {
+            let Some(site) = self.settlements.entity_at(slot) else {
+                continue;
+            };
+            if let Some(faction) = self.settlements.faction(site) {
+                sites[faction.0 as usize] += 1;
+            }
+        }
+        let mut leaving: Vec<FactionId> = Vec::new();
+        for number in 0..self.config.faction_count.max(1) {
+            let faction = FactionId(number);
+            let index = usize::from(number);
+            if self.eliminated.get(index).copied() != Some(0) {
+                continue;
+            }
+            // A faction that never founded and never spawned has not left the
+            // game. It has not entered it. The seat is what says it entered,
+            // and the controller keeps one for the first founding.
+            if self
+                .controller
+                .row(faction)
+                .and_then(FactionRow::seat)
+                .is_none()
+            {
+                continue;
+            }
+            if sites[index] > 0 || population[index] > 0 {
+                continue;
+            }
+            leaving.push(faction);
+        }
+        for faction in leaving {
+            self.eliminated[faction.0 as usize] = 1;
+            // The release ends the holder and the lease together. A lease
+            // left behind would take the tile back on the next spread, from a
+            // faction that can no longer raise it.
+            let released = self.holding.release(faction, threads);
+            let leftover: Vec<Entity> = self
+                .characters
+                .iter()
+                .filter(|character| {
+                    self.characters.faction_column()[character.index() as usize] == faction
+                })
+                .collect();
+            for character in leftover {
+                self.characters.remove(character);
+            }
+            self.eliminated_log
+                .push(FactionEliminated::new(self.tick, released, faction));
+        }
+    }
+
+    /// Returns the siege that stands against a site.
+    ///
+    /// The answer is the besieging faction and the work that faction has
+    /// done. It is `None` when the identity names no live site, and `None`
+    /// when no siege stands.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D8. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    #[must_use]
+    pub fn siege_of(&self, site: Entity) -> Option<(FactionId, i64)> {
+        self.settlements.siege(site)
+    }
+
+    /// Returns the work a siege must do before this site changes hands.
+    ///
+    /// The resistance is the residents the site holds, so the answer moves
+    /// as the city grows and as a war empties it.[^1] Returns `None` when
+    /// the identity names no live site.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D8. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    #[must_use]
+    pub fn capture_work_of(&self, site: Entity) -> Option<i64> {
+        let residents = self.site_residents(site)?;
+        Some(self.siege_rules.capture_work(residents))
+    }
+
+    /// Returns the work a siege must do before this site is destroyed.
+    ///
+    /// Returns `None` when the identity names no live site.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    #[must_use]
+    pub fn raze_work_of(&self, site: Entity) -> Option<i64> {
+        let residents = self.site_residents(site)?;
+        Some(self.siege_rules.raze_work(residents))
+    }
+
+    /// Returns the sites that changed hands since the last step began.
+    #[must_use]
+    pub fn taken_log(&self) -> &[SiteTaken] {
+        &self.taken_log
+    }
+
+    /// Returns the raw bytes of the taken log.
+    #[must_use]
+    pub fn taken_log_bytes(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.taken_log)
+    }
+
+    /// Returns the factions that left the game since the last step began.
+    #[must_use]
+    pub fn eliminated_log(&self) -> &[FactionEliminated] {
+        &self.eliminated_log
+    }
+
+    /// Returns the raw bytes of the eliminated log.
+    #[must_use]
+    pub fn eliminated_log_bytes(&self) -> &[u8] {
+        bytemuck::cast_slice(&self.eliminated_log)
     }
 
     /// Resolves the value of an identity back to the settlement it names.
@@ -3391,6 +4293,37 @@ impl World {
         other: FactionId,
         step: i32,
     ) -> Result<i32, MoveRelationError> {
+        // **The rule lives in the check, and this verb reads it.** The
+        // legality answer reads the same check.[^lg]
+        //
+        // [^lg]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+        let faction = self.move_relation_refusal(speaker, other, step)?;
+        self.relations
+            .shift(self.tick, faction, other, step)
+            .ok_or(MoveRelationError::Relation(RelationError::SameFaction))
+    }
+
+    /// Reports whether the relation verb would refuse one move, without
+    /// moving anything.
+    ///
+    /// **This is the one statement of the rule.** The relation verb calls it
+    /// before it shifts a row, and the legality answer calls it to fill one
+    /// row of the action table.[^1] Returns the faction of the speaker, so
+    /// that the verb does not read it twice.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the relation verb would return.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    pub fn move_relation_refusal(
+        &self,
+        speaker: Entity,
+        other: FactionId,
+        step: i32,
+    ) -> Result<FactionId, MoveRelationError> {
         let (Some(faction), Some(unit_type)) = (
             self.soldiers.faction(speaker),
             self.soldiers.unit_type(speaker),
@@ -3410,9 +4343,7 @@ impl World {
         if step > bound || step < -bound {
             return Err(RelationError::StepAboveBound { step, bound }.into());
         }
-        self.relations
-            .shift(self.tick, faction, other, step)
-            .ok_or(MoveRelationError::Relation(RelationError::SameFaction))
+        Ok(faction)
     }
 
     /// Returns the crossings of the war edge on the last step, in the order
@@ -3797,6 +4728,31 @@ impl World {
         self.settlements.on_tile(address)
     }
 
+    /// Returns the faction that holds a settlement.
+    ///
+    /// Returns `None` when the identity names no live settlement. A site
+    /// changes hands, so this answer is not fixed at the founding and a
+    /// caller must read it again.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D1. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    #[must_use]
+    pub fn settlement_faction(&self, entity: Entity) -> Option<FactionId> {
+        self.settlements.faction(entity)
+    }
+
+    /// Returns the quantity of one commodity in the store of a settlement.
+    ///
+    /// Returns `None` when the identity is dead, and `None` when the
+    /// commodity is outside the set.
+    #[must_use]
+    pub fn settlement_store(&self, entity: Entity, commodity: CommodityId) -> Option<Fix32> {
+        self.settlements
+            .store(entity)
+            .and_then(|store| store.quantity(commodity))
+    }
+
     /// Writes the quantity of one commodity into the store of a settlement.
     ///
     /// Returns `false` when the identity is dead.
@@ -4034,6 +4990,37 @@ impl World {
         self.terrain
             .kind(address)
             .is_some_and(TileKind::is_passable)
+    }
+
+    /// Returns the water crossing column of the type of one unit.
+    ///
+    /// **This is the one place that reads the column for a unit.** A unit
+    /// whose type the arena cannot answer for crosses nothing, which is the
+    /// answer every type gave before the column existed.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    fn crossing_of(&self, unit: Entity) -> u32 {
+        self.soldiers
+            .unit_type(unit)
+            .map_or(0, |unit_type| self.unit_types.row(unit_type).water_crossing)
+    }
+
+    /// Reports whether the ground at an address admits one named unit.
+    ///
+    /// The ground states a capacity for the crossing the type of the unit
+    /// holds, and a capacity above zero admits it. A type with no crossing
+    /// therefore gets the answer the ground alone gives, and a type that
+    /// crosses open water may stand on it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    fn admits_this_unit(&self, unit: Entity, address: Axial) -> bool {
+        self.terrain
+            .kind(address)
+            .is_some_and(|kind| kind.is_passable_for(self.crossing_of(unit)))
     }
 
     /// Refuses an address that lies inside the world on ground that admits
@@ -4669,6 +5656,13 @@ impl World {
         for total in &self.store_account {
             hash = hash.write_u64(total.0 as u64);
         }
+        // Whether a faction has left the game is stored state that the step
+        // reads. The elimination pass reads it to leave a faction that has
+        // gone alone, and every game end reader reads it to refuse a faction
+        // that is out, so it enters the hash.[^24]
+        //
+        // [^24]: ADR-0164, every stored value the step reads enters the state hash. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+        let hash = hash.write(&self.eliminated);
         // What two factions agreed is state that a later frame reads: the
         // settlement pass moves a quantity because a contract says so. The
         // plane holds no row until somebody speaks, and it then folds nothing,
@@ -4720,6 +5714,12 @@ impl World {
         //
         // [^17]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
         let hash = self.weather.hash_into(hash);
+        // What burns is state that a later frame reads: the next tick spreads
+        // from the tiles this one left burning, and it refuses the tiles this
+        // one left spent. The lightning chance enters with it, because two
+        // worlds that hold the same fire and different chances diverge on the
+        // next strike.[^17]
+        let hash = self.fire.hash_into(hash).write_u64(self.lightning_chance);
         // The climate is stored, and the terrain readers of this world read
         // it, so two worlds that hold the same seed and different climates
         // must diverge.[^17]
@@ -4739,6 +5739,12 @@ impl World {
         // ascending tile order. A lookup is a binary search, so an entry out
         // of order does not fail. It returns the wrong tile.
         if !self.values.check_invariants() {
+            return false;
+        }
+        // Both sets of the fire are ascending and hold each tile once, and no
+        // tile is both burning and spent. A lookup is a binary search, so an
+        // entry out of order does not fail. It answers about the wrong tile.
+        if !self.fire.check_invariants() {
             return false;
         }
         if self.values.grid() != self.grid {
@@ -4818,17 +5824,23 @@ impl World {
             return false;
         }
 
-        // No soldier stands on ground that admits no unit. The spawn, the
-        // placement and the movement each refuse such a tile, and this check
-        // is what fails when a later path forgets to.[^1]
+        // No soldier stands on ground that admits no unit of its own type.
+        // The spawn, the placement and the movement each refuse such a tile,
+        // and this check is what fails when a later path forgets to.[^1]
+        //
+        // **The gate is the capacity table, and the crossing column of the
+        // unit is an argument to it.** The movement pass admits a step by
+        // that table, so a check that read the ground alone would state a
+        // second, stricter rule and fail on a mariner that crossed open
+        // water exactly as its row permits.[^11]
         //
         // [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
-        if self
-            .soldiers
-            .iter()
-            .filter_map(|soldier| self.soldiers.address(soldier))
-            .any(|address| !self.admits_a_unit(address))
-        {
+        // [^11]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+        if self.soldiers.iter().any(|soldier| {
+            self.soldiers
+                .address(soldier)
+                .is_some_and(|address| !self.admits_this_unit(soldier, address))
+        }) {
             return false;
         }
         // The terrain holds a second copy of the seed and of the extent. One
@@ -5451,6 +6463,11 @@ impl World {
         self.collapsed_log.clear();
         self.finished_log.clear();
         self.founded_log.clear();
+        self.taken_log.clear();
+        self.fire_started_log.clear();
+        self.fire_ended_log.clear();
+        self.burned_log.clear();
+        self.eliminated_log.clear();
         self.fold_relations_into_the_census();
         self.relations.clear_log();
         self.tick = Tick(self.tick.0.wrapping_add(1));
@@ -5558,6 +6575,7 @@ impl World {
                     exits: &self.exits,
                     approaches: &self.approaches,
                     home_approaches: &self.home_approaches,
+                    stock_approaches: &self.stock_approaches,
                     site_tiles: self.settlements.tile_column(),
                     returns: &self.returns,
                     destinations: &self.destinations,
@@ -5568,6 +6586,7 @@ impl World {
                     unit_types: &self.unit_types,
                     upgrades: &self.upgrades,
                     table: &self.upgrade_table,
+                    fire: &self.fire,
                 },
                 threads,
             )?
@@ -5723,16 +6742,53 @@ impl World {
         // stays the barrier of this frame.
         //
         // [^21]: ADR-0153, a tile's lease follows the units that stand on it, decisions D2, D3, D4 and D7. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
-        {
+        // The occupancy outlives this block, because the capture pass below
+        // reads the same list. Who stands on a tile is stated once, and the
+        // lease and the capture both read that one statement.[^22]
+        let occupancy = {
             let _span = stage::open(Stage::HoldingLease);
             let occupancy = self.tile_occupancy(threads)?;
             self.holding.advance_leases(&occupancy, tick.0);
+            occupancy
+        };
+
+        // **A site changes hands here, between the lease and the spread.**
+        // The occupancy the lease pass built is the one statement of who
+        // stands on a tile, and this pass reads the same list rather than
+        // counting again.[^22] The spread below then reads the settlement
+        // faction column that this pass has just written, so a city taken on
+        // this tick reaches its new ground on this tick and not the next.
+        //
+        // The pass is serial and it walks the settlements in slot order,
+        // which is a stable key.[^23]
+        //
+        // [^22]: ADR-0180, a site changes hands or the taker destroys it, decision D4. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+        // [^23]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+        {
+            let _span = stage::open(Stage::SiteCapture);
+            self.capture_sites(&occupancy);
         }
 
         {
             let _span = stage::open(Stage::HoldingSpread);
             self.holding
                 .rewrite(self.terrain, &self.settlements, &self.upgrades, threads)?;
+        }
+
+        // **A faction leaves the game here, after the spread.** The spread
+        // above has just written the holder column, so the ground this pass
+        // releases is the ground the faction holds now and not the ground it
+        // held at the last barrier.[^24]
+        //
+        // The pass runs once for each tick. An elimination that releases
+        // ground gives that ground to a rival city through the spread of the
+        // next tick, by the rule that already decides every holder. Nothing
+        // loops here, and no elimination cascades inside one tick.[^24]
+        //
+        // [^24]: ADR-0181, a faction that holds no site and no unit leaves the game, decisions D2, D3 and D4. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
+        {
+            let _span = stage::open(Stage::FactionEliminate);
+            self.eliminate_factions(threads);
         }
 
         // The event reports the tile as this frame left it, so the holder is
@@ -5848,6 +6904,33 @@ impl World {
         {
             let _span = stage::open(Stage::Reap);
             self.reap(threads)?;
+        }
+
+        // **The fire runs here, after the pass that ends a starved unit and
+        // before the barrier that follows both.** It ends units of its own,
+        // and the refresh below the growth is the barrier of that structural
+        // change, in the way it is the barrier of the reap above.[^40]
+        //
+        // It reads the bridge that the barrier of this frame rebuilt, and it
+        // resolves every unit it reads through the arena, so a slot the reap
+        // above freed answers `None` and the fire skips it.
+        //
+        // It reads the weather field that the previous step left, because the
+        // weather solve runs later in this step. That is a fixed order and
+        // not a stale read: every tick reads the field of the tick before
+        // it, in the way the upgrade wear does.[^41]
+        //
+        // The stage takes no thread count. It walks the burning tiles and no
+        // tile of the world, and a fire is small beside a world, so the walk
+        // is the cheapest thing in the frame. A pass that takes no thread
+        // count also cannot take a thread completion order.[^42]
+        //
+        // [^40]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        // [^41]: ADR-0140, weather is a field over the level 1 cell lattice, decision D3. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+        // [^42]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+        {
+            let _span = stage::open(Stage::Fire);
+            self.burn();
         }
 
         // The queue advance runs after the shortage scan and before the
@@ -6370,6 +7453,49 @@ impl World {
             .inflict(faction, places, strength, self.tick, &ground)
     }
 
+    /// Raises a storm over one place.
+    ///
+    /// The place is a tile, and the storm stands over the weather cell that
+    /// covers it. **The storm is imposed and it did not form.** A field of one
+    /// layer grows no low of its own, so a caller places one and the field
+    /// carries it until it dies.[^1]
+    ///
+    /// **This is an authoring verb and not a faction power.** It names no
+    /// congregation, so the gate that a god meets does not govern it.[^2] The
+    /// power that a faction wields is the one that puts water over ground the
+    /// faction holds.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the place lies outside the world, when the
+    /// setting lies outside the range the field carries, and when the field
+    /// already carries as many storms as it holds.
+    ///
+    /// # References
+    ///
+    /// [^1]: A cyclone. [`Cyclone`]
+    /// [^2]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
+    pub fn raise_cyclone(
+        &mut self,
+        place: Axial,
+        setting: CycloneSetting,
+    ) -> Result<Cyclone, WeatherError> {
+        let tile = self
+            .grid
+            .index_of(place)
+            .ok_or(WeatherError::PlaceOutsideWorld(place))?;
+        let cell = self
+            .weather_cell_of(tile)
+            .ok_or(WeatherError::PlaceOutsideWorld(place))?;
+        self.weather.raise_cyclone(cell, setting)
+    }
+
+    /// Returns the storms that the weather of the world is carrying.
+    #[must_use]
+    pub fn cyclones(&self) -> &[Cyclone] {
+        self.weather.cyclones()
+    }
+
     fn cell_of(&self, tile: TileIdx) -> Option<u32> {
         let layout = self.pyramid.layout();
         Some(layout.block_of_key(layout.key_of(tile)?))
@@ -6451,6 +7577,408 @@ impl World {
             improvement,
             condition: site.condition.0,
         }
+    }
+
+    /// Returns what the fire needs to know about one tile.
+    ///
+    /// The reader gathers the ground, the building that stands on it and the
+    /// weather over it. It applies none of them. The fire module holds the
+    /// whole of the arithmetic, so a rule cannot be read one way here and
+    /// another way there.[^1]
+    ///
+    /// The weather values are the ones that the solve of the previous frame
+    /// left, in the same way the gather resolve and the upgrade wear read
+    /// them.[^2]
+    ///
+    /// Returns `None` when the index names no tile of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^2]: ADR-0140, weather is a field over the level 1 cell lattice, decision D3. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+    #[must_use]
+    fn fire_ground(&self, tile: TileIdx) -> Option<GroundReading> {
+        let address = self.grid.address_of(tile)?;
+        let kind = self.tile_kind(address)?;
+        let carries_upgrade = self
+            .upgrades
+            .at(tile)
+            .is_some_and(|site| site.is_complete());
+        let (is_wet, cloud_share, wind) = match self.weather_cell_of(tile) {
+            Some(cell) => (
+                self.weather.cell_is_wet(cell),
+                self.weather.cloud_share_at(cell),
+                self.weather.wind_at(cell),
+            ),
+            None => (false, 0, Wind::STILL),
+        };
+        Some(GroundReading {
+            kind,
+            carries_upgrade,
+            is_wet,
+            cloud_share,
+            cloud_whole: crate::weather::CLOUD_SHARE_WHOLE,
+            wind_along: crate::fire::wind_components(wind),
+            // The component along a direction is twice the speed when the
+            // wind points exactly that way, and the speed has a ceiling, so
+            // this is the largest value the component reaches.
+            wind_whole: 2 * crate::weather::SPEED_CEILING,
+        })
+    }
+
+    /// Sets one tile alight, and reports whether anything caught.
+    ///
+    /// **This is how a caller starts a fire.** The engine starts one the same
+    /// way, through the lightning draw, so both paths reach the same rule and
+    /// no second site states what may catch.[^1]
+    ///
+    /// Returns `false` when the index names no tile, when the ground carries
+    /// no fuel, when the weather has wetted the ground, when the tile already
+    /// burns, and when the tile has burned already.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    pub fn ignite(&mut self, tile: TileIdx) -> bool {
+        let Some(ground) = self.fire_ground(tile) else {
+            return false;
+        };
+        if !self.fire.ignite(tile, ground) {
+            return false;
+        }
+        let tick = self.tick;
+        self.fire_started_log.push(FireStarted::new(
+            tick,
+            tile,
+            crate::fire::START_CAUSE_ORDERED,
+        ));
+        true
+    }
+
+    /// Sets a set of tiles alight, and returns how many caught.
+    ///
+    /// **The set form is what a control plane calls.** The caller names the
+    /// whole set in one command and loops over nothing.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    pub fn ignite_set(&mut self, tiles: &[TileIdx]) -> usize {
+        let mut caught = 0usize;
+        for tile in tiles {
+            if self.ignite(*tile) {
+                caught += 1;
+            }
+        }
+        caught
+    }
+
+    /// Returns the fire field of the world.
+    #[must_use]
+    pub const fn fire(&self) -> &FireField {
+        &self.fire
+    }
+
+    /// Returns every burning tile, in ascending tile order.
+    ///
+    /// **This is the seed set that a control plane sends people to.** The
+    /// caller hands it straight back to the send verb, so it names no tile of
+    /// its own and it walks nothing.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    #[must_use]
+    pub fn burning_tiles(&self) -> Vec<TileIdx> {
+        self.fire.burning_tiles()
+    }
+
+    /// Reports whether one tile burns now.
+    #[must_use]
+    pub fn tile_is_burning(&self, address: Axial) -> Option<bool> {
+        let tile = self.grid.index_of(address)?;
+        Some(self.fire.is_burning(tile))
+    }
+
+    /// Reports whether one tile has burned already.
+    ///
+    /// Ground that has burned never catches again, and that is what makes a
+    /// fire end.
+    #[must_use]
+    pub fn tile_is_spent(&self, address: Axial) -> Option<bool> {
+        let tile = self.grid.index_of(address)?;
+        Some(self.fire.is_spent(tile))
+    }
+
+    /// Sets the chance that lightning starts a fire on one tick.
+    ///
+    /// The chance is stated out of the whole that the fire module names. A
+    /// world that states zero never catches by itself, and that is what a
+    /// world states until a caller says otherwise.
+    pub fn set_lightning_chance(&mut self, chance: u64) {
+        self.lightning_chance = chance.min(crate::fire::LIGHTNING_WHOLE);
+    }
+
+    /// Returns the chance that lightning starts a fire on one tick.
+    #[must_use]
+    pub const fn lightning_chance(&self) -> u64 {
+        self.lightning_chance
+    }
+
+    /// Orders one soldier to fight the fire on the tile it stands on.
+    ///
+    /// Returns `false` when the identity is dead. The order holds until a
+    /// caller stops it. A unit under this order that stands on a burning tile
+    /// stays there and takes intensity off it, and it risks its life doing
+    /// so.
+    pub fn order_douse(&mut self, entity: Entity, douses: bool) -> bool {
+        self.soldiers.set_douse_order(entity, douses)
+    }
+
+    /// Returns the fire order of one soldier, or `None` when it is dead.
+    #[must_use]
+    pub fn douse_order(&self, entity: Entity) -> Option<bool> {
+        self.soldiers.douse_order(entity)
+    }
+
+    /// Orders a set of soldiers to fight the fire, and sends the whole set at
+    /// the fire.
+    ///
+    /// **This is one command over a set, and it starts one field.** The
+    /// engine takes every burning tile as the seed set of the destination
+    /// plane the caller names, and every unit of the set then climbs that one
+    /// field. No unit searches for a fire and the caller loops over
+    /// nothing.[^1] [^2]
+    ///
+    /// Returns how many identities the order refused. The send is all or
+    /// nothing, in the way the send verb is.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal of the send verb when an identity is dead or the
+    /// plane number is out of range. Returns it unchanged, so a caller reads
+    /// one rule.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    pub fn order_douse_set(
+        &mut self,
+        units: &[Entity],
+        destination: u16,
+    ) -> Result<usize, SendError> {
+        let burning = self.fire.burning_tiles();
+        let seeds: Vec<Axial> = burning
+            .iter()
+            .filter_map(|tile| self.grid.address_of(*tile))
+            .collect();
+        if !seeds.is_empty() {
+            self.send_units_to(units, &seeds, destination)?;
+        }
+        let mut refused = 0usize;
+        for entity in units {
+            if !self.soldiers.set_douse_order(*entity, true) {
+                refused += 1;
+            }
+        }
+        Ok(refused)
+    }
+
+    /// Returns the tiles that caught fire since the last step began.
+    #[must_use]
+    pub fn fires_started(&self) -> &[FireStarted] {
+        &self.fire_started_log
+    }
+
+    /// Returns the tiles that stopped burning since the last step began.
+    #[must_use]
+    pub fn fires_ended(&self) -> &[FireEnded] {
+        &self.fire_ended_log
+    }
+
+    /// Returns the units the fire ended since the last step began.
+    #[must_use]
+    pub fn units_burned(&self) -> &[UnitBurned] {
+        &self.burned_log
+    }
+
+    /// Advances every fire by one tick.
+    ///
+    /// # What the pass does, in order
+    ///
+    /// 1. Lightning may set one tile alight.
+    /// 2. Each burning tile counts the people who fight it, and each unit
+    ///    standing on it draws for its life.
+    /// 3. Each burning tile decides, from the fire as it stands now, which of
+    ///    its six neighbours catches.
+    /// 4. Each burning tile loses fuel and gains or loses intensity, and a
+    ///    tile that runs out of either stops burning and becomes spent.
+    /// 5. The tiles that step 3 chose catch, unless step 4 spent them.
+    /// 6. The units the fire took leave the world.
+    ///
+    /// # Why the fire ends
+    ///
+    /// **Nothing here asks whether anything changed.** Step 4 takes a fixed
+    /// positive quantity of fuel off every burning tile on every tick, and a
+    /// tile that stops can never catch again. The burning set is therefore
+    /// empty after a bounded number of ticks, whatever the wind does.[^1]
+    ///
+    /// # Determinism
+    ///
+    /// The pass walks the burning set in ascending tile order and the six
+    /// directions in index order. It runs on one thread, so no thread
+    /// completion order can reach it. Every draw is keyed on the fire system,
+    /// the frame, a tile or a whole unit identity, and a draw index.[^2] [^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0005, a solver runs a fixed iteration count. `docs/adrs/REGISTRY.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^3]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+    fn burn(&mut self) {
+        let tick = self.tick;
+        let seed = self.config.seed;
+        let frame = tick.0;
+
+        // **The engine starts a fire here, and it costs the same whatever the
+        // world holds.** The draw asks whether lightning strikes at all, and
+        // a second draw picks the tile. Nothing walks the lattice, so a world
+        // of sixteen million tiles pays two draws for this.
+        if let Some(tile) =
+            crate::fire::lightning_strike(seed, frame, self.lightning_chance, self.grid)
+        {
+            if let Some(ground) = self.fire_ground(tile) {
+                if self.fire.ignite(tile, ground) {
+                    self.fire_started_log.push(FireStarted::new(
+                        tick,
+                        tile,
+                        crate::fire::START_CAUSE_LIGHTNING,
+                    ));
+                }
+            }
+        }
+
+        if self.fire.burning_count() == 0 {
+            return;
+        }
+
+        // The set is copied because the passes below read the world while
+        // they walk it. The copy holds the burning tiles and nothing else, so
+        // it follows the fire and never the world.
+        let burning: Vec<crate::fire::FireTile> = self.fire.burning().to_vec();
+
+        // **What the people on a tile do, and what it costs them.** A unit
+        // under a fire order takes intensity off the tile it stands on. Every
+        // unit on the tile, ordered or not, draws for its life against the
+        // intensity of the fire.
+        let mut suppression: Vec<i64> = Vec::with_capacity(burning.len());
+        let mut casualties: Vec<(TileIdx, Entity)> = Vec::new();
+        let mut cursor = self.bridge.tile_cursor();
+        for entry in &burning {
+            let mut work = 0i64;
+            let standing: Vec<Entity> = self.bridge.units_on_tile(&mut cursor, entry.tile).to_vec();
+            for unit in standing {
+                // **Every identity resolves against the arena.** The reap
+                // above this stage freed some slots, and the bridge rebuilds
+                // at the barrier below, so the list may name a dead unit. A
+                // dead identity answers `None` and contributes nothing.
+                if self.soldiers.tile(unit) != Some(entry.tile) {
+                    continue;
+                }
+                if self.soldiers.douse_order(unit) == Some(true) {
+                    work = work.saturating_add(crate::fire::DOUSE_WORK_FOR_EACH_UNIT);
+                }
+                if crate::fire::burns_unit(seed, frame, unit.to_bits(), entry.intensity) {
+                    casualties.push((entry.tile, unit));
+                }
+            }
+            suppression.push(work);
+        }
+
+        // **The spread reads the fire as this tick found it.** It runs before
+        // the advance, so a tile that people put out this tick still lit what
+        // it lit, and a tile that catches this tick does not spread until the
+        // next one.
+        let mut lit: Vec<(u32, u32)> = Vec::new();
+        for entry in &burning {
+            let Some(here) = self.grid.address_of(entry.tile) else {
+                continue;
+            };
+            for direction in 0..NEIGHBOUR_COUNT {
+                let Some(there) = self.grid.neighbour(here, direction) else {
+                    continue;
+                };
+                let Some(target) = self.grid.index_of(there) else {
+                    continue;
+                };
+                if self.fire.is_burning(target) || self.fire.is_spent(target) {
+                    continue;
+                }
+                let Some(ground) = self.fire_ground(target) else {
+                    continue;
+                };
+                if crate::fire::spreads(seed, frame, entry.tile, direction, entry.intensity, ground)
+                {
+                    lit.push((target.0, entry.tile.0));
+                }
+            }
+        }
+
+        for (tile, cause) in self.fire.advance(&suppression) {
+            self.fire_ended_log.push(FireEnded::new(tick, tile, cause));
+        }
+
+        // **One tile catches once, whatever number of neighbours lit it.**
+        // The sort is on the target and then on the source, so the source
+        // recorded is the lowest neighbour and never the neighbour a
+        // schedule reached first.
+        lit.sort_unstable();
+        lit.dedup_by_key(|(target, _)| *target);
+        for (target, _) in lit {
+            let target = TileIdx(target);
+            let Some(ground) = self.fire_ground(target) else {
+                continue;
+            };
+            if self.fire.ignite(target, ground) {
+                self.fire_started_log.push(FireStarted::new(
+                    tick,
+                    target,
+                    crate::fire::START_CAUSE_SPREAD,
+                ));
+            }
+        }
+
+        if casualties.is_empty() {
+            return;
+        }
+        // The order is the tile and then the whole identity. Both are stable
+        // properties of the world and neither is a slot order.
+        casualties.sort_unstable_by_key(|(tile, unit)| (tile.0, unit.to_bits()));
+        for (tile, unit) in casualties {
+            let Some(faction) = self.soldiers.faction(unit) else {
+                continue;
+            };
+            let Some(unit_type) = self.soldiers.unit_type(unit) else {
+                continue;
+            };
+            if self.despawn_soldier(unit) {
+                self.fire.count_burned_unit();
+                self.burned_log.push(UnitBurned::new(
+                    tick,
+                    unit.to_bits(),
+                    tile,
+                    faction,
+                    unit_type,
+                ));
+            }
+        }
+        self.cohorts.rebuild(
+            self.soldiers.home_column(),
+            self.soldiers.faction_column(),
+            self.soldiers.live_column(),
+            self.settlements.slot_count(),
+        );
     }
 
     /// Returns why one soldier chose what it chose.
@@ -7027,6 +8555,52 @@ impl World {
         entity: Entity,
         category: UpgradeCategory,
     ) -> Result<(), BuildRefusal> {
+        // **The rule lives in the check, and this verb reads it.** The
+        // legality answer reads the same check, so the answer and the verb
+        // cannot state two different rules.[^lg]
+        //
+        // [^lg]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+        if let Err(refusal) = self.build_refusal(entity, category) {
+            // The plan counts the refusals the permission rule makes, and
+            // not the ones the table or the identity make. The split is the
+            // one the verb kept before the check moved out of it.
+            if matches!(
+                refusal,
+                BuildRefusal::ProjectHoldsAnother { .. }
+                    | BuildRefusal::NoProject { .. }
+                    | BuildRefusal::GroundNotHeld { .. }
+            ) {
+                self.plan.count_refusal();
+            }
+            return Err(refusal);
+        }
+        if self.soldiers.set_build_order(entity, Some(category)) {
+            Ok(())
+        } else {
+            Err(BuildRefusal::NoSuchBuilder)
+        }
+    }
+
+    /// Reports whether the build verb would refuse one builder, without
+    /// ordering anything.
+    ///
+    /// **This is the one statement of the rule.** The build verb calls it
+    /// before it writes an order, and the legality answer calls it to fill
+    /// one row of the action table.[^1] Nothing here mutates, so a caller
+    /// may ask about every candidate and change nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the build verb would return.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    pub fn build_refusal(
+        &self,
+        entity: Entity,
+        category: UpgradeCategory,
+    ) -> Result<(), BuildRefusal> {
         // The verb refuses at the moment of the order, so a caller learns at
         // once. The pass below applies the same test on every step, so a
         // build whose ground changed hands stops.[^2]
@@ -7056,7 +8630,6 @@ impl World {
         )?;
         let zoned = self.plan.zones(faction, tile);
         if !build_is_permitted(holder, faction, row, category, zoned) {
-            self.plan.count_refusal();
             // The three refusals answer three rules. A project of another
             // category met the plan first, because it refuses whatever the
             // row asks for. A row that asks for held ground then met the
@@ -7070,7 +8643,7 @@ impl World {
                 _ => BuildRefusal::GroundNotHeld { category },
             });
         }
-        if self.soldiers.set_build_order(entity, Some(category)) {
+        if self.soldiers.slot_of(entity).is_some() {
             Ok(())
         } else {
             Err(BuildRefusal::NoSuchBuilder)
@@ -7423,6 +8996,23 @@ impl World {
         self.holding.set_rules(rules);
     }
 
+    /// Returns what a site resists, and what a raze costs over a capture.
+    #[must_use]
+    pub const fn siege_rules(&self) -> SiegeRules {
+        self.siege_rules
+    }
+
+    /// Sets what a site resists, and what a raze costs over a capture.
+    ///
+    /// The two values are balance rows.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the siege. `docs/reference/balance.md`
+    pub const fn set_siege_rules(&mut self, rules: SiegeRules) {
+        self.siege_rules = rules;
+    }
+
     /// Returns how a lease rises, falls and claims.
     ///
     /// A lease is one faction and one count for each tile. The count follows
@@ -7521,6 +9111,26 @@ impl World {
     ///
     /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
     /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// Returns the direction of the nearest tile that holds stock of one
+    /// kind, from one address.
+    ///
+    /// The answer is the seed offset when the address itself holds stock, a
+    /// direction when the block that holds the address holds stock
+    /// elsewhere, and nothing when the block holds none. A unit that reads
+    /// nothing takes the direction of its level 1 cell instead.[^1]
+    ///
+    /// The engine seeds the field only over the blocks that hold a unit, so
+    /// this reports nothing for an empty quarter of the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-589. `docs/FINDINGS.md`
+    #[must_use]
+    pub fn stock_direction(&self, address: Axial, kind: ResourceKind) -> Option<u8> {
+        let tile = self.grid.index_of(address)?;
+        self.stock_approaches.offset(u16::from(kind.to_u8()), tile)
+    }
+
     #[must_use]
     pub fn exit_direction(&self, address: Axial, option: u8) -> Option<Option<u8>> {
         let tile = self.grid.index_of(address)?;
@@ -7660,8 +9270,97 @@ impl World {
         )?;
         self.exits.derive(&self.pyramid);
         self.derive_return_fields();
+        self.derive_stock_field();
         self.derive_destination_fields();
         Ok(())
+    }
+
+    /// Derives the fine field that steers a gatherer to stock.
+    ///
+    /// **This is the one place that derives it.** The field comes from the
+    /// gather orders and the ground, and a path that rebuilt level 1 without
+    /// it would leave a stale value that nothing fails on.[^1]
+    ///
+    /// **No stock plane conducts across water**, so every plane takes the
+    /// land crossing. The empty slice is how the approach field states
+    /// that.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-029. `docs/FINDINGS.md`
+    /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    fn derive_stock_field(&mut self) {
+        let seeds = self.stock_seed_tiles();
+        self.stock_approaches
+            .derive_within(self.terrain, &seeds, &[], STOCK_PASSES);
+    }
+
+    /// Returns one seed for each tile that holds stock, in a block that a
+    /// unit stands in, as a resource kind plane and the tile.
+    ///
+    /// **The seed set follows the units, not the world.** A block that holds
+    /// no unit seeds nothing, so the derivation costs an empty quarter of the
+    /// world nothing at all. This is the cheaper algorithm that a set-valued
+    /// question permits, and the set is the whole population.[^1]
+    ///
+    /// **Each occupied block seeds every kind, and the set reads no order
+    /// column.** The field then states a fact about the ground alone: from
+    /// this tile, this is the way to the nearest food, wood or stone inside
+    /// the block. A set keyed on the order a unit holds now would go stale
+    /// the moment anything wrote that column, and two passes of one step
+    /// write it.[^2]
+    ///
+    /// A block that holds no stock of a kind seeds that kind nowhere, so the
+    /// derivation builds no entry for it and the unit there reads the coarse
+    /// field.
+    ///
+    /// The walk is over the arena in ascending identity order, and then over
+    /// the tiles of each occupied block in ascending offset. It runs on the
+    /// calling thread and it names no thread count.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    /// [^2]: Findings register, FND-590. `docs/FINDINGS.md`
+    /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn stock_seed_tiles(&self) -> Vec<(u16, TileIdx)> {
+        let layout = self.pyramid.layout();
+        let mut occupied: Vec<u32> = Vec::new();
+        for unit in self.soldiers.iter() {
+            let Some(tile) = self.soldiers.tile(unit) else {
+                continue;
+            };
+            let Some(key) = layout.key_of(tile) else {
+                continue;
+            };
+            occupied.push(layout.block_of_key(key));
+        }
+        occupied.sort_unstable();
+        occupied.dedup();
+        let edge = layout.block_edge();
+        let mut seeds: Vec<(u16, TileIdx)> = Vec::new();
+        for kind in ResourceKind::ALL {
+            let plane = u16::from(kind.to_u8());
+            for block in &occupied {
+                let first_column = (block % layout.blocks_wide()) * edge;
+                let first_row = (block / layout.blocks_wide()) * edge;
+                for row in first_row..first_row + edge {
+                    for column in first_column..first_column + edge {
+                        let address = Axial::new(column as i32, row as i32);
+                        let Some(tile) = self.grid.index_of(address) else {
+                            continue;
+                        };
+                        if self
+                            .tile_stock(address, kind)
+                            .is_some_and(|amount| amount.0 > 0)
+                        {
+                            seeds.push((plane, tile));
+                        }
+                    }
+                }
+            }
+        }
+        seeds
     }
 
     /// Derives the coarse and the fine field that steer a unit home.
@@ -8254,16 +9953,12 @@ impl World {
                     if *holder != wanted {
                         return Err(TradeError::LandNotHeld(*tile));
                     }
-                    // Whether an upgrade goes with the ground is open, and
-                    // the project owner holds the question. The engine
-                    // refuses the trade until it is answered. The commit that
-                    // answers it removes this check and the error variant,
-                    // and it searches the tree for the blocker number.[^1]
+                    // **An upgrade changes hands with the ground**, so a
+                    // land side that carries one needs no refusal and no
+                    // arithmetic. The upgrade is stored against the tile and
+                    // no owner stands beside it, so the ground carries it.[^32]
                     //
-                    // [^1]: Blockers register, BLK-036. `docs/BLOCKERS.md`
-                    if self.upgrades.at(*tile).is_some() {
-                        return Err(TradeError::UpgradeOnLand(*tile));
-                    }
+                    // [^32]: ADR-0180, a site changes hands or the taker destroys it, decision D2. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
                 }
                 side.kind = 0;
                 side.amount = count;
@@ -9483,13 +11178,37 @@ impl World {
                     }
                     None => 0,
                 };
-                let cause = match (storm > 0, army > 0) {
-                    (true, true) => WEAR_CAUSE_BOTH,
-                    (true, false) => WEAR_CAUSE_WEATHER,
-                    (false, true) => WEAR_CAUSE_ARMY,
-                    (false, false) => 0,
+                // **What stands on burning ground burns with it.** The pass
+                // that owns wear owns this too, so no second site removes an
+                // upgrade and the collapse event stays the one record that
+                // anything stood there.[^7]
+                //
+                // The fire stage runs later in this step, so this reads the
+                // fire the previous step left. That is the order the storm
+                // term already reads the weather in.
+                //
+                // [^7]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+                let burns = if self.fire.is_burning(tile) {
+                    crate::fire::WEAR_FOR_EACH_TICK
+                } else {
+                    0
                 };
-                (tile, storm.saturating_add(army), cause, holder)
+                let cause = if burns > 0 {
+                    WEAR_CAUSE_FIRE
+                } else {
+                    match (storm > 0, army > 0) {
+                        (true, true) => WEAR_CAUSE_BOTH,
+                        (true, false) => WEAR_CAUSE_WEATHER,
+                        (false, true) => WEAR_CAUSE_ARMY,
+                        (false, false) => 0,
+                    }
+                };
+                (
+                    tile,
+                    storm.saturating_add(army).saturating_add(burns),
+                    cause,
+                    holder,
+                )
             })
             .filter(|(_, taken, _, _)| *taken > 0)
             .collect();
@@ -11478,6 +13197,7 @@ fn build_holds_unit(
         unit_types,
         upgrades: _,
         table: _,
+        fire: _,
     } = *building;
     build_intent_of(unit, soldiers, holding, ground, plan)
         .is_some_and(|intent| build_contribution(unit_types.row(intent.unit_type)) > 0)
@@ -11861,7 +13581,20 @@ struct Steering<'a> {
     /// and no further**, and a delivery reads the tile. This one resolves
     /// that last cell at the pitch of one tile. It is the same mechanism as
     /// the approach field above, keyed on the faction.[^4]
+    ///
+    /// [^4]: Findings register, FND-315. `docs/FINDINGS.md`
     home_approaches: &'a ApproachField,
+    /// One direction for each resource kind plane and each tile of a block
+    /// that a gatherer stands in.
+    ///
+    /// **The exit field steers a unit to the cell that holds the most stock
+    /// and no further**, and a gather resolve reads the tile. A unit that
+    /// reached the cell stood on barren ground and took nothing, which is the
+    /// defect the sent unit and the carrier both had.[^6] [^7]
+    ///
+    /// [^6]: Findings register, FND-315. `docs/FINDINGS.md`
+    /// [^7]: Findings register, FND-589. `docs/FINDINGS.md`
+    stock_approaches: &'a ApproachField,
     /// The tile of every settlement slot.
     ///
     /// **A unit stops on the tile of its own home and on no other.** The
@@ -11891,6 +13624,36 @@ struct Building<'a> {
     upgrades: &'a UpgradeMap,
     /// The shared upgrade table that resolves the row a build order names.
     table: &'a UpgradeTable,
+    /// The tiles that burn, which the fire hold below reads.
+    fire: &'a FireField,
+}
+
+/// Reports whether the fire on the tile a unit stands on is work it must
+/// stay for.
+///
+/// **A unit that was ordered to fight the fire and stands in one stays.** The
+/// fire order is per unit, and movement takes its direction from a field over
+/// cells, so a hold cannot be written into that field without pinning every
+/// unit of the cell. The pass asks this question of each unit instead, in the
+/// way the build hold does.[^1] [^2]
+///
+/// **Nothing stores the answer.** The pass derives it from the order and from
+/// the fire on the tick it reads it. It stops being true on the tick the fire
+/// goes out and on the tick the unit dies, so there is no hold to clear and no
+/// unit can carry a stale one.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0168, a build order holds a unit on its tile, and the hold is derived, decisions D1, D2 and D3. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
+/// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+fn douse_holds_unit(unit: Entity, soldiers: &SoldierArena, fire: &FireField) -> bool {
+    if soldiers.douse_order(unit) != Some(true) {
+        return false;
+    }
+    match soldiers.tile(unit) {
+        Some(tile) => fire.is_burning(tile),
+        None => false,
+    }
 }
 
 struct UnitWalk<'a> {
@@ -11975,6 +13738,7 @@ fn soldier_moves(
         destinations,
         approaches,
         home_approaches,
+        stock_approaches,
         site_tiles,
     } = *steering;
     // **The walk is in cell order, not in slot order.** The two hold the same
@@ -12052,6 +13816,20 @@ fn soldier_moves(
                                 table: building.table,
                             },
                         ) {
+                            return None;
+                        }
+                        // **A unit that stands in the fire it was ordered to
+                        // fight does not move.** The suppression the unit adds
+                        // is charged against the tile it stands on, so a unit
+                        // that walked away between two ticks would spread its
+                        // effort over many tiles and put none of them out.
+                        //
+                        // The clause sits beside the build hold and above the
+                        // send, for the reason the build hold does: a unit the
+                        // control plane sent to the fire still carries that
+                        // send when it arrives, and a send that outranked the
+                        // hold would walk it straight back off the tile.
+                        if douse_holds_unit(*soldier, soldiers, building.fire) {
                             return None;
                         }
                         // **A unit the control plane sent somewhere climbs
@@ -12176,6 +13954,45 @@ fn soldier_moves(
                                 return None;
                             }
                         }
+                        // **The gathering leg reads the same mechanism, keyed
+                        // on the resource kind the unit was ordered to
+                        // gather.** The exit field holds one direction for a
+                        // block of tiles, and the stock of a tile is a level 0
+                        // property. A unit inside the cell with the most food
+                        // read that its own cell was the best one, stripped
+                        // the ground under it, and stood there while the world
+                        // still held food two tiles away.[^27]
+                        //
+                        // The plane is the order column, because the gather
+                        // resolve reads that column. A field keyed on the
+                        // option row instead would walk a unit to food and let
+                        // it take stone.[^28]
+                        //
+                        // A unit that a caller sent somewhere reads its
+                        // destination plane instead, and a laden unit reads
+                        // the home field above, so this answers only for a
+                        // unit that is steering itself by the ground.
+                        //
+                        // [^27]: Findings register, FND-589. `docs/FINDINGS.md`
+                        // [^28]: Findings register, FND-590. `docs/FINDINGS.md`
+                        let toward_stock = match (sent, option) {
+                            (None, Some(option))
+                                if matches!(OPTIONS[option as usize].ranked, Ranked::Cell(_)) =>
+                            {
+                                soldiers.gather_order(*soldier).flatten().and_then(|kind| {
+                                    stock_approaches
+                                        .offset(u16::from(kind.to_u8()), soldiers.tile(*soldier)?)
+                                })
+                            }
+                            _ => None,
+                        };
+                        // **A unit that stands on stock of the kind it wants
+                        // takes no step.** The seed offset is how the field
+                        // says so. A unit that stepped away would strip one
+                        // tile of one unit each frame and walk on.
+                        if toward_stock == Some(AT_SEED) {
+                            return None;
+                        }
                         let steer = match (steered, option) {
                             // **The destination plane wins over the option
                             // row.** A caller that sends a unit somewhere has
@@ -12185,7 +14002,19 @@ fn soldier_moves(
                             // fine field wins over the coarse one there.[^25]
                             (Some(direction), _) => Some(Some(direction)),
                             (None, Some(option)) => match OPTIONS[option as usize].ranked {
-                                Ranked::Cell(_) => exits.exit(cell, option),
+                                // **The fine field wins over the coarse
+                                // one**, in the way it does for a sent unit
+                                // and for a laden one. A unit whose block
+                                // holds no stock of its kind reads no fine
+                                // entry and takes the coarse answer, which is
+                                // the answer it read before this field
+                                // existed. The seed offset never reaches
+                                // here, because a unit that stands on stock
+                                // already left the walk.[^27]
+                                Ranked::Cell(_) => match toward_stock {
+                                    Some(direction) => Some(Some(direction)),
+                                    None => exits.exit(cell, option),
+                                },
                                 // **The fine field wins over the coarse
                                 // one**, in the way it does for a sent unit.
                                 // A unit outside every seeded block reads no
@@ -12996,6 +14825,31 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         read: |world| world.characters.iter().count() as i64,
     },
     CensusRow {
+        name: "tiles_burning",
+        basis: CensusBasis::Held,
+        read: |world| world.fire.burning_count() as i64,
+    },
+    CensusRow {
+        name: "fires_started",
+        basis: CensusBasis::Total,
+        read: |world| world.fire.started_total(),
+    },
+    CensusRow {
+        name: "tiles_burnt_out",
+        basis: CensusBasis::Total,
+        read: |world| world.fire.burnt_out_total(),
+    },
+    CensusRow {
+        name: "fires_doused",
+        basis: CensusBasis::Total,
+        read: |world| world.fire.doused_total(),
+    },
+    CensusRow {
+        name: "units_burned",
+        basis: CensusBasis::Total,
+        read: |world| world.fire.burned_units_total(),
+    },
+    CensusRow {
         name: "upgrades_complete",
         basis: CensusBasis::Held,
         read: |world| {
@@ -13162,6 +15016,31 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         name: "campaigns_won",
         basis: CensusBasis::Total,
         read: |world| world.census.campaigns_won + world.campaigns.count(campaign::EVENT_WON),
+    },
+    // The two acts of a conquest over the run. A taker keeps a city its own
+    // reach supplies and burns one it does not, and these two rows are the
+    // only place a reader sees which of the two a run reached.[^8]
+    //
+    // [^8]: ADR-0180, a site changes hands or the taker destroys it, decision D7. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    CensusRow {
+        name: "sites_captured",
+        basis: CensusBasis::Total,
+        read: |world| world.sites_captured,
+    },
+    CensusRow {
+        name: "sites_razed",
+        basis: CensusBasis::Total,
+        read: |world| world.sites_razed,
+    },
+    CensusRow {
+        name: "sieges_pressed",
+        basis: CensusBasis::Total,
+        read: |world| world.sieges_pressed,
+    },
+    CensusRow {
+        name: "sieges_relieved",
+        basis: CensusBasis::Total,
+        read: |world| world.sieges_relieved,
     },
 ];
 
@@ -13343,11 +15222,83 @@ impl World {
         objective: Axial,
         cohort: u32,
     ) -> Result<CampaignRow, CampaignError> {
+        // **The rule lives in the check, and this verb reads it.** The
+        // legality answer reads the same check.[^lg]
+        //
+        // [^lg]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+        let idle = self.campaign_cohort(faction, objective, cohort)?;
+        let tile = self
+            .grid
+            .index_of(objective)
+            .ok_or(CampaignError::OutsideWorld(objective))?;
+        let plane = faction.0;
+        let objective_kind = if self
+            .settlements
+            .on_tile(objective)
+            .and_then(|site| self.settlements.faction(site))
+            == Some(faction)
+        {
+            campaign::OBJECTIVE_RELIEVE_SITE
+        } else {
+            campaign::OBJECTIVE_TAKE_SITE
+        };
+        let holder_at_raise = self
+            .holding
+            .holder(objective)
+            .and_then(Holder::faction)
+            .map_or(campaign::NO_HOLDER, |holder| holder.0);
+        self.set_unit_type_set(&idle, SOLDIER);
+        self.send_units_to(&idle, &[objective], plane)?;
+        let row = CampaignRow {
+            raised_at: self.tick,
+            objective_tile: tile.0,
+            cohort_size: idle.len() as u32,
+            faction,
+            holder_at_raise,
+            objective_kind,
+            state: campaign::STATE_LIVE,
+            padding: [0; 2],
+        };
+        assert!(
+            self.campaigns.open(row),
+            "the faction exists and holds no live campaign, so the register takes the row"
+        );
+        self.campaigns.push(CampaignEvent {
+            tick: self.tick,
+            objective_tile: tile.0,
+            cohort_size: row.cohort_size,
+            faction,
+            kind: campaign::EVENT_RAISED,
+            objective_kind,
+            padding: [0; 4],
+        });
+        Ok(row)
+    }
+
+    /// Returns the cohort that a raise would march, or the refusal it would
+    /// give.
+    ///
+    /// **This is the one statement of the rule.** The raise verb calls it
+    /// before it writes a register row, and the legality answer calls it to
+    /// fill one row of the action table.[^1] Nothing here mutates.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the raise verb would return.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    pub fn campaign_cohort(
+        &self,
+        faction: FactionId,
+        objective: Axial,
+        cohort: u32,
+    ) -> Result<Vec<Entity>, CampaignError> {
         if faction.0 >= self.config.faction_count.max(1) {
             return Err(CampaignError::NoSuchFaction(faction.0));
         }
-        let tile = self
-            .grid
+        self.grid
             .index_of(objective)
             .ok_or(CampaignError::OutsideWorld(objective))?;
         if cohort == 0 {
@@ -13409,47 +15360,7 @@ impl World {
             return Err(CampaignError::NoIdleUnit);
         }
         idle.truncate(cohort as usize);
-        let objective_kind = if self
-            .settlements
-            .on_tile(objective)
-            .and_then(|site| self.settlements.faction(site))
-            == Some(faction)
-        {
-            campaign::OBJECTIVE_RELIEVE_SITE
-        } else {
-            campaign::OBJECTIVE_TAKE_SITE
-        };
-        let holder_at_raise = self
-            .holding
-            .holder(objective)
-            .and_then(Holder::faction)
-            .map_or(campaign::NO_HOLDER, |holder| holder.0);
-        self.set_unit_type_set(&idle, SOLDIER);
-        self.send_units_to(&idle, &[objective], plane)?;
-        let row = CampaignRow {
-            raised_at: self.tick,
-            objective_tile: tile.0,
-            cohort_size: idle.len() as u32,
-            faction,
-            holder_at_raise,
-            objective_kind,
-            state: campaign::STATE_LIVE,
-            padding: [0; 2],
-        };
-        assert!(
-            self.campaigns.open(row),
-            "the faction exists and holds no live campaign, so the register takes the row"
-        );
-        self.campaigns.push(CampaignEvent {
-            tick: self.tick,
-            objective_tile: tile.0,
-            cohort_size: row.cohort_size,
-            faction,
-            kind: campaign::EVENT_RAISED,
-            objective_kind,
-            padding: [0; 4],
-        });
-        Ok(row)
+        Ok(idle)
     }
 
     /// Returns the campaign rows of one faction, in slot order. Empty when the
@@ -13722,10 +15633,13 @@ impl World {
     /// Returns how many relation moves the controller made through the verb
     /// on the tick the log holds.
     fn relation_moves_of_the_log(&self) -> i64 {
+        let schema = self.action_schema();
         self.controller
             .log()
             .iter()
-            .filter(|command| command.kind == controller::COMMAND_RELATION && command.applied != 0)
+            .filter(|command| {
+                schema.verb_of(command.action) == Some(Verb::Relation) && command.applied != 0
+            })
             .count() as i64
     }
 
@@ -14559,9 +16473,72 @@ impl World {
     }
 
     fn controller_take_projects(&mut self, faction: FactionId) -> bool {
-        let projects: Vec<Project> = self.plan.projects_of(faction).to_vec();
-        if projects.is_empty() {
+        // **The rule lives in the partition, and this verb reads it.** The
+        // legality answer reads the same partition.[^lg]
+        //
+        // [^lg]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+        let Some((standing, walking)) = self.project_partition(faction) else {
             return false;
+        };
+        let mut applied = false;
+        if !walking.is_empty() {
+            let plane = faction.0;
+            if plane < self.destinations.plane_count() {
+                // The seeds are the projects the units took. The send verb
+                // sorts and deduplicates the set itself, so the order of this
+                // list decides nothing.
+                let seeds: Vec<Axial> = walking
+                    .iter()
+                    .filter_map(|(_, project)| self.grid.address_of(project.tile))
+                    .collect();
+                let set: Vec<Entity> = walking.iter().map(|(unit, _)| *unit).collect();
+                applied |= self.send_units_to(&set, &seeds, plane).is_ok();
+            }
+        }
+        // The build order names the category of the project the unit stands
+        // on. The units are grouped by category, in category order, so each
+        // call is the set form the boundary already exposes.
+        for category in UpgradeCategory::ALL {
+            let group: Vec<Entity> = standing
+                .iter()
+                .filter(|(_, held)| *held == category)
+                .map(|(unit, _)| *unit)
+                .collect();
+            if group.is_empty() {
+                continue;
+            }
+            let refused = self.order_build_set(&group, category);
+            // The plan counts a project refusal beside the one the build
+            // verb counts. The two counts were here before the check moved
+            // out of the build verb, and this call keeps them.
+            for _ in 0..refused {
+                self.plan.count_refusal();
+            }
+            applied |= refused < group.len();
+        }
+        applied
+    }
+
+    /// Splits the units of one faction into the ones that stand on a project
+    /// and the ones that would walk to one.
+    ///
+    /// **This is the one statement of the rule.** The project verb calls it
+    /// before it moves a unit, and the legality answer calls it to fill one
+    /// row of the action table.[^1] Nothing here mutates.
+    ///
+    /// Returns `None` when the faction has no project, when a campaign holds
+    /// the destination plane, or when the carriers hold it.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    #[allow(clippy::type_complexity)]
+    fn project_partition(
+        &self,
+        faction: FactionId,
+    ) -> Option<(Vec<(Entity, UpgradeCategory)>, Vec<(Entity, Project)>)> {
+        if self.plan.projects_of(faction).is_empty() {
+            return None;
         }
         if self.campaigns.live(faction).is_some()
             || self
@@ -14570,7 +16547,7 @@ impl World {
                 .iter()
                 .any(|entry| entry.faction == faction)
         {
-            return false;
+            return None;
         }
         let mut units: Vec<Entity> = self.soldiers.iter_faction(faction).collect();
         units.sort_unstable_by_key(|unit| unit.to_bits());
@@ -14615,40 +16592,7 @@ impl World {
                 walking.push((unit, project));
             }
         }
-        let mut applied = false;
-        if !walking.is_empty() {
-            let plane = faction.0;
-            if plane < self.destinations.plane_count() {
-                // The seeds are the projects the units took. The send verb
-                // sorts and deduplicates the set itself, so the order of this
-                // list decides nothing.
-                let seeds: Vec<Axial> = walking
-                    .iter()
-                    .filter_map(|(_, project)| self.grid.address_of(project.tile))
-                    .collect();
-                let set: Vec<Entity> = walking.iter().map(|(unit, _)| *unit).collect();
-                applied |= self.send_units_to(&set, &seeds, plane).is_ok();
-            }
-        }
-        // The build order names the category of the project the unit stands
-        // on. The units are grouped by category, in category order, so each
-        // call is the set form the boundary already exposes.
-        for category in UpgradeCategory::ALL {
-            let group: Vec<Entity> = standing
-                .iter()
-                .filter(|(_, held)| *held == category)
-                .map(|(unit, _)| *unit)
-                .collect();
-            if group.is_empty() {
-                continue;
-            }
-            let refused = self.order_build_set(&group, category);
-            for _ in 0..refused {
-                self.plan.count_refusal();
-            }
-            applied |= refused < group.len();
-        }
-        applied
+        Some((standing, walking))
     }
 
     fn controller_carriers(&mut self, faction: FactionId) -> bool {
@@ -14950,6 +16894,7 @@ impl World {
                 sets[index].push(entity);
             }
         }
+        let schema = self.action_schema();
         for (faction, sequence, choice) in plan {
             let set = std::mem::take(&mut sets[usize::from(faction.0)]);
             let applied = match choice {
@@ -15015,15 +16960,19 @@ impl World {
             };
             let applied = u8::from(applied);
             sets[usize::from(faction.0)] = set;
-            let (kind, argument) = choice.numbers();
+            // **The row carries the whole action.** A controller choice and
+            // a learner action reach one column in one encoding, so no
+            // field of either lives in a second log.[^14]
+            //
+            // [^14]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+            let action = choice.action(&schema).unwrap_or(0);
             self.controller.push(ControllerCommand {
                 tick,
-                faction,
-                kind,
-                argument,
+                action,
                 sequence,
+                faction,
                 applied,
-                padding: [0; 7],
+                padding: [0; 5],
             });
         }
     }
@@ -15210,6 +17159,23 @@ impl World {
         (0..self.config.faction_count.max(1)).map(FactionId)
     }
 
+    /// The factions that may still win, in ascending identifier order.
+    ///
+    /// **A faction that has left the game wins nothing.** This is the one
+    /// statement of that rule, and every game end reader walks this list
+    /// rather than the faction list. A reader that walked the factions would
+    /// let a faction with nothing alive take the world on held ground it can
+    /// no longer defend.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0181, a faction that holds no site and no unit leaves the game, decision D5. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
+    /// [^2]: Findings register, FND-579. `docs/FINDINGS.md`
+    fn contenders(&self) -> impl Iterator<Item = FactionId> + '_ {
+        self.factions()
+            .filter(move |faction| !self.is_eliminated(*faction))
+    }
+
     /// Returns the faction that holds the seat of a faction, or `None` when
     /// the faction has no seat or nobody holds it.
     fn seat_holder(&self, faction: FactionId) -> Option<FactionId> {
@@ -15247,11 +17213,16 @@ impl World {
             return None;
         }
         let population = self.soldiers.population_by_faction();
-        self.factions().find(|candidate| {
+        self.contenders().find(|candidate| {
             let mut rival_seats = 0u32;
             let mut holds_every_seat = true;
             let mut every_rival_is_empty = true;
             for other in self.factions() {
+                // A faction that has left the game is no rival. Its seat is
+                // not a seat to hold and its population is already zero.
+                if other != *candidate && self.is_eliminated(other) {
+                    continue;
+                }
                 if self
                     .controller
                     .row(other)
@@ -15284,9 +17255,10 @@ impl World {
             return None;
         }
         let held = self
-            .factions()
-            .map(|faction| (faction, self.holding.holding_of(faction)));
-        controller::territory_winner(held)
+            .contenders()
+            .map(|faction| (faction, self.holding.holding_of(faction)))
+            .collect::<Vec<_>>();
+        controller::territory_winner(held.into_iter())
     }
 
     /// Returns the seats a faction holds: the seat tiles, its own and every
@@ -15412,7 +17384,7 @@ impl World {
     /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     fn wonder_winner(&self) -> Option<FactionId> {
         let claims = self.victory_claims();
-        self.factions()
+        self.contenders()
             .find(|faction| claims[usize::from(faction.0)].0 > 0)
     }
 
@@ -15453,7 +17425,7 @@ impl World {
     /// [^2]: Balance register, the renown target. `docs/reference/balance.md`
     fn renown_winner(&self) -> Option<FactionId> {
         let best = self.best_renown();
-        self.factions()
+        self.contenders()
             .find(|faction| best[usize::from(faction.0)] >= i64::from(self.balance.renown_target()))
     }
 
@@ -15692,6 +17664,467 @@ pub struct Standing {
     ///
     /// [^1]: ADR-0173, the wealth or wonder path has no reader, decision D1. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
     pub wonder_progress: i64,
+}
+
+/// The action table, the legality answer, and the verb that takes one
+/// action integer.
+///
+/// # One integer, one action
+///
+/// A learner plays one faction, and it acts by one integer that indexes a
+/// bounded table the engine declares.[^1] The schema of that table is a
+/// mixed radix over the argument positions each verb declares, and the
+/// action module holds it.[^2] This block joins the table to the verbs.
+///
+/// # The answer and the verb read one rule
+///
+/// The engine answers one byte for each row of the table, and the byte says
+/// whether the verb would refuse that row at this tick.[^3] **The answer
+/// restates no refusal rule.** Each verb of the enumeration carries a check
+/// that reports its refusal without acting, and the verb itself calls that
+/// check before it changes anything. The answer calls the same check.
+///
+/// **The verb that takes an action does not read the answer first.** It
+/// runs the verb and reports what the verb did. A row the answer allows and
+/// the verb then refuses is therefore a defect a test can find, rather than
+/// a disagreement the engine hides from itself.[^3]
+///
+/// # The answer names no target the faction cannot see
+///
+/// Two verbs act on a place: a campaign marches at an objective, and a
+/// crossing sends at a tile. The engine resolves both, so neither carries an
+/// argument position.[^2] **The engine resolves both through the readers
+/// that answer for one faction.** A campaign objective is a settlement the
+/// faction has observed, and a crossing target is a place the faction has
+/// observed. A learner therefore cannot learn from a legality byte that a
+/// settlement it has never seen stands somewhere.[^4]
+///
+/// # Determinism
+///
+/// The answer walks the rows in ascending action order on the calling
+/// thread. Every candidate list it resolves is already sorted by a stable
+/// key. Nothing here draws, reads a thread, or reads a completion
+/// order.[^5]
+///
+/// # References
+///
+/// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D4. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+/// [^2]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decisions D1 and D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+/// [^3]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+/// [^4]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
+/// [^5]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+impl World {
+    /// Returns the declared layout of the action table of this world.
+    ///
+    /// The schema names each verb, the argument positions it declares, the
+    /// bound of each position, and the stride that position moves the action
+    /// integer by. A caller decodes an integer by arithmetic over this
+    /// schema, and never by a table it holds.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D1. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+    #[must_use]
+    pub fn action_schema(&self) -> ActionSchema {
+        ActionSchema::of(ActionShape {
+            faction_count: u32::from(self.config.faction_count.max(1)),
+        })
+    }
+
+    /// Returns one byte for each row of the action table of this world.
+    ///
+    /// The byte is one when the verb would take that row at this tick, and
+    /// zero when it would refuse it. Row zero is the no-op, and it is always
+    /// one, so the answer is never empty.[^1]
+    ///
+    /// The answer holds only what the faction observes. **No argument
+    /// widens it.**[^2]
+    ///
+    /// Returns `None` when the number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D3. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    #[must_use]
+    pub fn legal_actions(&self, faction: FactionId) -> Option<Vec<u8>> {
+        if faction.0 >= self.config.faction_count.max(1) {
+            return None;
+        }
+        let schema = self.action_schema();
+        let mut answer = vec![0u8; schema.length() as usize];
+        // A verb is asked once whether it could act at all, and then once
+        // for each row it holds. A verb with no argument position therefore
+        // costs one question.
+        for row in schema.rows() {
+            let allowed = self.verb_is_legal(faction, row.verb);
+            for offset in 0..row.rows {
+                let action = row.first + offset;
+                let Some((_, arguments)) = schema.decode(action) else {
+                    continue;
+                };
+                let legal = allowed && self.arguments_are_legal(faction, row.verb, &arguments);
+                answer[action as usize] = u8::from(legal);
+            }
+        }
+        Some(answer)
+    }
+
+    /// Applies one action of one faction, through the same verbs a caller
+    /// and the built-in controller use.[^1]
+    ///
+    /// Returns whether the verb took the action. **This runs the verb and
+    /// reports what the verb did.** It does not read the legality answer
+    /// first, so a disagreement between the two is a defect a test can
+    /// find.[^2]
+    ///
+    /// The engine writes one row of the command log for the action, whether
+    /// the verb took it or refused it.[^3]
+    ///
+    /// Returns `false` when the number names no faction, and when the
+    /// integer is at or above the length of the table.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^2]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^3]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    pub fn act(&mut self, faction: FactionId, action: u32) -> bool {
+        if faction.0 >= self.config.faction_count.max(1) {
+            return false;
+        }
+        let schema = self.action_schema();
+        let Some((verb, arguments)) = schema.decode(action) else {
+            return false;
+        };
+        let applied = self.apply_verb(faction, verb, &arguments);
+        let tick = self.tick;
+        self.controller.push(ControllerCommand {
+            tick,
+            faction,
+            action,
+            sequence: 0,
+            applied: u8::from(applied),
+            padding: [0; 5],
+        });
+        applied
+    }
+
+    /// Reports whether one verb could act at all for one faction this tick,
+    /// without reading its arguments.
+    ///
+    /// The verbs that declare no argument position answer here alone.
+    fn verb_is_legal(&self, faction: FactionId, verb: Verb) -> bool {
+        match verb {
+            // The no-op changes nothing, so nothing can refuse it.
+            Verb::NoOp => true,
+            // A gather order and a build order reach the units of the
+            // faction. The order verb refuses a unit that is not live, and
+            // the set below holds live units only.
+            Verb::Gather | Verb::Build => !self.faction_units(faction).is_empty(),
+            Verb::Relation => self.speaker_of(faction).is_some(),
+            Verb::Campaign => self
+                .observed_campaign_objective(faction)
+                .and_then(|tile| self.grid.address_of(tile))
+                .is_some_and(|address| {
+                    self.campaign_cohort(faction, address, self.campaigns.cohort_size())
+                        .is_ok()
+                }),
+            Verb::Advertise => self.check_faction(faction).is_ok(),
+            Verb::Trade => self.trade_step_is_due(faction),
+            Verb::Carry => self.controller_carry_work(faction),
+            Verb::Project => self.project_work(faction),
+            Verb::Queue => self.controller_queue_site(faction).is_some(),
+            Verb::Cross => self.observed_crossing_target(faction).is_some(),
+            Verb::Settle => self.settle_work(faction),
+        }
+    }
+
+    /// Reports whether one verb would take the arguments of one row.
+    ///
+    /// A verb with no argument position answers yes here, because the check
+    /// above already read its whole refusal.
+    fn arguments_are_legal(&self, faction: FactionId, verb: Verb, arguments: &[u32]) -> bool {
+        let first = arguments.first().copied().unwrap_or(u32::MAX);
+        match verb {
+            Verb::Gather => u8::try_from(first)
+                .ok()
+                .and_then(ResourceKind::from_u8)
+                .is_some(),
+            Verb::Build => {
+                let Some(category) = u8::try_from(first).ok().and_then(UpgradeCategory::from_u8)
+                else {
+                    return false;
+                };
+                self.faction_units(faction)
+                    .iter()
+                    .any(|unit| self.build_refusal(*unit, category).is_ok())
+            }
+            Verb::Relation => {
+                let (Some(speaker), Ok(other)) = (self.speaker_of(faction), u16::try_from(first))
+                else {
+                    return false;
+                };
+                self.move_relation_refusal(speaker, FactionId(other), controller::RELATION_STEP)
+                    .is_ok()
+            }
+            // The queue verb refuses a type the table does not hold. The
+            // site with room is already read above.
+            Verb::Queue => u8::try_from(first)
+                .ok()
+                .and_then(UnitTypeId::from_u8)
+                .is_some(),
+            Verb::NoOp
+            | Verb::Campaign
+            | Verb::Advertise
+            | Verb::Trade
+            | Verb::Carry
+            | Verb::Project
+            | Verb::Cross
+            | Verb::Settle => true,
+        }
+    }
+
+    /// Runs one verb of the action table for one faction.
+    ///
+    /// Every arm goes through the verb the built-in controller goes
+    /// through, so a learner reaches no store the controller cannot
+    /// reach.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    fn apply_verb(&mut self, faction: FactionId, verb: Verb, arguments: &[u32]) -> bool {
+        let first = arguments.first().copied().unwrap_or(0);
+        match verb {
+            Verb::NoOp => true,
+            Verb::Gather => {
+                let Some(kind) = u8::try_from(first).ok().and_then(ResourceKind::from_u8) else {
+                    return false;
+                };
+                let set = self.faction_units(faction);
+                !set.is_empty() && self.order_gather_set(&set, kind) < set.len()
+            }
+            Verb::Build => {
+                let Some(category) = u8::try_from(first).ok().and_then(UpgradeCategory::from_u8)
+                else {
+                    return false;
+                };
+                let set = self.faction_units(faction);
+                !set.is_empty() && self.order_build_set(&set, category) < set.len()
+            }
+            Verb::Relation => {
+                let (Some(speaker), Ok(other)) = (self.speaker_of(faction), u16::try_from(first))
+                else {
+                    return false;
+                };
+                self.move_relation(speaker, FactionId(other), controller::RELATION_STEP)
+                    .is_ok()
+            }
+            Verb::Campaign => {
+                let cohort = self.campaigns.cohort_size();
+                let Some(address) = self
+                    .observed_campaign_objective(faction)
+                    .and_then(|tile| self.grid.address_of(tile))
+                else {
+                    return false;
+                };
+                self.raise_campaign(faction, address, cohort).is_ok()
+            }
+            // The learner writes its board from the same site economies the
+            // controller writes from. The draw index is zero, because a
+            // learner emits one action for one faction on one tick.
+            Verb::Advertise => self.controller_write_board(faction, 0),
+            Verb::Trade => self.controller_trade_step(faction),
+            Verb::Carry => self.controller_carriers(faction),
+            Verb::Project => self.controller_take_projects(faction),
+            Verb::Queue => {
+                let (Some(unit_type), Some(site)) = (
+                    u8::try_from(first).ok().and_then(UnitTypeId::from_u8),
+                    self.controller_queue_site(faction),
+                ) else {
+                    return false;
+                };
+                self.order_site_queue(faction, site, QueueOrder::Push(unit_type))
+                    .is_ok()
+            }
+            Verb::Cross => {
+                let Some(tile) = self.observed_crossing_target(faction) else {
+                    return false;
+                };
+                self.controller_cross(faction, tile)
+            }
+            Verb::Settle => self.controller_settle(faction),
+        }
+    }
+
+    /// Returns the live units of one faction, in identity order.
+    ///
+    /// The arena yields live identities only, so every unit of the answer
+    /// passes the liveness test that the order verbs apply.
+    fn faction_units(&self, faction: FactionId) -> Vec<Entity> {
+        let mut units: Vec<Entity> = self.soldiers.iter_faction(faction).collect();
+        units.sort_unstable_by_key(|unit| unit.to_bits());
+        units
+    }
+
+    /// Returns the unit of one faction that carries command reach, by the
+    /// lowest identity.
+    ///
+    /// The relation verb reads the command reach column, and a faction with
+    /// no such unit moves no relation.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    fn speaker_of(&self, faction: FactionId) -> Option<Entity> {
+        self.faction_units(faction).into_iter().find(|unit| {
+            self.soldiers
+                .unit_type(*unit)
+                .is_some_and(|unit_type| self.unit_types.row(unit_type).command_reach > 0)
+        })
+    }
+
+    /// Returns the objective that one faction would march on, over the
+    /// settlements it has observed.
+    ///
+    /// **This reads the tiles the faction has seen, and never the world.**
+    /// The controller reads the whole world for its own factions, and a
+    /// learner may not, because a legality byte that answered from the whole
+    /// world would tell the learner that a settlement stands somewhere it
+    /// has never looked.[^1]
+    ///
+    /// The rule is the controller's own: a relief comes before a take, and
+    /// the nearest site wins with a tie to the lowest slot.
+    ///
+    /// # References
+    ///
+    /// [^1]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
+    fn observed_campaign_objective(&self, faction: FactionId) -> Option<TileIdx> {
+        let count = self.config.faction_count.max(1);
+        let seat = self.grid.address_of(self.seat(faction)?)?;
+        if self.campaigns.live(faction).is_some() {
+            return None;
+        }
+        let at_war =
+            |other: FactionId| other != faction && self.relations.war_between(faction, other);
+        if !(0..count).any(|other| at_war(FactionId(other))) {
+            return None;
+        }
+        let observed = |tile: TileIdx| {
+            self.grid
+                .address_of(tile)
+                .and_then(|address| self.grid.index_of(address))
+                .is_some_and(|index| self.observation.has_seen(faction, index))
+        };
+        let sites: Vec<(u32, FactionId, TileIdx)> = self
+            .settlements
+            .iter()
+            .filter_map(|site| {
+                Some((
+                    self.settlements.slot_of(site)?,
+                    self.settlements.faction(site)?,
+                    self.settlements.tile(site)?,
+                ))
+            })
+            .filter(|(_, _, tile)| observed(*tile))
+            .collect();
+        let distance = |tile: TileIdx| {
+            self.grid
+                .address_of(tile)
+                .map_or(u32::MAX, |address| seat.distance(address))
+        };
+        let holder_at_war = |tile: TileIdx| {
+            self.grid
+                .address_of(tile)
+                .and_then(|address| self.holding.holder(address))
+                .and_then(Holder::faction)
+                .is_some_and(at_war)
+        };
+        let relief = campaign::nearest_site(
+            sites
+                .iter()
+                .filter(|(_, owner, tile)| *owner == faction && holder_at_war(*tile))
+                .map(|(slot, _, tile)| (distance(*tile), *slot, *tile)),
+        );
+        if relief.is_some() {
+            return relief;
+        }
+        campaign::nearest_site(
+            sites
+                .iter()
+                .filter(|(_, owner, _)| at_war(*owner))
+                .map(|(slot, _, tile)| (distance(*tile), *slot, *tile)),
+        )
+    }
+
+    /// Returns the tile one faction would send its water-crossing units at,
+    /// when the faction has observed that tile.
+    ///
+    /// **The engine surveys the target, and a learner may only reach one it
+    /// has seen.** The survey itself is the controller's, so the rule has
+    /// one statement. This reader drops a target the faction has never
+    /// observed, so a legality byte states nothing about unseen ground.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
+    fn observed_crossing_target(&self, faction: FactionId) -> Option<TileIdx> {
+        let tile = self.controller_crossing_target(faction)?;
+        let index = self.grid.index_of(self.grid.address_of(tile)?)?;
+        if self.observation.has_seen(faction, index) {
+            Some(tile)
+        } else {
+            None
+        }
+    }
+
+    /// Reports whether one faction has a negotiation step to take this tick.
+    ///
+    /// The two readers below are the controller's own, and the step verb
+    /// takes one branch or the other from them. A faction that neither
+    /// reader names takes no step.
+    fn trade_step_is_due(&self, faction: FactionId) -> bool {
+        self.controller_answer_due(faction).is_some()
+            || self.controller_match_due(faction).is_some()
+    }
+
+    /// Reports whether one faction has project work this tick.
+    ///
+    /// The plan holds the projects, and the plane the send needs is busy
+    /// while a campaign runs or while the carriers hold it. Those are the
+    /// three gates the project verb reads before it moves a unit.
+    fn project_work(&self, faction: FactionId) -> bool {
+        let Some((standing, walking)) = self.project_partition(faction) else {
+            return false;
+        };
+        if !walking.is_empty() && faction.0 < self.destinations.plane_count() {
+            return true;
+        }
+        standing
+            .iter()
+            .any(|(unit, category)| self.build_refusal(*unit, *category).is_ok())
+    }
+
+    /// Reports whether one faction would found a city or walk a settler this
+    /// tick.
+    ///
+    /// The settle verb founds from the settlers that stand on ground a city
+    /// may take, and it walks the rest at the place the survey names. A
+    /// faction with no settler does neither.
+    fn settle_work(&self, faction: FactionId) -> bool {
+        let settlers = self.settlers_of(faction);
+        if settlers.is_empty() {
+            return false;
+        }
+        if settlers
+            .iter()
+            .any(|unit| self.settle_refusal(*unit).is_ok())
+        {
+            return true;
+        }
+        self.settling_plane_of(faction).is_some() && self.settling_target(faction).is_some()
+    }
 }
 
 #[cfg(test)]

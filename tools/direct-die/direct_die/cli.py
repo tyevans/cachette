@@ -5,8 +5,9 @@ from __future__ import annotations
 import argparse
 import sys
 
+from . import analyse as analyse_module
 from . import guide as guide_module
-from . import loop, render, session
+from . import loop, render, session, setrun, subjects
 from .client import BASE_URL, MODEL, ClientError
 
 
@@ -44,6 +45,60 @@ def _run(arguments: argparse.Namespace) -> int:
             f"{result.seconds:<8.1f} "
             f"{result.prompt_tokens + result.completion_tokens}"
         )
+    return 0
+
+
+def _set(arguments: argparse.Namespace) -> int:
+    """Run the whole asset set for one style, and print a summary table."""
+    names = None
+    if arguments.subjects:
+        names = [item.strip() for item in arguments.subjects.split(",") if item.strip()]
+    try:
+        results = setrun.run_set(
+            style=arguments.style,
+            rounds=arguments.rounds,
+            variants=arguments.variants,
+            names=names,
+            exemplar_limit=arguments.exemplars,
+        )
+    except guide_module.GuideError as error:
+        print(f"guide error: {error}", file=sys.stderr)
+        return 2
+    except KeyError as error:
+        print(f"subject error: {error}", file=sys.stderr)
+        return 2
+
+    print()
+    print(setrun.format_table(arguments.style, results))
+    return 0 if any(item.best_score is not None for item in results) else 3
+
+
+def _analyse(arguments: argparse.Namespace) -> int:
+    """Analyse one round, and print what the model said."""
+    try:
+        found = analyse_module.run(
+            arguments.asset,
+            arguments.session,
+            arguments.round,
+        )
+    except guide_module.GuideError as error:
+        print(f"guide error: {error}", file=sys.stderr)
+        return 2
+    except ClientError as error:
+        print(f"endpoint error: {error}", file=sys.stderr)
+        return 3
+    except analyse_module.AnalysisError as error:
+        print(f"analysis error: {error}", file=sys.stderr)
+        return 4
+
+    print()
+    print(found["preference"])
+    order = found.get("order") or []
+    if order:
+        print("order: " + " > ".join(order))
+    edit = found.get("guide_edit")
+    if edit:
+        print(f"proposed rule ({edit['section']}): {edit['rule']}")
     return 0
 
 
@@ -127,6 +182,43 @@ def main(argv: list[str] | None = None) -> int:
         help="how many exemplar images to attach to a critique",
     )
     run.set_defaults(handler=_run)
+
+    run_set = commands.add_parser(
+        "set", help="run the whole asset set for one style"
+    )
+    run_set.add_argument(
+        "--style",
+        required=True,
+        help="the style, which is also the asset type, for example 'cartoon'",
+    )
+    run_set.add_argument("--rounds", type=int, default=2, help="how many rounds")
+    run_set.add_argument(
+        "--variants", type=int, default=4, choices=[1, 2, 3, 4],
+        help="how many variants in each round",
+    )
+    run_set.add_argument(
+        "--subjects",
+        default=None,
+        help=(
+            "a comma separated subject list. The default is the whole set: "
+            + ", ".join(subjects.SUBJECT_ORDER)
+        ),
+    )
+    run_set.add_argument(
+        "--exemplars",
+        type=int,
+        default=guide_module.DEFAULT_EXEMPLAR_LIMIT,
+        help="how many exemplar images to attach to a critique",
+    )
+    run_set.set_defaults(handler=_set)
+
+    analysis = commands.add_parser(
+        "analyse", help="say what the liked drawings of a round share"
+    )
+    analysis.add_argument("--asset", default="hex-tile", help="the asset type")
+    analysis.add_argument("--session", required=True, help="the session identifier")
+    analysis.add_argument("--round", type=int, required=True, help="the round index")
+    analysis.set_defaults(handler=_analyse)
 
     commands.add_parser("guide", help="report what the guide holds").set_defaults(
         handler=_guide

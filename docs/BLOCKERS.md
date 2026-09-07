@@ -25,11 +25,166 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-153**
+**Next number: BLK-157**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
 ## Open
+
+### BLK-156 — How much is the terrain height range worth in metres?
+
+**Resolved on 6 September 2026. The range is 0 to 1500 metres**, revised from 4000 metres on 7 September against a measurement of where this terrain puts its land.
+
+The project owner chose the figure directly, and the scale constants table holds
+it beside the tile edge.[^SCALE] **A world states the range, in the way a world
+states its latitude span**, so a world that wants a different vertical scale
+changes a value rather than the physics.
+
+At the published environmental lapse rate the range gives a spread of about ten
+degrees from the lowest ground to the highest.[^BLK156B] **No ground reaches a
+permanent snow line at any latitude**, and that is a cost the owner accepted
+rather than a defect.
+
+**The first figure was 4000 metres and it was chosen against no measurement.** A
+probe then found the land of this world standing at 41 to 69 percent of its own
+range, so 4000 metres put the mean land near 2000 metres against a published
+mean near 800 for the Earth. The lapse rate then took 11 to 18 degrees off every
+land cell.[^BLK156D]
+
+**The zero of the term is no longer sea level, and the row below says it is.**
+The ground term now reads a cell against the mean land height of the world,
+because the balance constants already average over the land of a planet. Read
+the paragraphs below as the statement of the question, and not as the current
+statement of the term.[^BLK156E]
+
+**This weakens the objection to the larger range.** The objection was that 4000
+metres puts the mean land of this world near 2000 metres, so the lapse rate
+takes 11 to 18 degrees off every land cell. An anomaly subtracts that mean, so
+the range now sets how far cells stand apart and not how cold the world is. The
+figure stays at 1500 metres, and a change to it is a measurement the owner calls
+for rather than a consequence of this one.
+
+**What the row held.** The question below is the one the answer settles.
+
+**Owner:** the project owner. **Blocks:** ADR-0182, and every weather term that
+wants to read an elevation.
+
+**The height of a tile is a fraction and not a distance.** The terrain declares
+the height of a tile as a unit fraction, and it declares the mark below which a
+tile holds water as another fraction. Nothing anywhere states what the range
+between the two ends is worth in metres. The scale register fixes the tile edge
+at 80 metres and states no vertical scale at all.[^SCALE]
+
+**This blocks a published term.** Air cools as it rises, at a rate the research
+report states in degrees for each kilometre.[^BLK156B] A term that reads an
+elevation therefore needs metres, and there are none. The heat that a cell takes
+from its ground is instead a count on an abstract scale, chosen so that the sum
+of the driver fits the heat scale.
+
+**That was harmless while the driver was relative, and it is not harmless now.**
+A record states that the temperature a cell is driven toward is a published
+energy balance in degrees.[^BLK156C] Under that record the sun term carries the
+level, so the ground term must be a signed perturbation about it. **A term with
+no unit has no zero**, so nothing says which ground receives the balance
+temperature and which stands above or below it.
+
+Two attempts measured the cost. A ground term added whole to the balance lifts
+the poles about 8 degrees above it, and the polar band then grades desert rather
+than ice. A ground term centred on the middle of its own range cools the whole
+world by about 16 degrees, because the range midpoint is not where the ground of
+a world actually sits. **Neither is a defect in the energy balance. Both are the
+same missing unit.**
+
+**What would close this.** One statement of what the terrain height range is
+worth in metres. The lapse rate then converts it, the ground term becomes a
+signed number of degrees, and the zero of that term is sea level rather than a
+choice.
+
+**What the project does meanwhile.** The energy balance record stays a draft
+that nothing implements. The driver keeps the base that is derived from the heat
+scale rather than from the balance, and the belt keeps the profile of the
+radiation with no transport in it.
+
+### BLK-155 — The subtropics receive one percent of the rain the equator receives
+
+**Owner:** the project owner. **Blocks:** every climate class that a dry test
+decides, and the temperate band in particular.
+
+**The subtropics are too dry, and the first measurement of how much was
+wrong.** The figure this row first carried was one percent, and it came from
+the Köppen probe, which grades only the cells that hold more land than water.
+**The equatorial band of this world is 93 percent open water**, so its handful
+of land cells sit inside an ocean and read as saturated, while the subtropical
+land sits in larger blocks. The comparison was between two unlike samples.
+
+**The corrected measurement.** Over the demonstration world, at an extent of
+128, at seed `0x2f`, at the tile pitch, settled 400 ticks, read at one tick on
+6 September 2026 on one development machine (x86-64). Over the cells that hold
+more land than water: the band at 7 degrees north holds 73,323 drops on the
+ground and the band at 37 degrees north holds 3,208. **The ratio is about 23
+to 1, and not 100 to 1.** The vapour those two bands carry differs by only 2.2
+to 1, so the amplification happens after the transport and not in it.
+
+**Where the amplification happens.** The fall share rises with how full the
+air is. The equatorial band stands at 94 percent of its capacity and the
+subtropical band at 47 percent, so the wetter band both holds more water and
+sheds a larger share of it. The imposed pressure high at thirty degrees then
+drives the wind outward from the subtropics, which carries water away from a
+band that is already shedding less.
+
+**Both of those are the right physics with the wrong size.** The subtropical
+high is why the deserts of the Earth sit near thirty degrees, and a full sky
+does rain more than a clear one.[^BLK155A] The published ratio between
+equatorial and subtropical rain over land is nearer 4 to 10 than 23. **So this
+row records an exaggeration of about two to five times, and not a collapse.**
+
+**This caps a climate that no other change can reach.** The Köppen aridity
+test runs before every temperature test, so an arid cell never reaches the
+temperate test whatever its temperature does. At thirty-seven degrees, which
+is where the published classification puts the temperate climates, 61 percent
+of the land grades arid. **So the temperate band cannot pass about 39 percent
+of that latitude while this stands.** A separate measurement found that
+correcting the season alone reaches 36 percent of that band, which is most of
+the headroom the aridity test leaves. **The two defects are therefore less
+coupled than they look**: the temperature reaches the ceiling that the
+moisture sets, and raising that ceiling is a second and independent gain.[^BLK155B]
+
+**What would close this.** A measurement of what the transport carries out of
+the equatorial band, and a statement of how much of the rain of a world the
+wettest band may hold. The evaporation, the transport share and the rain-out
+share each reach this, and no measurement says which one carries it.
+
+**What the project does meanwhile.** The temperate band stays short of its
+published share, and the desert band stays above it. A change to the season or
+to the temperature profile moves the cells that are not already arid, and it
+leaves this untouched.
+
+### BLK-153 — Nobody has said whether a unit sent to a project may feed itself on the way
+
+**Owner:** the project owner. **Blocks:** the throughput of the economy. It
+does not block any named item.
+
+A destination wins over the option a unit scored for itself. A unit that a
+caller sent somewhere reads its destination plane, and it reads no field that
+its own option would have read. That rule is correct for a caller who said
+where a unit goes.
+
+The faction controller sends the idle units of a faction to the projects its
+plan zones, through the same verb.[^BLK153A] Measured in the demonstration
+world, 256 by 256, four factions, seed 0x0123456789abcdef, 300 ticks, on
+ty001-ubuntu (x86-64): 131 of 174 live units hold a destination at tick 300.
+Those units hold a gather order every tick, and they never read the field that
+would carry them to the ground that holds it.[^BLK153B]
+
+The question is what a sent unit does when it is also told to gather. Three
+answers are open. It ignores the order until it arrives. It gathers from the
+tile it stands on and never steps aside for stock. It steers to stock while it
+is more than some distance from its destination.
+
+The third answer needs a distance, and the register that holds a distance is
+the balance register. The first two need no figure. Nothing should invent one
+of the three, because the answer decides how much of the population the
+economy ever reaches.
 
 ### BLK-122 — Nobody has said what belief costs a god
 
@@ -136,42 +291,6 @@ may still write the column and read it back, and a game built on this engine may
 make its own rule from it. What is still missing is everything the row asks
 beyond a source: what lowers renown, and whether it falls on its own. Nothing
 lowers it today.
-### BLK-152 — Nobody has said where the heat base of the world should stand
-
-**Owner:** the project owner. **Blocks:** the mean temperature of every world,
-and therefore every climate class the map holds.
-
-**The field now declares a temperature scale, and it reads cold against it.**
-The weather holds an abstract warmth count for each cell, and every published
-curve needs a temperature, so the field declares one linear map from the count
-to degrees Celsius.[^BLK152A] Nothing could read that map before, so nothing
-could notice where the field stood.
-
-Four terms drive the warmth of a cell: the mean height, the open water share,
-the sun and the cloud. A base stands under them, and the four were balanced so
-that they reach the bottom of the scale together and the top of it
-together.[^BLK152B]
-
-**The sun term can no longer reach the swing it reserves.** Its two parts are
-the belt of a latitude and the season around that belt, and the published
-geometry never peaks both at one place at one moment. The belt peaks at the
-equator, where the season is near nothing, and the season peaks at the middle
-latitudes, where the belt is near nothing.[^BLK152C] So the top of the scale is
-out of reach, and a probe over a whole planet grades most of its land as ice
-cap. The commit body holds the readings and the command that produced them.
-
-**What would close this.** A statement of what the mean temperature of a world
-should be, or of which class shares a map should hold. Two levers reach it: the
-base under the four terms, and the divisor that holds the ground term down. A
-third lever is the amount that a full sky takes away, which is larger here than
-the published radiative effect of cloud.
-
-**What the project does meanwhile.** The engine holds the base and the divisor
-as named constants beside the rule that reads each one, and the two build
-checks that bound them still fail the build when they disagree. The record rule
-forbids inventing a value that an unanswered question governs, so no record
-states either.[^BLK110C]
-
 ### BLK-130 — Nobody has said what weather should be worth
 
 **Owner:** the project owner. **Blocks:** every quantity that the weather
@@ -363,35 +482,6 @@ and it is prose that no test can hold, so it decays the moment this row closes.
 whether the project publishes to a public index. A search of the tree for this
 row number then repairs every place that states the install path.
 
-### BLK-036 — Does an upgrade change hands when the ground does?
-
-**Owner:** the project owner. **Blocks:** any rule that ties an existing
-upgrade to the faction that holds the tile under it.
-
-The engine stores an upgrade on a tile and asks nothing about who holds the
-tile.[^BLK34A] A holder column names who holds each tile, and that value moves
-as units move.[^BLK34B] Nothing says what happens to an upgrade on a tile whose
-holder changes.
-
-**This row is the part of BLK-034 that stayed open when the rest of it
-resolved.** It was split out on 3 September 2026, because a row that is mostly
-answered reads as open and stops work that should proceed.
-
-**The three answered questions do not answer this one.** A faction builds only
-on ground it holds. Anyone may destroy an upgrade. Destruction takes work, and
-a faction-level removal is instant. Every one of those is an act that somebody
-invokes. This question asks what happens when nobody invokes anything and the
-ground changes hands.
-
-**Two shapes the answer could take.** The upgrade goes to the new holder, or
-the upgrade stays with the faction that built it. A third shape is that the
-upgrade is destroyed. Each reaches the state hash, so the engine cannot hold
-two of them.
-
-Work continues without the answer. The engine states the storage and the
-arithmetic, and neither depends on a faction. A rule invented here would be a
-content decision made by the wrong person.
-
 ### BLK-050 — The rules of the downstream game are not written down
 
 **Owner:** the project owner. **Blocks:** the meaning of every verb the
@@ -525,6 +615,70 @@ a different game from one in which they do not, and both are playable.
 
 
 ## Resolved
+
+### BLK-152 — Nobody has said where the heat base of the world should stand
+
+**Resolved on 6 September 2026. The base did not move. The two terms above it
+are now derived, and each is derived from what it can reach.**
+
+The weather holds an abstract warmth count for each cell, and the field declares
+one linear map from that count to degrees Celsius. Four terms drive the warmth:
+the mean height, the open water share, the sun and the cloud. A base stands
+under them.
+
+**What was wrong.** The sun term splits into the belt of a latitude and the
+season around it, and the two never peak at one place at one moment. The belt
+peaks at the equator, where the season is near nothing. The season peaks at the
+middle latitudes, where the belt is near nothing. Each part reserved its own
+share of the heat scale, so the sum reached about half of what the two reserved
+together, and the top of the scale was out of reach.
+
+**A second term was wrong beside it.** A whole sky took away about three times
+the published net effect of cloud. The equator is the wettest band of the world,
+so the cloud cooled the equator far more than the dry poles, and the equator
+stood colder than the subtropics.
+
+**What the answer is.** The sun term walks its own geometry once, takes the
+highest and the lowest sum that geometry holds, and maps that range onto the
+swing the scale reserves. The cloud term reads the published effect of cloud in
+watts and converts it on the scale that the sun term states. The base is what
+the top of the scale leaves under the ground term and the sun swing, and it
+holds the value it already held.
+
+**The base was not raised, and that is the answer.** A base carries the same
+degrees to a pole that it carries to the equator, so raising it would have
+flattened the latitude gradient. The decision record states the rule.[^BLK152D]
+The findings register holds what the project believed and what the measurement
+showed.[^BLK152E]
+
+**What this leaves open.** The annual range of a mid-latitude cell is about
+twice the published range over land, so most mid-latitude land grades
+continental rather than temperate. That is the season against the belt, and the
+row that holds what the weather should be worth governs it.[^BLK152F]
+
+### BLK-036 — Does an upgrade change hands when the ground does?
+
+**Resolved on 6 September 2026. An upgrade changes hands with the ground.**
+
+The engine stores an upgrade against a tile and stores no owner beside it, so
+an upgrade already followed the ground. This answer makes that binding rather
+than incidental, and a decision record now states it.[^BLK36A]
+
+The row named three shapes the answer could take. The upgrade goes to the new
+holder, the upgrade stays with the faction that built it, or the upgrade is
+destroyed. The project owner chose the first, and asked for the rule of cool.
+
+**The answer arrived with the question that made it matter.** A settlement's
+faction was written at its founding and never again, so no city could change
+hands and the question had no case. The owner asked for both a capture and a
+raze at the same time. A faction that takes a city intact keeps its roads, its
+terraces, its lodging and its walls, and a faction that razes one destroys
+them. Taking a developed city is therefore a prize, and razing one is a real
+sacrifice.
+
+**A record and not this row is now the statement of the rule.** Two records
+hold the constraints: one for the capture and the raze, and one for the
+elimination that a raze made reachable.[^BLK36A] [^BLK36B]
 
 ### BLK-052 — Nobody has measured whether a fight at this granularity looks like a fight
 
@@ -779,6 +933,8 @@ normally.
 [^BLK40B]: Findings register, FND-341. `docs/FINDINGS.md`
 [^BLK50A]: PRD-0031, a god knows whose ground its people stand on. `docs/product/shaped/prd-0031-a-god-knows-whose-ground-its-people-stand-on.md`
 [^BLK50B]: Research report 21, what a god needs from this engine, section 8. `docs/research/reports/21-what-a-god-needs.md`
+[^BLK36A]: ADR-0180, a site changes hands or the taker destroys it. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+[^BLK36B]: ADR-0181, a faction that holds no site and no unit leaves the game. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
 [^BLK52A]: Research report 21, what a god needs from this engine, section 4. `docs/research/reports/21-what-a-god-needs.md`
 [^BLK52B]: Research report 21, what a god needs from this engine, section 4.2. `docs/research/reports/21-what-a-god-needs.md`
 [^BLK52C]: Findings register, FND-390. `docs/FINDINGS.md`
@@ -795,6 +951,13 @@ normally.
 [^BLK120A]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D1. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
 [^BLK121A]: ADR-0126, a trade negotiation is engine state, and the words are not, decision D5. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
 
+[^BLK153A]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+[^BLK153B]: Findings register, FND-589. `docs/FINDINGS.md`
+[^BLK155A]: Research report 30, the published atmospheric math, section 5.1. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^BLK155B]: Research report 30, the published atmospheric math, section 8.1. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^BLK156B]: Research report 30, the published atmospheric math, section 2. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^BLK156D]: Findings register, FND-604. `docs/FINDINGS.md`
+[^BLK156C]: ADR-0182, the temperature a cell is driven toward is a published energy balance. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
 [^BLK122A]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decisions D1 and D4. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
 [^BLK123A]: ADR-0132, conversion changes the faction of a unit and adds no second allegiance, decision D2. `docs/adrs/draft/adr-0132-conversion-changes-the-faction-of-a-unit.md`
 [^BLK130A]: ADR-0142, a god inflicts weather only on ground its own faction holds, decisions D2 and D4. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
@@ -803,6 +966,7 @@ normally.
 [^BLK130D]: Balance register, the weather. `docs/reference/balance.md`
 
 [^BLK151A]: Findings register, FND-575. `docs/FINDINGS.md`
-[^BLK152A]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-[^BLK152B]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-[^BLK152C]: Research report 30, the published atmospheric math, section 4.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^BLK152D]: ADR-0177, the row axis of a world is a latitude that the world states, decision D5. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+[^BLK152E]: Findings register, FND-586. `docs/FINDINGS.md`
+[^BLK152F]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+[^BLK156E]: Findings register, FND-614. `docs/FINDINGS.md`

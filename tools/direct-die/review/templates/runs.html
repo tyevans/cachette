@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}direct-die runs{% endblock %}
+
+{% block main %}
+  <h1>Runs</h1>
+  <p class="lede">
+    A job draws one style. It runs its subjects one after another, because
+    the endpoint answers one request at a time.
+  </p>
+
+  {% if not jobs %}
+    <p class="gap">
+      No run has started yet. Start one from the pack grid.
+    </p>
+  {% endif %}
+
+  {% for job in jobs %}
+    <section class="card">
+      <h2>
+        <a href="/runs/{{ job.job_id }}">{{ job.style }}</a>
+        <span class="sid">{{ job.job_id }}</span>
+        <span class="badge run-{{ job.state_now }}">{{ job.state_now }}</span>
+      </h2>
+      <dl class="meta">
+        <dt>Started</dt><dd>{{ job.started or "—" }}</dd>
+        <dt>Subjects</dt>
+        <dd>{{ job.done_count }} of {{ job.items | length }} finished</dd>
+        <dt>Rounds</dt><dd>{{ job.rounds }} of {{ job.variants }} variants</dd>
+      </dl>
+      {% if job.state_now == "abandoned" %}
+        <p class="gap">
+          The server that supervised this job is gone. The drawings on disk
+          are whole. Start the subject that was in flight again.
+        </p>
+      {% endif %}
+      <ul class="rounds">
+        {% for item in job.items %}
+          <li>
+            <span class="letter">{{ item.name }}</span>
+            <span class="badge run-{{ item.state }}">{{ item.state }}</span>
+            <a href="/s/{{ job.style }}/{{ item.session_id }}">{{ item.session_id }}</a>
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endfor %}
+{% endblock %}

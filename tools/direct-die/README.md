@@ -19,8 +19,8 @@ gate.
 4. The critique comes back as JSON with a verdict, a fault list, and a
    score. The tool validates it, and asks once more when the answer is
    malformed.
-5. The next round revises the parent that the critique or the human
-   chose.
+5. The next round revises the parents that the human liked, one lens
+   each.
 
 Each round makes up to four variants, `a` to `d`. Each variant has its
 own direction and its own temperature, so the four drawings differ. One
@@ -51,6 +51,8 @@ python3 -m direct_die probe
 python3 -m direct_die guide
 python3 -m direct_die run --asset hex-tile --subject "a dense pine forest" --rounds 3
 python3 -m direct_die run --asset hex-tile --subject "a dense pine forest" --session 20260906-190000 --rounds 1
+python3 -m direct_die set --style cartoon --rounds 2
+python3 -m direct_die set --style pencil --subjects forest,water --rounds 1
 ```
 
 The `--session` option continues a session that is already on disk. It
@@ -68,21 +70,54 @@ interface shows the score that comes back.
 ## The human outranks the model
 
 The review interface writes `feedback.json` into a round directory. This
-tool reads that file and never writes it. When the file names a choice,
-the chosen variant becomes the parent of the next round. When the file
-holds text, that text goes into the next prompt above the model
-critique, and the prompt says that the human direction outranks every
-model note.
+tool reads that file and never writes it.
 
-The file names the round that it belongs to. This tool refuses the file
-when that name disagrees with the directory, because a mismatch means
+The file holds four things. It names the drawings that a person liked, the
+drawings they refused, an order between the liked drawings, and two notes.
+
+Every liked drawing becomes a parent of the next round. The round cycles the
+parents across the four variant lenses, so each parent gets a spread of
+directions. One like gives every lens that one parent.
+
+Every refused drawing goes into the next prompt as SVG source, under a
+heading that says not to draw like it. The refusal holds for the whole
+session, and the prompt carries the two newest.
+
+The standing note holds for the whole session. The round note holds for the
+next round only. Both go above the model critique, and the prompt says that
+the human direction outranks every model note.
+
+The file names the round that it belongs to, by index. This tool refuses the
+file when that index disagrees with the directory, because a mismatch means
 one of the two is wrong, and neither is safe to guess from.
 
-When no feedback exists, the parent is the highest scoring variant of
-every round so far, and not only of the last round. A critique names a
-fault even in a good drawing, and a revision that acts on that fault can
-make the drawing worse. The loop must not walk away from its best work
-when that happens. A later round wins a tie, so the loop still moves.
+When nobody liked anything, the parent is the highest scoring variant of
+every round so far, and not only of the last round. A critique names a fault
+even in a good drawing, and a revision that acts on that fault can make the
+drawing worse. The loop must not walk away from its best work when that
+happens. A later round wins a tie, so the loop still moves. A refused drawing
+is never the parent, whatever it scored.
+
+## The analysis
+
+The analysis compares what a person liked with what they refused. It runs
+between two rounds, and not inside one.
+
+```
+python3 -m direct_die analyse --asset hex-tile --session 20260906-190000 --round 1
+```
+
+It shows the model the display render of each liked drawing and of each
+refused drawing, beside the rules. It answers with three things: a sentence
+that says what the liked drawings share, an order between the liked drawings,
+and one rule that the guide does not state. It writes `analysis.json` into
+the round directory.
+
+It gives an order and not a score. A large change to a drawing moves the
+absolute score by a few points, which the known limits below record. A
+comparison of two drawings does not have that defect. The order does not
+replace the score. The score still decides which drawing wins when no person
+chose.
 
 ## The layout on disk
 
@@ -96,6 +131,7 @@ sessions/<asset>/<session-id>/
     variant-a.large.png      the inspection size render
     variant-a.critique.json
     feedback.json            the review interface writes this file
+    analysis.json            this tool writes this file
   round-01/
 ```
 
@@ -120,6 +156,72 @@ copy its SVG into the exemplar directory. The guide version is a digest
 of the rules and the exemplars, and it goes into `session.json`.
 
 Keep the rules few and concrete. A vague rule gives a vague critique.
+
+## A style is an asset type
+
+The tool has one mechanism for a rules file, and a style needs nothing
+more than that. `--asset X` and `--style X` both read
+`styleguide/X.md` and `styleguide/exemplars/X/`. The size table gives a
+default of 64 pixels display and 384 pixels inspection to any name that
+no row holds. A style therefore needs a rules file and nothing else.
+
+Four styles ship: `cartoon`, `pencil`, `elegant`, and `sandcastle`.
+
+### How to add a style
+
+1. Write `styleguide/<style>.md`. Copy the section order of a shipped
+   style. State the geometry, the palette by hex value, the line
+   weight, the shape language, the detail budget, the silhouette rule,
+   and what the style forbids.
+2. State what varies **by subject** and what stays fixed **by style**.
+   Without that table the critic pulls every subject toward the nearest
+   exemplar. It once told a pine forest to drop its triangles, because
+   both exemplars were rounded.
+3. State what survives at 64 pixels. A rule that only reads at 384
+   pixels is the wrong rule for a hex tile.
+4. Do not restate the score scale. That scale has one declaration site,
+   and every asset type shares it.
+5. Add the style to the style list in `tests/test_styles.py`. Those
+   tests check that the guide loads, that it names every subject of the
+   asset set, that it states what it forbids, and that it does not
+   restate the score scale.
+6. Add a size row in the render module only when the style needs a size
+   that the default does not give.
+
+A style that would accept the same drawing as another style is not a
+second style. Give each style a rule that the others break.
+
+### The asset set
+
+One module declares the subjects: five terrain kinds and six upgrade
+categories. The engine also has an `OPEN` upgrade category, which means
+no upgrade and needs no art. A style guide names the same subjects in
+its own subject table, and a test fails when one is missing. Add a
+subject in the subject module, then add a row to each style guide.
+
+### How to promote a drawing to an exemplar
+
+An exemplar directory starts empty, and every new style has this
+problem. The first run of a style therefore judges against the rules
+alone. Bootstrap it this way.
+
+1. Run one subject at one round and read the four drawings through the
+   review interface.
+2. Choose the drawing that shows the style best. Prefer a drawing that
+   shows a rule the prose states weakly.
+3. Copy its SVG into `styleguide/exemplars/<style>/<subject>.svg`. Name
+   the file for the subject, because the critic reads the label.
+4. Run the next subject. The critic now has a picture.
+
+Ship an exemplar for a subject before you ask for that subject, or
+expect the critic to aim at the exemplar that exists. Two rounded
+exemplars pull a conifer toward a hump. Three or four exemplars that
+differ from each other by subject pull nothing.
+
+The guide version is a digest of the rules and of the exemplars, so a
+new exemplar changes the version in `session.json`. A session that ran
+before the exemplar is still readable, and its header says which guide
+it ran against.
 
 ## Cost
 
@@ -157,6 +259,22 @@ each one is a reason to keep a person in the loop.
   a tile went from eight small shapes to three large ones, which is
   what the critic asked for, and the score moved by five points. A
   fixed score scale with anchors improved this. It did not remove it.
+
+- **A score compares two rounds of one style. It does not compare two
+  styles.** One bootstrap run drew the same forest in four styles at one
+  round each. Two styles reached 95 and two reached 25 and 40. The
+  spread measures how hard each guide is to satisfy, not how good the
+  drawing is. Compare a score only inside one style.
+- **A guide that is easy to satisfy stops the critic from
+  discriminating.** In that same run every variant of one style scored
+  95 with an empty fault list, and one of those drawings did not read as
+  its subject. A guide of few mechanical rules gives the critic nothing
+  to fault, so it accepts a wrong subject. Add a rule that names the
+  subject silhouette when this happens.
+- **The critic judges the raster, not the source.** It faulted a
+  stroke-only drawing for using solid fills. The strokes were dark and
+  close, so they read as solid at the display size. The note is wrong
+  about the source and right about the picture.
 
 Use the loop to make four candidates and a fault list. Use a person to
 choose. Do not leave the loop running unattended and expect the score to

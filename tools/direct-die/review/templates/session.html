@@ -10,7 +10,15 @@
     {% include "_sessions.html" %}
     <div class="body">
       <h1>{{ session.asset }} <span class="sid">{{ session.session_id }}</span></h1>
+      {% if live %}
+        <p class="waiting live-line">
+          A run is writing this session now. It is on subject
+          {{ live[1].name }} of the job {{ live[0].job_id }}.
+          <a href="/runs/{{ live[0].job_id }}">Open the run</a>
+        </p>
+      {% endif %}
       <dl class="meta">
+        <dt>Subject</dt><dd>{{ session.subject or "—" }}</dd>
         <dt>Created</dt><dd>{{ session.created or "—" }}</dd>
         <dt>Model</dt><dd>{{ session.model or "—" }}</dd>
         <dt>Guide</dt><dd>{{ session.guide_version or "—" }}</dd>
@@ -18,6 +26,35 @@
       {% if session.manifest is none %}
         <p class="gap">This session has no session.json yet.</p>
       {% endif %}
+      <section class="card add-rounds">
+        <h2>Add rounds to this session</h2>
+        <p class="note">
+          This adds rounds to this session. The next round revises the
+          drawings you liked, and reads the drawings you refused as a
+          warning. Write and save your feedback on a round first.
+        </p>
+        <form
+          method="post"
+          action="/s/{{ session.asset }}/{{ session.session_id }}/rounds"
+          class="inline"
+        >
+          <label>Rounds
+            <select name="rounds">
+              {% for value in round_choices %}
+                <option value="{{ value }}" {{ 'selected' if value == 3 else '' }}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Variants
+            <select name="variants">
+              {% for value in variant_choices %}
+                <option value="{{ value }}" {{ 'selected' if value == 4 else '' }}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <button type="submit">Add rounds</button>
+        </form>
+      </section>
       {% if not session.rounds %}
         <p class="gap">
           This session holds no round yet. The generation loop writes the first
@@ -32,7 +69,7 @@
               <span class="count">{{ entry.present_variants | length }} variant{{ "" if entry.present_variants | length == 1 else "s" }}</span>
               {% if entry.feedback is not none %}
                 <span class="tag">
-                  feedback{% if entry.choice %}: {{ entry.choice }}{% endif %}
+                  feedback{% if entry.winner %}: {{ entry.winner }}{% endif %}
                 </span>
               {% endif %}
               {% if entry.prompt_summary %}

@@ -173,14 +173,6 @@ pub enum TradeError {
     LandNotHeld(TileIdx),
     /// A land side names a tile that carries an upgrade.
     ///
-    /// Whether an upgrade goes with the ground is an open question, and the
-    /// engine refuses the offer until it is answered.[^1] One commit removes
-    /// this variant when the blocker closes.
-    ///
-    /// # References
-    ///
-    /// [^1]: Blockers register, BLK-036. `docs/BLOCKERS.md`
-    UpgradeOnLand(TileIdx),
     /// A land side names more tiles than the bound. The fields are the count
     /// and the bound.
     TooMuchLand(u32, u32),

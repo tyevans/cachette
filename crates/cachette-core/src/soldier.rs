@@ -150,6 +150,12 @@ const fn order_of(value: u8) -> Option<ResourceKind> {
 /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
 const NO_BUILD: u8 = 0;
 
+/// The value that says a unit fights no fire.
+const NO_DOUSE: u8 = 0;
+
+/// The value that says a unit fights the fire on the tile it stands on.
+const DOUSING: u8 = 1;
+
 /// The deeds at which a unit becomes eligible for promotion, before a caller
 /// says otherwise.
 ///
@@ -306,6 +312,23 @@ pub struct SoldierArena {
     ///
     /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
     builds: Vec<u8>,
+    /// Whether each slot was ordered to fight a fire.
+    ///
+    /// The value zero means the unit fights nothing. The value one means a
+    /// caller ordered it to fight the fire on the tile it stands on. The
+    /// column holds a small integer and not a boolean, because it is plain
+    /// data that reaches the state hash.[^1]
+    ///
+    /// **The order says what the unit does, and never where.** Which tile
+    /// burns is a property of the fire field, and a copy of it here would be
+    /// one fact in two places with nothing to fail when the copies
+    /// disagree.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    douses: Vec<u8>,
     /// The destination that the control plane sent each slot to.
     ///
     /// The value zero means nobody sent the unit anywhere. Any other value is
@@ -502,6 +525,7 @@ impl Clone for SoldierArena {
             carries: copy_column(&self.carries, capacity),
             orders: copy_column(&self.orders, capacity),
             builds: copy_column(&self.builds, capacity),
+            douses: copy_column(&self.douses, capacity),
             sends: copy_column(&self.sends, capacity),
             needs: copy_column(&self.needs, capacity),
             deficits: copy_column(&self.deficits, capacity),
@@ -553,6 +577,7 @@ impl SoldierArena {
             carries: Vec::with_capacity(slots),
             orders: Vec::with_capacity(slots),
             builds: Vec::with_capacity(slots),
+            douses: Vec::with_capacity(slots),
             sends: Vec::with_capacity(slots),
             needs: Vec::with_capacity(slots),
             deficits: Vec::with_capacity(slots),
@@ -735,6 +760,7 @@ impl SoldierArena {
         debug_assert_eq!(self.types[index], DEFAULT_UNIT_TYPE);
         debug_assert_eq!(self.orders[index], NO_ORDER);
         debug_assert_eq!(self.builds[index], NO_BUILD);
+        debug_assert_eq!(self.douses[index], NO_DOUSE);
         debug_assert_eq!(self.sends[index], NO_SEND);
         // A unit arrives fed and out of deficit, and it belongs to no site
         // until something gives it one.
@@ -772,6 +798,7 @@ impl SoldierArena {
         self.carries.push(CarryLoad::EMPTY);
         self.orders.push(NO_ORDER);
         self.builds.push(NO_BUILD);
+        self.douses.push(NO_DOUSE);
         self.sends.push(NO_SEND);
         self.needs.push(NEED_FULL);
         self.deficits.push(Fix32::ZERO);
@@ -825,6 +852,10 @@ impl SoldierArena {
         self.types[index] = DEFAULT_UNIT_TYPE;
         self.orders[index] = NO_ORDER;
         self.builds[index] = NO_BUILD;
+        // A fire order ends with the unit, in the way a build order does. A
+        // stale order in a free slot would send the next unit in that slot
+        // into a fire nobody ordered it into.
+        self.douses[index] = NO_DOUSE;
         // A send ends with the unit. A stale send in a free slot would put the
         // next unit in that slot under an order nobody gave it.
         self.sends[index] = NO_SEND;
@@ -1282,6 +1313,34 @@ impl SoldierArena {
         true
     }
 
+    /// Returns the whole fire order column.
+    #[must_use]
+    pub fn douse_column(&self) -> &[u8] {
+        &self.douses
+    }
+
+    /// Reports whether a caller ordered one soldier to fight a fire.
+    ///
+    /// Returns `None` when the identity is dead.
+    #[must_use]
+    pub fn douse_order(&self, entity: Entity) -> Option<bool> {
+        let slot = self.slot_of(entity)?;
+        Some(self.douses[slot as usize] == DOUSING)
+    }
+
+    /// Orders one soldier to fight a fire, or stops it.
+    ///
+    /// Returns `false` when the identity is dead. An order is not a
+    /// structural fact, so it does not raise the revision. It moves no unit,
+    /// and the derived unit structure maps a tile to the units on it.
+    pub fn set_douse_order(&mut self, entity: Entity, douses: bool) -> bool {
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        self.douses[slot as usize] = if douses { DOUSING } else { NO_DOUSE };
+        true
+    }
+
     /// Returns the destination that the control plane sent a soldier to.
     ///
     /// The outer option reports whether the identity names a live soldier.
@@ -1512,6 +1571,7 @@ impl SoldierArena {
             .write(bytemuck::cast_slice(&self.carries))
             .write(&self.orders)
             .write(&self.builds)
+            .write(&self.douses)
             .write(bytemuck::cast_slice(&self.sends))
             .write(bytemuck::cast_slice(&self.needs))
             .write(bytemuck::cast_slice(&self.deficits))
@@ -1680,6 +1740,12 @@ impl SoldierArena {
         }
         // A dead slot holds no build order. A stale order there would reach
         // the state hash and would set the next unit in the slot building.
+        if (0..slots).any(|slot| self.live[slot] == 0 && self.douses[slot] != NO_DOUSE) {
+            return false;
+        }
+        if (0..slots).any(|slot| self.douses[slot] > DOUSING) {
+            return false;
+        }
         if (0..slots).any(|slot| self.live[slot] == 0 && self.builds[slot] != NO_BUILD) {
             return false;
         }

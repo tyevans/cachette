@@ -24,7 +24,7 @@ use cachette_core::campaign::{
 use cachette_core::types::Entity;
 use cachette_core::unit_type::{SOLDIER, WORKER};
 use cachette_core::{
-    Axial, CampaignError, FactionId, FactionWeights, Tick, World, WorldConfig, COMMAND_CAMPAIGN,
+    Axial, CampaignError, FactionId, FactionWeights, Tick, Verb, World, WorldConfig,
 };
 
 const A: FactionId = FactionId(0);
@@ -244,7 +244,9 @@ fn a_faction_at_peace_raises_no_campaign() {
             world
                 .controller_log()
                 .iter()
-                .all(|command| command.kind != COMMAND_CAMPAIGN),
+                .all(
+                    |command| world.action_schema().verb_of(command.action) != Some(Verb::Campaign)
+                ),
             "the controller plans no campaign at peace"
         );
     }
@@ -285,10 +287,16 @@ fn a_faction_at_war_raises_a_campaign_on_the_nearest_enemy_site() {
     let command = world
         .controller_log()
         .iter()
-        .find(|command| command.kind == COMMAND_CAMPAIGN && command.faction == A)
+        .find(|command| {
+            world.action_schema().verb_of(command.action) == Some(Verb::Campaign)
+                && command.faction == A
+        })
         .expect("the command is logged");
     assert_eq!(command.applied, 1);
-    assert_eq!(command.argument, OBJECTIVE_TAKE_SITE);
+    // The campaign verb declares no argument position, because the engine
+    // resolves the objective at the tick the action applies. The objective
+    // kind therefore lives on the campaign event, which the engine wrote.
+    assert_eq!(event.objective_kind, OBJECTIVE_TAKE_SITE);
     assert_eq!(
         command.sequence,
         world.controller_evaluations() + 1,
@@ -352,7 +360,9 @@ fn a_faction_holds_at_most_one_live_campaign() {
             .controller_log()
             .iter()
             .filter(|command| {
-                command.kind == COMMAND_CAMPAIGN && command.faction == A && command.applied == 1
+                world.action_schema().verb_of(command.action) == Some(Verb::Campaign)
+                    && command.faction == A
+                    && command.applied == 1
             })
             .count();
         assert!(applied <= 1, "two raises for one faction on one tick");

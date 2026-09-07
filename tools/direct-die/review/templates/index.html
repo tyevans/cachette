@@ -38,7 +38,7 @@
               <span class="count">{{ entry.present_variants | length }} variant{{ "" if entry.present_variants | length == 1 else "s" }}</span>
               {% if entry.feedback is not none %}
                 <span class="tag">
-                  feedback{% if entry.choice %}: {{ entry.choice }}{% endif %}
+                  feedback{% if entry.winner %}: {{ entry.winner }}{% endif %}
                 </span>
               {% endif %}
             </li>

@@ -335,9 +335,10 @@ mod declarations {
     use crate::contest::UnitFell;
     use crate::conversion::UnitConverted;
     use crate::event::{
-        ChangeKind, ResourceTaken, SettlementFounded, TileChanged, UpgradeCollapsed,
-        UpgradeFinished, WearCause,
+        ChangeKind, FactionEliminated, ResourceTaken, SettlementFounded, SiteTaken, TakeKind,
+        TileChanged, UpgradeCollapsed, UpgradeFinished, WearCause,
     };
+    use crate::fire::{EndCause, FireEnded, FireStarted, StartCause, UnitBurned};
     use crate::holding::Holder;
     use crate::promotion::UnitPromoted;
     use crate::rates::SiteShortfall;
@@ -457,6 +458,46 @@ mod declarations {
             tile: TileIdx => "tile",
             faction: FactionId => "faction",
             padding: [u8; 2] => pad,
+        };
+
+        SiteTaken, "site_taken", {
+            tick: Tick => "tick",
+            site: u64 => "site",
+            tile: TileIdx => "tile",
+            from: FactionId => "from_faction",
+            to: FactionId => "to_faction",
+            kind: TakeKind => "kind",
+            padding: [u8; 7] => pad,
+        };
+
+        FactionEliminated, "faction_eliminated", {
+            tick: Tick => "tick",
+            released: u64 => "released",
+            faction: FactionId => "faction",
+            padding: [u8; 6] => pad,
+        };
+
+        FireStarted, "fire_started", {
+            tick: Tick => "tick",
+            tile: TileIdx => "tile",
+            cause: StartCause => "cause",
+            padding: [u8; 3] => pad,
+        };
+
+        FireEnded, "fire_ended", {
+            tick: Tick => "tick",
+            tile: TileIdx => "tile",
+            cause: EndCause => "cause",
+            padding: [u8; 3] => pad,
+        };
+
+        UnitBurned, "unit_burned", {
+            tick: Tick => "tick",
+            unit: u64 => "unit",
+            tile: TileIdx => "tile",
+            faction: FactionId => "faction",
+            unit_type: UnitTypeId => "unit_type",
+            padding: [u8; 1] => pad,
         };
 
         CampaignEvent, "campaign_event", {

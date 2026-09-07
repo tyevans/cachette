@@ -24,9 +24,10 @@ use std::collections::BTreeSet;
 use cachette_core::controller::{asking_good_of, wants_trade_step};
 use cachette_core::resource::{Amount, ResourceKind, RESOURCE_KIND_COUNT};
 use cachette_core::unit_type::SOLDIER;
+use cachette_core::Verb;
 use cachette_core::{
     Advert, Axial, CommodityId, Entity, FactionId, FactionWeights, Fix32, Tick, World, WorldConfig,
-    ADVERT_OFFERS, ADVERT_WANTS, COMMAND_TRADE, TRADE_BOUND, WORK_COMMODITY,
+    ADVERT_OFFERS, ADVERT_WANTS, TRADE_BOUND, WORK_COMMODITY,
 };
 
 /// The people each founding settles.
@@ -130,25 +131,83 @@ fn set_store(world: &mut World, faction: FactionId, quantity: Fix32) {
 /// unit of the speaker stands in the territory of the listener. The holding
 /// rule takes such a tile for the speaker on the next step, so the fixture
 /// renews the presence before every step.
+///
+/// **The unit never stands on the site tile of the listener.** A unit of one
+/// faction on the site tile of another besieges that site, and the site
+/// changes hands after the capture work.[^1] The two sites of this fixture sit
+/// a few tiles apart, so the site tile of the listener is the first tile the
+/// listener holds in index order. A fixture that took it walked an enemy onto
+/// the rival capital, the capital fell inside ten ticks, and every test here
+/// then failed in its own setup on the reader that asks for the site of a
+/// faction. The suite measures the trade, and a siege is not the trade.
+///
+/// # References
+///
+/// [^1]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
 fn renew_presence(world: &mut World, one: FactionId, other: FactionId) {
+    garrison(world);
     for (speaker, listener) in [(one, other), (other, one)] {
         if world.stands_in_territory_of(speaker, listener) {
             continue;
         }
         let grid = world.grid();
+        let seats = world.standing_places();
         let mut place = None;
         for index in 0..grid.tile_count() {
             let address = Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32);
             if world.tile_holder(address) == Some(cachette_core::holding::Holder::of(listener))
                 && world.admits_a_unit(address)
+                && !seats.contains(&address)
             {
                 place = Some(address);
                 break;
             }
         }
-        if let Some(place) = place {
-            let _ = world.spawn_soldier(place, speaker);
+        let place = place.expect(
+            "the listener holds no tile outside its own sites, so the fixture \
+             cannot put a guest in its territory without besieging it",
+        );
+        let _ = world.spawn_soldier(place, speaker);
+    }
+}
+
+/// Puts one unit of the owning faction on the tile of each site.
+///
+/// **A unit of the owner on the site tile ends a siege and takes its work
+/// away.**[^1] The two sites of this fixture sit a few tiles apart, and the
+/// guests this file places walk. Over a long run a guest reaches the rival
+/// site tile and besieges it, the site changes hands, and every test then
+/// fails in its own setup on the reader that asks for the site of a faction.
+/// A garrison keeps both sites standing, so the run measures the trade.
+///
+/// The garrison is renewed rather than placed once, because a garrison unit
+/// walks away in the same way a guest does.
+///
+/// # References
+///
+/// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D10. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+fn garrison(world: &mut World) {
+    let sites: Vec<(Axial, FactionId)> = world
+        .settlements()
+        .iter()
+        .filter_map(|site| {
+            Some((
+                world.settlements().address(site)?,
+                world.settlements().faction(site)?,
+            ))
+        })
+        .collect();
+    for (address, owner) in sites {
+        let held = world
+            .soldiers()
+            .iter_faction(owner)
+            .any(|unit| world.soldiers().address(unit) == Some(address));
+        if held {
+            continue;
         }
+        world
+            .spawn_soldier(address, owner)
+            .expect("the site tile admits a unit of its own faction");
     }
 }
 
@@ -469,7 +528,7 @@ fn no_offer_crosses_a_war_pair() {
             world
                 .controller_log()
                 .iter()
-                .all(|entry| entry.kind != COMMAND_TRADE),
+                .all(|entry| world.action_schema().verb_of(entry.action) != Some(Verb::Trade)),
             "the controller asked for a refusal it could see coming"
         );
         assert!(
@@ -512,10 +571,10 @@ fn no_second_negotiation_opens_with_one_pair() {
         // second one with the same pair. A stage that read no live row would
         // ask the verb, and the verb would refuse.
         for faction in [ZERO, ONE] {
-            let spoke = world
-                .controller_log()
-                .iter()
-                .any(|entry| entry.faction == faction && entry.kind == COMMAND_TRADE);
+            let spoke = world.controller_log().iter().any(|entry| {
+                entry.faction == faction
+                    && world.action_schema().verb_of(entry.action) == Some(Verb::Trade)
+            });
             if !spoke {
                 continue;
             }
@@ -542,7 +601,10 @@ fn no_second_negotiation_opens_with_one_pair() {
             let steps = world
                 .controller_log()
                 .iter()
-                .filter(|entry| entry.faction == faction && entry.kind == COMMAND_TRADE)
+                .filter(|entry| {
+                    entry.faction == faction
+                        && world.action_schema().verb_of(entry.action) == Some(Verb::Trade)
+                })
                 .count();
             assert!(steps <= 1, "one faction takes one step: {steps}");
         }
@@ -617,12 +679,26 @@ fn a_contract_binds_and_a_carrier_delivers() {
         let before = delivered(&world);
         world.step(1).expect("the step runs");
         // Every carrier the controller assigned is a live unit of the faction
-        // that owes, its type carries, and it is sent on the plane of its
-        // faction. A carrier that failed any of those would be a row that the
-        // engine wrote and nothing acted on.
+        // that owes, and its type carries. A carrier that failed either of
+        // those would be a row that the engine wrote and nothing acted on.
+        //
+        // **A carrier is sent on the plane of its own faction, or it is not
+        // sent at all.** The engine releases a sent unit when the plane it
+        // climbs stops steering it, which is what lets an arrived carrier read
+        // its option row and deliver. A sent carrier reads its plane and never
+        // that row, so a rule that kept every carrier sent would keep it from
+        // ever gathering or delivering. The assertion therefore refuses a
+        // carrier on the plane of another faction, and admits a released
+        // one.[^8]
+        //
+        // [^8]: Findings register, FND-572. `docs/FINDINGS.md`
         for (unit, _, faction) in world.carrier_units() {
             assert_eq!(world.soldiers().faction(unit), Some(faction));
-            assert_eq!(world.sent_to(unit), Some(Some(faction.0)));
+            let sent = world.sent_to(unit);
+            assert!(
+                sent == Some(None) || sent == Some(Some(faction.0)),
+                "a carrier of {faction:?} was sent as {sent:?}"
+            );
             let unit_type = world.soldiers().unit_type(unit).expect("the unit is live");
             assert!(
                 world.unit_types().row(unit_type).carry_capacity > 0,

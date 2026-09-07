@@ -112,7 +112,7 @@ fn main() {
         // The time for each cell is what a reader carries to another world
         // size. It is a division of two measured numbers and it stays
         // measured. The two columns that follow it are derived from it.
-        let for_each_cell = if cells > 0 { nanos * 1000 / cells } else { 0 };
+        let for_each_cell = (nanos * 1000).checked_div(cells).unwrap_or(0);
         let target_cells = TARGET_TILES / (u64::from(scale.side()) * u64::from(scale.side()));
         let target_millis = for_each_cell * target_cells / 1_000_000 / 1000;
         println!(

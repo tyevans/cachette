@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-579**
+**Next number: FND-622**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -912,6 +912,57 @@ the interior of a polar continent.
 **A fixture must supply the input the assertion needs.** A test that asks
 whether a model destroys the water reaching a pole must give the pole water.
 The landlocked fixture supplied none, so it measured the fixture.[^F487C]
+
+
+### FND-582 — The flat observation array carries one win threshold and not the other
+
+**Believed.** Item 0516 put the victory claim into the observation array of a
+faction, so the array now carries every quantity a win reader compares. A
+learner that reads the array can therefore tell how close each path is.[^F582A]
+
+**True.** The array carries the tick limit, which is the threshold of the
+territory path. It carries no renown target, which is the threshold of the
+renown path. The renown reader fires for the first faction whose best renown
+reaches that target, and a learner that reads the array alone cannot tell how
+far it is from it.[^F582B]
+
+**Evidence.** Read on 6 September 2026 from the schema of a world of extent 32
+with three factions. The field list holds the tick and the tick limit as two
+fields, and it holds the best renown with no matching target. The world states
+the target through a public accessor, so the value exists and the array omits
+it. The commit body holds the command.
+
+**What follows.** The omission is an asymmetry and not a rule. The reward of a
+faction reads the array, so it can weigh the best renown and it cannot weigh
+the distance to the target. A later item may add the field. Until then, a
+caller that wants the distance reads the target from the world, which is a
+public rule of the game and not a fact about a rival.
+
+### FND-583 — A faction that loses every unit is not eliminated, because it keeps its ground
+
+**Believed.** A faction that loses every unit and every person is eliminated.
+Its run is over, so a reward may pay a terminal value for the elimination and
+stop the episode there.
+
+**True.** Such a faction keeps its held tiles and its seat. The territory reader
+compares held tiles at the tick limit, so the faction may still win. A terminal
+that fired on the loss of the last unit would end an episode the faction could
+still win.
+
+**Evidence.** Measured on 6 September 2026 on one development machine
+(ty001-ubuntu, x86-64), over nine seeds at two and three factions, on a world of
+extent 24, to 800 ticks or to the game end. A faction that had been alive and
+then held no unit and no person appeared in 4907 sampled tick and faction pairs.
+In none of them did the same faction reach zero held tiles. On one seed the
+faction with no unit at all held 187 tiles against the winner's 179. No
+ever-alive faction reached zero on all four of held tiles, seats held, live
+units and population. The commit body holds the probe and the command.
+
+**What follows.** The reward of a faction states three terminal outcomes and no
+elimination. It reports one boolean beside them, which is true while the faction
+holds a unit or a person. A caller that wants to stop a run early reads it. A
+faction the seeding never seated reads the same boolean, because it holds the
+same nothing.
 
 
 ## C. Defects found in specified rules
@@ -2235,6 +2286,111 @@ fails. The earlier row stands for that part.[^F321A]
 short. The check prints the missing annotation and exits non-zero, and the
 test that runs it goes red.
 
+### FND-584 — The heat scale ran cold because two terms were written down, and the repair was to derive both
+
+**Believed.** The four terms that drive the temperature of a cell were balanced
+so that they reach the bottom of the heat scale together and the top of it
+together. The sun term reserves a swing, and that swing is the sum of the two
+amplitudes its two parts carry.
+
+**True.** The sum of the two parts never reaches the sum of the two amplitudes.
+The belt of a latitude peaks at the equator, where the season contributes
+nothing. The season peaks at the middle latitudes, where the belt contributes
+nothing. So the highest sum the geometry holds is a little over half of the
+reserved swing, and the top of the scale was out of reach.
+
+**A second term was wrong beside it, and the first repair exposed it.** A whole
+sky took away about three times the published net effect of cloud. The equator
+is the wettest band of the world, so the cloud cooled the equator far more than
+the dry poles. The equator therefore stood colder than the subtropics, and the
+latitude order of the temperature was inverted at its warm end.
+
+**Evidence.** A probe grades the land of a world against the published Köppen
+thresholds. Before the repair no land graded tropical on either seed, and
+between 44 and 58 percent graded ice cap. After it the land grades tropical near
+the equator, desert in the subtropics, continental at the middle latitudes and
+tundra and ice at the poles. The commit body holds both grades, both seeds, the
+mean land temperature of each band, and the command that produced them.
+
+**The defect was put back twice.** A test asserts that the sun term reaches the
+reserved swing at each end, and it fails when the normaliser is written down
+rather than derived. A second test asserts that a whole sky is worth the
+published effect of cloud on the scale the sun states, and it fails when the
+cloud swing is written down.
+
+**Follows.** Three things.
+
+**A term normalised on each part is not normalised on the sum.** Two parts that
+each span a range do not span the sum of the two ranges, unless they peak
+together. Normalise against the reach of the sum, and measure that reach from
+the thing that produces it.
+
+**The heat base did not move.** A base carries the same degrees to a pole that
+it carries to the equator. Raising it was the obvious repair, and it would have
+flattened the latitude gradient rather than restoring the warm equator. The
+defect was the shape of one term and the size of another.
+
+**Five of the weather defects this project has found were a value written down
+where it should have been derived.** Both halves of this one are that shape
+again.
+### FND-592 — The way between two settlements was believed to be planned, and the branch that planned it could never run
+
+**Believed.** The plan solver chose a way between the seat of a faction and
+another settlement of that faction. The solver held a loop over the
+settlements, the decision record names a way between one site and another, and
+a test asserted that a faction with two cities zoned a way between them.[^F545D]
+
+**True.** The branch was inert. The solver anchored one window on the seat, and
+it asked that window for the cost of reaching each other settlement. The window
+radius is a balance value and the founding rule keeps two settlements of one
+faction apart by a distance that is more than twice it. Every settlement
+therefore lay outside the window, the window answered no cost, and the branch
+skipped every candidate on every tick of every world.
+
+**The test could not see it.** The fixture founded its second city inside the
+window radius, and it asserted that the pair sat inside the radius. The founding
+verb never places a second city there, so the fixture modelled a world the
+engine does not build. The fixture measured the window, not the way.[^F496G]
+
+**Evidence.** A run of the demonstration world over four seeds reports the
+distance between each pair of settlements of one faction. The least distance in
+every run equals the founding distance, and no run holds a pair inside the
+window radius. A separate run counts the pairs that a standing road joins, and
+it counts none.
+
+**What follows.** A way between two settlements chains a fixed number of fixed
+windows, each aimed at the far end. A fixture for a way places its two
+settlements at least the founding distance apart, and the assertion that the
+pair sits inside the radius is the wrong assertion. Two values that must agree
+were declared in two files with nothing that fails when they disagree, which is
+the first recurring shape.[^F487B]
+
+### FND-593 — A way was believed to stand wherever a unit walks
+
+**Believed.** A way between two places follows the cheapest path over ground
+that admits a unit. The path search refuses a tile that admits nobody, and
+nothing else was thought to bar a way.
+
+**True.** A unit walks the mountain and a road does not fit the mountain. The
+ground fit of the joining category admits the plain, the forest and the hill,
+and the mountain admits a unit at the ordinary capacity. A way whose cheapest
+path crosses high ground therefore holds a tile that no unit can ever build.
+The plan holds that project, the build pass refuses it on every tick, and the
+two settlements at the ends stay apart while the plan reads as though it joined
+them.
+
+**Evidence.** A fixture founded two cities sixteen steps apart and ran nine
+hundred ticks. The road that touched the seat grew to about a hundred tiles and
+stopped eleven steps short of the far city, and the count did not move over a
+further two thousand one hundred ticks. The way crossed high ground, and the
+tiles on it were never built.
+
+**What follows.** The window a way reads admits only ground the joining
+category fits. The window a deposit and a yield read is unchanged, because
+those two ask where a unit may go and not where a road may stand. A pair of
+settlements that no such ground joins now yields no project, which is a plan
+that says nothing rather than a plan that lies.
+
 ## D. Cost estimates that were wrong
 
 ### FND-222 — A frame at the target scale costs eleven times its budget
@@ -3495,8 +3651,104 @@ already works, which is one fact in two places.[^F526A]
 **An item is not done until it moves.** A directory is a status, and a status
 that nobody sets is a register that decays.
 
+### FND-594 — The camera was believed to say where every renderer stands, and the sketch fits its own page instead
+
+**Believed.** The engine camera says where the view sits. It holds the size of
+a tile in pixels and the pixel offset of the tile at the origin, and every
+renderer draws the view that camera names. A control that moves the camera
+therefore moves what both renderers show, by the same amount.
+
+**True.** That holds for the flat map alone. The sketch renderer reads the
+camera only to name the window of tiles it must cover. It then fits that window
+to the frame with a scale of its own. The size of a tile on the camera reaches
+the picture through which tiles fall inside the frame, and through nothing
+else.
+
+Two things follow from that, and both are visible to a person.
+
+The window changes in whole tiles, because it comes from the address the camera
+gives nine corner pixels, widened by a margin. A pan of a few pixels therefore
+changes the sketch by nothing, and then by a whole tile.
+
+The fit is recomputed for each window, so a pan that changes the window by one
+tile also changes the scale of the page. Grab-and-move is exact on the flat map
+and approximate in the sketch, and no arithmetic in the control layer can
+change that.
+
+**Evidence.** The build pass takes the window and the frame size, derives its
+own scale from the two, and never reads the tile size of the camera. A drag of
+nine pixels for each frame at a tile size of twenty-four rebuilds the page on
+three frames out of six, and holds the page on the other three.
+
+**Follows.** Three things.
+
+**The camera is the one source of truth for where the view stands, and a
+renderer may still choose its own scale.** The two statements are not in
+conflict, and a reader who takes the first for a promise about pixels will be
+wrong about the second.
+
+**Do not make the sketch follow the camera scale in order to fix the drag.** A
+page keyed on a continuous camera rebuilds on every pixel of a pan. The whole
+tile window is what makes the page cacheable at all.
+
+**A renderer that composites on the graphics card can honour the camera
+exactly.** It has no page to cache and no rebuild to avoid, so the limit above
+belongs to the processor path and not to the design.
+
 
 ## F. Sourcing
+
+### FND-595 — A test that names a handler cannot see that the window refuses to hold it
+
+**Believed.** The mouse controls were checked against the window library
+without a display. The check read the handler method names and compared them
+against the event names the library declares. That was called the strongest
+check a machine with no display can make.
+
+**True.** The library does not only call those methods. It holds the handler
+object by weak reference. A class that declares its attribute slots and names
+no weak reference slot cannot be referred to weakly, so the push raises
+`TypeError` before any name is read. The names were right and the push failed.
+
+**Evidence.** The demonstration raised `cannot create weak reference to
+'Controls' object` at the first window it opened. Adding the weak reference
+slot to the declared slots fixes it. Removing the slot again makes the new
+test fail with the same message the owner saw.
+
+**What follows.** A test that reads names is a test about names. When a
+library takes an object rather than calling a function, drive the real call:
+build the library's own dispatcher, push the handler onto it, and send one
+event. That needs no display and it catches what the name check cannot.
+
+### FND-596 — Every graphics test read a texture back, so none of them looked at the screen
+
+**Believed.** The device draws into a frame buffer of its own and reads the
+result back, so one path serves a window, a picture on a disk and a test with
+no display. The tests read the pixels back and compared them against the
+processor path, and they agreed. The graphics path was therefore held to work
+in a window.
+
+**True.** The device takes the application's context when the application has
+a window, because a second context would hold a second copy of every texture.
+Each pass points the frame buffer at a texture the device owns and leaves it
+pointed there. The window then presented into that texture instead of onto the
+screen, and the screen stayed black. The pixels the tests read were correct
+the whole time, because they came from the texture.
+
+**Evidence.** The demonstration drew a black window under the sketch flag on a
+machine with a display. Binding the frame buffer back to the window after the
+read fixes it. Removing that line again makes the new test fail, and the test
+reports the binding as 1 where it must be 0.
+
+**What follows.** A test that reads a target back proves the drawing is
+right. It cannot prove the screen shows it. When a module borrows a caller's
+state, test that the state is handed back, not only that the work was done.
+This is the second finding in one day where a test checked the work and not
+the hand-over.[^FND596A]
+
+**References**
+
+[^FND596A]: Findings register, FND-595. `docs/FINDINGS.md`
 
 ### FND-026 — Games do not document their implementations
 
@@ -10988,6 +11240,151 @@ serves the product record that asks a developer to set what a settlement holds
 and to read the value back.[^F485G]
 
 
+### FND-589 — The economy was believed to deadlock on hunger, and the population never walks to the food
+
+**Believed.** A unit must be fed to deliver a load and hungry to fill one, so a
+world whose store starts empty can never begin: the units stay hungry, they
+never deliver, and the store stays empty. The dispatcher stated this as the
+likely cause of an economy that moves almost nothing.
+
+**True.** There is no deadlock. Measured in the demonstration world, 256 by 256,
+four factions, seed 0x0123456789abcdef, 300 ticks, two threads, on
+ty001-ubuntu (x86-64): the mean need holds between 23808 and 37012 of a full
+65536, and 151 of 166 units are fed at tick 300. The store cycles, because the
+production fills it and the ration draws it in the same tick. Hunger never pins
+to zero, so the term that drives the delivery row is not what blocks it.
+
+**What blocks it is that the population never travels.** The units occupy 22 to
+26 distinct tiles at a mean distance of 2 from their home site. They strip that
+ground in about ninety ticks and then stand on it. Every live unit holds a
+gather order every tick and the grant is zero, because no unit stands on
+remaining stock of the kind it ordered. The world still holds 53611 food on
+11631 tiles against 83 ever taken.
+
+**The cause has a shape this project has met before.** The exit field of an
+option answers at the level 1 pitch, and the stock of a tile is a level 0
+property. A unit standing on barren ground inside the cell that holds the most
+food is told that its cell is the right cell, and nothing tells it to step two
+tiles sideways. A field that answers at one pitch about a fact that lives at
+another is the same defect as a flow field that ran out inside its destination
+cell.[^F589A]
+
+**What follows.** The option rows are not at fault and must not be changed to
+compensate. The movement and steering of a unit toward stock is the subject.
+
+### FND-590 — The gather order of a unit is written in two places, and the comment that forbids it is in one of them
+
+**Believed.** A laden unit stops gathering, and that rule lives in the option
+row rather than in a second place that could disagree with it. The delivery row
+says so in its own doc comment.
+
+**True.** The choice pass clears the gather order when a unit takes a row that
+names no resource kind, and the faction controller then sets the order for every
+unit of the faction at the last stage of the same step. Measured over the run
+above: the units holding a gather order equal the live unit count at every tick,
+while the intent to forage is only 18 to 118. So the rule holds in a world with
+no controller and fails in every world that has one.
+
+**What follows.** This is the recurring shape of one value with two declaration
+sites and no check that fails when they disagree. The comment states the rule
+the code does not keep, which is worse than no comment.[^F590A]
+
+### FND-591 — A field over stock must state a fact about the ground, not about the order a unit holds now
+
+**Believed.** A field that steers a unit to stock is keyed on the resource
+kind, so the seed set takes the kind from the gather order of each unit. A
+block seeds only the kind that the units standing in it were told to gather,
+which is the cheapest set that answers the question.
+
+**True.** That set is stale before any unit reads it. The engine derives the
+field at the barrier of one step, and two passes write the gather order after
+that barrier. The controller of a faction writes the order of every unit of
+that faction at the last stage of the step.[^F591A] A unit therefore reads the
+field on the plane of an order that the field was not seeded for, finds no
+entry, and takes the coarse answer it took before the field existed.
+
+**Evidence.** The first build keyed the seed set that way. Measured in the
+demonstration world, 256 by 256, four factions, seed 0x0123456789abcdef, 300
+ticks, two threads, on ty001-ubuntu (x86-64): the food ever taken rose from 83
+to 136 of 53694, which is the rise that the frames between two order writes
+give. A build that seeds every kind in each occupied block reached 160 in the
+same run, and the field then answers on every plane a unit can read.
+
+**What follows.** A derived field that a later pass can invalidate is a stale
+read that nothing fails on.[^F591B] Seed such a field from the state that no
+later pass writes. Here that state is the ground: a block seeds every resource
+kind it holds, and the order of a unit only selects which plane the unit reads.
+The field then holds no fact that any pass of the step can contradict.
+
+**The cheap set is still the block set.** The seeds follow the blocks that hold
+a unit, and a block that holds none seeds nothing, so the derivation follows
+the population and never the tile count.[^F591C]
+
+### FND-597 — The relaxation reach of an approach field follows what the frame needs, not the block edge
+
+**Believed.** An approach field relaxes over twice the block edge, so its reach
+covers a whole block by a straight route and admits a detour of the same
+length. That count is a property of the instrument.
+
+**True.** It is a property of the question. A destination plane must lead a
+sent unit from anywhere in a block to one named tile, so its reach must cover
+the block. A field over stock must not: a block holds many stocked tiles, the
+engine derives the field again at every frame, and a unit takes one step in a
+frame. A reach beyond the step the unit takes now is derived again before the
+unit walks it.
+
+**Evidence.** Measured in the demonstration world named in the finding above.
+At the block reach the food ever taken reached 131, and one step cost 25.5
+milliseconds more than a step with no field at all. At a reach of two the food
+ever taken reached 160, which is more, and the step cost 6.6 milliseconds more
+than a step with no field. **Part of that 6.6 is not the field.** A population
+that walks moves more units and gathers more often, so the step does more of
+its own work, and the two runs are not the same simulation. A unit whose stock
+lies further reads no offset and takes the direction of its level 1 cell, which
+is the answer every unit read before the field existed.
+
+**A second measurement came out of the same work.** The derivation asked the
+terrain for the ground of one block once for each plane of that block. The
+terrain is generated and never stored, so each question costs a noise
+evaluation.[^F299A] The ground of a block depends on the block and on the
+water crossing of the plane, and never on the plane itself. A walk in block
+order that holds the ground while the block repeats cut the whole demonstration
+step from 34.9 to 30.0 milliseconds, before the new field was added at all.
+
+**What follows.** State the reach a field needs beside the field, not beside
+the instrument. The two figures above are derived on a development machine and
+not on the target platform, and the blocker that says which cost figures are
+measured stays open.[^28]
+
+### FND-598 — Two tests held that a store fills from production alone, and a unit that reaches food makes both false
+
+**Believed.** A site store fills from the production rate of the site and from
+nothing else. A conservation test over the store therefore names four terms:
+what production put in, what upkeep spent, what the cohorts drew, and what a
+birth cost. A starvation test therefore holds that a group whose site has no
+production rate loses every person.
+
+**True.** A fifth thing fills a store, and it always could. A unit that gathers
+from the ground and walks home moves its load into the store of its home site.
+Neither test was wrong when it was written, because no unit ever reached ground
+that carried the kind it was ordered to gather.[^F593A] Both went false on the
+frame that one did.
+
+**Evidence.** Both tests pass on the parent commit and fail on the commit that
+lets a gatherer reach stock. The conservation test misses by three whole loads,
+which is what the delivery ledger reports for the same run. The starvation test
+finds 30 of 120 seated people alive where it asserted none.
+
+**What follows.** A test that lists the terms of a balance states a count, and
+a count decays.[^F483G] Read a listed balance as a claim about what the engine
+can do, not as arithmetic. When a capability that was inert starts working, the
+tests that passed because it was inert are the ones to look at first.[^F498G]
+
+**The starvation test now claims the negation of the test it defends**, and no
+more. The test above it asserts that every seated person lives. This one takes
+the rate away and asserts that they do not. A survivor count would be the same
+decaying figure again.
+
 ## References
 
 [^F443A]: Review of backlog item 0390, section 5. `docs/reviews/0390-the-fallen-log.md`
@@ -10995,6 +11392,12 @@ and to read the value back.[^F485G]
 
 [^F470A]: PRD-0015, a unit has parents and children. `docs/product/accepted/prd-0015-a-unit-has-parents-and-children.md`
 [^F470B]: PRD-0016, somebody is in charge. `docs/product/accepted/prd-0016-somebody-is-in-charge.md`
+[^F589A]: Findings register, FND-576, the release of a sent unit that arrives, in this document.
+[^F590A]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+[^F591A]: Findings register, FND-590, in this document.
+[^F593A]: Findings register, FND-589, in this document.
+[^F591B]: Findings register, FND-029, in this document.
+[^F591C]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
 [^F470D]: Findings register, FND-360, in this document.
 [^F471A]: Backlog item 0461, tell a caller which arena an identity belongs to. `docs/backlog/proposed/0461-tell-a-caller-which-arena-an-identity-belongs-to.md`
 [^F471B]: Decisions register, DEC-265. `docs/DECISIONS.md`
@@ -12357,7 +12760,6 @@ public interface, and everyone would learn to ignore it.
 [^F493E]: ADR-0159, a project order names one category for each unit and one seed set for the faction. `docs/adrs/accepted/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
 [^F491C]: Decision Record Scope, section 4.6. `.agents/rules/adr-scope.md`
 [^F487A]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
-[^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F487C]: Testing Rules, section 2a. `.agents/rules/testing.md`
 [^F487D]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F340A]: Findings register, FND-325, in this document.
@@ -14214,8 +14616,443 @@ learner at the start of a run pays for the ground it has walked. A record says
 that fog storage grows with observed area, and the read now grows the same
 way.[^F572E]
 
+### FND-579 — The campaign takes no argument position, and the record's context reads as if it takes two
+
+**Believed.** ADR-0176 replaces the fixed verb-target-magnitude triple because
+the choice enumeration does not have that shape. Its context names the campaign
+as the choice that "names two things", an objective kind and an objective tile.
+A reader takes that as a statement that the campaign verb declares two argument
+positions in the new encoding.
+
+**True.** The campaign declares none. The rule that decides how many positions a
+verb takes is D2 of that record: a verb whose content the engine resolves at the
+tick the action applies takes no argument position, and a position that carried
+that content would be a second declaration of one fact.[^F580A] The engine does
+resolve both the objective kind and the objective tile for a faction, with no
+draw, in the pass that plans the tick. The crossing verb is the same shape: the
+engine surveys the tile. The context of the record explains why the triple
+failed. It does not decide what the campaign declares, and D2 does.
+
+**Evidence.** The engine holds one reader that chooses, for each faction, the
+objective it would march on, and one that chooses the tile it would cross to.
+Both are pure functions of the state. The controller's choice carries what those
+readers returned, and the raise verb takes the tile from the choice. Giving the
+learner a tile position would therefore have meant building a candidate list
+that no other caller builds, and ADR-0154 rejects a one-hot over the tiles for
+the reason that its width would follow the world.[^F580B]
+
+**What follows.** Two things.
+
+**Read the decision, not the context, for what a record binds.** The context of
+a record says why a claim was hard. The numbered decisions say what the claim
+is. A reader who sizes work from the context of ADR-0176 builds a campaign
+position that D2 forbids.
+
+**The action table stays small because two place-naming verbs carry no place.**
+The whole table is a function of the faction count and four fixed enumeration
+counts. Nothing in it follows the population, so the legality answer that names
+one byte for each row stays affordable. A benchmark measures it beside one
+step, and a blocker keeps every figure of it derived.[^28]
+
+### FND-580 — The legality answer and the verb disagreed on the project order, and only the agreement test saw it
+
+**Believed.** The three gates the project order reads before it moves a unit are
+the whole of its refusal: the faction holds a project, no campaign holds the
+destination plane, and no carrier holds it. A legality answer that reads those
+three answers for that verb.
+
+**True.** They are necessary and not sufficient. A faction may hold a project,
+hold the plane free, and still have no unit that would take the order: every
+unit either stands off a zoned tile with no project to walk to, or stands on one
+whose build the ground refuses. The verb then moves nothing and reports a
+refusal, while the answer said yes.
+
+**Evidence.** The test that compares the answer against the verb over five seeds
+and three tick counts found it on the first run, at seed 29 and tick 2. The
+repair moved the partition of the units out of the verb into one reader that the
+verb and the answer both call, so the answer now reads what the verb reads.
+
+**What follows.** Two things.
+
+**A verb that acts on a set refuses on the set, not on its gates.** A gate says
+the verb may run. It does not say the verb will do anything. Any other
+set-valued verb has the same shape, and a legality answer for one must read the
+set.
+
+**Write the agreement test before you trust the answer.** The record asks for a
+test that compares the two over a seed set, and it says a row the answer allows
+and the verb then refuses is a defect.[^F581A] Nothing else in the tree would
+have found this: the verb was correct, the answer was correct on its own terms,
+and neither had a test that read the other.
+
+### FND-581 — The world invariant read the ground alone, so a mariner that crossed lost it
+
+**Believed.** A demonstration run at eight seeds lost a world invariant, and the
+reading was that the settler order had walked a unit onto ground that refuses
+it. The session that turned the target red moved several balance figures, so the
+first reading blamed one of those.
+
+**True.** The engine broke nothing. The invariant states a stricter rule than
+the movement pass. The movement pass admits a step by the terrain capacity
+table, and that table takes the water crossing column of the type that steps. A
+nonzero column means the type may stand on a water tile. The invariant called
+the reader that passes no crossing, so it refused every unit on water whatever
+its type. The offending unit was a mariner, whose row carries the
+crossing.[^F581B]
+
+**Evidence.** Measured on 6 September 2026 on one development machine
+(ty001-ubuntu, x86-64). A bisect over 110 revisions named the commit that sends
+the settlers of a faction at ground worth founding on. That commit gives each
+faction three destination planes rather than one, and the third is the plane the
+crossing order had always asked for and never received. Mariners therefore began
+to cross for the first time. The invariant was instrumented to name its own
+failing branch, and it named the passability branch and printed the unit: a live
+unit of unit type 5, the mariner row, standing on a water tile. The commit body
+holds the bisect log.
+
+**What follows.** Two things.
+
+**One rule declared twice, and only one copy took the new column.** The
+capability column landed in the terrain capacity table and in the movement pass.
+The invariant kept the older, narrower reader, and nothing failed until a unit
+reached the case. This is the shape the recurring defect rule names first, and
+this is a local instance of it.[^F581C]
+
+**A check that states a stricter rule than the code is a defect in the check.**
+It reads back correctly, it passes every test that does not reach the case, and
+when it does fail it accuses the engine.
+
+### FND-585 — Two tests asserted that a value stands still, and a rule neither test models moves it
+
+**Believed.** A test may read a rule by asserting that a state does not change
+while the input to that rule is absent. Two tests did so. One asserted that a
+faction with no speaker does not move its relation entry. The other asserted
+that every carrier the controller assigned is sent on the plane of its faction.
+
+**True.** Both assertions state the absence of a change, and in each case an
+engine rule that reads none of the inputs of the test makes that change. The
+relation drift moves every entry outside the peace band one step toward it, on a
+schedule, and it reads no speaker. The release frees a sent unit when its
+destination plane stops steering it, which is what lets an arrived carrier read
+its option row and deliver at all.[^F585B]
+
+**Evidence.** Measured on 6 September 2026 on one development machine
+(ty001-ubuntu, x86-64). A per-tick trace of the relation fixture showed the
+entry rising from minus one to zero on the failing tick, with no relation
+command by that faction on that tick, and with the other entry of the pair
+rising by one on the same tick. Zero is the peace edge, and one is the drift
+step, so the drift explains both. The trace also showed that the faction planned
+no relation command on any of the two hundred ticks, so the assertion the test
+did hold was near vacuous as well. A second run that gave that faction the
+leader row planned thirty commands, none of them on a tick it held no speaker.
+For the carrier, removing the one assertion made the test pass: the contract
+bound, the controller assigned a carrier, and the engine moved a quantity.
+
+**What follows.** Three things.
+
+**Assert what the rule produces, not what its absence leaves alone.** A state
+has many writers. An assertion that a state did not change is an assertion about
+every writer, and a test states only the one it knows.
+
+**Compare two runs that differ in one input.** The relation test now runs the
+same world twice and differs only in the unit type of one faction. The command
+count goes from zero to thirty, so the gate is what stops the silent run, and
+not the fixture.
+
+**A test may go vacuous without going red.** The relation fixture reached its
+case when it was written and stopped reaching it later. Nothing failed, because
+a test that asserts a zero passes hardest when the case never arrives.
+
+
+### FND-586 — A city could never change hands, so a war could take the ground and the people and end nothing
+
+**Believed.** A war reaches an end. A faction that takes the ground around a
+city and kills the people in it has beaten that faction, and the domination
+reader ends the game when one faction holds every seat or every rival is
+empty.[^F542C]
+
+**True.** A settlement's faction was written at its founding and never again.
+One assignment wrote it and the founding was its only caller, so no verb, no
+stage and no control-plane call could move a city from one faction to another.
+Held ground is decided by the reach of the city nearest a tile, so the ground
+of a faction returned to it as soon as the lease of an invader decayed.[^F586B]
+A faction with no unit and no person kept its cities, kept its ground and kept
+its seat for ever, and its cities kept producing.
+
+**Evidence.** A sweep of the demonstration world over eight seeds, at three
+factions, at an extent of 48, to a tick limit of 4000, on 6 September 2026 on
+one development machine (x86-64). Before the change, territory ended six of the
+eight at the tick limit and domination ended two. After the change, domination
+ended eight of eight, and every one of them ended well inside the limit. The
+commit body holds the two tables and the command that produced them. The
+figures stay derived until the target platform measures them.[^28]
+
+**What follows.** **A fact that nothing writes leaves every reader of it
+unreachable.** The domination reader, the campaign objective that takes a
+settlement tile, and the elimination path all read a fact that no write site
+produced. Each passed its own test, because each test wrote the fact by hand.
+
+**Ask which write site is missing when a reader never fires.** The readers were
+correct throughout. What was absent was the one assignment a conquest needed,
+and a count of the game ends by path is the measurement that found it.
+
+### FND-587 — Two facts about one conquest lived in two columns, and nothing failed when they disagreed
+
+**Believed.** A capture moves a site to the taker and moves the residents of
+that site with it. A resident is a unit, and moving a unit is one write to the
+faction column of the unit.
+
+**True.** A unit may name a character, and the character carries a faction of
+its own. A capture that moved the unit and not the character left the two
+disagreeing. Nothing read both, so nothing failed. The disagreement surfaced
+one pass later and by accident. The elimination pass removes the characters of
+a faction that leaves, the losing faction left the game on the tick its last
+city changed hands, and the invariant check then found a live unit naming a
+character the arena no longer held.
+
+**A second instance of the same shape appeared in the same work.** A faction
+claims ground through the holder column and through a lease that outranks the
+reach of every city.[^F587A] A release that cleared the holder and left the
+lease gave the tile straight back on the next spread, from a lease that nobody
+could raise or lower any more.
+
+**Evidence.** Both were found by putting the defect back and running the test.
+The character case failed the world invariant check. The lease case needed a
+fixture built for it, in which a faction holds ground by a lease at the claim
+threshold rather than by a city. A fixture that held ground only through a city
+stayed green with the release removed, because the spread already gives that
+ground up on the next tick.
+
+**What follows.** **Count the columns a fact lives in before you write one of
+them.** The through-line of the recurring shapes is one fact in more than one
+place with nothing that fails on disagreement, and a conquest touches several
+of those places at once.[^F487B]
+
+**A fixture that holds ground the cheap way tests the cheap path.** The lease
+case is the whole reason the release exists, and the first fixture never
+supplied it.[^F492B]
+
+### FND-588 — Two guards this work added cannot be reached, and the register says so rather than the tests
+
+**Believed.** A guard that a test drives is a guard the project has tested.
+
+**True.** Two guards in this work refuse a case that the rest of the work
+already makes impossible. Both were found by putting the defect back and
+watching the test stay green.
+
+**The first is the refusal that stops a faction that has left the game from
+winning it.** Every game end reader now walks the factions that may still win.
+The elimination releases the ground of a faction that leaves and removes its
+characters, so such a faction holds nothing that any reader reads. No fixture
+could be built in which removing the refusal changed the winner.
+
+**The second is the clearing of the home of a unit whose site is lost.** A raze
+destroys the residents of the site, and a resident is exactly a unit whose home
+names that site. No live unit can name the freed slot, whatever the loss does
+about it.
+
+**Evidence.** Both were measured by replacing the guard and running the test
+that covers it. Both tests stayed green. Six other put-back experiments in the
+same work failed as they should, and the commit body holds every row.
+
+**What follows.** **Say that a guard is unreached rather than letting a green
+test imply it is covered.** The refusal about a winner stays, because the rule
+about who may win must be stated where a later reader will see it, and a later
+reader may not depend on held ground.
+
+**A put-back experiment answers a question a passing test cannot.** Both guards
+read as tested until the experiment ran.[^F492B]
+
+### FND-599 — Giving the engine a raze rule made a seeded run burn far more cities than it keeps
+
+**Believed.** A rule that keeps a city the taker can supply and burns one it
+cannot gives conquest two shapes. A near conquest grows the taker and a far one
+pays it in plunder, and a run holds a mixture of the two.
+
+**True.** At the reach the balance register holds today, and at the distance
+the seeder places cities apart, almost no conquest is a near one. A seeded run
+burns far more cities than it keeps, and it ends with fewer cities standing
+than it began with. The rule is doing what it says. The world it produces is
+one-sided, because one of its two branches almost never fires.
+
+**Evidence.** A sweep of the demonstration world over eight seeds, at three
+factions, at an extent of 48, to a tick limit of 4000, on 6 September 2026 on
+one development machine (x86-64). With a capture and no raze rule, the eight
+runs ended holding between one and six sites, and five of them held three or
+more. With the raze rule, the same eight ended holding one or two. Domination
+still ended all eight, and the end ticks moved from a range of 1 to 1139 to a
+range of 1 to 2962. The commit body holds both tables and the command. The
+figures stay derived until the target platform measures them.[^28]
+
+**What follows.** **A rule that reads a balance value inherits that value's
+distribution.** The rule states no distance and reads the reach of a city,
+which is what the project wanted. What the project did not see is that the
+reach and the founding distance together decide which branch fires, and neither
+was chosen with this rule in mind.
+
+**Do not repair this by changing the rule.** The lever is the reach, or how far
+apart the seeder places cities. Both are balance values that one blocker
+governs, and the project owner has said he intends to tune from reinforcement
+learning runs rather than ahead of them.[^F494F] [^DEC278]
+
+**The sentence above is history. The project owner gave authority to tune
+these two values on 6 September 2026, and a later finding records what the
+measurement said.**[^F591C]
+
+**Measure the branch that a rule does not take.** A test proved each branch
+works, and a run showed that one of them almost never happens. Neither answer
+is available from the other.
+
+### FND-600 — A siege that asks an army to stand still cannot be done, because the armies of this engine do not stand still
+
+**Believed.** A conquest that costs work over ticks prices the act. The
+besieger holds the site tile, the work rises on each tick it holds, and a
+defender that returns takes the work away.
+
+**True.** The engine has nothing that makes an army stay. A campaign releases
+its cohort when the cohort reaches its objective, and the choice pass then
+moves each unit every tick. A siege that ended whenever the besieger stepped
+off the tile therefore never accumulated. **A run of 8 seeds took no city at
+all and burned one.** The rule was not expensive. It was unreachable.
+
+**Evidence.** Two sweeps of the demonstration world over eight seeds, at three
+factions, at an extent of 48, to a tick limit of 4000, on 6 September 2026 on
+one development machine (x86-64). Two counters were added to the census for
+the measurement: the site ticks a siege pressed, and the sieges that ended
+before the site fell. The sieges pressed for 1167 site ticks in one seed and
+ended 680 times, so a siege lasted under two ticks on average. A second run
+split the ending by cause. **Of 680 endings only 47 were a unit of the owning
+faction. The other 633 were the besieger leaving.** The commit body holds both
+tables and the command.
+
+**What follows.** **A rule that asks a unit to do the same thing for many
+ticks needs something in the engine that keeps it there.** The siege now waits
+when the besieger leaves and ends only when a unit of the owning faction
+stands on the site tile. The defence the project owner asked for is unchanged,
+and the rule is reachable.
+
+**Measure the mechanism before you tune its value.** The first work value was
+refuted for the wrong reason. It looked too expensive, and the value was
+lowered by two thirds with no effect at all, because the cost was never what
+stopped the conquest.
+
+**A counter that reports why a rule did not fire is worth more than one that
+reports how often it did.** The site count of the sweep rose when conquest
+stopped, and it rose again when conquest worked, so it could not tell the two
+apart.[^F592A]
+
+### FND-601 — The reach and the founding distance decide which branch of the raze rule fires, and both had to move
+
+**Believed.** The reach of a city or the distance the seeder places cities
+apart is the lever on whether a taker keeps a city or burns it, and one of the
+two would be enough.[^F593A]
+
+**True.** Both had to move. The base reach decides whether an undeveloped
+faction keeps what it takes, and the reach bound decides whether a developed
+one does. The founding distance must stand between the two. With the distance
+above the bound the keeping branch cannot fire at all, and with the distance
+below the base the burning branch cannot fire between two founded capitals.
+
+**Evidence.** Four sweeps of the demonstration world over eight seeds, at
+three factions, at an extent of 48, to a tick limit of 4000, on 6 September
+2026 on one development machine (x86-64). At a base reach of 4, a bound of 8
+and a founding distance of 16 the eight runs captured nothing. At a base of 8
+and a bound of 16, with the distance still at 16, the runs burned in six seeds
+and still captured nothing. At a founding distance of 12 the runs captured in
+one seed and burned in two, and domination ended seven of the eight. The
+commit body holds every table and the command. The figures stay derived until
+the target platform measures them.[^28]
+
+**What follows.** **A rule that reads two derived quantities inherits the gap
+between them.** The rule states no distance of its own, which is what the
+project wanted, and the values it reads must then be chosen against each
+other. The balance register now states that relation in all three rows.
+
+**A lowered founding distance moves a fixture that has nothing to do with
+conquest.** One seeding test asserts that a small world seats three of four
+factions, and a shorter distance let the same world seat four. The fixture
+seed moved, and the assertion did not.
+
+
+
+### FND-602 — Four fixture families measured a balance value and not the rule they name
+
+**Believed.** A test suite whose assertions read a work count, a distance or a
+tick budget from the table it is about is safe against a balance change,
+because it reads the value rather than repeating it.
+
+**True.** Reading the value is not enough. Each of these fixtures also depends
+on a second balance value that it never reads, and a change to either one moves
+the two apart. Four families failed on that shape at once.
+
+An unfed unit lives a fixed number of ticks, because its need falls at a fixed
+rate and its deficit then reaches a fixed bound. The work of one upgrade level
+is a separate value. Six suites placed a builder that no site feeds and gave it
+work that now takes more ticks than it lives for. The builder died partway and
+the assertion measured the hunger.
+
+The destination field of a campaign relaxes a fixed number of passes over level
+1 cells, so it steers a unit toward a seed a bounded number of cells away.[^F594A]
+One fixture chose the far corner of the world as an unreachable objective. The
+unit read no direction, the engine released it, the cohort was empty, and the
+campaign closed as lost rather than as expired.
+
+A unit of one faction on the site tile of another besieges that site.[^F594B]
+One fixture renewed a guest presence by placing an enemy on the first tile the
+listener held in index order, which is the site tile itself. The capital fell
+inside ten ticks and every test in the file failed in its own setup.
+
+**Evidence.** Eight suites of the core crate, run on 7 September 2026 on one
+development machine (x86-64), at the tip of the integration branch. Each cause
+was proved by putting the defect back and watching the suite go red again.
+
+**What follows.** **A fixture must read every balance value its run depends on,
+or it must remove the dependency.** The upgrade suites now hold the need where
+it is, through the verb a caller has, so that hunger bounds no run in a file
+about builds. The crowd counts and the raised-world counts are derived from the
+table rather than written. The campaign objective sits inside a stated window.
+
+**A fixture that cannot reach its case must say which reason it stopped for.**
+One guard already read that way and it fired correctly. The others did not:
+they reported that a level did not stand, or that a campaign did not expire,
+without saying that the builder starved or that the cohort dissolved. Both now
+name the reason.
+
+### FND-603 — A state hash pinned inside a suite is a second golden file
+
+**Believed.** A test may pin the whole state hash of a world to a constant it
+holds, as a regression pin over the subsystem the suite is about.
+
+**True.** The state hash of a world covers every arena and every rule the world
+holds. A pin on it fails when any rule moves, whether or not the subsystem
+reads that rule. The weather margin suite pinned the state hash of a world with
+no unit and no site, and a siege rule added to the world moved it. The message
+then accused the weather of a move the weather did not make.
+
+That is one fact in two declaration sites, with nothing that says which to
+regenerate when they disagree.[^F595A] The golden state hash already pins the
+state of a world, it is a stored file, and it has an owner.
+
+**Evidence.** The suite failed at the tip of the integration branch with no
+change to any weather pass. The fold of the weather field alone is stable
+across the same commits.
+
+**What follows.** A pin inside a suite must cover the subsystem the suite
+names. The weather pin now folds the weather field and not the world. Its value
+was taken on 7 September 2026 on one development machine (x86-64).
+
 
 ## References
+
+[^F591C]: Findings register, FND-601. `docs/FINDINGS.md`
+[^F592A]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
+[^F593A]: Findings register, FND-599. `docs/FINDINGS.md`
+[^F494F]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+[^DEC278]: Decisions register, DEC-278. `docs/DECISIONS.md`
+
+[^F579B]: ADR-0150, held ground is the ground within reach of a city its faction owns. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+[^F580A]: ADR-0153, a tile's lease follows the units that stand on it, decision D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+[^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 
 [^F572A]: Backlog item 0495, build the observation plane and let every reader answer for one faction. `docs/backlog/complete/0495-build-the-observation-plane-and-let-every-reader-answer-for-one-faction.md`
 [^F572C]: Project orientation, the design principles. `AGENTS.md`
@@ -14266,7 +15103,6 @@ way.[^F572E]
 [^F496I]: Backlog item 0502. `docs/backlog/proposed/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
 [^F494A]: Balance register, the stock target, the wonder work, the tick limit, the founding group and the campaign cohort size. `docs/reference/balance.md`
 [^F494B]: The census row that counts a filled seat. `crates/cachette-core/src/world.rs`
-[^F494F]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^F492A]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^F492B]: Testing rules, section 2a. `.agents/rules/testing.md`
 [^F488A]: The send verb, which names a seed set and a plane. `crates/cachette-core/src/world.rs`
@@ -14333,3 +15169,852 @@ way.[^F572E]
 [^F568B]: ADR-0059, fog storage grows with observed area, not with world area, the context. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^F568C]: The observation module of the core crate. `crates/cachette-core/src/observation.rs`
 [^F568D]: Research report 31, the state of the learner surface, claim 1. `docs/research/reports/31-the-state-of-the-learner-surface.md`
+[^F580A]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+[^F580B]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the alternatives it rejects. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^F588A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^F582A]: Backlog item 0516. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
+[^F585B]: The flat observation array and its schema. `crates/cachette-core/src/faction_observation.rs`
+[^F588B]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+[^F588C]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+[^F585B]: Findings register, FND-572. `docs/FINDINGS.md`
+[^F594A]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+[^F594B]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+[^F595A]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+
+### FND-604 — The season is twice the published swing, and the oversized swing hides a cold pole
+
+**Believed.** The temperate band was missing because the world holds too little
+seasonal swing. A world with a correct annual mean and too small a swing grades
+every mid-latitude cell against one temperature, so no cell passes the
+temperate test anywhere.
+
+**True.** The swing is too large, not too small, and the register already said
+so. Reducing it puts the temperate band where the published classification puts
+it. **Reducing it also uncovers a second defect that the oversized swing was
+hiding.** The annual mean at a high latitude is so cold that only a very large
+summer lifted the warmest month above freezing. With a realistic swing the
+polar summer stays below freezing, and the ice cap grows from 1 percent of the
+land to 22 percent.
+
+**Neither term reaches the temperate band alone.** The season decides where the
+band forms. The mean decides whether the pole survives it.
+
+**Evidence.** Four runs of the Köppen probe over one demonstration world, at an
+extent of 128, at seed `0x2f`, at the tile pitch, settled for 400 ticks and
+sampled every 8 ticks over one season period, on 6 September 2026 on one
+development machine (x86-64). Every figure is derived and none is measured on
+the target platform.[^F601A]
+
+At the swing the engine carries, the mid-latitude band at 37 degrees holds 1
+percent temperate, 36 percent continental and 61 percent arid. Its coldest
+month averages −7 °C and its annual range is 40 °C. **The published range that
+the classification is built on is about half that**, and the season term is
+built to reach its whole reserved swing at 45 degrees and then to clamp, so
+every latitude poleward of about 50 degrees receives the same swing.
+
+Halving the season moves that band from 1 percent temperate to 36 percent, and
+the continental share of it from 36 percent to 1 percent. Over the whole land
+the temperate share moves from 1 percent to 3 percent and the ice cap from 1
+percent to 22 percent.
+
+Restoring the constant returned every figure to the first run, cell for cell.
+
+**Raising the season instead does not build.** The heat scale reserves the belt
+and the season together, and a larger season fails the assertion that the
+coldest cell must not clamp at the bottom of the scale. **So the direction the
+hypothesis asked for is not merely wrong. It is unreachable.**
+
+**What follows.** **A share over the whole land is not the measurement here,
+because the land of this world is not distributed as the land of the Earth
+is.** The two bands around the equator hold 3 percent of the land cells of this
+world, and the two polar bands hold 23 percent. The published shares are shares
+of the land of the Earth.[^F601B] **Compare a latitude band against its own
+published class, and do not compare the totals.**
+
+The second defect has no term to repair it. The belt maps the annual mean
+insolation onto the temperature with no transport term, and the published
+energy balance models flatten that profile with a diffusion of heat toward the
+poles.[^F601C] The engine carries the temperature on the wind and mixes it
+nowhere, so it holds no such term. **Adding one is a decision and not a
+constant**, and this finding does not make it.
+
+**Do not reduce the season until the pole has a floor.** The change is correct
+at the middle latitudes and it regresses the poles, and the poles were repaired
+immediately before this work.
+
+## References
+
+[^F601A]: The Köppen probe. `crates/cachette-core/examples/weather_koppen_probe.rs`
+[^F601B]: Research report 30, the published atmospheric math, section 8. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^F601C]: Research report 30, the published atmospheric math, section 4.4. `docs/research/reports/30-the-published-atmospheric-math.md`
+
+
+### FND-605 — A diffusion on the carried temperature cannot flatten the profile, because the driver pins it
+
+**Believed.** The mid-latitudes and the poles stand too cold because the
+temperature follows the insolation with no transport term. A published energy
+balance model carries a diffusion of heat toward the poles, and the engine
+carries none.[^F601C] Adding one would flatten the profile and lift the polar
+summer above freezing.
+
+**True.** The first half holds. The engine carries no transport term and a
+published model does. **The second half does not.** A diffusion on the carried
+temperature plane changes nothing that a reader can see, at any pass count the
+engine can afford.
+
+**The driver is the reason.** Each pass moves the temperature of a cell one
+eighth of the way toward what the world asks of that cell. That is a
+relaxation to a local value, and it competes with the diffusion. The diffusion
+smooths over the square root of the ratio between the two, which is about one
+cell at one pass and about seven cells at thirty-two. **The profile it must
+flatten is 128 cells from pole to pole.** Flattening it needs about 10,900
+passes for each tick.
+
+**Evidence.** Three runs of the Köppen probe over one demonstration world, at
+an extent of 128, at seed `0x2f`, at the tile pitch, settled for 400 ticks and
+sampled every 8 ticks over one season period, on 6 September 2026 on one
+development machine (x86-64). Every figure is derived.[^F601A]
+
+The mean temperature of every latitude band is the same to the whole degree
+with no transport pass, with one, and with thirty-two: −26, −19, −5, 12, 23,
+26, 25, 22, 12, −5, −17, −24. The ice cap holds 1 percent of the land in all
+three. **Thirty-two passes are indistinguishable from none.**
+
+**The term is not merely inert. It is slightly harmful.** The temperate band
+falls from 123 cells to 109, because the pass smooths the local contrast that
+was carrying a few marginal cells over the threshold. It costs a pass over
+every cell and it returns less than nothing.
+
+**What follows.** **A transport term belongs in what the field is driven
+toward, and not in what it carries.** The published model diffuses against a
+radiative relaxation whose timescale is a tenth of a year. The engine relaxes
+to a prescribed profile in eight ticks of a 2048-tick year, which is not a
+relaxation but an assignment. **Nothing can compete with an assignment.**
+
+So the profile must be flattened where it is prescribed, which is the belt
+that the insolation table builds. That is the same answer the project already
+reached for the circulation bands: a single-layer field cannot grow the eddies
+that do the transport on the Earth, so the result of that transport is imposed
+rather than awaited.[^F602C]
+
+**That change needs a published target profile, and this work could not verify
+one.** No zonal mean land temperature against latitude was reachable from an
+accessible source. The next attempt needs that data before it starts.
+
+## References
+
+[^F602C]: Research report 30, the published atmospheric math, section 5.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+
+
+### FND-606 — The published energy balance produces the classes, and the ground term has no unit to meet it in
+
+**Believed.** The belt of a latitude and the season are locked together, so
+neither can be corrected alone, and correcting both against a published energy
+balance would put each climate class where the published classification puts
+it.[^F603A]
+
+**True, for the two terms it names.** A driver built from the published
+diffusive energy balance moved every class in the right direction at once, in
+one run, with no constant fitted to the result. The temperate band appeared
+where the published classification puts it, the equatorial band became wholly
+tropical, and the ice cap went to nothing.
+
+**False for the run as a whole, and one term is the reason.** The heat a cell
+takes from its ground is a count on an abstract scale with no unit and no zero.
+The old driver hid that, because its base was derived from the heat scale and
+absorbed whatever the ground term averaged. **A driver stated in degrees has no
+such slack.** A blocker now holds the missing unit.[^F603B]
+
+**Evidence.** Runs of the Köppen probe over one demonstration world, at an
+extent of 128, at seed `0x2f`, at the tile pitch, settled for 400 ticks and
+sampled every 8 ticks over one season period, on 6 September 2026 on one
+development machine (x86-64). Every figure is derived.[^F601A]
+
+The band at 37 degrees north, which is where the published classification puts
+the temperate climates, moved from 1 percent temperate and 36 percent
+continental to 56 percent temperate and no continental. Its coldest month moved
+from −7 °C to +10 °C and its annual range from 40 °C to 16 °C. The equatorial
+band moved from 81 percent tropical to 100 percent. The ice cap moved from 1
+percent of the land to none.
+
+In the same run the polar band moved from 95 percent tundra to 76 percent
+desert, its annual mean from −24 °C to 0 °C. **Two causes, and they are
+separable.** The published model holds the albedo constant, so it carries no ice
+feedback and is known to settle warmer at a pole than a planet with ice
+does.[^F603D] The larger cause is the ground term, which the driver adds whole
+rather than as a perturbation, and which lifts the poles about 8 degrees.
+
+Centring that term on the middle of its own range cooled the whole world by
+about 16 degrees and put 97 percent of the equatorial band under tundra. **The
+midpoint of a range is not where the ground of a world sits**, so the correction
+is not a centring.
+
+**What follows.** **A term with no unit cannot join a model that has one.** The
+belt and the season are now stated in degrees against published constants. The
+ground term is not, and no offset for it can be chosen without either a
+measurement of this world or a physical scale for the terrain. The first is
+fitting and the second is the blocker.
+
+**Do not close the gap with an offset.** Both attempts above are offsets, both
+are defensible in a sentence, and both are wrong by more than ten degrees over
+most of the world. The scale of the error is the evidence that the quantity is
+missing rather than mis-set.
+
+## References
+
+[^F603A]: Findings register, FND-604. `docs/FINDINGS.md`
+[^F603B]: Blockers register, BLK-156. `docs/BLOCKERS.md`
+[^F603D]: ADR-0182, the temperature a cell is driven toward is a published energy balance, the consequences. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+
+
+### FND-607 — The lapse rate is right and the terrain stands too high for it
+
+**Believed.** Giving the terrain a height in metres would let the ground term
+read the published lapse rate, which would give it a unit and a zero, and the
+energy balance driver would then land.[^F603B]
+
+**True in the mechanism and false in the result.** The lapse rate reads
+correctly, sea level is its zero, and it repairs the polar band. It also cools
+the whole world by between eleven and eighteen degrees, because **the land of
+this world stands two to three times higher in its own range than the land of
+the Earth stands in its**.
+
+**Evidence.** The Köppen probe and a water probe over the demonstration world,
+at an extent of 128, at seed `0x2f`, at the tile pitch, settled 400 ticks, on
+6 September 2026 on one development machine (x86-64). Every figure is
+derived.[^F604B]
+
+The mean height of the land runs from 41 percent of the range at the equator to
+69 percent at the southern pole. At the chosen relief that is 1650 to 2750
+metres, and at the published lapse rate it is 10.7 to 17.8 degrees of cooling.
+**The mean land elevation of the Earth is near 800 metres**, which is about
+5 degrees.
+
+The polar band moved from 85 percent desert to 3 percent, which is the repair
+the lapse rate was wanted for. In the same run the equatorial band lost every
+tropical cell, and the bands at 52 and 66 degrees went to ice cap and tundra.
+
+**What follows.** **The relief of a world and the height distribution of its
+terrain are one quantity declared in two places, and nothing fails when they
+disagree.**[^F590A] The relief says what the whole fraction is worth. The
+terrain decides where in that fraction the land sits. Only their product
+reaches the lapse rate, and only their product is wrong.
+
+**Do not repair this by changing the lapse rate.** The rate is published and it
+is not the free variable. The free variables are the relief and the terrain,
+and both are choices that belong to the project owner.
+
+### FND-608 — Two terms had no zero, and both were found by the same question
+
+**Believed.** Restating the temperature driver in degrees was a change of unit.
+The terms that fed it would carry over unchanged.
+
+**True.** Two of them could not, and neither was visible until the driver
+carried a level of its own. **A relative driver hides a term that has no zero**,
+because a base tuned to the scale silently absorbs whatever that term averages.
+
+**The ground term had no zero.** It was a count on an abstract scale that only
+ever added. Added whole to an absolute balance it lifted the poles about 8
+degrees; centred on the middle of its own range it cooled the world about 16
+degrees. Both are choices and both are wrong by more than ten degrees. The
+answer was a physical zero, which is sea level, and that needed a unit.[^F603B]
+
+**The cloud term double-counted the albedo.** The balance takes the albedo of a
+planet that already carries its mean cloud, so subtracting a whole cloud effect
+on top counted the same cloud twice. It cooled the equator by about 16 degrees
+and took every tropical cell off the map. The answer was an anomaly about the
+mean cover.
+
+**Evidence.** Runs of the Köppen probe over the demonstration world on 6
+September 2026 on one development machine (x86-64), each isolating one term.
+Every figure is derived.[^F604B]
+
+**What follows.** **Ask of every term what its zero is and why.** Both defects
+answer that question the same way and neither answers it in the old code,
+because a relative driver never asks. A record now states the rule for any
+radiative term the project adds.[^F605A]
+
+**A third defect of the same shape was in this work and not in the code.** The
+land share of a cell was read as the water share, so the relief term was
+multiplied by the water fraction and vanished over land. Three measurements
+were taken and reported before an ablation at forty thousand metres returned a
+result identical to the cell. **A term that does nothing looks exactly like a
+term that is not needed**, and only an absurd input separated them.
+
+## References
+
+[^F604B]: The Köppen probe and the water probe. `crates/cachette-core/examples/`
+[^F605A]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+
+
+### FND-609 — The field is not over-blended, and the plane that looks smoothest is the one carrying a gradient
+
+**Believed.** The weather reads as one colour, so the field mixes more than it
+needs and it should keep more local contrast.
+
+**True in the impression and false in the field.** Every water plane already
+carries more local contrast than the terrain under it. The temperature carries
+more than its own driver supplies. **Nothing measured here is over-blended.**
+
+**Evidence.** A contrast probe over the demonstration world, at an extent of
+128, at seed `0x2f`, settled 400 ticks, on 7 September 2026 on one development
+machine (x86-64). The probe reports, for each plane, the mean absolute
+deviation over the world beside the mean step between two neighbours. Every
+figure is derived.[^F606A]
+
+At the tile pitch the terrain steps 702 of a spread of 10,407 between
+neighbours. The air steps 232 of 2,870 and the ground steps 1,836 of 8,453, so
+both stand rougher than the terrain. The temperature steps 1 of 44.
+
+**Two things had to be ruled out and both were.** Quartering the share that the
+warmth carry mixes changed the temperature roughness by nothing at all: still a
+step of 1 in a spread of 44. And the ratio between the temperature roughness
+and the terrain roughness holds between a third and a half across four lattice
+pitches, so it is not an averaging effect of the pitch either.
+
+**The metric flattered the wrong conclusion, and this is the correction.** The
+temperature plane carries a large smooth latitude gradient and the terrain
+carries none, so the temperature spread is inflated by a signal that has no
+local step. Comparing the two ratios is unfair to the temperature. Read in one
+unit instead: the terrain steps about one percent of its height range between
+neighbours, which through the ground term is about half a warmth unit of
+driver, against a measured step of one whole unit. **The temperature carries
+about twice the local contrast its driver supplies.**
+
+**What follows.** **A ratio of two spreads is not a measure of blending when
+one plane carries a gradient and the other does not.** The metric is still
+useful for comparing one plane against itself under a change, and it is
+misleading for comparing two planes with different large-scale structure.
+
+**Do not reach for the ground divisor.** Roughness is a ratio, so dividing the
+ground term scales the spread and the step together and changes the contrast by
+nothing. It sets how much of the heat scale the terrain claims, not how sharp
+the field is.
+
+## References
+
+[^F606A]: The contrast probe. `crates/cachette-core/examples/weather_contrast_probe.rs`
+
+
+### FND-620 — The height ceiling was the whole of the cooling error, and none of the rest
+
+**Believed.** The land of this world stands two to three times higher in its own
+range than the land of the Earth stands in its, so the published lapse rate took
+11 to 18 degrees off every land cell. Either the ceiling or the height
+distribution had to move.[^F603A]
+
+**True, and the ceiling alone was enough.** Moving the ceiling from 4000 metres
+to 1500 puts the mean land near 800 metres, which is the published mean for the
+Earth, and the cooling falls to between 4.0 and 6.7 degrees. **The distribution
+did not need to move.** A reshape of the terrain was specified and then
+withdrawn before any of it was written.
+
+**Evidence.** A water probe and the Köppen probe over the demonstration world,
+at an extent of 128, at seed `0x2f`, at the tile pitch, settled 400 ticks, on 7
+September 2026 on one development machine (x86-64). Every figure is derived.
+
+The land stands at 41 to 69 percent of its range, which is unchanged because the
+terrain is unchanged. At 1500 metres that is 620 to 1029 metres, and at the
+published lapse rate it is 4.0 to 6.7 degrees of cooling, against 11 to 18 at
+the old ceiling.
+
+**What follows.** **The class table did not come right, and the height was not
+why.** With the cooling corrected the polar band still grades desert and the
+equatorial band still misses tropical by about two degrees. Both are the cloud
+term, and the next finding holds the measurement.
+
+**Two figures were proposed for this and both were arithmetic from the same
+table.** The first was wrong by a factor of two and a half. The second was
+checked against a probe before anything was built on it, and it held.
+
+### FND-621 — The cloud term is load-bearing in both directions, and it reads the wrong quantity
+
+**Believed.** With the height corrected, the published energy balance would give
+the classes their published latitudes.
+
+**True for the middle latitudes and false at both ends.** The band at 37 degrees
+moved from 1 percent temperate to 23. The polar bands grade 80 to 84 percent
+desert, and the equatorial band misses tropical by two degrees.
+
+**An ablation proves the cause and refuses the fix.** Removing the cloud term
+entirely repairs the poles, which grade 84 to 90 percent tundra. In the same run
+the rain of the middle latitudes collapses, the band at 37 degrees falls from
+364 to 48 on the probe's rain scale and grades 94 percent desert. **The term is
+load-bearing in both directions, so its presence is not the defect and its
+absence is not the repair.**
+
+**The defect is the quantity it reads.** The term takes the water the air holds
+against what that air could hold, which is a relative humidity, and treats it as
+a cloud cover. In this field that quantity runs from 14 percent to 94 percent
+between bands. **Real cloud cover does not swing that far**, so the anomaly
+swings about twice as wide as it should: it warms a dry polar cell by about 7
+degrees and cools the wet equator by about 4.
+
+**Evidence.** Runs of the Köppen probe over the demonstration world at a 1500
+metre ceiling, with the cloud term at its published value and at zero, on 7
+September 2026 on one development machine (x86-64). Every figure is derived.
+
+**What follows.** **The two records are coupled and neither lands alone.** The
+right source for a cloud term is the condensed water that a second record adds
+as a plane, and that record already states that the two readers deriving cloud
+from humidity must move onto it.[^F608A] **Until they do, the energy balance has
+no correct cloud to read.**
+
+**A fourth reason not to land the driver was found by the tests.** The peak of
+the air plane visits three cells in about a thousand ticks, where the test
+requires four. The weather is pinned. A better class table bought by losing the
+motion of the field is not a trade this work will make quietly.
+
+## References
+
+[^F608A]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D1. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
+
+
+### FND-610 — The cloud plane does not hold up beside the energy balance, and the run that said it did was reading a broken scale
+
+**Believed.** The energy balance reads a relative humidity where it wants a
+cloud cover, so moving that reader onto the condensed water plane would repair
+it.[^F608A]
+
+**True in the reasoning and false in the result.** Moving both readers onto the
+plane did raise the temperate band, from 23 percent of the band at 37 degrees to
+33. **That gain is an artefact and not a repair.**
+
+**Condensed water is not a cover fraction.** The plane holds what has condensed
+and not yet fallen, and it falls at a share of one seventh in each solve, so it
+is a small transient quantity against the capacity of the air. Read as a cover
+it gives about 5 percent everywhere. The cloud term is an anomaly about a mean
+cover of 68 percent, so a uniform 5 percent is a uniform warming of the whole
+world, and that warming is what moved the band.
+
+**A test caught it that the class table could not.** The painted sky over polar
+land reads 13 of a whole sky of 255, where the field requires the high latitudes
+to hold cloud. **The class table cannot see a uniform offset, and a readability
+test can.**
+
+**Evidence.** Runs of the Köppen probe and the weather test binary over the
+demonstration world at a 1500 metre ceiling, on 7 September 2026 on one
+development machine (x86-64). Three arrangements were measured: the driver
+alone, the driver with the plane and the old readers, and the driver with both
+readers moved. The first two differ by about three points of desert and one of
+temperate, which is a wash. Every figure is derived.
+
+**What follows.** **A quantity that is conserved and a quantity that is a
+fraction are not the same shape, and one cannot be substituted for the other by
+changing what a reader points at.** A cloud cover needs its own scale: how much
+condensed water makes an overcast sky. That is a constant nobody has chosen, and
+choosing it against the picture would be fitting.
+
+So the cloud plane is left out of this landing. **It is not wrong. It has no
+correct reader yet**, and the record that adds it already says the two readers
+must move onto it.[^F608A]
+
+### FND-611 — One account, two readers, and only the test knew about the second
+
+**Believed.** Adding a plane to the water account meant updating the account
+check. Three sites in the test file were found and repaired.
+
+**True, and there was a fourth.** The engine carries its own account check, and
+the world invariant calls it every frame. It read the air and the ground and not
+the cloud, so it failed at frame zero with the whole world still empty.
+
+**The failure was correct and the repair was one line each side.** What made it
+cheap was that the invariant runs inside the world rather than only inside a
+test, so it fired on the first frame of an unrelated test rather than waiting
+for a reviewer.
+
+**Evidence.** The weather test binary over the demonstration world on 7
+September 2026 on one development machine (x86-64). Eight tests failed with the
+account short by the cloud; five failed after the engine check was repaired, and
+the three that recovered were the account tests.
+
+**What follows.** **A rule that lives in a test protects one test. A rule that
+lives in the engine protects every caller.** The account is one fact with two
+readers, and only the one inside the engine caught the omission. The finding is
+recorded because the next plane added to any account will meet the same pair.
+
+## References
+
+
+
+### FND-612 — The field moved on a terrain contrast that was three times the physics, and correcting it stopped the motion
+
+**Believed.** The pinned air peak was either a driver that damps the field or a
+test threshold carried from the old behaviour, in the way three other failures
+of this landing are.
+
+**True: the driver damps the field, and the threshold is sound.** Measured at
+the configuration the guarding test builds, which is an extent of 256 at the
+default weather scale, over 1024 ticks on one thread, on 7 September 2026 on one
+development machine (x86-64). Every figure is derived.[^F612A]
+
+| | before | after |
+|---|---|---|
+| cells the air peak visited | 6 | 3 |
+| mean wind speed, of a ceiling of 48 | 38 | 34 |
+| mean temperature step between neighbours, hundredths | 391 | 299 |
+
+**The cause is the ground term and it is not a defect in the new one.** The old
+term spanned 64 warmth units, which is 32 degrees, between the lowest wettest
+cell and the highest driest. The published lapse rate over a 1500 metre relief
+spans 19.5 units, which is 9.8. **The old field moved on about three times the
+terrain contrast that correct physics gives.**
+
+**What follows, and it is structural.** A single layer has no baroclinic
+instability, so it grows none of the eddies that move a real atmosphere.[^F602C]
+**Terrain contrast and the seasonal march are the only things left that can move
+this field**, and correcting the terrain term to the published rate leaves too
+little of the first.
+
+**A proposal, which this work did not take.** The rule this landing already
+states for the cloud applies to the relief as well: a term for a quantity the
+published constants already average over must be an anomaly about that
+average.[^F612C] The balance temperature is an observed global mean, and the
+land of a real planet already stands at its mean elevation inside that
+observation. **So the lapse rate should read the height of a cell against the
+mean land height of its world, and not against sea level.** The mean cooling
+then vanishes by construction, the ceiling is free to rise, and the contrast
+comes back with it. That is a design change and it reverses a value the owner
+chose, so it is stated here rather than taken.
+
+### FND-613 — A lag nominated to carry an effect was never measured against the effect
+
+**Believed.** The sea moderates a coast by holding its heat rather than by
+sitting at a different mean, so a record removed the water term from the
+temperature driver and named the existing lag as the thing that carries
+it.[^F612C]
+
+**True in the physics and false in the value.** A first order lag driven by a
+yearly cycle damps its driver by one over the root of one plus the square of two
+pi times the time constant over the period. At the value the lag carried, the
+sea damped its own seasonal swing by **1.9 percent**. It tracked the season as
+closely as the land beside it, and the two never parted.
+
+**The published anchor.** The warmest month over the ocean falls about two
+months after the solstice, where over land it falls about one. A two month lag
+on a twelve month cycle gives a time constant near a quarter of the year, which
+on this module's season period is about eight times the value the lag held.
+
+**Evidence.** The value moved from 8 to 64 and the field was measured again on 7
+September 2026 on one development machine (x86-64). The mean temperature step
+between neighbours moved from 299 hundredths to 308, against 391 before the
+driver. **The correction is real and it recovers about a tenth of what the
+ground term lost**, so it is kept on its own merits and it is not the repair for
+the motion. The class table moved by four cells of 6,544, which is nothing.
+
+**What follows.** **A mechanism nominated to carry an effect must be measured
+against the effect, in the same change that nominates it.** The record removed a
+term and handed its work to a lag without asking what the lag could carry, and
+the answer was two percent. The removal was correct and the handover was not
+checked.
+
+### FND-614 — A published constant already carries the land, so a lapse rate from sea level counts it twice
+
+**What the project believed.** The ground term of the temperature driver took
+the published lapse rate on the height of a cell above sea level. The record
+stated sea level as the zero, and gave a reason: the balance is a sea-level
+temperature, so a cell at sea level receives it unchanged.[^F614A]
+
+**What is true.** The balance constants are fitted to a planet that already has
+land above the sea. The temperature they give is therefore the temperature of
+the mean land height, not the temperature of the sea mark. A term measured from
+sea level takes the whole height off every land cell, so the world pays for its
+own land twice: once inside the constants that were fitted to it, and once again
+in the term. The reference is the mean land height of the world, and the term is
+an anomaly about it.
+
+**This is the third instance of one rule.** The cloud term counted the mean
+cloud twice, because the albedo already carried it. The ground term counted the
+mean land twice, because the balance already carried it. The rule that names
+both was written after the first and did not reach the second, although the two
+sit in the same record.[^F614A]
+
+**Evidence.** The world mean replaced sea level as the reference, and the field
+was measured on 7 September 2026 on one development machine (x86-64). Both
+equatorial bands graded wholly tropical for the first time. The temperate share
+of the world did not move. The tropical share rose from nothing, and the polar
+share fell by about two thirds. The commit body holds the table.
+
+**What follows.** **A decision that states a general rule must be checked
+against every term the same record already holds.** The rule was general when it
+was written, the record that holds it holds four other terms, and no one read
+them against it. The check is mechanical and it costs one pass: for each term,
+name its zero, and name what the published constant it rides on already averages
+over.
+
+**Do not wait for each term to fail.** A rule stated once, beside the one
+instance that produced it, reaches that instance and nothing else. It was four
+decisions above the term it should have governed, in the same file, and it did
+not reach it. Apply the rule to every radiative and terrain term deliberately,
+as a pass. Three terms have now been found with a wrong zero, and the third was
+found by reading the rule rather than by watching a table go wrong. That is the
+first time the rule has caught anything before the symptom did, and it is the
+argument for doing the pass.
+
+
+### FND-615 — The belt kept a share of the sun and the season kept all of it
+
+**What the project believed.** The sun term of the driver has two parts that
+come from one geometry. Nothing said that the two treat the sunlight
+differently.
+
+**What is true.** They did. The belt multiplied the annual mean insolation of a
+latitude by the share the globe keeps, which is the published albedo. The season
+took the daily value against that annual mean and multiplied it by nothing. So
+one term claimed a planet that reflects three tenths of the sun and the other
+claimed a surface that absorbs every watt, from the same table, four lines
+apart.
+
+**The cost falls at the pole, because that is where the anomaly is largest.**
+The polar day delivers the largest daily insolation anywhere on the globe, and
+the term handed all of it to a surface that is ice. The measured seasonal range
+over land peaks near sixty-five degrees and falls toward the pole; the term rose
+to the pole without turning.[^F615A]
+
+**Evidence.** Measured 7 September 2026 on one development machine (x86-64). The
+seasonal range of the polar band moved from 44 K to 38 K against a published
+35.3 K. The root mean square error of the range over six bands moved from 5.01 K
+to 4.41 K. The predicted figure, computed before the term was written, was
+4.89 K; the measurement beat the prediction because a cooler polar summer also
+carries more ice in the mean, which the driver already reads.
+
+**What follows.** **A term that reads a published quantity must apply every
+factor the published form applies to it.** The zero of a term is not the only
+thing a reviewer must ask for. The gain is the other, and it is easier to miss,
+because a term with the wrong gain still has the right shape and still moves the
+right way.
+
+**What this did not fix.** The measured range at forty-five degrees is 0.85 of
+the range at the pole, and the insolation geometry gives 0.52. The albedo moves
+this to 0.65 and no further. The remainder is not a latitude law: Earth's land
+poleward of eighty degrees is an ice plateau beside an ocean, and this world's
+is continental. **A term that reproduced the last of that ratio would be fitting
+one planet's geography into a function of latitude.**
+
+
+### FND-616 — The class shares of this world were compared to Earth's without correcting for where the land sits
+
+**What the project believed.** The share of each climate class over the land of
+this world is comparable to the published share of that class over the land of
+Earth.[^F616A] Every weather change tonight was judged against that comparison.
+
+**What is true.** The two worlds do not put their land in the same places, and
+the class of a cell is mostly a function of its latitude. This world holds
+23 percent of its land poleward of 74 degrees, where Earth holds 7. It holds
+3 percent within 15 degrees of the equator, where Earth holds 10. **A comparison
+of the two totals therefore measures the terrain generator as much as it
+measures the weather.**
+
+**The correction is one weighting.** Take the class shares of each latitude band
+of this world, and combine them with the land area Earth holds in that band
+rather than the land area this world holds. The result says what this world's
+climate rules would produce on Earth's land, which is what the published shares
+describe.
+
+**Evidence.** Measured 7 September 2026 on one development machine (x86-64),
+seed 0x2f. The total absolute error over the five first-letter classes falls
+from 39.8 points to 23.9 points under the reweighting, with no change to the
+engine. **Two of the three gaps are geography and one is not.** The tropical
+share moves from 5.0 to 12.8 against a published 19.0, and the continental share
+from 34.1 to 27.4 against 24.6. The temperate share moves from 6.7 to 6.9
+against 13.4, which is no movement at all.
+
+**What follows.** **The continental band is not eating the temperate one.** The
+continental surplus is polar land, and it is mostly the terrain generator. The
+temperate shortfall survives the reweighting untouched, so it is the one class
+gap that is a defect in the weather. It is a dry gap and not a cold one: the
+band at 37 degrees south holds 931 land cells at 225 mm and grades 88 percent
+arid, where the band at 37 degrees north holds 403 cells at 587 mm and grades
+49 percent temperate.
+
+**Report every class figure both ways from here.** A single total invites the
+project to fix the terrain generator by changing the physics.
+
+**Amended 7 September 2026. Read the conclusion of this finding and treat its
+precision as indicative.**[^F616B] The reweighting above was computed on a
+128-row world whose two equatorial bands held 192 land cells between them, and
+the weighting gives those 192 cells 10.4 percent of the whole. A sample that
+small cannot carry that weight. The conclusion stands and is unchanged: the
+metric was confounded by where this world puts its land, the continental surplus
+is polar land, and the temperate shortfall is the one gap that survives the
+correction. **Take the figures from the 256-row world instead**, where the same
+bands hold 3,323 cells: on Earth's land distribution the temperate share is 12.1
+percent against a published 13.4, and the total absolute error over the five
+classes is 19.7 points.
+
+
+### FND-617 — The subtropics are not too dry. The equator is too wet and the poles never receive anything
+
+**What the project believed.** The rain over land runs about 23 to 1 from the
+equator to the subtropics against a published 4 to 10, so the subtropics are too
+dry, and that dryness is what holds the temperate share down.[^F617A]
+
+**Corrected on 7 September 2026. Read the conclusion, which holds, and not the
+multiples.**[^F618C] The figures below were measured on a 128-row world whose
+two equatorial bands held 95 and 97 land cells. That band is 93 percent open
+water, so those cells are islands, and they collect the convergence of a whole
+ocean. At 256 rows the same bands hold 1,470 and 1,853 land cells and read
+between 0.8 and 2.0 times Earth, against the five times this finding reports.
+
+**The same contamination, in the same band, caught the same worker twice in one
+night.** It first produced a claim that the subtropics receive one percent of
+the rain the equator receives, which was corrected to 23 to 1 over land. The
+correction fixed the number and did not record the shape, so the shape returned
+four hours later and was believed again. **A defect shape that catches the same
+person twice in one night belongs in this register more than any number it
+produced.** The shape is: a band whose land is a small minority of its cells
+does not report the climate of that band, and nothing about the figure says so.
+
+**What is true.** The ratio is right and the reading of it is wrong. The probe
+normalises so that the mean land cell of the world receives the mean annual
+rainfall of Earth's land, so a band figure is comparable to Earth in millimetres
+and not only in shape. Read that way, **the subtropical bands are correct and
+the equator is five times too wet**. The band at 21 degrees receives 688 mm
+against about 700, and the band at 37 degrees north receives 587 mm against
+about 600. The equatorial bands receive about 11,000 mm against about 2,200.
+
+**The two equatorial bands hold 2.9 percent of the land of this world and take
+38.3 percent of its rain.** Because the normaliser divides by the mean, one band
+taking a third of the water grades every other band as a desert. The subtropics
+looked dry because the equator was hoarding, not because they were short.
+
+**The poles are the other end of it.** The bands at 82 degrees receive 49 and
+60 mm against about 200. The bands at 52 degrees receive 1,287 and 1,516 mm
+against about 650. Water piles up where the air converges and never reaches the
+cold end of the world.
+
+**Nothing in a single-layer field can carry it there, and the module already
+says so about the wind.** The three circulation cells cannot emerge from one
+layer, because a single layer has no baroclinic eddies and one temperature
+profile that falls to the pole gives two pressure extremes and not three. The
+module therefore imposes the cells. **Poleward moisture transport fails for the
+same reason and needs the same remedy.** On Earth the moisture that reaches the
+middle and high latitudes is carried by those eddies and by the upper branch of
+the overturning, and this field has neither.
+
+**A condensed phase that travels does not fix it, and would make it worse.**
+The published conversion and fallout times are about 1,000 seconds each. One
+tick of this model is 15,409 seconds and one weather cell of the probe world
+spans about 156 km, so condensate at 20 m/s travels about a quarter of one cell
+before it falls. What little it does travel, it travels with the surface wind,
+and the imposed belts send the surface wind toward the equator. **A term that
+advected condensate would concentrate the rain further where it is already five
+times too high.**
+
+**What follows.** A poleward moisture flux must be imposed, in the shape and for
+the reason the pressure belts are imposed, and its amplitude is a tuning
+constant under the blocker that already governs the wind.[^F617B] **Do not read
+a normalised band figure as a statement about that band alone.** The normaliser
+couples every band to every other one, so a defect in the wettest band is
+reported as a defect in all the others.
+
+
+### FND-618 — The land of a band is not a sample of the band, and the probe world was one third the width of a storm
+
+**What the project believed.** The rain figure of a latitude band describes the
+climate of that latitude, so the bands can be compared with each other and with
+Earth.[^F618A]
+
+**What is true.** The probe measures rain over the land of a band, and **the
+land fraction of a band varies from 6 percent to 66 percent in the probe
+world.** Land is drier than open water in every band except the equatorial ones,
+where a few islands stand where the wind of a whole ocean converges and are
+wetter. So the land figure is biased down in most bands and up at the equator,
+and a comparison across bands compounds both.
+
+Measured over the same world both ways, the land figure divided by the whole
+band figure runs from 0.38 to 0.93 in every band away from the equator, and
+reaches 1.40 and 1.61 in the two equatorial bands. **The equator-to-subtropics
+ratio is 19 to 1 over land and 7.3 to 1 over the whole band.** Earth's whole
+surface gives about 3.6 to 1.
+
+**The second cause is the size of the probe world.** One weather cell of a
+128-row world spans about 156 km. The published travel of a condensed drop is
+about 20 km, so the world could not resolve a moisture gradient. Doubling the
+world to 256 rows, with no change to the engine, moved the land fraction of the
+equatorial bands from 6 and 7 percent to 27 and 32, and moved the whole-band
+ratio from 7.3 to 1 down to between 3.5 and 5.6 to 1, which brackets Earth.
+
+**The class table moves the same way with no engine change.** On Earth's land
+distribution the temperate share moves from 6.9 percent to 12.1 against a
+published 13.4, and the total absolute error over the five classes moves from
+23.9 points to 19.7.
+
+**What follows.** **The equatorial excess is geography and resolution, and it is
+not a defect in the weather.** No imposed moisture flux is needed, and a flux
+fitted to the 128-row figure would have tuned the engine against the instrument.
+
+**Do not compare a land-only figure across bands whose land fraction differs.**
+Report the whole-band figure beside it, and treat a band where the two disagree
+as reporting its geography. **Do not quote a weather figure from a world whose
+cell is wider than the process being measured.**
+
+**This corrects the register.** An earlier finding states that the equator is
+five times too wet.[^F618B] That figure was taken on the 128-row world, whose
+two equatorial bands held 95 and 97 land cells. At 256 rows the same bands read
+between 0.8 and 2.0 times Earth. The conclusion of that finding, that the
+subtropics are correct and were misread through the normaliser, still holds.
+
+
+### FND-619 — An explanation that has been right five times stops being tested
+
+**What happened.** In one night five defects were traced to the measuring
+instrument rather than to the engine: a share read as its own complement, a
+contrast metric carrying a gradient the comparison did not, a probe building a
+different lattice from the test it explained, a normaliser coupling every band
+to the wettest one, and a land fraction varying from 6 to 66 percent across the
+bands being compared.[^F619A] [^F619B]
+
+The sixth residual was then explained the same way, and that explanation was
+wrong. The class table was reweighted onto Earth's land distribution, which
+removes the latitude geography **by construction**. The remaining error was
+nonetheless attributed to where this world puts its land, which the reweighting
+had already subtracted. The same excuse was spent twice, and neither the worker
+who offered it nor the reader who published it noticed.
+
+**What the check would have been, and it was cheap.** The error is symmetric
+across the two hemispheres. Terrain is not symmetric and a land fraction is not
+symmetric. A symmetric error is a mechanism. The measurement needed for this
+check was already on the page.
+
+**What is true.** The residual is a missing term. The warmest month of the polar
+band reads 13 degrees against a published −0.1, and it **rises** toward the pole
+where the measurement falls, in both hemispheres alike. The insolation anomaly
+peaks at the pole, so the seasonal amplitude grows poleward while the annual
+mean flattens, and nothing stops the polar summer. On Earth it is held near the
+melting point by the latent heat of fusion until the ice is gone. This model
+carries no ice mass, so it has nothing to melt.
+
+**What follows, and it is two rules.**
+
+**A pattern that keeps being right is the one that stops being checked.** This
+failure mode follows a *successful* investigation rather than a failed one, so
+it arrives when confidence is highest and scrutiny is lowest. When an
+explanation has just worked several times, require of its next use the same
+evidence its first use needed. Ask what measurement would distinguish it from
+the alternative, and take that measurement.
+
+**Work set aside must stay on the ledger.** The missing term above was
+identified hours before it was needed, judged too large to take at that moment,
+and set aside. That judgement was correct. It then left the account entirely, so
+when its symptom reappeared the explanation was rebuilt from nothing. **Setting
+work aside is sound; losing it from the ledger is the defect.** A deferred
+mechanism belongs in a register at the moment it is deferred, not at the moment
+it is finally needed.
+
+
+## References
+
+[^F612A]: The motion probe. `crates/cachette-core/examples/weather_motion_probe.rs`
+[^F612C]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+[^F614A]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+[^F615A]: Research report 32, zonal mean surface temperature, section 7. `docs/research/reports/32-zonal-mean-surface-temperature.md`
+[^F616A]: Peel, Finlayson and McMahon, updated world map of the Koppen-Geiger climate classification, 2007. Hydrology and Earth System Sciences 11, 1633 to 1644.
+[^F617A]: Blockers register, BLK-155. `docs/BLOCKERS.md`
+[^F617B]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+[^F618A]: Blockers register, BLK-155. `docs/BLOCKERS.md`
+[^F618B]: Findings register, FND-617. `docs/FINDINGS.md`
+[^F618C]: Findings register, FND-618. `docs/FINDINGS.md`
+[^F616B]: Findings register, FND-618. `docs/FINDINGS.md`
+[^F619A]: Findings register, FND-605 and FND-606. `docs/FINDINGS.md`
+[^F619B]: Findings register, FND-618. `docs/FINDINGS.md`

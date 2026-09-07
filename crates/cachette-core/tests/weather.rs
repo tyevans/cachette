@@ -557,19 +557,37 @@ fn cold_ground_holds_less_air_than_warm_ground() {
             *slot = slot.combine(weather::CellGround::of_tile(tile));
         }
     }
+    // **The reference is the mean land height of this world, not sea level.**
+    // The published lapse rate is measured about the mean height the balance
+    // constants already average over, so a cell reads its own height against
+    // that mean. The engine computes the reference over the same plane, so
+    // the test asks for it the way the engine does.[^2]
+    //
+    // [^2]: ADR-0182, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    let reference = weather::mean_land_height_over(&under);
     let mut lowest = i64::MAX;
     let mut highest = i64::MIN;
     for ground in under {
         if ground.tiles() == 0 {
             continue;
         }
-        let capacity = weather::capacity_at(weather::heat_of(ground)).0;
-        lowest = lowest.min(capacity);
-        highest = highest.max(capacity);
+        // **The ground supplies a cooling and not a heat.** It is a signed
+        // number of hundredths of a degree below the balance, so the test
+        // reads it directly rather than through the capacity of a warmth it
+        // no longer produces.[^1]
+        //
+        // [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+        let cooling = i64::from(weather::relief_cooling_of(
+            ground,
+            weather::HeightRange::DEFAULT,
+            reference,
+        ));
+        lowest = lowest.min(cooling);
+        highest = highest.max(cooling);
     }
     assert!(
         highest > lowest,
-        "every cell holds the same air, so the ground does nothing"
+        "every cell stands at one height, so the ground does nothing"
     );
 }
 
@@ -990,8 +1008,9 @@ fn the_season_slope_holds_no_step() {
         // The slope is read over a block of rows, because the truncation of
         // one row is a whole degree and a single difference is mostly that.
         const BLOCK: usize = 16;
-        let slopes: Vec<i32> = readings
-            .chunks_exact(BLOCK)
+        let (blocks, _) = readings.as_chunks::<BLOCK>();
+        let slopes: Vec<i32> = blocks
+            .iter()
             .map(|block| block[BLOCK - 1] - block[0])
             .collect();
         let bend = slopes
@@ -1267,7 +1286,7 @@ fn the_air_never_stands_above_the_saturation_mark() {
 /// past that mark carries no depth, so nothing else in the field can tell a
 /// shelf from an abyss.
 #[test]
-fn shallow_water_is_warmer_than_deep_water_and_lags_less() {
+fn shallow_water_lags_less_than_deep_water() {
     let mark = i64::from(cachette_core::terrain::HEIGHT_WATER.0);
     let sea = |height: i64| weather::CellGround {
         height_total: height * 1024,
@@ -1277,10 +1296,13 @@ fn shallow_water_is_warmer_than_deep_water_and_lags_less() {
     };
     let shelf = sea(mark - mark / 8);
     let abyss = sea(mark / 8);
-    assert!(
-        weather::heat_of(shelf) > weather::heat_of(abyss),
-        "a shelf and an abyss hold the same heat, so depth does nothing"
-    );
+    // **This test held a second clause and a record removed it.** It asserted
+    // that a shelf stands warmer than an abyss in the mean. The sea moderates
+    // a coast by holding its heat rather than by sitting at a different mean,
+    // and the field carries that as the lag below. A second term for it would
+    // be one fact in two places, so the driver no longer holds one.[^1]
+    //
+    // [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
     assert!(
         weather::lag_of(abyss) > weather::lag_of(shelf),
         "an abyss tracks the season as fast as a shelf does"
@@ -1605,7 +1627,7 @@ fn the_capacity_never_passes_the_ceiling() {
     for warmth in -8..=(cachette_core::HEAT_CEILING + 8) {
         let held = weather::capacity_at(warmth).0;
         assert!(
-            held >= 2 && held <= weather::AIR_SATURATION.0,
+            (2..=weather::AIR_SATURATION.0).contains(&held),
             "the capacity at warmth {warmth} is {held} drops"
         );
     }
@@ -1662,24 +1684,81 @@ fn the_insolation_holds_the_published_table() {
     );
 }
 
+/// Returns the highest and the lowest sun term at one latitude over a year.
+fn reach_at(latitude: i32) -> (i32, i32) {
+    let mut top = i32::MIN;
+    let mut floor = i32::MAX;
+    for tick in 0..weather::SEASON_PERIOD_TICKS as u64 {
+        let value = weather::season_at(Tick(tick), latitude);
+        top = top.max(value);
+        floor = floor.min(value);
+    }
+    (top, floor)
+}
+
 /// The pole holds a summer and a winter, and they are half a year apart.
+///
+/// **Every check here is an equality or an ordering, and none is a margin.**
+/// The test carried a margin of sixty units while the sun term was normalised
+/// onto a swing the heat scale reserved. The term states absolute degrees now,
+/// so a count of units on that scale means nothing, and a margin written
+/// against it would be a number chosen to pass.[^1]
+///
+/// **A solstice is an extreme at a pole and nowhere else.** A pole has one day
+/// and one night in the year, so its warmest and coldest moments are the two
+/// solstices exactly. At any other latitude the extreme lags or leads, so this
+/// equality is a property of a pole and it is the sharpest statement the term
+/// allows.
+///
+/// **The largest swing on the globe stands at a pole.** That is the anchor the
+/// season normaliser is read at, so a change that moved the largest anomaly
+/// anywhere else would leave the normaliser describing a latitude that no
+/// longer holds the extreme.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D1 and D2. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+/// [^2]: ADR-0182, decision D3. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
 #[test]
 fn each_pole_holds_a_summer_of_its_own() {
     let quarter = weather::SEASON_PERIOD_TICKS as u64 / 4;
     let pole = 90 * weather::LATITUDE_FINE;
     let summer = weather::season_at(Tick(quarter), pole);
     let winter = weather::season_at(Tick(3 * quarter), pole);
+    let (top, floor) = reach_at(pole);
+    assert_eq!(
+        summer, top,
+        "the pole read {summer} at its solstice and {top} at its warmest moment"
+    );
+    assert_eq!(
+        winter, floor,
+        "the pole read {winter} at its solstice and {floor} at its coldest moment"
+    );
     assert!(
-        summer > winter + 60,
+        summer > winter,
         "the pole read {summer} in its summer and {winter} in its winter"
     );
-    // The two poles are opposite. One is in summer while the other is in
-    // winter.
+
+    // The two poles are opposite. One stands at its own warmest moment while
+    // the other stands at its own coldest, at the same tick.
     let other = weather::season_at(Tick(quarter), -pole);
-    assert!(
-        summer > other + 60,
-        "the two poles read {summer} and {other} at the same tick"
+    let (_, other_floor) = reach_at(-pole);
+    assert_eq!(
+        other, other_floor,
+        "the far pole read {other} while this one read its summer, and its own \
+         coldest moment is {other_floor}"
     );
+
+    // No latitude swings further over the year than a pole does.
+    let polar = top - floor;
+    for degree in -90..=90 {
+        let (high, low) = reach_at(degree * weather::LATITUDE_FINE);
+        assert!(
+            high - low <= polar,
+            "the sun swings {} at {degree} degrees and {polar} at a pole",
+            high - low
+        );
+    }
 }
 
 /// The annual mean of the sun term falls from the equator to the pole.
@@ -1931,4 +2010,87 @@ fn the_banded_pressure_follows_the_world_row_and_not_the_lattice_row() {
         "a margin cell beyond the pole reads a latitude that no world row holds"
     );
     assert!(inner.height() > 0);
+}
+
+/// A world that spans three degrees reads a flat slice of the same sun.
+///
+/// **The normalisers are properties of the globe and not of the world.** A
+/// normaliser read from the world would stretch a four percent change across
+/// the whole scale, and a narrow world would then hold every climate zone
+/// inside three degrees. The reach that the normaliser divides by comes from
+/// the whole globe, so a narrow span keeps a narrow spread and no constant
+/// moves with the span.
+#[test]
+fn a_narrow_span_reads_a_flat_slice_of_the_same_sun() {
+    let region = weather::Latitudes::new(45 * weather::LATITUDE_FINE, 3 * weather::LATITUDE_FINE)
+        .expect("three degrees fits on the globe");
+    let rows = 64u32;
+    let mut top = i32::MIN;
+    let mut floor = i32::MAX;
+    for row in 0..rows {
+        let value = weather::season_at(Tick(0), region.of_row(row, rows));
+        top = top.max(value);
+        floor = floor.min(value);
+    }
+    assert!(
+        top - floor < weather::SEASON_SWING / 4,
+        "a three degree world spreads the sun by {}, and the globe reserves {}",
+        top - floor,
+        weather::SEASON_SWING
+    );
+}
+
+/// A full sky takes away what the published effect of cloud is worth on the
+/// scale of the sun.
+///
+/// **The cloud swing is derived and nothing writes it down.** A cloud that
+/// shades the ground is worth what the sun it shades is worth. This test
+/// measures what one watt of insolation is worth in degrees of warmth, through
+/// the public terms alone, and asks that a full sky match the published effect
+/// of cloud on that scale.
+///
+/// The measurement is a slope between two latitudes, and the annual mean of
+/// the season part is not exactly nothing at either one. So the test holds a
+/// band rather than an equality. A figure written down in place of the
+/// derivation was outside the band by a factor of about three, which is the
+/// error this test exists to catch.
+#[test]
+fn a_full_sky_is_worth_the_published_effect_of_cloud() {
+    let ticks = weather::SEASON_PERIOD_TICKS as u64;
+    // The sun term summed over one year, at one latitude.
+    let sun_over_a_year = |latitude: i32| -> i64 {
+        (0..ticks)
+            .map(|tick| i64::from(weather::season_at(Tick(tick), latitude)))
+            .sum()
+    };
+    // The published insolation summed over the same year, at the same
+    // latitude. Both sums walk the same ticks, so the tick count cancels.
+    let watts_over_a_year = |latitude: i32| -> i64 {
+        (0..ticks)
+            .map(|tick| weather::daily_insolation(latitude, weather::declination_at(Tick(tick))))
+            .sum()
+    };
+    let warm = 0;
+    let cool = 30 * weather::LATITUDE_FINE;
+    let degrees = sun_over_a_year(warm) - sun_over_a_year(cool);
+    let watts = watts_over_a_year(warm) - watts_over_a_year(cool);
+    assert!(
+        degrees > 0 && watts > 0,
+        "the equator must hold more sun and more watts than thirty degrees"
+    );
+
+    // The published net effect of cloud is near twenty watts for each square
+    // metre, over a cover near sixty-eight hundredths. A whole sky is the one
+    // divided by the other.
+    let full_sky = 20 * 100 / 68;
+    let asked = full_sky * degrees / watts;
+    let held = i64::from(weather::cloud_at(
+        weather::Drops(1024),
+        weather::Drops(1024),
+    ));
+    assert!(
+        held * 4 >= asked * 3 && held * 3 <= asked * 4,
+        "a full sky takes {held} degrees, and the published effect on the scale \
+         of the sun asks near {asked}"
+    );
 }

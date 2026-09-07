@@ -60,6 +60,17 @@ Identities = Sequence[int] | npt.NDArray[np.uint64]
 # log it asked for narrows this to the typed dictionary of that event.
 EventColumns = dict[str, npt.NDArray[np.generic]]
 
+class TileWinds(TypedDict):
+    """The wind over every tile, as one column for each free lattice axis.
+
+    Both columns hold one entry for each tile, in the tile order that
+    ``tile_holders`` uses. The entries are whole lattice steps and not a
+    fixed-point value. The third cube part is ``-(q + r)``.
+    """
+
+    q: npt.NDArray[np.int32]
+    r: npt.NDArray[np.int32]
+
 class TileChangedColumns(TypedDict):
     """One column for each field of the tile change event.
 
@@ -153,6 +164,25 @@ class Storm(TypedDict):
     cells: int
     drops: int
     ready_at: int
+
+class CycloneReport(TypedDict):
+    """One travelling storm that the weather field carries.
+
+    The eye is the cell of the whole weather lattice that the storm stands
+    over, as the pair ``(q, r)``. The lattice carries a margin around the
+    world, so an eye may stand over a cell that covers no tile.
+
+    The depth is the pressure deficit at the eye, in the units that the
+    temperature plane carries. The radius is the cells that the deficit
+    reaches. The age and the life are in ticks.
+    """
+
+    id: int
+    eye: tuple[int, int]
+    depth: int
+    radius: int
+    age: int
+    life: int
 
 class WeatherTotals(TypedDict):
     """What the weather of the whole world holds.
@@ -577,6 +607,46 @@ class ObservationField(TypedDict):
     dtype: str
     low: int
     high: int
+
+class ActionPosition(TypedDict):
+    """One argument position of one verb of the action table.
+
+    The candidate names what the position chooses. The bound is how many
+    choices it holds, and the stride is what one step of it adds to the action
+    number.
+    """
+
+    candidate: str
+    bound: int
+    stride: int
+
+class ActionVerb(TypedDict):
+    """One verb of the action table, and the block of rows it holds.
+
+    The first entry is the action number of the first row of the verb. The
+    rows entry is how many rows it holds, which is the product of the bound of
+    each position. A verb the engine resolves by itself declares no position
+    and holds one row.
+    """
+
+    name: str
+    first: int
+    rows: int
+    positions: list[ActionPosition]
+
+class ActionSchema(TypedDict):
+    """The whole action table, as the engine publishes it.
+
+    The version moves whenever a change moves a row. A stored set of weights
+    pins the version it was trained against and refuses a mismatch.
+
+    The length is the number of rows, and it is the length of the array that
+    the legality reader gives back.
+    """
+
+    version: int
+    length: int
+    verbs: list[ActionVerb]
 
 class ObservationSchema(TypedDict):
     """The declared layout of the observation array of one world.
@@ -1203,6 +1273,12 @@ class World:
     def holds(self, faction: int, q: int, r: int) -> bool: ...
     def city_reach(self, site: int) -> int: ...
     def tile_holders(self) -> npt.NDArray[np.uint16]: ...
+    def tile_heights(self) -> npt.NDArray[np.int32]: ...
+    def tile_kinds(self) -> npt.NDArray[np.uint8]: ...
+    def cloud_shares(self) -> npt.NDArray[np.int32]: ...
+    @property
+    def cloud_share_whole(self) -> int: ...
+    def tile_winds(self) -> TileWinds: ...
     @property
     def gather_count(self) -> int: ...
     @property
@@ -1305,12 +1381,34 @@ class World:
         destination: int = ...,
     ) -> None: ...
     def stop_sending(self, units: Identities) -> None: ...
+    def ignite(self, tiles: Sequence[tuple[int, int]]) -> int: ...
+    def burning_tiles(self) -> list[tuple[int, int]]: ...
+    @property
+    def burning_tile_count(self) -> int: ...
+    @property
+    def spent_tile_count(self) -> int: ...
+    def order_douse(self, units: Identities, destination: int = ...) -> None: ...
+    def stop_dousing(self, units: Identities) -> None: ...
+    @property
+    def lightning_chance(self) -> int: ...
+    def set_lightning_chance(self, chance: int) -> None: ...
     def inflict_weather(
         self,
         faction: int,
         places: Sequence[tuple[int, int]],
         strength: int = ...,
     ) -> Storm: ...
+    def raise_cyclone(
+        self,
+        place: tuple[int, int],
+        kind: str = ...,
+        depth: int | None = ...,
+        radius: int | None = ...,
+        life: int | None = ...,
+    ) -> CycloneReport: ...
+    def cyclones(self) -> list[CycloneReport]: ...
+    @property
+    def cyclone_ceiling(self) -> int: ...
     def air_at(self, q: int, r: int) -> int: ...
     def ground_water_at(self, q: int, r: int) -> int: ...
     def ground_is_wet(self, q: int, r: int) -> bool: ...
@@ -1331,9 +1429,7 @@ class World:
     def destination_count(self) -> int: ...
     def set_destination_count(self, count: int) -> None: ...
     def faction_units(self, faction: int) -> FactionUnitColumns: ...
-    def faction_visible_units(
-        self, faction: int
-    ) -> FactionVisibleUnitColumns: ...
+    def faction_visible_units(self, faction: int) -> FactionVisibleUnitColumns: ...
     @property
     def settlement_count(self) -> int: ...
     def found_settlements(
@@ -1354,6 +1450,9 @@ class World:
     ) -> FactionRegionSummary: ...
     def faction_observation(self, faction: int) -> npt.NDArray[np.int64]: ...
     def observation_schema(self) -> ObservationSchema: ...
+    def action_schema(self) -> ActionSchema: ...
+    def legal_actions(self, faction: int) -> npt.NDArray[np.uint8]: ...
+    def act(self, faction: int, action: int) -> bool: ...
     def site_economy(self, site: int, commodity: int = ...) -> SiteEconomy: ...
     def site_production(self, site: int, commodity: int = ...) -> SiteProduction: ...
     def site_housing(self, site: int) -> SiteHousing: ...
@@ -1472,6 +1571,20 @@ class World:
     ) -> npt.NDArray[np.uint64]: ...
     def remove_characters(self, characters: Identities) -> None: ...
     def set_character_renown(self, characters: Identities, renown: int) -> None: ...
+
+class StepRow:
+    @property
+    def index(self) -> int: ...
+    @property
+    def events(self) -> int | None: ...
+    @property
+    def error(self) -> str | None: ...
+
+class Batch:
+    def __init__(self, worlds: Sequence[World]) -> None: ...
+    def __len__(self) -> int: ...
+    def world(self, index: int) -> World: ...
+    def step(self, workers: int, threads: int) -> list[StepRow]: ...
 
 def version() -> str: ...
 def stock_ceiling_of_one_settlement() -> int: ...

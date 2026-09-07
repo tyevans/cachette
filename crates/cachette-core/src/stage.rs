@@ -162,15 +162,18 @@ declare_stages! {
     Build,                    "build",                      true,  1, false;
     UpgradeWear,              "upgrade_wear",               false, 1, false;
     HoldingLease,             "holding_lease",              true,  1, false;
+    SiteCapture,              "site_capture",               false, 1, false;
     HoldingSpread,            "holding_spread",             true,  1, false;
     HoldingCandidates,        "holding_candidates",         true,  1, true;
     HoldingDecide,            "holding_decide",             true,  1, true;
     HoldingApply,             "holding_apply",              true,  1, true;
+    FactionEliminate,         "faction_eliminate",          true,  1, false;
     StampHolders,             "stamp_holders",              false, 1, false;
     Contest,                  "contest",                    true,  1, false;
     ApplyRates,               "apply_rates",                true,  1, false;
     Consume,                  "consume",                    true,  1, false;
     Reap,                     "reap",                       true,  1, false;
+    Fire,                     "fire",                       false, 1, false;
     Grow,                     "grow",                       false, 1, false;
     QueueAdvance,             "queue_advance",              false, 1, false;
     BridgeRefreshAfterReap,   "bridge_refresh_after_reap",  false, 1, false;

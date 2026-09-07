@@ -17,6 +17,7 @@ import json
 import os
 import re
 import tempfile
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -100,6 +101,50 @@ class Variant:
         return [item for item in value if isinstance(item, str)]
 
 
+def _letters(value: object) -> tuple[str, ...]:
+    """Take the variant letters out of a value, once each, in order."""
+    if not isinstance(value, list):
+        return ()
+    found: list[str] = []
+    for item in value:
+        if isinstance(item, str) and item in VARIANT_LETTERS and item not in found:
+            found.append(item)
+    return tuple(found)
+
+
+def read_feedback(
+    value: dict | None,
+) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...], str, str]:
+    """Read one feedback object into likes, refusals, order, note and text.
+
+    The function never raises. It drops what it cannot read, because a person
+    can edit the file by hand and a page must still render.
+
+    The generation loop holds the same rule in its own reader, and one test
+    compares the two.[^1]
+
+    ## References
+
+    [^1]: The reader of the loop. `tools/direct-die/direct_die/steer.py`
+    """
+    if not isinstance(value, dict):
+        return (), (), (), "", ""
+    denies = _letters(value.get("denies"))
+    likes = _letters(value.get("likes"))
+    likes = tuple(letter for letter in likes if letter not in denies)
+    ranked = [letter for letter in _letters(value.get("order")) if letter in likes]
+    ranked.extend(letter for letter in likes if letter not in ranked)
+    note = value.get("note")
+    text = value.get("text")
+    return (
+        likes,
+        denies,
+        tuple(ranked),
+        note.strip() if isinstance(note, str) else "",
+        text.strip() if isinstance(text, str) else "",
+    )
+
+
 @dataclass(frozen=True)
 class Round:
     """One round of one session."""
@@ -109,6 +154,7 @@ class Round:
     meta: dict | None
     variants: list[Variant] = field(default_factory=list)
     feedback: dict | None = None
+    analysis: dict | None = None
 
     @property
     def prompt_summary(self) -> str | None:
@@ -119,33 +165,64 @@ class Round:
         return value if isinstance(value, str) else None
 
     @property
-    def parent(self) -> str | None:
-        """Name the variant that this round came from, if the loop said."""
-        if self.meta is None:
-            return None
-        value = self.meta.get("parent")
-        return value if isinstance(value, str) else None
-
-    @property
     def present_variants(self) -> list[Variant]:
         """List the variants that hold at least one file."""
         return [variant for variant in self.variants if variant.present]
 
     @property
-    def choice(self) -> str | None:
-        """Give the letter that the person picked, or `None`."""
-        if self.feedback is None:
-            return None
-        value = self.feedback.get("choice")
-        return value if value in VARIANT_LETTERS else None
+    def _read(self) -> tuple:
+        """Read the feedback once, for the properties below."""
+        return read_feedback(self.feedback)
+
+    @property
+    def likes(self) -> tuple[str, ...]:
+        """Give the letters that the person accepted."""
+        return self._read[0]
+
+    @property
+    def denies(self) -> tuple[str, ...]:
+        """Give the letters that the person refused."""
+        return self._read[1]
+
+    @property
+    def order(self) -> tuple[str, ...]:
+        """Give the accepted letters, best first."""
+        return self._read[2]
+
+    @property
+    def note(self) -> str:
+        """Give the standing note. Give "" when there is none."""
+        return self._read[3]
+
+    @property
+    def winner(self) -> str | None:
+        """Give the letter that stands for this round, or `None`.
+
+        It is the first of the order, which is the drawing the person put
+        first. A refused drawing is never the winner, because the reader
+        drops a refused letter from the likes.
+        """
+        found = self.order
+        return found[0] if found else None
+
+    @property
+    def parents(self) -> dict[str, str]:
+        """Give the parent that each variant of this round revised."""
+        if self.meta is None:
+            return {}
+        found = self.meta.get("parents")
+        if isinstance(found, dict):
+            return {
+                letter: value
+                for letter, value in found.items()
+                if letter in VARIANT_LETTERS and isinstance(value, str)
+            }
+        return {}
 
     @property
     def feedback_text(self) -> str:
-        """Give the free text that the person typed. Give "" when there is none."""
-        if self.feedback is None:
-            return ""
-        value = self.feedback.get("text")
-        return value if isinstance(value, str) else ""
+        """Give the note for this round only. Give "" when there is none."""
+        return self._read[4]
 
 
 @dataclass(frozen=True)
@@ -161,6 +238,22 @@ class Session:
     def key(self) -> str:
         """Give the two-part name that a URL uses for this session."""
         return f"{self.asset}/{self.session_id}"
+
+    @property
+    def subject(self) -> str | None:
+        """Give the subject that the loop drew, as the round metadata says.
+
+        The manifest holds no subject. The loop writes the subject into the
+        prompt summary of each round, before a semicolon. This reads the
+        first round that has one. Give `None` when no round has one.
+        """
+        for entry in self.rounds:
+            summary = entry.prompt_summary
+            if summary:
+                first = summary.split(";")[0].strip()
+                if first:
+                    return first
+        return None
 
     @property
     def created(self) -> str | None:
@@ -197,11 +290,41 @@ class Session:
         return value if isinstance(value, str) else None
 
 
-def _safe_name(name: str) -> str:
-    """Reject a path segment that could leave the sessions directory."""
+def safe_name(name: str) -> str:
+    """Reject a path segment that could leave the directory it names."""
     if not name or name in (".", "..") or "/" in name or "\\" in name:
         raise ContractError(f"unsafe path segment: {name!r}")
     return name
+
+
+# The old private name. The run manager and the pack export call the public
+# one. This alias keeps one definition of the rule.
+_safe_name = safe_name
+
+
+def write_json_atomically(path: Path, payload: object) -> Path:
+    """Write one JSON document, and give the path.
+
+    The write goes to a temporary name in the same directory, and then
+    renames. A rename inside one directory is atomic, so a reader never sees
+    half a file. Every write in this tool takes this form.
+    """
+    directory = path.parent
+    directory.mkdir(parents=True, exist_ok=True)
+    handle, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}-", suffix=".tmp", dir=directory
+    )
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            json.dump(payload, stream, indent=2)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_name, path)
+    except BaseException:
+        Path(temporary_name).unlink(missing_ok=True)
+        raise
+    return path
 
 
 class SessionStore:
@@ -284,6 +407,8 @@ class SessionStore:
         number = int(match.group(1)) if match else -1
         meta = read_json(directory / "meta.json")
         feedback = read_json(directory / "feedback.json")
+        feedback = self._checked_feedback(feedback, number)
+        analysis = read_json(directory / "analysis.json")
         variants = [self._load_variant(directory, letter) for letter in VARIANT_LETTERS]
         return Round(
             number=number,
@@ -291,7 +416,29 @@ class SessionStore:
             meta=meta,
             variants=variants,
             feedback=feedback,
+            analysis=analysis,
         )
+
+    @staticmethod
+    def _checked_feedback(feedback: dict | None, number: int) -> dict | None:
+        """Drop a feedback that names a round other than the one it sits in.
+
+        A feedback file with no `round` field still loads. `number` is `-1`
+        when the round directory name does not match the pattern, so this
+        does not reject on that. `Session.feedback` applies the same rule,
+        and one test checks that the two agree.[^1]
+
+        ## References
+
+        [^1]: The rule against a misfiled feedback.
+            `tools/direct-die/review/test_readers_agree.py`
+        """
+        if not isinstance(feedback, dict):
+            return feedback
+        named = feedback.get("round")
+        if named is not None and named != number:
+            return None
+        return feedback
 
     @staticmethod
     def _load_variant(directory: Path, letter: str) -> Variant:
@@ -332,6 +479,19 @@ class SessionStore:
         path = self.round_directory(asset, session_id, round_name) / file_name
         return path if path.is_file() else None
 
+    @staticmethod
+    def round_index(round_name: str) -> int:
+        """Give the index that a round directory name holds.
+
+        Raise `ContractError` when the name is not a round directory name.
+        """
+        if not round_name.startswith("round-"):
+            raise ContractError(f"not a round name: {round_name!r}")
+        try:
+            return int(round_name[len("round-") :])
+        except ValueError as error:
+            raise ContractError(f"not a round name: {round_name!r}") from error
+
     # -- the one write -----------------------------------------------------
 
     def write_feedback(
@@ -339,7 +499,10 @@ class SessionStore:
         asset: str,
         session_id: str,
         round_name: str,
-        choice: str | None,
+        likes: Sequence[str],
+        denies: Sequence[str],
+        order: Sequence[str],
+        note: str,
         text: str,
     ) -> Path:
         """Write `feedback.json` into a round directory, and give its path.
@@ -347,34 +510,35 @@ class SessionStore:
         The write is atomic. It writes a temporary file in the same directory
         and then renames it, so the generation loop never reads half a file.
 
-        Raise `ContractError` when the choice is not a variant letter, and
-        when the round directory does not exist. The loop owns that
-        directory, so this module does not create one.
+        Raise `ContractError` when a letter is not a variant letter, when a
+        letter is in both lists, when the order is not the same set as the
+        likes, and when the round directory does not exist. The loop owns
+        that directory, so this module does not create one.
         """
-        if choice is not None and choice not in VARIANT_LETTERS:
-            raise ContractError(f"not a variant letter: {choice!r}")
+        index = self.round_index(round_name)
+        for group in (likes, denies, order):
+            for letter in group:
+                if letter not in VARIANT_LETTERS:
+                    raise ContractError(f"not a variant letter: {letter!r}")
+        both = sorted(set(likes) & set(denies))
+        if both:
+            raise ContractError(
+                f"a letter cannot be liked and refused: {', '.join(both)}"
+            )
+        if sorted(set(order)) != sorted(set(likes)):
+            raise ContractError("the order must hold every liked letter once")
         directory = self.round_directory(asset, session_id, round_name)
         if not directory.is_dir():
             raise ContractError(f"no such round: {asset}/{session_id}/{round_name}")
         payload = {
-            "choice": choice,
+            "round": index,
+            "likes": list(dict.fromkeys(likes)),
+            "denies": list(dict.fromkeys(denies)),
+            "order": list(dict.fromkeys(order)),
+            "note": note.strip(),
             "text": text,
             "at": datetime.now(UTC)
             .isoformat(timespec="seconds")
             .replace("+00:00", "Z"),
         }
-        target = directory / "feedback.json"
-        handle, temporary_name = tempfile.mkstemp(
-            prefix=".feedback-", suffix=".json", dir=directory
-        )
-        try:
-            with os.fdopen(handle, "w", encoding="utf-8") as stream:
-                json.dump(payload, stream, indent=2)
-                stream.write("\n")
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temporary_name, target)
-        except BaseException:
-            Path(temporary_name).unlink(missing_ok=True)
-            raise
-        return target
+        return write_json_atomically(directory / "feedback.json", payload)

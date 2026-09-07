@@ -142,6 +142,8 @@ pub enum WeatherError {
     ScaleAboveCeiling(u32),
     /// The caller asked for a latitude span that does not fit on the globe.
     LatitudeSpanOutsideTheGlobe(i32),
+    /// The caller asked for a relief that is not a positive height.
+    ReliefNotPositive(i32),
     /// The caller named a faction that this world does not hold.
     NoSuchFaction(u16),
     /// The caller named a place outside the world.
@@ -152,6 +154,12 @@ pub enum WeatherError {
     TooManyPlaces(usize),
     /// The strength is zero, or above the ceiling.
     StrengthOutOfRange(u8),
+    /// The caller named a cell that the lattice does not hold.
+    NoSuchCell(u32),
+    /// The caller asked for a storm outside the range the field carries.
+    CycloneSettingOutOfRange,
+    /// The field already carries as many storms as it holds.
+    TooManyCyclones,
     /// The faction inflicted weather too recently.
     StillCooling {
         /// The first tick at which the faction may inflict weather again.
@@ -178,6 +186,10 @@ impl core::fmt::Display for WeatherError {
                 formatter,
                 "the latitude span {span} does not fit between the two poles"
             ),
+            Self::ReliefNotPositive(metres) => write!(
+                formatter,
+                "the relief {metres} is not a positive height in metres"
+            ),
             Self::NoSuchFaction(faction) => {
                 write!(formatter, "this world holds no faction {faction}")
             }
@@ -198,6 +210,17 @@ impl core::fmt::Display for WeatherError {
             Self::StrengthOutOfRange(strength) => write!(
                 formatter,
                 "the strength {strength} is outside the range 1 to {STRENGTH_CEILING}"
+            ),
+            Self::NoSuchCell(cell) => {
+                write!(formatter, "the lattice holds no cell {cell}")
+            }
+            Self::CycloneSettingOutOfRange => write!(
+                formatter,
+                "a storm carries a depth of {CYCLONE_DEPTH_FLOOR} to {CYCLONE_DEPTH_CEILING}, a radius of 0 to {CYCLONE_RADIUS_CEILING}, and a life of 1 to {CYCLONE_LIFE_CEILING}"
+            ),
+            Self::TooManyCyclones => write!(
+                formatter,
+                "the field carries {CYCLONE_CEILING} storms at once"
             ),
             Self::StillCooling { ready_at } => write!(
                 formatter,
@@ -901,8 +924,8 @@ impl Wind {
         }
         let mut best = 0usize;
         let mut most = i32::MIN;
-        for direction in 0..NEIGHBOUR_COUNT {
-            let along = self.along(NEIGHBOURS[direction]);
+        for (direction, neighbour) in NEIGHBOURS.iter().enumerate() {
+            let along = self.along(*neighbour);
             if along > most {
                 most = along;
                 best = direction;
@@ -1006,7 +1029,7 @@ fn bleed(part: i32) -> i32 {
             Accum(DRAG_DENOMINATOR),
         )
         .map_or(0, |taken| taken.0);
-    (kept - i64::from(kept.signum())) as i32
+    (kept - kept.signum()) as i32
 }
 
 /// Returns what drag leaves of one wind.
@@ -1179,19 +1202,6 @@ const _: () = assert!(
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
 pub const HEAT_CEILING: i32 = 256;
 
-/// What open water adds to the heat of a cell, at the top of its range.
-///
-/// **The term is graded by depth, and the shallowest water takes all of it.**
-/// Shallow water takes up heat and gives it up over a small column, so it is
-/// a strong source. Deep water spreads the same heat through a large one, so
-/// it takes almost none of this term.
-///
-/// **Water biases the ground warm, and it does not dominate it.** What water
-/// mostly does to the weather is to hold its temperature rather than to raise
-/// it, and the temperature pass states that separately by moving a deep cell
-/// more slowly than a shallow one.
-const HEAT_FROM_WATER: i32 = 64;
-
 /// The height below which a tile holds water, read and not restated.
 ///
 /// The terrain declares the mark, and the shallowness of a cell is its mean
@@ -1203,27 +1213,6 @@ const HEAT_FROM_WATER: i32 = 64;
 ///
 /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 use crate::terrain::{Terrain, TerrainTile, HEIGHT_WATER};
-
-/// What low ground adds to the heat of a cell, at the bottom of the height
-/// range.
-///
-/// **The term reads the height of the land of the cell, and never the height
-/// of its water.** A mean over both put the sea at the bottom of the height
-/// range and therefore at the top of this term, which made every sea hotter
-/// than every coast.
-const HEAT_FROM_LOW_GROUND: i32 = 192;
-
-/// What the ground term is divided by before it drives the temperature.
-///
-/// **The ground still biases the temperature, and it must not dominate it.**
-/// The two ground terms above span the whole scale between them. A driver
-/// that took them whole would leave no room for the season and the cloud, and
-/// the field would return to the fixed heat that the season replaces.[^1]
-///
-/// # References
-///
-/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const GROUND_DIVISOR: i64 = 4;
 
 /// The degrees that the sun adds at the warmest place and the warmest moment.
 ///
@@ -1238,7 +1227,7 @@ const GROUND_DIVISOR: i64 = 4;
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 /// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D3. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-const SEASON_SWING: i32 = LATITUDE_SWING + SEASON_ANOMALY_SWING;
+pub const SEASON_SWING: i32 = LATITUDE_SWING + SEASON_ANOMALY_SWING;
 
 /// The ticks in which the sun completes one whole swing.
 ///
@@ -1257,16 +1246,34 @@ const SEASON_SWING: i32 = LATITUDE_SWING + SEASON_ANOMALY_SWING;
 /// hold a wet part of the year and a dry part.
 pub const SEASON_PERIOD_TICKS: i64 = 2048;
 
-/// The degrees that a saturated sky takes away from a cell.
+/// The published net effect of cloud on the energy the Earth keeps, in whole
+/// watts for each square metre.
 ///
-/// **Cloud stands between the ground and the sun.** The term rises with the
-/// water in the air over the cell and it stops at the saturation mark, so it
-/// is bounded whatever a god puts into the sky.[^1]
+/// **The published effect is negative, and this is its size.** Cloud reflects
+/// sunlight away and it holds heat in, and the reflection wins. The figure is
+/// the whole-Earth net of the two, over the cover the Earth carries.[^1]
+///
+/// **The author of this constant did not read a primary source for it.** It
+/// is the figure a reader meets in the standard account of the energy budget
+/// of the Earth, and the research report that this module follows states no
+/// figure of its own for cloud.[^2]
 ///
 /// # References
 ///
-/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const CLOUD_SWING: i32 = 32;
+/// [^1]: The net effect of cloud on the energy budget of the Earth, from the standard account of that budget. It is reported near twenty watts for each square metre.
+/// [^2]: Research report 30, the published atmospheric math. `docs/research/reports/30-the-published-atmospheric-math.md`
+const CLOUD_EFFECT_WATTS: i64 = 20;
+
+/// The published share of the Earth that cloud covers, in hundredths.
+///
+/// **The effect above is the effect of this cover, and not of a whole sky.**
+/// The term in this module answers a whole sky, so the build divides the one
+/// by the other.[^1]
+///
+/// # References
+///
+/// [^1]: The mean cloud cover of the Earth, from the standard account of the energy budget of the Earth. It is reported near two thirds.
+const CLOUD_COVER_FINE: i64 = 68;
 
 /// The part of the way to the asked temperature that one pass moves.
 const WARMTH_NUMERATOR: i64 = 1;
@@ -1283,28 +1290,30 @@ const WARMTH_NUMERATOR: i64 = 1;
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 const WARMTH_DENOMINATOR: i64 = 8;
 
-/// What the whole of the part is multiplied by over the deepest water.
+/// What the temperature divisor of the deepest water is multiplied by.
 ///
-/// **Deep water warms slowly and cools slowly. Land does neither.** A large
-/// column of water takes up the same heat over a greater depth, so its
-/// temperature moves a small part of the way in the time that a field or a
-/// shallow lake moves the whole of it. Shallow water sits between the two,
-/// because the grading runs with the depth and not with the tile count.
+/// **This is the thermal inertia of the sea, and it is derived from a
+/// published seasonal lag.** The warmest month over the ocean falls about two
+/// months after the solstice, where over land it falls about one. A first
+/// order lag driven by a yearly cycle lags its driver by the arc tangent of
+/// two pi times the time constant over the period, so a two month lag on a
+/// twelve month year gives a time constant near a quarter of the year. On the
+/// season period this module carries, that is this multiple of the land
+/// figure.
 ///
-/// **This is what makes a coast interesting.** Two neighbouring cells that
-/// track one driver at one rate hold one temperature, and no wind blows
-/// between them. A land cell that tracks the season while the sea beside it
-/// lags gives a heat difference across the coast, and that difference changes
-/// sign as the season turns. So the coastal wind blows one way in the warm
-/// half of the year and the other way in the cold half.
-///
-/// The doc of the water heat term claimed this behaviour before anything did
-/// it. One share moved every cell at one rate, whatever it held.[^1]
+/// **The old value was eight and it did almost nothing.** At eight the sea
+/// damps its own seasonal swing by about two percent, so a sea tracked the
+/// season as closely as the land beside it and the two never parted. That was
+/// harmless while a second term in the driver gave the sea a mean of its own,
+/// and it stopped being harmless when a record removed that term and named
+/// this lag as the thing that carries the sea.[^2] **A mechanism nominated to
+/// carry an effect must be measured against the effect**, and this one was
+/// not.
 ///
 /// # References
 ///
-/// [^1]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
-const DEEP_WATER_LAG: i64 = 8;
+/// [^2]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+const DEEP_WATER_LAG: i64 = 64;
 
 /// The share of a temperature difference that one step of wind carries.
 const CARRY_FOR_EACH_WIND_STEP: i64 = 1;
@@ -1821,17 +1830,17 @@ const LIFT_DRAW: u32 = 0;
 /// reading that once made wetness separate nothing.[^1]
 ///
 /// **The share fell from a thirty-second to a sixty-fourth at the same time.**
-/// The world runs cold against the temperature scale it now declares, so the
-/// water it holds sits well under what the ceiling allows, and a thirty-second
-/// of the ceiling stood above the wettest cell of a coarse world. A blocker
-/// holds where the heat base should stand, and the share follows it.[^3] The
-/// commit body holds the readings.
+/// The ceiling is the capacity of a cell at the top of the heat scale, which
+/// is far above the temperature that any land of any world holds. So the
+/// wettest cell of a world stands well under the ceiling, and a thirty-second
+/// of the ceiling stood above the wettest cell of a coarse world. **Nobody has
+/// measured the share again since the heat terms were derived**, and the
+/// blocker that holds what weather should be worth governs it.[^1]
 ///
 /// # References
 ///
 /// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
 /// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-/// [^3]: Blockers register, BLK-152. `docs/BLOCKERS.md`
 pub const WET_MARK: Drops = Drops(AIR_SATURATION.0 / 64);
 
 /// The largest strength that a god may inflict.
@@ -2017,12 +2026,70 @@ fn part_of(whole: i32, fraction: Fix32) -> i32 {
     ))
 }
 
-/// Returns the heat of one cell, from zero to the heat ceiling.
+/// Returns the mean height of the land of a world, weighted by how much land
+/// each cell holds.
 ///
-/// **A low coast is hot and a high ridge is cold.** The heat rises with the
-/// share of the cell that holds open water and falls with the mean height of
-/// the cell. Both come from the ground array over the weather lattice, which
-/// the world folds from the terrain once. **They do not come from the level 1
+/// **This is the zero of the relief term.** The balance temperature is an
+/// observed global mean, and the land of a planet already stands at its mean
+/// elevation inside that observation, so a term that cooled every cell from
+/// sea level would count that elevation twice. A cell at this height therefore
+/// receives the balance unchanged, one above it is colder, and one below it is
+/// warmer.[^1]
+///
+/// **This reads the world and not the Earth, and that is a modelling choice.**
+/// The strict reading of the rule would take the mean elevation of the Earth,
+/// because that is what the published constants average over, and a world whose
+/// land really does stand higher would then be genuinely colder. That reading is
+/// correct physics and it leaves the height ceiling controlling the temperature
+/// of the whole world, which is what cost this project two decisions. Reading
+/// the world's own mean makes the ceiling decide how dramatic the ground looks
+/// and nothing else. **The two agree at a ceiling where the world's land
+/// happens to average what the Earth's does, and they part as the ceiling
+/// rises.**
+///
+/// The answer is a reduction over the ground of the world in ascending cell
+/// order, and the ground does not change, so it is the same integer on every
+/// tick and at every thread count.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+/// [^2]: ADR-0004, iteration order is explicit. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+#[must_use]
+pub fn mean_land_height_over(ground: &[CellGround]) -> Fix32 {
+    let mut total = 0i64;
+    let mut counted = 0i64;
+    for cell in ground {
+        let Some(height) = cell.mean_land_height() else {
+            continue;
+        };
+        let land = i64::from(to_unit(cell.open_share().unwrap_or(Fix32::ZERO)).0);
+        total += i64::from(to_unit(height).0) * land;
+        counted += land;
+    }
+    if counted <= 0 {
+        return Fix32::ZERO;
+    }
+    Fix32(clamp_to_fix(total / counted))
+}
+
+/// Returns what the relief of a cell takes off the balance temperature, in
+/// hundredths of a degree.
+///
+/// **The answer is signed, and its zero is the mean land height of the
+/// world.** Air cools as it rises, so ground above that mean stands below the
+/// temperature the energy balance settles at, and ground below it stands
+/// above. Open water carries no height, so it takes the whole of the
+/// reference as a warming.[^4]
+///
+/// **The water of a cell does not appear here, and that is deliberate.** The
+/// sea moderates a coast by holding its heat, not by sitting at a different
+/// mean, and the field already carries that as a lag on how fast a cell
+/// follows its driver. A second term for it would be one fact in two
+/// places.[^5]
+///
+/// The ground comes from the ground array over the weather lattice, which the
+/// world folds from the terrain once. **It does not come from the level 1
 /// summary**, because that summary describes a block thirty-two tiles a side
 /// and is the wrong source at any other weather pitch.[^1]
 ///
@@ -2040,41 +2107,46 @@ fn part_of(whole: i32, fraction: Fix32) -> i32 {
 /// # References
 ///
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+/// [^4]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+/// [^5]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 /// [^2]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 /// [^3]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 #[must_use]
-pub fn heat_of(ground: CellGround) -> i32 {
+pub fn relief_cooling_of(ground: CellGround, relief: HeightRange, reference: Fix32) -> i32 {
     if ground.tiles() <= 0 {
         return 0;
     }
-    // Water is the only ground that admits no unit, so the share of the cell
-    // that admits none is its water share exactly.
-    let open = ground.open_share().map_or(Fix32::ZERO, to_unit);
-    let water = Fix32(Fix32::ONE.0 - open.0);
+    // **The share of the cell that holds land.** A tile is open when a unit
+    // may stand on it, so the open share is the land share and not the water
+    // share. Open water stands at the sea mark, which is the bottom of the
+    // range, so it cools nothing.
+    let land = ground.open_share().map_or(Fix32::ZERO, to_unit);
 
-    // **The land term reads the height of the land, and not of the cell.**
-    // Low land is warm. A cell that averaged its water in with its land
-    // reported a height that no tile of it held, and a deep sea then read as
-    // the lowest ground in the world and therefore as the hottest. That is
-    // backwards, and it was the whole of the difference between a sea and the
-    // coast beside it: the sea ran warmer than every land cell, the air
-    // leaving it met that step as cooling at the first land it reached, and
-    // it rained out there. No air survived one cell inland.[^2]
+    // **The land term reads the height of the land, and not of the cell.** A
+    // mean over both reported a height that no tile of it held, and a deep
+    // sea then read as the lowest ground in the world.
     let land_height = ground.mean_land_height().map_or(Fix32::ZERO, to_unit);
-    let low = Fix32(Fix32::ONE.0 - land_height.0);
-    let land_term = part_of(part_of(HEAT_FROM_LOW_GROUND, low), open);
 
-    // **The water term is graded by depth, and shallow water is the warmer.**
-    // Shallow water takes up heat and gives it up over a small column, so a
-    // shelf or a lake is a strong source. Deep water spreads the same heat
-    // through a large one, so it is a weak one. A cell that counted its water
-    // tiles alone could not tell the two apart, because a tile counts as
-    // water when its height falls below one mark and the count carries no
-    // depth past it.[^2]
-    let shallow = ground.shallowness().map_or(Fix32::ZERO, to_unit);
-    let water_term = part_of(part_of(HEAT_FROM_WATER, shallow), water);
-
-    land_term + water_term
+    // **Air cools as it rises, at the published rate.** The height is a unit
+    // fraction and the relief of the world is what the whole fraction is
+    // worth, so the metres are the one multiplied by the other. The answer is
+    // negative, because high ground is colder than the balance and never
+    // warmer than it.[^3]
+    //
+    // [^3]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    // **The height stands against the mean land of the world and not against
+    // sea level.** Ground at that mean receives the balance unchanged, ground
+    // above it is colder, and ground below it is warmer.
+    let metres = i64::from(part_of(relief.metres(), land_height))
+        - i64::from(part_of(relief.metres(), reference));
+    let cooling = narrow(sim_math::share(
+        Accum(LAPSE_RATE_FINE * metres),
+        Accum(1),
+        Accum(METRES_IN_KILOMETRE),
+    ));
+    // A cell that is half sea and half mountain cools by half of what the
+    // mountain alone would.
+    -part_of(cooling, land)
 }
 
 /// Returns what the temperature divisor of a cell is multiplied by.
@@ -2152,6 +2224,16 @@ pub fn declination_at(tick: Tick) -> i32 {
 /// flat, rather than stretching a four percent change across the whole
 /// scale.[^1]
 ///
+/// **The sum of the two parts is normalised against what that sum can
+/// actually reach, and not against the sum of the two amplitudes.** The belt
+/// peaks at the equator, where the season is near nothing, and the season
+/// peaks at the middle latitudes, where the belt is near nothing. So the two
+/// amplitudes added together name a swing that no place and no moment holds.
+/// The table therefore walks its own geometry once, records the highest and
+/// the lowest sum it holds, and maps that range onto the swing the heat scale
+/// reserves. The two amplitudes above are then the ratio between the belt and
+/// the season, and the reserved swing is the whole of the sun term.[^3]
+///
 /// The term reads the tick and the latitude. It reads no clock and takes no
 /// draw.
 ///
@@ -2162,28 +2244,11 @@ pub fn declination_at(tick: Tick) -> i32 {
 ///
 /// [^1]: Research report 30, the published atmospheric math, sections 4.3, 4.4 and 9. `docs/research/reports/30-the-published-atmospheric-math.md`
 /// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D3. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+/// [^3]: ADR-0177, the row axis of a world is a latitude that the world states, decision D5. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
 #[must_use]
 pub fn season_at(tick: Tick, latitude: i32) -> i32 {
     let table = insolation();
-    let daily = table.daily_at(latitude, declination_at(tick));
-    let mean = table.mean_at(latitude);
-    // The belt of the latitude. It runs from the whole swing at the equator
-    // to the whole swing the other way at a pole.
-    let belt = narrow(sim_math::share(
-        Accum(i64::from(LATITUDE_SWING)),
-        Accum(2 * mean - i64::from(table.top) - i64::from(table.floor)),
-        Accum(i64::from(table.top) - i64::from(table.floor)),
-    ))
-    .clamp(-LATITUDE_SWING, LATITUDE_SWING);
-    // The season. It is the daily value against the annual mean of the same
-    // latitude, so it is zero at the equinox everywhere.
-    let season = narrow(sim_math::share(
-        Accum(i64::from(SEASON_ANOMALY_SWING)),
-        Accum(daily - mean),
-        Accum(i64::from(table.reference)),
-    ))
-    .clamp(-SEASON_ANOMALY_SWING, SEASON_ANOMALY_SWING);
-    (belt + season).clamp(-SEASON_SWING, SEASON_SWING)
+    table.shape_at(latitude, declination_at(tick))
 }
 
 /// Returns the pressure that the banded circulation adds at one latitude.
@@ -2255,13 +2320,11 @@ struct Insolation {
     daily: Vec<i16>,
     /// The annual mean insolation at each latitude band.
     mean: Vec<i16>,
-    /// The annual mean at the equator.
-    top: i16,
-    /// The annual mean at a pole.
-    floor: i16,
     /// The daily value at the solstice against the annual mean, at the middle
     /// latitude. It is the normaliser of the season part.
     reference: i16,
+    /// The degrees that a saturated sky takes away from a cell.
+    cloud_swing: i32,
 }
 
 /// The latitude bands that the insolation table holds.
@@ -2301,12 +2364,254 @@ const SOLAR_CONSTANT: i64 = 1361;
 /// not a measurement, so it belongs beside the arithmetic that reads it.
 const PI_FIXED: i64 = 205_887;
 
-/// The middle latitude, in hundredths of a degree.
+/// The share of the incoming radiation that the planet keeps, in hundredths.
 ///
-/// The season normaliser is read here. A season that reached its whole swing
-/// at the pole would leave the middle latitudes with almost no season at all,
-/// because the polar swing is twice the swing at forty-five degrees.
-const MIDDLE_LATITUDE: i32 = 45 * LATITUDE_FINE;
+/// **Published, and held constant.** The published model this module takes its
+/// belt from holds the albedo constant, so it carries no ice feedback and it
+/// settles warmer at a pole than a planet with ice does. The engine inherits
+/// that bias knowingly.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the energy balance constants. `docs/reference/balance.md`
+const ALBEDO_KEPT: i64 = 70;
+
+/// The constant term of the outgoing radiation, in watts for each square
+/// metre.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the energy balance constants. `docs/reference/balance.md`
+const OLR_INTERCEPT: i64 = 210;
+
+/// The slope of the outgoing radiation, in hundredths of a watt for each
+/// square metre for each degree.
+///
+/// **This is what turns a radiation anomaly into degrees**, so every term of
+/// the driver that starts in watts reads it.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the energy balance constants. `docs/reference/balance.md`
+const OLR_SLOPE_FINE: i64 = 200;
+
+/// The poleward diffusion of the published model, in hundredths of a watt for
+/// each square metre for each degree.
+///
+/// **The engine never runs this diffusion.** It takes the profile the model
+/// settles at, which is a closed form. A diffusion on the carried temperature
+/// changed nothing at any affordable pass count, because the driver relaxes
+/// each cell to a local value far faster than any affordable diffusion moves
+/// heat between cells.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-602. `docs/FINDINGS.md`
+const POLEWARD_DIFFUSION_FINE: i64 = 55;
+
+/// What a radiation anomaly that varies with the latitude is divided by,
+/// after the diffusion damps it.
+///
+/// **The diffusion damps each Legendre mode by its own order**, and the annual
+/// mean insolation of a globe is a constant plus one second Legendre
+/// polynomial to within a few percent. The second mode carries a factor of
+/// six, so the belt divides by the slope plus six times the diffusion while a
+/// term that does not vary with the latitude divides by the slope alone.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D2. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+const DAMPED_SLOPE_FINE: i64 = OLR_SLOPE_FINE + 6 * POLEWARD_DIFFUSION_FINE;
+
+/// The share of the incoming radiation that ice reflects beyond bare ground,
+/// in hundredths.
+///
+/// **Published.** A diffusive energy balance model that carries an ice albedo
+/// takes the absorbed share as about 0.68 where there is no ice and about
+/// 0.38 where there is, so ice reflects this much more than the ground it
+/// covers.
+const ICE_ALBEDO_DROP_FINE: i64 = 30;
+
+/// The temperature at which half of a cell carries ice, in hundredths of a
+/// degree.
+///
+/// **Published.** The ice line of the reference model stands here.
+const ICE_MIDPOINT: i64 = -10 * DEGREE_FINE;
+
+/// The temperature range over which a cell goes from bare to wholly iced, in
+/// hundredths of a degree.
+///
+/// **This width is a stability condition and the record states it as one.**
+/// The albedo term spans about 19 degrees between a bare cell and an iced
+/// one. A cell that cools grows ice, and the ice cools it further, so the
+/// feedback has a gain of that span divided by this width. **Above a gain of
+/// one the loop runs away**, which is the published instability that takes a
+/// planet to a frozen state. This width holds the gain near two thirds.
+///
+/// A narrower width is not more accurate. It is the same physics with the
+/// runaway left in.
+const ICE_RAMP: i64 = 30 * DEGREE_FINE;
+
+/// The share of the world that carries ice in the published mean, in
+/// hundredths.
+///
+/// **The balance is calibrated on a planet that already carries this ice**, so
+/// the albedo term is an anomaly about it and not an addition to it. A cell at
+/// this share moves nothing. Adding the whole ice albedo instead would count
+/// the same ice twice, which is the defect the cloud term carried.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+const MEAN_ICE_FINE: i64 = 10;
+
+/// The radiation that reaches the top of the atmosphere, in watts for each
+/// square metre, averaged over the globe.
+///
+/// The albedo acts on what arrives and not on what is already absorbed, so
+/// this is the quarter of the solar constant and not the absorbed share.
+const INCIDENT_MEAN: i64 = SOLAR_CONSTANT / 4;
+
+/// Returns the share of a cell that carries ice, in hundredths, from the
+/// temperature the cell is carrying.
+///
+/// **The reader takes the carried temperature and never the asked one.** The
+/// albedo changes what the world asks of a cell, so a term that read the asked
+/// value would be a loop with itself. Reading the carried value makes the
+/// feedback explicit: it runs once for each pass, at a count the solve fixes,
+/// and no pass tests whether it settled.[^1]
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+///
+/// # References
+///
+/// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D3. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+#[must_use]
+pub fn ice_share_of(warmth: i32) -> i64 {
+    let degrees = i64::from(warmth) * i64::from(WARMTH_FINE) + i64::from(WARMTH_FLOOR);
+    let top = ICE_MIDPOINT + ICE_RAMP / 2;
+    let apart = top - degrees;
+    if apart <= 0 {
+        return 0;
+    }
+    if apart >= ICE_RAMP {
+        return 100;
+    }
+    apart * 100 / ICE_RAMP
+}
+
+/// Returns the degrees that the ice of a cell takes off the balance, in
+/// hundredths.
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+#[must_use]
+pub fn ice_forcing_of(warmth: i32) -> i64 {
+    let anomaly = ice_share_of(warmth) - MEAN_ICE_FINE;
+    // The watts the anomaly reflects away, and then the degrees those watts
+    // are worth. The anomaly varies with the latitude, so it divides by the
+    // damped slope in the way the belt does.
+    let watts = ICE_ALBEDO_DROP_FINE * anomaly * INCIDENT_MEAN / (100 * 100);
+    -watts * DEGREE_FINE * 100 / DAMPED_SLOPE_FINE
+}
+
+/// The hundredths of a degree in one whole degree.
+const DEGREE_FINE: i64 = 100;
+
+/// Returns the warmth that one temperature in hundredths of a degree stands
+/// at on the heat scale.
+///
+/// **The scale is an affine map to a temperature and the module declares it
+/// once.** This is the inverse of that map, so every term of the driver can be
+/// stated in degrees and converted here.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D1. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+const fn warmth_of_hundredths(hundredths: i64) -> i32 {
+    let steps = (hundredths - WARMTH_FLOOR as i64) / WARMTH_FINE as i64;
+    if steps < 0 {
+        0
+    } else if steps > HEAT_CEILING as i64 {
+        HEAT_CEILING
+    } else {
+        steps as i32
+    }
+}
+
+/// The relief of a world, as the metres between its lowest ground and its
+/// highest.
+///
+/// **A world states its own vertical range, in the way it states its latitude
+/// span.** The terrain declares a height as a unit fraction, and this is what
+/// the whole fraction is worth. A world that wants taller mountains changes
+/// this value and not the physics.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+/// [^2]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct HeightRange {
+    metres: i32,
+}
+
+impl HeightRange {
+    /// The relief a world takes when the caller states none.
+    ///
+    /// The scale constants table holds the figure beside the tile edge.[^1]
+    ///
+    /// **A world states its own relief, so this is a default and not a
+    /// constant of the physics.** A caller that wants a different vertical
+    /// scale passes one.
+    ///
+    /// **The figure is what the lapse rate reads a cell against, and not what
+    /// the lapse rate takes off the world.** The ground term is an anomaly
+    /// about the mean land height, so the range sets how far cells stand
+    /// apart and not how cold the world is.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+    /// [^2]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    pub const DEFAULT: Self = Self { metres: 4000 };
+
+    /// Builds a relief from a height in metres.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the relief is not positive.
+    pub const fn new(metres: i32) -> Result<Self, WeatherError> {
+        if metres <= 0 {
+            return Err(WeatherError::ReliefNotPositive(metres));
+        }
+        Ok(Self { metres })
+    }
+
+    /// Returns the relief in metres.
+    #[must_use]
+    pub const fn metres(self) -> i32 {
+        self.metres
+    }
+}
+
+/// The environmental lapse rate, in hundredths of a degree for each kilometre
+/// of height.
+///
+/// **This is the published mean and not a chosen figure.** Air cools as it
+/// rises, and the standard atmosphere uses this rate. The saturated rate is
+/// lower and the dry rate is higher, and the research report recommends one
+/// rate for a field at this scale because the difference across one ridge is
+/// about two degrees and no watcher sees it.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, sections 2.1 and 2.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+const LAPSE_RATE_FINE: i64 = 650;
+
+/// The metres in one kilometre.
+const METRES_IN_KILOMETRE: i64 = 1000;
 
 /// The degrees that the belt of a latitude adds at the equator.
 const LATITUDE_SWING: i32 = 40;
@@ -2355,20 +2660,113 @@ impl Insolation {
             }
             mean[band] = clamp_to_watts(total / DECLINATION_STEPS as i64);
         }
-        let top = mean[INSOLATION_BANDS / 2];
-        let floor = mean[0];
-        let middle = (Self::band_of_latitude(MIDDLE_LATITUDE) / i64::from(Fix32::ONE.0)) as usize;
-        let reference = (i64::from(daily[middle * (DECLINATION_STEPS + 1) + DECLINATION_STEPS])
-            - i64::from(mean[middle]))
-        .abs()
-        .max(1);
-        Self {
+        // **The normaliser is the largest anomaly the geometry holds
+        // anywhere, and it stands at a pole.** A normaliser read at a chosen
+        // latitude makes every latitude beyond it clamp, which replaces the
+        // geometry with one number over the whole of the high latitudes.[^1]
+        //
+        // [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D3. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+        let mut reference = 1i64;
+        for band in 0..INSOLATION_BANDS {
+            for step in 0..=DECLINATION_STEPS {
+                let apart = (i64::from(daily[band * (DECLINATION_STEPS + 1) + step])
+                    - i64::from(mean[band]))
+                .abs();
+                if apart > reference {
+                    reference = apart;
+                }
+            }
+        }
+        let mut table = Self {
             daily,
             mean,
-            top,
-            floor,
             reference: clamp_to_watts(reference),
-        }
+            // The derivation below needs a table to read. This is what it
+            // writes.
+            cloud_swing: 0,
+        };
+        // **What a whole sky takes away, derived and not written down.** The
+        // sun term already states what one watt of insolation is worth in
+        // degrees of warmth: the belt maps the annual mean range of the globe
+        // onto twice the belt amplitude, and the normaliser then maps the sum
+        // onto twice the swing the heat scale reserves. So the cloud reads
+        // the published effect of cloud in watts and converts it on the same
+        // scale. A cloud that shades the ground is worth what the sun it
+        // shades is worth, and nothing else.
+        let full_sky = CLOUD_EFFECT_WATTS * 100 / CLOUD_COVER_FINE.max(1);
+        let hundredths = full_sky * DEGREE_FINE * 100 / OLR_SLOPE_FINE;
+        table.cloud_swing =
+            (hundredths / i64::from(WARMTH_FINE)).clamp(0, i64::from(HEAT_CEILING)) as i32;
+
+        // **The coldest cell must not clamp at the bottom of the scale.** The
+        // top of the scale needs no check, because the base is derived from
+        // it. The check is here and not at a declaration, because the cloud
+        // reads the table and a constant cannot read a table.
+        assert!(
+            table.cloud_swing < HEAT_CEILING,
+            "a whole sky must not take the scale away"
+        );
+        table
+    }
+
+    /// Returns the sum of the belt and the season at one latitude and one
+    /// declination, before the sum is normalised.
+    fn shape_at(&self, latitude: i32, declination: i32) -> i32 {
+        self.shape_of(self.daily_at(latitude, declination), self.mean_at(latitude))
+    }
+
+    /// Returns the sum of the belt and the season from one daily value and
+    /// one annual mean.
+    ///
+    /// **The belt is absolute and the season is a swing about it.** The belt
+    /// carries the level, so the driver needs no separate base. Nothing
+    /// clamps: the season is normalised against the largest anomaly the
+    /// geometry holds anywhere, and no latitude can exceed it.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D2 and D3. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    /// [^2]: Research report 30, the published atmospheric math, section 4.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+    /// [^3]: Recurring Defect Shapes, redundant declaration sites. `.agents/rules/recurring-defects.md`
+    /// [^4]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    fn shape_of(&self, daily: i64, mean: i64) -> i32 {
+        // **The belt is the settled profile of the published energy balance,
+        // and it is stated in degrees.** The globe keeps a share of what
+        // reaches it, radiates a linear function of its temperature, and
+        // diffuses heat along the latitude. The diffusion damps the second
+        // Legendre mode by six times its own strength, and the annual mean
+        // insolation is a constant plus that mode to within a few percent, so
+        // the settled profile is arithmetic and not a solver.[^1]
+        let global = SOLAR_CONSTANT * ALBEDO_KEPT / (4 * 100);
+        let base = (global - OLR_INTERCEPT) * DEGREE_FINE * 100 / OLR_SLOPE_FINE;
+        let absorbed = mean * ALBEDO_KEPT / 100;
+        let belt = (absorbed - global) * DEGREE_FINE * 100 / DAMPED_SLOPE_FINE;
+        // **The season is the daily value against the annual mean of the same
+        // latitude**, so it is zero at the equinox everywhere. Its shape comes
+        // from the geometry and its size is a balance value that a blocker
+        // governs, because no published heat capacity this project could
+        // verify fixes it.[^2]
+        //
+        // **The season is an absorbed anomaly, so the albedo scales it in the
+        // way it scales the belt.** The belt multiplies the annual mean
+        // insolation by the share the globe keeps, and the season multiplied
+        // the anomaly by nothing at all. That is one value stated in two
+        // places, and the copies disagreed: a pole reflects most of the sun
+        // its polar day delivers, and the term gave it every watt.[^3] [^4]
+        //
+        // **The share is read at the annual mean of the latitude and not at
+        // the temperature of the moment, so no loop exists.** The annual mean
+        // is the belt above, which does not depend on the season, so the term
+        // cannot drive itself. This is why it needs no stability condition,
+        // where the ice term in the driver does.[^4]
+        let annual = warmth_of_hundredths(base + belt);
+        let kept = ALBEDO_KEPT - ICE_ALBEDO_DROP_FINE * ice_share_of(annual) / 100;
+        let season = narrow(sim_math::share(
+            Accum(i64::from(SEASON_ANOMALY_SWING) * kept / ALBEDO_KEPT),
+            Accum(daily - mean),
+            Accum(i64::from(self.reference).max(1)),
+        ));
+        annual + season
     }
 
     /// Returns the latitude of one band, in hundredths of a degree.
@@ -2509,22 +2907,41 @@ pub fn daily_insolation(latitude: i32, declination: i32) -> i64 {
 /// The term stops at the whole swing, so a god who fills the sky cannot drive
 /// the temperature below the bound.[^1]
 ///
+/// **The whole swing is derived and it is not written down.** The sun term
+/// states what one watt of insolation is worth in degrees of warmth, and the
+/// build converts the published effect of cloud on the same scale. A written
+/// figure here made a full sky worth about three times the published effect,
+/// and it cooled the wet equator far more than the dry poles. So the equator
+/// stood colder than the subtropics, and no land graded tropical.[^2] [^3]
+///
 /// **This is public so that a test can move one input and watch the answer
 /// move.**
 ///
 /// # References
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+/// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D5. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+/// [^3]: Findings register, FND-586. `docs/FINDINGS.md`
 #[must_use]
 pub fn cloud_at(air: Drops, capacity: Drops) -> i32 {
-    if capacity.0 <= 0 {
-        return CLOUD_SWING;
-    }
-    let held = air.0.clamp(0, capacity.0);
+    let swing = insolation().cloud_swing;
+    // **The term is an anomaly about the mean cover, and never an absolute
+    // subtraction.** The albedo the balance uses is the albedo of a planet
+    // that already carries its mean cloud, so a term that took the whole
+    // effect off every cell would count the same cloud twice. A cell under
+    // the mean cover therefore warms and a cell above it cools.[^4]
+    //
+    // [^4]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    let cover = if capacity.0 <= 0 {
+        CLOUD_SHARE_WHOLE
+    } else {
+        air.0.clamp(0, capacity.0) * CLOUD_SHARE_WHOLE / capacity.0
+    };
+    let mean = CLOUD_SHARE_WHOLE * CLOUD_COVER_FINE / 100;
     narrow(sim_math::share(
-        Accum(i64::from(CLOUD_SWING)),
-        Accum(held),
-        Accum(capacity.0),
+        Accum(i64::from(swing)),
+        Accum(cover - mean),
+        Accum(CLOUD_SHARE_WHOLE),
     ))
 }
 
@@ -2548,49 +2965,22 @@ pub fn cloud_at(air: Drops, capacity: Drops) -> i32 {
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 #[must_use]
-pub fn asked_warmth(ground: i32, season: i32, cloud: i32) -> i32 {
-    let ground = narrow(sim_math::share(
-        Accum(i64::from(ground)),
-        Accum(1),
-        Accum(GROUND_DIVISOR),
-    ));
-    (HEAT_BASE + ground + season - cloud).clamp(0, HEAT_CEILING)
+pub fn asked_warmth(relief: i32, season: i32, cloud: i32, held: i32) -> i32 {
+    // **The relief arrives in hundredths of a degree and the scale steps by
+    // half a degree.** The sun term already carries the level, so the relief
+    // is a signed perturbation about it and never an addition to it.[^2]
+    //
+    // [^2]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D1 and D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    let relief = (i64::from(relief) / i64::from(WARMTH_FINE)) as i32;
+    // **The ice reads the temperature the cell is carrying.** A cold cell
+    // grows ice, the ice reflects more than the ground it covers, and the
+    // cell cools further. The term is an anomaly about the ice the published
+    // balance already carries, so a cell at that share moves nothing.[^3]
+    //
+    // [^3]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    let ice = (ice_forcing_of(held) / i64::from(WARMTH_FINE)) as i32;
+    (season + relief + ice - cloud).clamp(0, HEAT_CEILING)
 }
-
-/// The degrees a cell holds before any of the three terms moves it.
-///
-/// **The four terms reach the bottom of the scale and they no longer reach
-/// the top of it.** The two checks below still hold, because they read the
-/// swing the sun term reserves. The sun term cannot reach that swing any
-/// more: its two parts are the belt of a latitude and the season, and the
-/// published geometry never peaks both at one place at one moment. The belt
-/// peaks at the equator, where the season is near nothing, and the season
-/// peaks at the middle latitudes, where the belt is near nothing.[^1]
-///
-/// **So the top of the scale is out of reach by about the season part, and
-/// the world runs cold against the temperature that the scale now
-/// declares.** A blocker holds the question of where the base should
-/// stand.[^2]
-///
-/// A clamp would put a flat region into the temperature field, the pressure
-/// gradient would read the edge of that region as a step, and the wind would
-/// hold a straight line across the map. The bottom of the scale is reachable,
-/// at a winter pole, and nothing clamps there.
-///
-/// # References
-///
-/// [^1]: Research report 30, the published atmospheric math, section 4.3. `docs/research/reports/30-the-published-atmospheric-math.md`
-/// [^2]: Blockers register, BLK-152. `docs/BLOCKERS.md`
-const HEAT_BASE: i32 = 112;
-
-// The four terms reach the bottom of the scale together. The second check
-// reads the swing the sun term reserves at the top, and the sun term no
-// longer reaches that swing. Both checks fail the build rather than a test.
-const _: () = assert!(HEAT_BASE - SEASON_SWING - CLOUD_SWING == 0);
-const _: () = assert!(
-    HEAT_BASE + (HEAT_FROM_WATER + HEAT_FROM_LOW_GROUND) / GROUND_DIVISOR as i32 + SEASON_SWING
-        == HEAT_CEILING
-);
 
 /// Returns the numerator of the share of the air that falls on one cell.
 ///
@@ -2622,6 +3012,462 @@ pub fn fall_numerator(air: Drops, capacity: Drops) -> i64 {
     let by_fullness = sim_math::share(Accum(FALL_FOR_FULL_AIR), Accum(held), Accum(capacity.0))
         .map_or(0, |value| value.0);
     FALL_NUMERATOR_FLOOR + by_fullness
+}
+
+/// A cyclone: a travelling low that the field carries as state.
+///
+/// # What this is, and what it is not
+///
+/// **A cyclone here is imposed. It does not form out of the field, and it
+/// cannot.** A single-layer field grows no baroclinic eddies, so the three
+/// circulation cells cannot emerge from it and the module imposes them
+/// instead.[^1] The same argument holds one level down. A mesocyclone is an
+/// instability of a layered atmosphere, and this atmosphere has one layer. So
+/// the field places a low, carries it, and lets it die. Nothing here claims
+/// that a storm grew.
+///
+/// **What is imposed is the pressure deficit and nothing else.** The wind
+/// pass reads the deficit as it reads the belt of a latitude, and the
+/// deflection then turns the inflow aside. A closed circulation is what a
+/// deflected inflow is, and that part is the field's own arithmetic rather
+/// than a shape written here.[^2]
+///
+/// # What a scale of one cell means
+///
+/// **A tornado is smaller than one cell of any lattice this engine builds,
+/// and this type does not resolve one.** A cell of a world that spans pole to
+/// pole over 128 rows is about 156 kilometres across.[^3] A tornado is under
+/// one kilometre. So the small violent setting below is an intensity carried
+/// on one cell, and it stands for a severe local storm rather than a funnel.
+/// A reader who takes it for a resolved tornado is reading a claim that the
+/// lattice cannot support.
+///
+/// The large setting is different. A tropical cyclone runs to several hundred
+/// kilometres, which is a few cells, so the lattice does resolve its
+/// structure and the figures under it mean something.
+///
+/// # The parameters
+///
+/// **One shape carries both settings.** The three fields below are what
+/// separate the small violent storm from the large sustained one, and every
+/// other quantity follows from them: the wind from the deficit over the
+/// radius, the rain from the deficit at the cell, and the end from the life
+/// and from the ground under the eye.
+///
+/// The type declares its layout, because it reaches the state hash. Seven
+/// four-byte fields fill twenty-eight bytes exactly, so the type needs no
+/// padding field.[^4]
+///
+/// # References
+///
+/// [^1]: The banded circulation. [`band_pressure_at`]
+/// [^2]: The deflection. [`deflect`]
+/// [^3]: Findings register, FND-618. `docs/FINDINGS.md`
+/// [^4]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+pub struct Cyclone {
+    /// The position along the first lattice axis, in sub-cell steps of the
+    /// whole lattice.
+    pub q_fine: i32,
+    /// The position along the second lattice axis, in the same steps.
+    pub r_fine: i32,
+    /// The pressure deficit at the eye, in the units that the temperature
+    /// plane carries. It falls as the storm dies.
+    pub depth: i32,
+    /// The cells that the deficit reaches from the eye. A radius of zero is
+    /// one cell.
+    pub radius: i32,
+    /// The solves that the storm lives from its birth.
+    pub life: u32,
+    /// The solves that it has lived.
+    pub age: u32,
+    /// The identity of the storm, which keys its wander draw.
+    ///
+    /// **The slot is not the identity.** A storm that dies frees its slot,
+    /// and the next storm in that slot must not draw what the dead one drew.
+    /// The field counts identities and never reuses one.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Testing rules, section 2. `.agents/rules/testing.md`
+    pub id: u32,
+}
+
+/// The settings that raise one cyclone.
+///
+/// **This is the parameter set, and the two constants below are two points in
+/// it.** They are not two mechanisms and they are not two types. A caller may
+/// name any other point.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CycloneSetting {
+    /// The pressure deficit at the eye, in the units that the temperature
+    /// plane carries.
+    pub depth: i32,
+    /// The cells that the deficit reaches from the eye.
+    pub radius: i32,
+    /// The solves that the storm lives.
+    pub life: u32,
+}
+
+impl CycloneSetting {
+    /// A small violent storm, on one cell, over quickly.
+    ///
+    /// **This is not a resolved tornado.** One cell of a planet-wide lattice
+    /// is two orders of magnitude wider than a funnel, so this setting is an
+    /// intensity carried on a cell and nothing finer. It is the honest
+    /// reading of a tornado-level storm at this pitch.
+    pub const SEVERE: Self = Self {
+        depth: CYCLONE_DEPTH_CEILING,
+        radius: 0,
+        life: 24,
+    };
+
+    /// A large sustained storm, over several cells, lasting many solves.
+    ///
+    /// The lattice does resolve this one. A tropical cyclone runs to several
+    /// hundred kilometres, and a cell of a planet-wide lattice is about one
+    /// hundred and fifty.
+    pub const TROPICAL: Self = Self {
+        depth: 40,
+        radius: 3,
+        life: 320,
+    };
+
+    /// Reports whether the setting is inside the range that the field
+    /// carries.
+    #[must_use]
+    pub const fn is_in_range(self) -> bool {
+        self.depth >= CYCLONE_DEPTH_FLOOR
+            && self.depth <= CYCLONE_DEPTH_CEILING
+            && self.radius >= 0
+            && self.radius <= CYCLONE_RADIUS_CEILING
+            && self.life > 0
+            && self.life <= CYCLONE_LIFE_CEILING
+    }
+}
+
+impl Cyclone {
+    /// Returns the cell of the whole lattice that the eye stands over.
+    #[must_use]
+    pub const fn eye(self) -> Axial {
+        Axial::new(
+            self.q_fine.div_euclid(CYCLONE_FINE),
+            self.r_fine.div_euclid(CYCLONE_FINE),
+        )
+    }
+
+    /// Returns the pressure deficit that the storm puts on one cell.
+    ///
+    /// **The deficit is a cone.** It stands at the depth over the eye and
+    /// falls in a straight line to nothing one cell beyond the radius. So the
+    /// gradient, which is what the wind answers to, is the depth over the
+    /// radius: a small deep storm is violent, and a large one of the same
+    /// depth is broad and gentler. That is the whole difference between the
+    /// two settings, and it is one division.
+    ///
+    /// **This is public so that a test can move one input and watch the
+    /// answer move.**
+    #[must_use]
+    pub fn deficit_at(self, cell: Axial) -> i32 {
+        let span = i64::from(self.eye().distance(cell));
+        let reach = i64::from(self.radius) + 1;
+        if span >= reach {
+            return 0;
+        }
+        narrow(sim_math::share(
+            Accum(i64::from(self.depth)),
+            Accum(reach - span),
+            Accum(reach),
+        ))
+    }
+
+    /// Reports whether the storm is over.
+    ///
+    /// A storm ends on its age or on its depth. Each of the two is a
+    /// comparison, and neither is a convergence test.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+    #[must_use]
+    pub const fn is_over(self) -> bool {
+        self.age >= self.life || self.depth < CYCLONE_DEPTH_FLOOR
+    }
+}
+
+/// The sub-cell steps that one cell of the lattice spans.
+///
+/// A storm carries its position in these steps, so it drifts across a cell
+/// over several solves rather than jumping from one cell to the next.
+const CYCLONE_FINE: i32 = 64;
+
+/// The deepest eye that the field carries, in the units that the temperature
+/// plane carries.
+///
+/// The belt of a latitude swings by thirty-two of the same units over the
+/// whole globe, so a storm at this depth is a deeper low than any belt, and
+/// it stands over one or a few cells rather than over a third of the world.
+/// The value is a content constant that no measurement chose, and the blocker
+/// that holds what the wind should be worth governs it.[^1]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+pub const CYCLONE_DEPTH_CEILING: i32 = 96;
+
+/// The shallowest eye that is still a storm. A storm that falls below it
+/// ends.
+pub const CYCLONE_DEPTH_FLOOR: i32 = 8;
+
+/// The widest storm that the field carries, in cells from the eye.
+pub const CYCLONE_RADIUS_CEILING: i32 = 8;
+
+/// The longest life that the field carries, in solves.
+pub const CYCLONE_LIFE_CEILING: u32 = 4096;
+
+/// The storms that the field carries at once.
+///
+/// The stamp pass costs the footprint of every storm on every solve, so the
+/// ceiling is what bounds that cost. It is a content constant that no
+/// measurement chose.[^1]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+pub const CYCLONE_CEILING: usize = 8;
+
+/// What turns a wind into the sub-cell steps that a storm travels.
+///
+/// **This is a unit conversion and not a tuning constant.** A wind counts
+/// eight fine steps to one lattice step, and a storm counts its position in
+/// sub-cell steps of a cell. So the two constants that state those units are
+/// what this is made of, and no third declaration of either exists.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+const CYCLONE_STEER_NUMERATOR: i64 = (CYCLONE_FINE / WIND_FINE) as i64;
+
+/// The share of the steering flow that the eye travels at.
+///
+/// A real storm travels at about the speed of the flow it stands in, so the
+/// share is the whole of it. The value is a content constant that no
+/// measurement chose, and the blocker that holds what the wind should be
+/// worth governs it.[^1]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+const CYCLONE_STEER_DENOMINATOR: i64 = 1;
+
+/// The sub-cell steps that the wander adds to each axis, either way.
+///
+/// The track of a real storm is not a straight line, and a straight line is
+/// what a steering flow alone gives. The wander is a keyed draw and never a
+/// thread-local one.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+const CYCLONE_WANDER: i32 = 6;
+
+/// The depth that a storm loses on each solve over land.
+///
+/// **A storm over land loses its source.** The engine does not model the
+/// latent heat that feeds a real cyclone, so the decay is imposed in the way
+/// that the storm itself is. A storm that made landfall dies within a few
+/// tens of solves rather than lasting out its whole life.
+const CYCLONE_LANDFALL_DECAY: i32 = 3;
+
+/// The depth that a storm loses on each solve over a cold sea.
+const CYCLONE_COLD_DECAY: i32 = 2;
+
+/// The depth that a storm loses on each solve wherever it stands.
+///
+/// **Nothing here sustains a storm, so every storm is always dying.** The
+/// figure is small, so a tropical storm over a warm sea still lives out most
+/// of its life.
+const CYCLONE_DECAY: i32 = 1;
+
+/// The share of a cell that must admit a unit before the cell counts as land.
+///
+/// Water is the only ground that admits no unit, so a cell whose open share
+/// stands above this mark is mostly land.
+const CYCLONE_LAND_MARK: i64 = 1;
+
+/// What that share is measured against.
+const CYCLONE_LAND_WHOLE: i64 = 2;
+
+/// The temperature at which the sea under a storm is warm enough to hold it.
+///
+/// The published figure for tropical cyclone genesis is a sea surface near
+/// twenty-six degrees. The temperature plane counts half a degree in one unit
+/// and stands at half the heat ceiling for a temperate cell, so this mark is
+/// at the warm end of the scale rather than at the middle of it.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math. `docs/research/reports/30-the-published-atmospheric-math.md`
+const CYCLONE_WARM_MARK: i32 = 3 * HEAT_CEILING / 5;
+
+/// One in this many solves, the field tries to raise a storm.
+///
+/// **The attempt is a keyed draw, and the gates below it decide the rest.**
+/// So the rate that a world sees is the product of this period and of how
+/// much warm wet sea the world holds, rather than this number alone.
+const CYCLONE_GENESIS_PERIOD: u64 = 24;
+
+/// The share of its capacity that the air over a cell must hold before a
+/// storm may be raised there.
+const CYCLONE_GENESIS_AIR_NUMERATOR: i64 = 1;
+
+/// What that share is measured against.
+const CYCLONE_GENESIS_AIR_DENOMINATOR: i64 = 4;
+
+/// The draw index of the genesis attempt within a frame.
+const GENESIS_DRAW: u32 = 1;
+
+/// The draw index of the cell that a genesis attempt names.
+const GENESIS_CELL_DRAW: u32 = 2;
+
+/// The draw index of the first axis of the wander.
+const WANDER_Q_DRAW: u32 = 3;
+
+/// The draw index of the second axis of the wander.
+const WANDER_R_DRAW: u32 = 4;
+
+/// The entity that the two genesis draws key on.
+///
+/// **Genesis has no entity, so it names one that no cell can name.** A cell
+/// key is a 32-bit index, so this value collides with none of them.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+const GENESIS_ENTITY: u64 = u64::MAX;
+
+/// Reports whether the field tries to raise a storm on one frame.
+///
+/// The answer is a keyed draw on the world seed, the weather system and the
+/// frame. It holds no state, and it does not depend on which thread
+/// asked.[^1]
+///
+/// **This is public so that a test can change one field of the key and watch
+/// the answer move.**[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+/// [^2]: Testing rules, section 2. `.agents/rules/testing.md`
+#[must_use]
+pub fn cyclone_forms(seed: u64, tick: Tick) -> bool {
+    rng::draw_below(
+        seed,
+        rng::SYSTEM_WEATHER,
+        tick.0,
+        GENESIS_ENTITY,
+        GENESIS_DRAW,
+        CYCLONE_GENESIS_PERIOD,
+    ) == 0
+}
+
+/// Returns the cell of the whole lattice that a genesis attempt names.
+///
+/// The answer is a keyed draw over the cells of the lattice. The gates that
+/// follow it decide whether that cell may hold a storm.
+///
+/// **This is public so that a test can change one field of the key and watch
+/// the answer move.**
+#[must_use]
+pub fn cyclone_genesis_cell(seed: u64, tick: Tick, cells: u32) -> u32 {
+    if cells == 0 {
+        return 0;
+    }
+    rng::draw_below(
+        seed,
+        rng::SYSTEM_WEATHER,
+        tick.0,
+        GENESIS_ENTITY,
+        GENESIS_CELL_DRAW,
+        u64::from(cells),
+    ) as u32
+}
+
+/// Returns the sub-cell steps that the track of one storm wanders this frame.
+///
+/// The draw is keyed on the world seed, the weather system, the frame and the
+/// identity of the storm. **The identity is not the slot.** A storm that dies
+/// frees its slot, and a storm born into that slot later must not repeat the
+/// track of the dead one.[^1] [^2]
+///
+/// **This is public so that a test can change one field of the key and watch
+/// the answer move.**[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+/// [^2]: Testing rules, section 2. `.agents/rules/testing.md`
+#[must_use]
+pub fn cyclone_wander(seed: u64, tick: Tick, id: u32) -> (i32, i32) {
+    let span = (2 * CYCLONE_WANDER + 1) as u64;
+    let along = rng::draw_below(
+        seed,
+        rng::SYSTEM_WEATHER,
+        tick.0,
+        u64::from(id),
+        WANDER_Q_DRAW,
+        span,
+    ) as i32;
+    let across = rng::draw_below(
+        seed,
+        rng::SYSTEM_WEATHER,
+        tick.0,
+        u64::from(id),
+        WANDER_R_DRAW,
+        span,
+    ) as i32;
+    (along - CYCLONE_WANDER, across - CYCLONE_WANDER)
+}
+
+/// The whole of the capacity that a cell outside every storm keeps.
+const CYCLONE_KEPT_WHOLE: i64 = 64;
+
+/// The share of its capacity that the deepest eye leaves the air.
+const CYCLONE_KEPT_FLOOR: i64 = 8;
+
+/// Returns the capacity of the air under a storm.
+///
+/// **A storm is forced ascent, and ascent rains.** The eye of the deepest
+/// storm leaves the air an eighth of what its temperature would allow, so the
+/// settle pass pours seven eighths of what stands there onto the ground. A
+/// cell outside every footprint keeps the whole of its capacity and reads
+/// nothing of this.
+///
+/// **The capacity is a bound and never an assignment.** The settle pass
+/// computes the water above the bound and moves that quantity from the air
+/// plane to the ground plane of the same cell, so the water account holds
+/// through it.[^1]
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+///
+/// # References
+///
+/// [^1]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
+#[must_use]
+pub fn cyclone_capacity(base: Drops, deficit: i32) -> Drops {
+    if deficit <= 0 {
+        return base;
+    }
+    let held = i64::from(deficit.clamp(0, CYCLONE_DEPTH_CEILING));
+    let shed = sim_math::share(
+        Accum(CYCLONE_KEPT_WHOLE - CYCLONE_KEPT_FLOOR),
+        Accum(held),
+        Accum(i64::from(CYCLONE_DEPTH_CEILING)),
+    )
+    .map_or(0, |value| value.0);
+    share_of(base, CYCLONE_KEPT_WHOLE - shed, CYCLONE_KEPT_WHOLE)
 }
 
 /// What one call to the divine power did.
@@ -2702,6 +3548,14 @@ pub struct WeatherField {
     /// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D2. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
     band: Vec<i32>,
     faction_count: u16,
+    /// The relief of the world, which the lapse rate reads.
+    ///
+    /// **A world states it, in the way it states its latitude span.**[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    relief: HeightRange,
     /// The water in the air above each cell, in cell index order. It is empty
     /// until the first drop enters the world.
     air: Vec<Drops>,
@@ -2770,6 +3624,43 @@ pub struct WeatherField {
     ///
     /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     storms: i64,
+    /// The storms that the field is carrying, in ascending identity order.
+    ///
+    /// **This is simulated state and it enters the state hash.** A storm
+    /// carries a position, a depth and an age, and the next solve reads all
+    /// three.[^1]
+    ///
+    /// The order is the order the storms were raised in, and a storm that
+    /// ends is removed without moving the ones before it. So the order is a
+    /// fixed key and never a completion order.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: A cyclone. [`Cyclone`]
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    cyclones: Vec<Cyclone>,
+    /// The identity that the next storm takes.
+    ///
+    /// **A slot is reused and an identity is not.** The wander draw of a
+    /// storm keys on the identity, so a storm born into the slot of a dead
+    /// one would otherwise repeat the track of the dead one exactly.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Testing rules, section 2. `.agents/rules/testing.md`
+    next_cyclone: u32,
+    /// The pressure deficit that the storms put on each cell of the whole
+    /// lattice.
+    ///
+    /// **This is derived and never carried.** One pass rebuilds the whole of
+    /// it from the storms at the start of every solve, so it enters no state
+    /// hash. It is stored rather than recomputed because the wind pass and
+    /// the settle pass both read it, and a cell of it is a walk over every
+    /// storm.
+    ///
+    /// The plane is empty while no storm stands, and every reader takes zero
+    /// for a cell it does not hold.
+    depression: Vec<i32>,
     /// Every drop that has ever left the ground.
     evaporated: i64,
     /// The first tick at which each faction may inflict weather again.
@@ -2849,6 +3740,7 @@ impl WeatherField {
             latitudes,
             band,
             faction_count,
+            relief: HeightRange::DEFAULT,
             air: Vec::new(),
             ground: Vec::new(),
             scratch: Vec::new(),
@@ -2864,6 +3756,9 @@ impl WeatherField {
             wind_passes: 0,
             raised: 0,
             storms: 0,
+            cyclones: Vec::new(),
+            next_cyclone: 0,
+            depression: Vec::new(),
             evaporated: 0,
             ready: vec![Tick(0); faction_count as usize],
             passes: 0,
@@ -3393,6 +4288,15 @@ impl WeatherField {
         if ground.len() != self.cells().tile_count() as usize {
             return Err(WeatherError::LatticeMismatch);
         }
+        // The storms move, weaken and die before anything reads them, and the
+        // field then tries to raise one. The deficit plane is stamped last,
+        // so the wind pass and the settle pass below both read the storms of
+        // this frame rather than the storms of the last one.[^5]
+        //
+        // [^5]: A cyclone. [`Cyclone`]
+        self.drift_cyclones(tick, seed, ground);
+        self.raise_from_the_sea(tick, seed, ground);
+        self.stamp_cyclones();
         // The temperature of every cell moves before anything reads it. Four
         // readers follow: the pressure that drives the wind, the lift, the
         // fall, and the carry itself.[^1] [^3]
@@ -3436,6 +4340,303 @@ impl WeatherField {
         Ok(())
     }
 
+    /// Returns the storms that the field is carrying.
+    #[must_use]
+    pub fn cyclones(&self) -> &[Cyclone] {
+        &self.cyclones
+    }
+
+    /// Returns the storms that the field has raised over its whole life.
+    ///
+    /// The count is the identity that the next storm takes, and no identity
+    /// is reused, so it counts every storm that ever stood.
+    #[must_use]
+    pub const fn cyclones_raised(&self) -> u32 {
+        self.next_cyclone
+    }
+
+    /// Returns the pressure deficit that the storms put on one cell.
+    ///
+    /// The answer is zero for a cell that no storm reaches, and zero for
+    /// every cell while no storm stands.
+    #[must_use]
+    pub fn depression_at(&self, cell: u32) -> i32 {
+        self.depression.get(cell as usize).copied().unwrap_or(0)
+    }
+
+    /// Raises a storm over one cell of the whole lattice.
+    ///
+    /// **This is an authoring verb and not a faction power.** It names no
+    /// congregation, so the gate that holds the divine power does not govern
+    /// it: a caller that places a storm is the author of the world rather
+    /// than a god inside it.[^1] The power that a faction wields is the one
+    /// that puts water over ground it holds.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cell lies outside the lattice, when the
+    /// setting lies outside the range the field carries, and when the field
+    /// already carries as many storms as it holds.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
+    pub fn raise_cyclone(
+        &mut self,
+        cell: u32,
+        setting: CycloneSetting,
+    ) -> Result<Cyclone, WeatherError> {
+        let Some(address) = self.cells().address_of(TileIdx(cell)) else {
+            return Err(WeatherError::NoSuchCell(cell));
+        };
+        if !setting.is_in_range() {
+            return Err(WeatherError::CycloneSettingOutOfRange);
+        }
+        if self.cyclones.len() >= CYCLONE_CEILING {
+            return Err(WeatherError::TooManyCyclones);
+        }
+        Ok(self.place_cyclone(address, setting))
+    }
+
+    /// Puts one storm on the field, at the middle of a cell.
+    ///
+    /// The identity comes from the counter and never from the slot, so a
+    /// storm born into the slot of a dead one draws its own track.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Testing rules, section 2. `.agents/rules/testing.md`
+    fn place_cyclone(&mut self, address: Axial, setting: CycloneSetting) -> Cyclone {
+        let middle = CYCLONE_FINE / 2;
+        let storm = Cyclone {
+            q_fine: address.q * CYCLONE_FINE + middle,
+            r_fine: address.r * CYCLONE_FINE + middle,
+            depth: setting.depth,
+            radius: setting.radius,
+            life: setting.life,
+            age: 0,
+            id: self.next_cyclone,
+        };
+        self.next_cyclone = self.next_cyclone.saturating_add(1);
+        self.cyclones.push(storm);
+        storm
+    }
+
+    /// Moves every storm, weakens it, and drops the ones that are over.
+    ///
+    /// **A storm travels on the flow around it and not on its own wind.** The
+    /// wind at the eye is the storm's own circulation, so a storm steered by
+    /// it would chase its own tail. The steering flow is the mean wind over
+    /// the six cells one step beyond the radius, and a symmetric circulation
+    /// sums to nothing over that ring, so what is left of the sum is the flow
+    /// that the storm sits in.
+    ///
+    /// **Nothing here sustains a storm.** The depth falls on every solve, and
+    /// it falls faster over land and over a cold sea. So a storm always ends,
+    /// and the three ways it ends are a comparison rather than a convergence
+    /// test.[^1]
+    ///
+    /// The pass walks the storms in ascending slot order, which is the order
+    /// they were raised in.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn drift_cyclones(&mut self, tick: Tick, seed: u64, ground: &[CellGround]) {
+        if self.cyclones.is_empty() {
+            return;
+        }
+        let cells = self.cells();
+        let mut carried: Vec<Cyclone> = Vec::with_capacity(self.cyclones.len());
+        for storm in &self.cyclones {
+            let mut storm = *storm;
+            let steer = self.steering_at(storm);
+            let (wander_q, wander_r) = cyclone_wander(seed, tick, storm.id);
+            storm.q_fine += narrow(sim_math::share(
+                Accum(i64::from(steer.q)),
+                Accum(CYCLONE_STEER_NUMERATOR),
+                Accum(CYCLONE_STEER_DENOMINATOR),
+            )) + wander_q;
+            storm.r_fine += narrow(sim_math::share(
+                Accum(i64::from(steer.r)),
+                Accum(CYCLONE_STEER_NUMERATOR),
+                Accum(CYCLONE_STEER_DENOMINATOR),
+            )) + wander_r;
+            storm.age = storm.age.saturating_add(1);
+            storm.depth -= CYCLONE_DECAY;
+
+            // A storm that walked off the lattice is gone. The margin is what
+            // gives it somewhere to go, and a storm that crossed the margin
+            // has left the world for good.
+            let Some(at) = cells.index_of(storm.eye()) else {
+                continue;
+            };
+            let index = at.0 as usize;
+            if let Some(under) = ground.get(index) {
+                let open = under.open_tiles() * CYCLONE_LAND_WHOLE;
+                if open > under.tiles() * CYCLONE_LAND_MARK {
+                    storm.depth -= CYCLONE_LANDFALL_DECAY;
+                }
+            }
+            let heat = self.warmth.get(index).copied().unwrap_or(0);
+            if heat < CYCLONE_WARM_MARK {
+                storm.depth -= CYCLONE_COLD_DECAY;
+            }
+            if storm.is_over() {
+                continue;
+            }
+            carried.push(storm);
+        }
+        self.cyclones = carried;
+    }
+
+    /// Returns the flow that one storm travels on.
+    ///
+    /// The answer is the mean wind over the six cells one step beyond the
+    /// radius of the storm, in the six directions. A cell outside the lattice
+    /// is left out of the mean, and a storm that finds no such cell reads the
+    /// wind under its own eye.
+    fn steering_at(&self, storm: Cyclone) -> Wind {
+        let cells = self.cells();
+        let eye = storm.eye();
+        let reach = storm.radius + 1;
+        let mut sum_q = 0i64;
+        let mut sum_r = 0i64;
+        let mut found = 0i64;
+        for step in NEIGHBOURS {
+            let around = Axial::new(eye.q + step.q * reach, eye.r + step.r * reach);
+            let Some(at) = cells.index_of(around) else {
+                continue;
+            };
+            let wind = self.wind.get(at.0 as usize).copied().unwrap_or(Wind::STILL);
+            sum_q += i64::from(wind.q);
+            sum_r += i64::from(wind.r);
+            found += 1;
+        }
+        if found == 0 {
+            return cells
+                .index_of(eye)
+                .and_then(|at| self.wind.get(at.0 as usize).copied())
+                .unwrap_or(Wind::STILL);
+        }
+        Wind {
+            q: narrow(sim_math::share(Accum(sum_q), Accum(1), Accum(found))),
+            r: narrow(sim_math::share(Accum(sum_r), Accum(1), Accum(found))),
+        }
+    }
+
+    /// Tries to raise one storm out of the warm sea.
+    ///
+    /// **Nothing emerges here, and nothing can.** A single-layer field grows
+    /// no baroclinic eddies, so a low cannot form out of it. This pass places
+    /// one, and the gates below only decide where a placed one is
+    /// plausible.[^1]
+    ///
+    /// The gates are the published conditions for a tropical cyclone that
+    /// this field can read: a sea rather than land, a warm sea, and air that
+    /// already holds a share of what it can carry. **The latitude gate is not
+    /// modelled.** A real cyclone does not form within about five degrees of
+    /// the equator, because the deflection vanishes there; the deflection of
+    /// this field is the same at every latitude, so there is nothing for that
+    /// gate to read.[^2]
+    ///
+    /// The pass takes two keyed draws, whatever the field holds, so it costs
+    /// the same on every frame and it takes no branch that a thread could
+    /// change.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: The banded circulation. [`band_pressure_at`]
+    /// [^2]: The deflection. [`deflect`]
+    /// [^3]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+    fn raise_from_the_sea(&mut self, tick: Tick, seed: u64, ground: &[CellGround]) {
+        let cells = self.cells();
+        let cell = cyclone_genesis_cell(seed, tick, cells.tile_count());
+        if !cyclone_forms(seed, tick) {
+            return;
+        }
+        if self.cyclones.len() >= CYCLONE_CEILING {
+            return;
+        }
+        let index = cell as usize;
+        let Some(under) = ground.get(index) else {
+            return;
+        };
+        // A sea cell, and not a coast. Water is the only ground that admits
+        // no unit.
+        if under.tiles() <= 0 || under.open_tiles() * CYCLONE_LAND_WHOLE > under.tiles() {
+            return;
+        }
+        let heat = self.warmth.get(index).copied().unwrap_or(0);
+        if heat < CYCLONE_WARM_MARK {
+            return;
+        }
+        // The air must already hold a share of what it can carry. A dry sky
+        // has nothing for a storm to rain out, and a storm over one would be
+        // a low with no weather under it.
+        let air = self.air.get(index).copied().unwrap_or(Drops::ZERO);
+        let capacity = capacity_at(heat);
+        let asked = sim_math::share(
+            Accum(capacity.0),
+            Accum(CYCLONE_GENESIS_AIR_NUMERATOR),
+            Accum(CYCLONE_GENESIS_AIR_DENOMINATOR),
+        )
+        .map_or(0, |value| value.0);
+        if air.0 < asked {
+            return;
+        }
+        let Some(address) = cells.address_of(TileIdx(cell)) else {
+            return;
+        };
+        self.place_cyclone(address, CycloneSetting::TROPICAL);
+    }
+
+    /// Rebuilds the deficit plane from the storms.
+    ///
+    /// **The plane is derived, and this pass derives the whole of it.** No
+    /// part of the previous frame survives, so a storm that ended leaves
+    /// nothing behind and the ambient field returns to what it was.
+    ///
+    /// The pass walks the storms in slot order and the cells of each
+    /// footprint in ascending row and column order. Both orders are
+    /// fixed.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn stamp_cyclones(&mut self) {
+        if self.cyclones.is_empty() {
+            self.depression.clear();
+            return;
+        }
+        let cells = self.cells();
+        let count = cells.tile_count() as usize;
+        if self.depression.len() == count {
+            self.depression.fill(0);
+        } else {
+            self.depression = vec![0; count];
+        }
+        for storm in &self.cyclones {
+            let eye = storm.eye();
+            let reach = storm.radius;
+            for r in (eye.r - reach)..=(eye.r + reach) {
+                for q in (eye.q - reach)..=(eye.q + reach) {
+                    let address = Axial::new(q, r);
+                    let Some(at) = cells.index_of(address) else {
+                        continue;
+                    };
+                    let deficit = storm.deficit_at(address);
+                    if deficit <= 0 {
+                        continue;
+                    }
+                    let slot = &mut self.depression[at.0 as usize];
+                    *slot = slot.saturating_add(deficit).clamp(0, CYCLONE_DEPTH_CEILING);
+                }
+            }
+        }
+    }
+
     /// Moves the temperature of every cell toward what the world asks.
     ///
     /// **The pass never assigns the asked temperature.** It moves the stored
@@ -3461,6 +4662,10 @@ impl WeatherField {
         // [^3]: The padded lattice. [`PaddedLattice::inner_row_of`]
         let height = self.lattice.inner().height();
         let latitudes = self.latitudes;
+        // **The zero of the relief term, read once for the pass.** It is a
+        // reduction over ground that never changes, so it is the same integer
+        // on every tick.
+        let reference = mean_land_height_over(ground);
         for (cell, under) in ground.iter().enumerate() {
             let row = self.lattice.inner_row_of(cell as u32);
             let air = self.air.get(cell).copied().unwrap_or(Drops::ZERO);
@@ -3470,9 +4675,10 @@ impl WeatherField {
             // overcast, and a warm cell holding the same water is clear.
             let capacity = capacity_at(self.warmth.get(cell).copied().unwrap_or(0));
             let asked = asked_warmth(
-                heat_of(*under),
+                relief_cooling_of(*under, self.relief, reference),
                 season_at(tick, latitudes.of_row(row, height)),
                 cloud_at(air, capacity),
+                self.warmth.get(cell).copied().unwrap_or(0),
             );
             let Some(held) = self.warmth.get_mut(cell) else {
                 continue;
@@ -3568,6 +4774,7 @@ impl WeatherField {
             wind: &self.wind,
             warmth: &self.warmth,
             band: &self.band,
+            depression: &self.depression,
             pressure_divisor: self.scale.pressure_divisor(),
         };
         run_in_chunks(count, threads, &mut self.wind_scratch, |low, out| {
@@ -3744,7 +4951,16 @@ impl WeatherField {
             // [^4]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
             let cooling = self.cooling_at(cell, heat);
             let climb = self.climb_at(cell, ground);
-            let capacity = travelling_capacity(capacity_at(heat), cooling, climb);
+            // **A storm is forced ascent, and ascent rains.** The deficit
+            // takes a further share of the capacity, so the air under an eye
+            // pours out most of what it holds. The move is a bound and never
+            // an assignment, so the water account holds through it.[^7]
+            //
+            // [^7]: A cyclone. [`cyclone_capacity`]
+            let capacity = cyclone_capacity(
+                travelling_capacity(capacity_at(heat), cooling, climb),
+                self.depression.get(cell).copied().unwrap_or(0),
+            );
             let held = self.air[cell];
             let poured = Drops((held.0 - capacity.0).max(0));
             self.air[cell] = Drops(held.0 - poured.0);
@@ -3894,7 +5110,16 @@ impl WeatherField {
         // makes them different.[^3]
         //
         // [^3]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+        // **A storm is state that the next step reads, so it enters the
+        // hash.** The identity counter goes in beside it, because two fields
+        // holding the same storms and a different counter give the next storm
+        // a different draw key.[^4]
+        //
+        // [^4]: A cyclone. [`Cyclone`]
         running
+            .write_u64(u64::from(self.next_cyclone))
+            .write_u64(self.cyclones.len() as u64)
+            .write(bytemuck::cast_slice(&self.cyclones))
             .write(bytemuck::cast_slice(&self.air))
             .write(bytemuck::cast_slice(&self.ground))
             .write(bytemuck::cast_slice(&self.wind))
@@ -4126,6 +5351,16 @@ struct WindPass<'a> {
     ///
     /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D2. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
     band: &'a [i32],
+    /// The pressure deficit that the storms put on each cell.
+    ///
+    /// **A storm is a low, and the pass reads it as it reads a belt.** The
+    /// plane is empty while no storm stands, and the pass then takes zero for
+    /// every cell.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: A cyclone. [`Cyclone`]
+    depression: &'a [i32],
     /// What the pressure sum is divided by. It follows the cell side, because
     /// a finer lattice holds a smaller difference between two neighbours.
     pressure_divisor: i64,
@@ -4151,7 +5386,14 @@ impl WindPass<'_> {
             .get(address.r.max(0) as usize)
             .copied()
             .unwrap_or(0);
-        warmth - band
+        // **A storm is a low, and the pass reads it as it reads a belt.** So
+        // the wind answers to the deficit through the arithmetic that is
+        // already here, and the deflection then turns the inflow into a
+        // circulation. Nothing here writes a rotation.[^2]
+        //
+        // [^2]: A cyclone. [`Cyclone`]
+        let storm = self.depression.get(index).copied().unwrap_or(0);
+        warmth - band - storm
     }
 
     /// Fills one run of the wind scratch plane.
@@ -4177,7 +5419,7 @@ impl WindPass<'_> {
             // points toward the hotter neighbours.
             let mut asked_q = 0i64;
             let mut asked_r = 0i64;
-            for direction in 0..NEIGHBOUR_COUNT {
+            for (direction, step) in NEIGHBOURS.iter().enumerate() {
                 let Some(neighbour) = self.cells.neighbour(address, direction) else {
                     continue;
                 };
@@ -4186,8 +5428,8 @@ impl WindPass<'_> {
                 };
                 let there = self.drive(at.0 as usize, neighbour);
                 let pull = i64::from(there - here);
-                asked_q += i64::from(NEIGHBOURS[direction].q) * pull;
-                asked_r += i64::from(NEIGHBOURS[direction].r) * pull;
+                asked_q += i64::from(step.q) * pull;
+                asked_r += i64::from(step.r) * pull;
             }
             let step = cap(
                 Wind {

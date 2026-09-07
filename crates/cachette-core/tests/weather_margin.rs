@@ -6,10 +6,16 @@
 //! and nothing arrives through the other, so the cells beside an edge stay
 //! starved of whatever the wind should carry in.
 //!
-//! These tests state three things. A margin of zero reproduces the field the
-//! engine held before the margin existed. A reader that names a tile reads the
-//! world at every margin width. And the margin gives the border of the world
-//! more water than it holds without one.
+//! These tests state three things. A margin of zero widens no lattice and
+//! shifts no index, so nothing the margin adds reaches a reader. A reader that
+//! names a tile reads the world at every margin width. And the margin gives
+//! the border of the world more water than it holds without one.
+//!
+//! **No test here pins a hash against a stored number.** The state of a world
+//! is pinned once, in the golden file, which is regenerated deliberately and
+//! checked at more than one thread count. A second pin kept beside a subsystem
+//! goes stale on every change to that subsystem and teaches its readers to
+//! regenerate it without reading it.
 //!
 //! # References
 //!
@@ -35,7 +41,6 @@ fn config(width: u32, height: u32) -> WorldConfig {
         seed: 0x9e37_79b9_7f4a_7c15,
         faction_count: 2,
         unit_capacity: 64,
-        ..WorldConfig::default()
     }
 }
 
@@ -47,55 +52,79 @@ fn hash_after(world: &mut World, frames: u32) -> u64 {
     world.state_hash().finish()
 }
 
-/// The hash of a world at margin zero, after the stated frames.
-///
-/// **The value no longer comes from the engine that had no margin, and it
-/// cannot.** It was taken from a run of that engine, at the commit this branch
-/// left, with the same extent, the same seed and the same frame count. The
-/// weather model has since changed: the row axis of a world became a latitude,
-/// the sun term became the published insolation geometry, and the capacity of
-/// the air became the published saturation curve.[^2] Every world therefore
-/// holds a different state, and the old value can never be reached again.
-///
-/// **So this constant is now a pin on the current engine and not a proof of
-/// the equivalence it was written for.** It still fails when a change moves
-/// the field at margin zero, which is what a regression pin does. It no longer
-/// says that a margin of zero reproduces an engine that had none, because that
-/// engine is gone. The other tests in this file carry the properties of the
-/// margin that are still checkable. The commit body holds the command that
-/// produced the value.
-///
-/// A test must read a stored value rather than compute it, or it compares a
-/// run against itself and proves nothing.[^1]
-///
-/// # References
-///
-/// [^1]: Testing rules, section 1. `.agents/rules/testing.md`
-/// [^2]: ADR-0177, the row axis of a world is a latitude that the world states. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-const BARE_HASH_AFTER_24_FRAMES: u64 = 2_287_978_085_891_004_685;
-
-/// The frames that the bare hash was taken after.
-const BARE_HASH_FRAMES: u32 = 24;
-
-/// A margin of zero widens no lattice, and the field it gives is pinned.
+/// A margin of zero widens no lattice, and nothing it adds reaches a reader.
 ///
 /// The whole lattice is then the lattice of the world, the index of a cell is
 /// its own index, the key of a draw is its own index, and the ground fold
-/// gives the fold of the world alone. Nothing the margin adds reaches the
-/// field.
+/// gives the fold of the world alone.
+///
+/// **This test pinned a hash of the weather field, and it does not any more.**
+/// The pin stated none of the four claims above. It stated that the field had
+/// not moved, which is what the golden state hash states, and that file is
+/// regenerated deliberately and checked at three thread counts. A second such
+/// pin living in a weather suite is one fact in two places, and the copy with
+/// no owner is the one that goes stale.[^3] It was regenerated twice in one
+/// night, by two people passing through, and each time it recorded the weather
+/// of that hour rather than a property of the margin.
+///
+/// **The four claims survive a change to the weather, and a hash cannot.**
+/// None of them reads a temperature, a wind or a rainfall. They read the shape
+/// of the lattice and the maps that the ring offsets. A weather change moves a
+/// hash and moves none of these.
+///
+/// The equivalence the pin was written for is asserted elsewhere in this file,
+/// against a hand-built bare field rather than against a stored number, so
+/// removing the pin takes no coverage away.
+///
+/// # References
+///
+/// [^3]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 #[test]
-fn a_margin_of_zero_widens_no_lattice_and_holds_its_pinned_field() {
+fn a_margin_of_zero_widens_no_lattice_and_changes_no_index() {
     let scale = WeatherScale::LEVEL_1;
-    let mut bare = World::with_weather_margin(config(48, 48), scale, 0).expect("it builds");
+    let bare = World::with_weather_margin(config(48, 48), scale, 0).expect("it builds");
+    let lattice = bare.weather().lattice();
+    assert_eq!(lattice.ring(), 0, "the fixture asked for no ring");
     assert_eq!(
-        bare.weather().lattice().whole(),
-        bare.weather().lattice().inner(),
+        lattice.whole(),
+        lattice.inner(),
         "a margin of zero widens the lattice"
     );
+
+    let count = lattice.inner().tile_count();
+    assert!(count > 0, "the lattice of the fixture holds no cell");
+    for cell in 0..count {
+        assert_eq!(
+            lattice.whole_of_inner(cell),
+            Some(cell),
+            "the whole index of inner cell {cell} is not its own index"
+        );
+        assert_eq!(
+            lattice.inner_of_whole(cell),
+            Some(cell),
+            "the inner index of whole cell {cell} is not its own index"
+        );
+        assert_eq!(
+            lattice.draw_key(cell),
+            cell,
+            "the draw key of cell {cell} is not its own index"
+        );
+    }
     assert_eq!(
-        hash_after(&mut bare, BARE_HASH_FRAMES),
-        BARE_HASH_AFTER_24_FRAMES,
-        "a world at margin zero moved away from the field this branch pinned"
+        lattice.inner_cells(),
+        (0..count).collect::<Vec<u32>>(),
+        "the cropped list at no ring is not the lattice in order"
+    );
+
+    // The ground fold gives the fold of the world alone. The fold over a
+    // lattice takes an early path when the lattice carries no ring, and this
+    // is what states that the path gives the same answer as the fold that
+    // knows nothing about a ring.
+    let layout = bare.weather_layout();
+    assert_eq!(
+        ground_over_lattice(lattice, layout, bare.terrain()),
+        cell_ground_of(layout, bare.terrain()),
+        "the fold over a lattice of no ring parts from the fold of the world"
     );
 }
 

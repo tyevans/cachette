@@ -18,10 +18,11 @@
 //! [^3]: Testing rules, section 2. `.agents/rules/testing.md`
 //! [^4]: Testing policy. `docs/TESTING.md`
 
-use cachette_core::controller::{self, FactionWeights, COMMAND_RELATION, WEIGHT_HIGH, WEIGHT_LOW};
+use cachette_core::controller::{self, FactionWeights, WEIGHT_HIGH, WEIGHT_LOW};
 use cachette_core::holding::Holder;
 use cachette_core::relation::RelationError;
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, LEADER, WORKER, WORKER_ROW};
+use cachette_core::Verb;
 use cachette_core::{
     Axial, Entity, FactionId, Fix32, Influence, MoveRelationError, Tick, World, WorldConfig,
 };
@@ -455,17 +456,31 @@ fn the_rival_is_the_largest_other_faction_and_a_tie_goes_low() {
     );
 }
 
-#[test]
-fn the_controller_moves_a_relation_through_the_verb() {
-    // The world seeds itself, so every faction has a seat. Every unit of the
-    // first faction becomes a leader, so the faction has a speaker from the
-    // first tick. The other faction starts with none.
-    //
-    // **The second faction does not stay without one.** A faction with no
-    // unit that carries command reach queues a leader outright, so it builds
-    // one and then speaks. The rule under test is therefore read tick by
-    // tick: while a faction holds no speaker, it plans no move, and the entry
-    // it would move stands still.
+/// What one run of the speaker measurement counted.
+struct SpeakerRun {
+    /// The ticks on which the second faction held no speaker.
+    speechless: usize,
+    /// The ticks on which the second faction held a speaker.
+    speaking: usize,
+    /// The relation commands the second faction planned on those ticks.
+    while_speechless: usize,
+    /// The relation commands the second faction planned over the whole run.
+    total: usize,
+    /// The moves the relation verb made over the whole run.
+    moves: i64,
+    /// The entry from the first faction to the second, at the start.
+    start: i32,
+    /// The same entry at the end.
+    end: i32,
+}
+
+/// Runs the speaker measurement once, and counts what the second faction
+/// planned.
+///
+/// The `b_speaks` flag says whether the units of the second faction take the
+/// leader row. Every unit of the first faction takes it in both runs, so the
+/// two runs differ in that one flag and in nothing else.
+fn speaker_run(b_speaks: bool) -> SpeakerRun {
     let mut world = World::new(WorldConfig {
         width: 64,
         height: 64,
@@ -477,56 +492,148 @@ fn the_controller_moves_a_relation_through_the_verb() {
     world.seed_world().expect("the world seeds once");
     let units: Vec<Entity> = world.soldiers().iter().collect();
     for unit in units {
-        if world.soldiers().faction(unit) == Some(A) {
+        let faction = world.soldiers().faction(unit);
+        if faction == Some(A) || (b_speaks && faction == Some(B)) {
             assert!(world.set_unit_type(unit, LEADER));
         }
     }
     let start = world.relation(A, B).expect("the pair exists");
-    let mut moves = 0i64;
-    let mut speechless = 0usize;
+    let mut run = SpeakerRun {
+        speechless: 0,
+        speaking: 0,
+        while_speechless: 0,
+        total: 0,
+        moves: 0,
+        start,
+        end: start,
+    };
     for tick in 0..200 {
         // The plan reads the arena at the head of the step, so the state
         // before the step is the state the plan saw.
         let spoke = has_speaker(&world, B);
-        let before = world.relation(B, A).expect("the pair exists");
         world.step(4).expect("the step runs");
-        moves += world
+        run.moves += world
             .subsystem_census()
             .iter()
             .find(|(name, _)| *name == "relation_moves")
             .map_or(0, |(_, count)| *count);
+        let schema = world.action_schema();
         let by_b = world
             .controller_log()
             .iter()
-            .filter(|command| command.kind == COMMAND_RELATION && command.faction == B)
+            .filter(|command| {
+                schema.verb_of(command.action) == Some(Verb::Relation) && command.faction == B
+            })
             .count();
+        run.total += by_b;
         if spoke {
-            continue;
+            run.speaking += 1;
         }
-        speechless += 1;
-        assert_eq!(
-            by_b, 0,
-            "a faction with no speaker planned a move on tick {tick}"
-        );
-        assert_eq!(
-            world.relation(B, A),
-            Some(before),
-            "the faction with no speaker moved the entry on tick {tick}"
-        );
+        if !spoke {
+            run.speechless += 1;
+            run.while_speechless += by_b;
+            assert_eq!(
+                by_b, 0,
+                "a faction with no speaker planned a move on tick {tick}"
+            );
+        }
     }
+    run.end = world.relation(A, B).expect("the pair exists");
+    run
+}
+
+/// A faction plans a relation move only while it holds a speaker, and the
+/// verb is what moves the entry.
+///
+/// **The test compares two runs, not one run against a belief.** The gate the
+/// controller reads is the command reach column of the units of a faction: a
+/// faction with no unit that carries reach gets no rival, and the relation
+/// command needs one. One run leaves the second faction with the row its
+/// seeding gave it. The other gives its units the leader row. Nothing else
+/// differs, so the count of relation commands the second faction planned
+/// measures the gate.[^6]
+///
+/// **The test does not assert that the entry stands still.** The drift moves
+/// every entry outside the peace band one step toward it, on a schedule, and
+/// it reads no speaker. An assertion that the entry of a speechless faction
+/// does not move therefore states a rule the engine never held, and it fails
+/// as soon as anything else drives that entry out of the band.[^7]
+///
+/// # References
+///
+/// [^6]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D3. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+/// [^7]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D6. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+#[test]
+fn the_controller_moves_a_relation_through_the_verb() {
+    let silent = speaker_run(false);
+    let speaks = speaker_run(true);
+    println!(
+        "silent: speechless {}, planned {} of them, {} in all, {} moves, {} to {}",
+        silent.speechless,
+        silent.while_speechless,
+        silent.total,
+        silent.moves,
+        silent.start,
+        silent.end
+    );
+    println!(
+        "speaks: speechless {}, planned {} of them, {} in all, {} moves, {} to {}",
+        speaks.speechless,
+        speaks.while_speechless,
+        speaks.total,
+        speaks.moves,
+        speaks.start,
+        speaks.end
+    );
+
+    // **Each run must reach the case it exists for, and the two cases are not
+    // the same.** The silent run carries the evidence: it must hold ticks on
+    // which the second faction had no speaker, because those are the ticks the
+    // gate answers for. The speaking run is the control: it must hold ticks on
+    // which the second faction did have one, because a control that never
+    // spoke would plan nothing for a reason other than the gate.
+    //
+    // **The guard once asked both runs to go speechless, and that asked the
+    // control to stop being a control.** A run that gives every unit of the
+    // second faction the leader row holds a speaker from its first tick, and
+    // it loses one only if every such unit dies. Nothing in the gate rule
+    // needs that to happen. The silent run reads the gate on every one of its
+    // speechless ticks, and the control reads the other side of it.
     assert!(
-        moves > 0,
+        silent.speechless > 0,
+        "the second faction held a speaker on every tick of the silent run, \
+         so the gate was never read"
+    );
+    assert!(
+        speaks.speaking > 0,
+        "the second faction held no speaker on any tick of the speaking run, \
+         so the control never reached the case it exists for"
+    );
+    assert_eq!(
+        silent.while_speechless, 0,
+        "the faction planned a move on a tick it held no speaker"
+    );
+    assert_eq!(
+        speaks.while_speechless, 0,
+        "the faction planned a move on a tick it held no speaker"
+    );
+    // The gate is what stops the silent run, and not the fixture. The two
+    // runs hold the same world, so a command the speaking run planned is a
+    // command the silent run would have planned had it held a speaker.
+    assert_eq!(
+        silent.total, 0,
+        "a faction that never spoke planned a relation move"
+    );
+    assert!(
+        speaks.total > 0,
+        "a faction that spoke planned no relation move, so the silent run proves nothing"
+    );
+    assert!(
+        silent.moves > 0,
         "the controller never moved a relation in 200 ticks"
     );
-    // The fixture must reach the case it asserts on. A run in which the
-    // second faction speaks from the first tick would pass the loop above on
-    // nothing at all.
     assert!(
-        speechless > 0,
-        "the second faction held a speaker on every tick, so the rule was never read"
-    );
-    assert!(
-        world.relation(A, B).expect("the pair exists") <= start,
+        silent.end <= silent.start,
         "the moves go toward war and the drift cannot outrun them here"
     );
 }

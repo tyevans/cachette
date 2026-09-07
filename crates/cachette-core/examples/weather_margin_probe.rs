@@ -132,9 +132,16 @@ fn run(scale: WeatherScale, margin: u32) -> Option<Row> {
         seed: 0x9e37_79b9_7f4a_7c15,
         faction_count: 2,
         unit_capacity: 64,
-        ..WorldConfig::default()
     };
     let mut world = World::with_weather_margin(config, scale, margin).ok()?;
+    // **A cost probe measures elapsed time and the engine must not.** The
+    // clock is banned from the crate because a simulation that reads it stops
+    // being reproducible. This is an example that reports a cost and drives
+    // no simulated state from what it reads, and it asserts nothing on the
+    // figure, so no test can go flaky on it.[^1]
+    //
+    // [^1]: Testing Rules, do not assert on time. `.agents/rules/testing.md`
+    #[allow(clippy::disallowed_methods)]
     let started = Instant::now();
     let mut before: Vec<i64> = Vec::new();
     let mut border_move = 0i64;

@@ -91,8 +91,8 @@ fn correlation_at(plane: &[i64], wide: u32, high: u32, lag: u32, down: bool) -> 
 /// numerator unit of the transport.
 fn shares(wind: Wind) -> (i64, i64) {
     let mut directed = 0i64;
-    for direction in 0..NEIGHBOUR_COUNT {
-        directed += i64::from(wind.along(NEIGHBOURS[direction]).max(0));
+    for neighbour in NEIGHBOURS {
+        directed += i64::from(wind.along(neighbour).max(0));
     }
     (NEIGHBOUR_COUNT as i64 * i64::from(WIND_FINE), directed)
 }

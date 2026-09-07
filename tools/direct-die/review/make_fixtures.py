@@ -156,12 +156,13 @@ def write_round(
     directory = session_directory / f"round-{number:02d}"
     directory.mkdir(parents=True, exist_ok=True)
     if with_meta:
+        parents = {letter: parent for letter in letters} if parent is not None else {}
         write_json(
             directory / "meta.json",
             {
                 "round": number,
                 "prompt_summary": summary or f"round {number} of the hex tile",
-                "parent": parent,
+                "parents": parents,
             },
         )
     for letter in letters:
@@ -210,10 +211,24 @@ def build(root: Path, clean: bool = True) -> Path:
     write_round(
         healthy, 2, parent="round-01/variant-c", summary="lift the value against grass"
     )
+    for round_name in ("round-01", "round-02"):
+        meta_path = healthy / round_name / "meta.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        meta["parents"] = {
+            "a": "round-00/variant-b",
+            "b": "round-00/variant-d",
+            "c": "round-00/variant-b",
+            "d": "round-00/variant-d",
+        }
+        write_json(meta_path, meta)
     write_json(
         healthy / "round-00" / "feedback.json",
         {
-            "choice": "b",
+            "round": 0,
+            "likes": ["b"],
+            "denies": [],
+            "order": ["b"],
+            "note": "",
             "text": "B reads best at tile size. The outline of A is too heavy.",
             "at": (created + timedelta(minutes=6))
             .isoformat(timespec="seconds")
@@ -223,11 +238,27 @@ def build(root: Path, clean: bool = True) -> Path:
     write_json(
         healthy / "round-01" / "feedback.json",
         {
-            "choice": None,
-            "text": "None of these. The canopy lost its silhouette. Go back to B.",
-            "at": (created + timedelta(minutes=14))
-            .isoformat(timespec="seconds")
-            .replace("+00:00", "Z"),
+            "round": 1,
+            "likes": ["b", "d"],
+            "denies": ["a"],
+            "order": ["d", "b"],
+            "note": "keep the palette flat",
+            "text": "raise the contrast of the base",
+            "at": "2026-09-01T10:20:00Z",
+        },
+    )
+    write_json(
+        healthy / "round-01" / "analysis.json",
+        {
+            "round": 1,
+            "preference": "The accepted drawings hold three shapes and one flat fill.",
+            "order": ["d", "b"],
+            "reasons": {"d": "the silhouette reads at 64 pixels", "b": ""},
+            "guide_edit": {
+                "section": "Shape language",
+                "rule": "Use three shapes or fewer inside the hexagon.",
+            },
+            "at": "2026-09-01T10:25:00Z",
         },
     )
 
@@ -239,8 +270,15 @@ def build(root: Path, clean: bool = True) -> Path:
     write_round(partial, 0, summary="first pass at the mountain hex")
     # A round that holds one variant only.
     write_round(partial, 1, letters=("a",), summary="only variant a is written")
-    # A round whose variants have no critique.
-    write_round(partial, 2, with_critique=False, summary="the critique is not written")
+    # A round whose variants have no critique. Every letter gets the same
+    # parent, as the regression proof that one parent covers every variant.
+    write_round(
+        partial,
+        2,
+        parent="round-00/variant-a",
+        with_critique=False,
+        summary="the critique is not written",
+    )
     # A round with an SVG and no render, and no meta.json.
     write_round(partial, 3, letters=("a", "b"), with_renders=False, with_meta=False)
     # A round whose critique file holds broken JSON.
@@ -256,15 +294,139 @@ def build(root: Path, clean: bool = True) -> Path:
     nameless.mkdir(parents=True, exist_ok=True)
     write_round(nameless, 0, letters=("a", "b", "c"), summary="no manifest yet")
 
+    build_style_sessions(root, created)
     return root
 
 
+# The styles that the fixture guide names. The real guide names its own.
+FIXTURE_STYLES = ("cartoon", "pencil")
+
+
+def build_style_sessions(root: Path, created: datetime) -> None:
+    """Write sessions that a style run writes, so the grid has cells.
+
+    The server names a session after the engine asset name when it starts a
+    run. These names follow that shape, so the grid reads the asset name out
+    of the directory name.
+
+    The tree holds one complete asset with a human choice, one asset that is
+    part way through, one asset whose name only the subject text gives, and
+    one session with no round at all.
+    """
+    # A cartoon forest that a person chose in the second round.
+    chosen = root / "cartoon" / "20260904-090000-forest"
+    chosen.mkdir(parents=True, exist_ok=True)
+    write_manifest(chosen, "cartoon", created + timedelta(days=3), 2)
+    write_round(chosen, 0, summary="a dense stand of trees")
+    write_round(
+        chosen, 1, parent="round-00/variant-b", summary="a dense stand of trees"
+    )
+    write_json(
+        chosen / "round-01" / "feedback.json",
+        {
+            "round": 1,
+            "likes": ["b", "d"],
+            "denies": ["a"],
+            "order": ["b", "d"],
+            "note": "Keep the canopy shape.",
+            "text": "B reads at tile size.",
+            "at": (created + timedelta(days=3, minutes=5))
+            .isoformat(timespec="seconds")
+            .replace("+00:00", "Z"),
+        },
+    )
+    write_json(
+        chosen / "round-01" / "analysis.json",
+        {
+            "round": 1,
+            "preference": "The accepted drawings hold three shapes and one flat fill.",
+            "order": ["d", "b"],
+            "reasons": {"d": "the silhouette reads at 64 pixels", "b": ""},
+            "guide_edit": {
+                "section": "Shape language",
+                "rule": "Use three shapes or fewer inside the hexagon.",
+            },
+            "at": (created + timedelta(days=3, minutes=8))
+            .isoformat(timespec="seconds")
+            .replace("+00:00", "Z"),
+        },
+    )
+
+    # A cartoon water that the loop is part way through. One variant is
+    # drawn and has no critique. This is the live case.
+    live = root / "cartoon" / "20260904-091000-water"
+    live.mkdir(parents=True, exist_ok=True)
+    write_manifest(live, "cartoon", created + timedelta(days=3, minutes=10), 1)
+    write_round(live, 0, letters=("a",), with_critique=False, summary="open water")
+
+    # A cartoon hill whose name only the subject text gives. The session
+    # identifier carries no asset name, as a command line run does not.
+    unnamed = root / "cartoon" / "20260904-092000"
+    unnamed.mkdir(parents=True, exist_ok=True)
+    write_manifest(unnamed, "cartoon", created + timedelta(days=3, minutes=20), 1)
+    write_round(unnamed, 0, letters=("a", "b"), summary="a low rolling hill")
+
+    # A pencil session that holds no round, and no manifest.
+    empty = root / "pencil" / "20260904-093000-mountain"
+    empty.mkdir(parents=True, exist_ok=True)
+
+
+def build_styleguide(root: Path, clean: bool = True) -> Path:
+    """Write a fake style guide, with two styles and no exemplar.
+
+    An exemplar directory starts empty. That is the state a person meets
+    before the first promotion, and the grid must render it.
+    """
+    root = Path(root)
+    if clean and root.exists():
+        shutil.rmtree(root)
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "score.md").write_text(
+        "# The score scale\n\nThe fixture score scale.\n", encoding="utf-8"
+    )
+    for style in FIXTURE_STYLES:
+        (root / f"{style}.md").write_text(
+            f"# The {style} style\n\nThe fixture rules of the {style} style.\n",
+            encoding="utf-8",
+        )
+        (root / "exemplars" / style).mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def build_workspace(root: Path, clean: bool = True) -> dict[str, Path]:
+    """Write every directory that the front end reads, and give the paths.
+
+    The front end reads four roots: the sessions, the style guide, the packs
+    and the runs. This writes the first two with data, and makes the other
+    two empty. An empty packs directory and an empty runs directory are the
+    first state a person meets.
+    """
+    root = Path(root)
+    paths = {
+        "sessions": root / "sessions",
+        "styleguide": root / "styleguide",
+        "packs": root / "packs",
+        "runs": root / "runs",
+    }
+    build(paths["sessions"], clean=clean)
+    build_styleguide(paths["styleguide"], clean=clean)
+    paths["packs"].mkdir(parents=True, exist_ok=True)
+    paths["runs"].mkdir(parents=True, exist_ok=True)
+    return paths
+
+
 def main() -> None:
-    """Write the fixture tree at the path the caller names."""
-    default = Path(__file__).resolve().parent.parent / "fixtures" / "sessions"
-    parser = argparse.ArgumentParser(description="write a fake direct-die session tree")
+    """Write the fixture workspace at the path the caller names."""
+    default = Path(__file__).resolve().parent.parent / "fixtures"
+    parser = argparse.ArgumentParser(
+        description="write a fake direct-die workspace for the front end"
+    )
     parser.add_argument(
-        "root", nargs="?", type=Path, default=default, help="the sessions root to write"
+        "root",
+        nargs="?",
+        type=Path,
+        default=default,
+        help="the workspace root to write",
     )
     parser.add_argument(
         "--keep",
@@ -272,8 +434,15 @@ def main() -> None:
         help="add to the tree instead of removing it first",
     )
     arguments = parser.parse_args()
-    root = build(arguments.root, clean=not arguments.keep)
-    print(f"wrote the fixture sessions to {root}")
+    paths = build_workspace(arguments.root, clean=not arguments.keep)
+    print(f"wrote the fixture workspace to {arguments.root}")
+    print(
+        "start the server with: python app.py"
+        f" --sessions {paths['sessions']}"
+        f" --styleguide {paths['styleguide']}"
+        f" --packs {paths['packs']}"
+        f" --runs {paths['runs']}"
+    )
 
 
 if __name__ == "__main__":

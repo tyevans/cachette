@@ -23,6 +23,7 @@ from cachette import World
 from cachette.demo.app import Demo
 from cachette.demo.clock import SPEEDS, WHOLE_TICK, Clock
 from cachette.demo.settings import SIZES, Settings
+from cachette.names import Names
 
 # A world small enough to step many times in a test.
 WIDTH = 32
@@ -34,7 +35,7 @@ FACTIONS = 3
 def a_demo() -> Demo:
     """Build a demonstration over a small world."""
     world = World(width=WIDTH, height=HEIGHT, seed=SEED, faction_count=FACTIONS)
-    return Demo(world, width=320, height=240, threads=1)
+    return Demo(world, Names(world.seed), width=320, height=240, threads=1)
 
 
 def test_a_paused_world_draws_and_does_not_step() -> None:
@@ -101,10 +102,24 @@ def test_a_panel_the_engine_does_not_hold_is_refused() -> None:
 
 
 def test_a_named_panel_changes_the_frame() -> None:
-    """The deck must reach the pixels, not only the selection list."""
+    """The deck must reach the pixels, not only the selection list.
+
+    **The clock is paused, and the first assertion is what makes the second
+    one mean something.** A running world moves between two frames, so two
+    frames differ whether a panel was named or not. This test asserted that
+    difference and passed with the panel taken out of it. A paused world
+    draws the same pixels twice, so the panel is the only thing left that can
+    change them.
+    """
     demo = a_demo()
+    demo.clock.pause()
     demo.advance()
     bare = bytes(demo.surface.to_bytes())
+    demo.advance()
+    assert bytes(demo.surface.to_bytes()) == bare, (
+        "a paused world drew two different frames, so this test cannot say "
+        "that the panel changed the third one"
+    )
 
     demo.toggle_panel(World.panel_names()[0])
     demo.advance()

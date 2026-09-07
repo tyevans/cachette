@@ -150,7 +150,13 @@ impl Group {
 /// of a cell are the six months around its own summer, which the probe finds
 /// from the temperature rather than from the calendar, so the two hemispheres
 /// need no separate rule.
-fn grade(record: &Record, rain_for_each_drop: i64, whole: i64) -> Group {
+///
+/// **The boundary between the temperate and the continental class is a
+/// parameter, because the published scheme has two variants of it.** One puts
+/// it at a coldest month of 0 degrees and the other at −3 degrees. The
+/// difference is a convention and not a physical claim, so the probe reports
+/// both rather than choosing.
+fn grade(record: &Record, rain_for_each_drop: i64, whole: i64, boundary: i64) -> Group {
     let millimetres = |month: usize| record.water_of(month) * rain_for_each_drop / whole;
     let annual: i64 = (0..MONTHS).map(millimetres).sum();
     let mean = record.mean_degrees();
@@ -198,7 +204,7 @@ fn grade(record: &Record, rain_for_each_drop: i64, whole: i64) -> Group {
         }
         return Group::Tundra;
     }
-    if coldest >= 0 {
+    if coldest >= boundary {
         Group::Temperate
     } else {
         Group::Continental
@@ -311,72 +317,136 @@ fn main() {
          {MEAN_ANNUAL_RAIN} millimetres"
     );
 
-    let bands = 12u32;
-    println!();
-    println!("  band  latitude  cells   mean C  coldest C  warmest C   rain mm   dominant");
-    let mut totals = [0usize; 7];
-    for band in 0..bands {
-        let members: Vec<&Record> = records
-            .iter()
-            .filter(|record| record.land && record.row * bands / high.max(1) == band)
-            .collect();
-        if members.is_empty() {
-            continue;
-        }
-        let count = members.len() as i64;
-        let mean: i64 = members
-            .iter()
-            .map(|record| record.mean_degrees())
-            .sum::<i64>()
-            / count;
-        let coldest: i64 = members
-            .iter()
-            .map(|record| (0..MONTHS).map(|m| record.degrees(m)).min().unwrap_or(0))
-            .sum::<i64>()
-            / count;
-        let warmest: i64 = members
-            .iter()
-            .map(|record| (0..MONTHS).map(|m| record.degrees(m)).max().unwrap_or(0))
-            .sum::<i64>()
-            / count;
-        let rain: i64 = members
-            .iter()
-            .map(|record| record.year_water() * rain_for_each_drop / whole)
-            .sum::<i64>()
-            / count;
-        let mut counts = [0usize; 7];
-        for record in &members {
-            let group = grade(record, rain_for_each_drop, whole);
-            let at = Group::ALL
+    // **The land of a band is not a sample of the band.** A band that is
+    // mostly open water holds its land in a few cells, and those cells sit
+    // where the wind of a whole ocean converges. The land figure of such a
+    // band says what its islands receive and not what its latitude receives.
+    // So the probe reports both, on the same normaliser, and a band where the
+    // two disagree is reporting its geography rather than its climate.
+    {
+        let bands = 12u32;
+        println!();
+        println!("=== the rain of a band over its land and over the whole of it ===");
+        println!();
+        println!(
+            "  band  latitude  cells   land  land %   land mm   whole mm                land over whole"
+        );
+        for band in 0..bands {
+            let members: Vec<&Record> = records
                 .iter()
-                .position(|other| *other == group)
-                .unwrap_or(0);
-            counts[at] += 1;
-            totals[at] += 1;
+                .filter(|record| record.row * bands / high.max(1) == band)
+                .collect();
+            if members.is_empty() {
+                continue;
+            }
+            let dry: Vec<&&Record> = members.iter().filter(|record| record.land).collect();
+            let rain = |set: &[&&Record]| -> i64 {
+                if set.is_empty() {
+                    return 0;
+                }
+                set.iter()
+                    .map(|record| record.year_water() * rain_for_each_drop / whole)
+                    .sum::<i64>()
+                    / set.len() as i64
+            };
+            let all: Vec<&&Record> = members.iter().collect();
+            let land_mm = rain(&dry);
+            let whole_mm = rain(&all);
+            let middle = (band * high / bands + (band + 1) * high / bands) / 2;
+            let latitude = i64::from(latitudes.of_row(middle, high)) / i64::from(LATITUDE_FINE);
+            // The ratio is in hundredths, because this crate holds no
+            // floating point number anywhere, probe or engine.[^1]
+            //
+            // [^1]: ADR-0002, simulated and aggregated state holds no floating point number. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+            let ratio = land_mm * 100 / whole_mm.max(1);
+            println!(
+                "  {band:4}  {latitude:8}  {:5}  {:5}  {:5}%  {land_mm:8}  {whole_mm:9}                   {:11}.{:02}",
+                members.len(),
+                dry.len(),
+                dry.len() * 100 / members.len().max(1),
+                ratio / 100,
+                ratio % 100
+            );
         }
-        let top = (0..7).max_by_key(|at| counts[*at]).unwrap_or(0);
-        let middle = (band * high / bands + (band + 1) * high / bands) / 2;
-        let latitude = i64::from(latitudes.of_row(middle, high)) / i64::from(LATITUDE_FINE);
-        println!(
-            "  {band:>4}  {latitude:>8}  {count:>5}  {mean:>7}  {coldest:>9}  {warmest:>9}  \
-             {rain:>8}   {} {}%",
-            Group::ALL[top].name(),
-            counts[top] * 100 / members.len()
-        );
     }
 
-    println!();
-    println!("over every land cell of the world:");
-    let land_count = land.len().max(1);
-    for (at, group) in Group::ALL.iter().enumerate() {
+    // The two published boundaries between the temperate and the continental
+    // class. The probe grades the same world under each.
+    for (label, boundary) in [("0 C", 0i64), ("-3 C", -3i64)] {
+        let bands = 12u32;
+        println!();
+        println!("=== the C and D boundary at a coldest month of {label} ===");
+        println!();
         println!(
-            "  {:<16} {:>6} cells, {:>3}%",
-            group.name(),
-            totals[at],
-            totals[at] * 100 / land_count
+            "  band  latitude  cells   mean C  coldest C  warmest C   rain mm    \
+         A  BW  BS   C   D  ET  EF"
         );
-    }
+        let mut totals = [0usize; 7];
+        for band in 0..bands {
+            let members: Vec<&Record> = records
+                .iter()
+                .filter(|record| record.land && record.row * bands / high.max(1) == band)
+                .collect();
+            if members.is_empty() {
+                continue;
+            }
+            let count = members.len() as i64;
+            let mean: i64 = members
+                .iter()
+                .map(|record| record.mean_degrees())
+                .sum::<i64>()
+                / count;
+            let coldest: i64 = members
+                .iter()
+                .map(|record| (0..MONTHS).map(|m| record.degrees(m)).min().unwrap_or(0))
+                .sum::<i64>()
+                / count;
+            let warmest: i64 = members
+                .iter()
+                .map(|record| (0..MONTHS).map(|m| record.degrees(m)).max().unwrap_or(0))
+                .sum::<i64>()
+                / count;
+            let rain: i64 = members
+                .iter()
+                .map(|record| record.year_water() * rain_for_each_drop / whole)
+                .sum::<i64>()
+                / count;
+            let mut counts = [0usize; 7];
+            for record in &members {
+                let group = grade(record, rain_for_each_drop, whole, boundary);
+                let at = Group::ALL
+                    .iter()
+                    .position(|other| *other == group)
+                    .unwrap_or(0);
+                counts[at] += 1;
+                totals[at] += 1;
+            }
+            let middle = (band * high / bands + (band + 1) * high / bands) / 2;
+            let latitude = i64::from(latitudes.of_row(middle, high)) / i64::from(LATITUDE_FINE);
+            // The share of each class in this band, in whole percent, in the
+            // order of `Group::ALL`. A dominant class hides where a band splits.
+            let mut spread = String::new();
+            for count in counts {
+                spread.push_str(&format!("{:>4}", count * 100 / members.len()));
+            }
+            println!(
+                "  {band:>4}  {latitude:>8}  {count:>5}  {mean:>7}  {coldest:>9}  {warmest:>9}  \
+             {rain:>8}  {spread}"
+            );
+        }
 
+        println!();
+        println!("over every land cell of the world:");
+        let land_count = land.len().max(1);
+        for (at, group) in Group::ALL.iter().enumerate() {
+            println!(
+                "  {:<16} {:>6} cells, {:>3}%",
+                group.name(),
+                totals[at],
+                totals[at] * 100 / land_count
+            );
+        }
+    }
     // The two headline questions, in one line each.
     let band_of = |degrees: i32| -> Vec<&Record> {
         let low = degrees - 8;

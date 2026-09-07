@@ -78,6 +78,8 @@ fn the_new_logs_are_registered() {
         "upgrade_collapsed",
         "upgrade_finished",
         "settlement_founded",
+        "site_taken",
+        "faction_eliminated",
     ] {
         assert!(log_of(name).is_some(), "the register lost `{name}`");
     }

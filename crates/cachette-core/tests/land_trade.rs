@@ -51,9 +51,10 @@ fn a_world(seed: u64) -> World {
 /// Returns every tile one faction holds and that carries no upgrade, in
 /// ascending tile index.
 ///
-/// The controller stage raises upgrades on held ground, and the engine
-/// refuses a land side whose tile carries one while BLK-036 is open. The
-/// upgrade refusal has its own test, which builds the upgrade it needs.
+/// The controller stage raises upgrades on held ground. A land side may name
+/// a tile that carries one, because an upgrade changes hands with the ground.
+/// This helper skips them, so that the tests below read the land rule and not
+/// the upgrade.
 fn tiles_held_by(world: &World, faction: FactionId) -> Vec<TileIdx> {
     let grid = world.grid();
     let mut found = Vec::new();
@@ -341,7 +342,7 @@ fn a_land_side_the_debtor_does_not_hold_is_refused() {
 }
 
 #[test]
-fn a_land_side_whose_tile_carries_an_upgrade_is_refused() {
+fn a_land_side_whose_tile_carries_an_upgrade_is_accepted() {
     let mut world = a_world(7);
     let mine = tiles_held_by(&world, ZERO);
     let site = mine[mine.len() / 2];
@@ -379,7 +380,11 @@ fn a_land_side_whose_tile_carries_an_upgrade_is_refused() {
         Consideration::relation(0, 1),
         50,
     );
-    assert_eq!(refused, Err(TradeError::UpgradeOnLand(site)));
+    assert_eq!(
+        refused,
+        Ok(()),
+        "the engine refused a land side that carries an upgrade"
+    );
 }
 
 #[test]

@@ -406,20 +406,50 @@ fn a_deposit_falls_and_then_rises() {
         Some(None),
         "the choice did not clear the order of a unit that chose nothing"
     );
-    // The moisture over the tile stretches the declared period, so the test
-    // waits the period the engine will act on rather than a fixed count.
-    let period = world
+    // **The period the engine acts on moves while the test waits, so the test
+    // reads it on every tick and not once.** The moisture over the tile scales
+    // the declared period, and the moisture is weather. Food is slowest on
+    // parched ground and slow again on drowned ground, so a tile that is
+    // getting wetter can pass out of the band it was read in and into a slower
+    // one. This fixture does exactly that: measured, the ground under the
+    // deposit went from 198 drops to 5052 over the wait, and the period the
+    // engine reported rose from 6 ticks to 16.
+    //
+    // A test that read the period once and waited twice it therefore waited
+    // against a number the engine had already left behind. The budget below is
+    // twice the slowest period the ground has shown so far, so it grows with
+    // the ground rather than trusting one sample. It is bounded, because the
+    // moisture curve is a table with a largest entry.
+    let first_period = world
         .recovery_period_at(standing, ResourceKind::Food)
         .expect("food recovers");
-    for _ in 0..(period * 2) {
+    let first_water = world.ground_water_at(standing);
+    let mut slowest = first_period;
+    let mut waited = 0u32;
+    while waited < slowest * 2 {
         world.step(1).expect("the step must run");
+        waited += 1;
+        let now = world
+            .recovery_period_at(standing, ResourceKind::Food)
+            .expect("food recovers");
+        slowest = slowest.max(now);
     }
     let given_back = world
         .tile_stock(standing, ResourceKind::Food)
         .expect("the tile is inside the world");
+    // **The message names every number the next reader needs.** A bare report
+    // that the deposit did not rise leaves them to discover the moisture rule
+    // for themselves, which is what happened here.
     assert!(
         given_back > drawn,
-        "the deposit did not rise: {drawn:?} {given_back:?}"
+        "the deposit did not rise: {drawn:?} then {given_back:?}. The tile \
+         waited {waited} ticks against a slowest period of {slowest}. The \
+         period read {first_period} at the start and {:?} at the end, and the \
+         water on the ground went from {first_water:?} to {:?}. The ledger \
+         returned {:?} of food.",
+        world.recovery_period_at(standing, ResourceKind::Food),
+        world.ground_water_at(standing),
+        world.depletion().returned(ResourceKind::Food),
     );
     assert!(world.check_invariants(), "conservation does not hold");
 }

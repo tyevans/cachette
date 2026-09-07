@@ -132,7 +132,10 @@ fn main() {
     }
     println!(
         "mean band width along a row, in hundredths of a tile: {}",
-        if bands == 0 { 0 } else { tiles * 100 / bands }
+        tiles
+            .checked_mul(100)
+            .and_then(|scaled| scaled.checked_div(bands))
+            .unwrap_or(0)
     );
 
     // A picture, so a person can look at what the figures describe.

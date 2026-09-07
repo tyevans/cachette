@@ -14,6 +14,7 @@
 //! [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
+pub mod action;
 pub mod balance;
 pub mod bridge;
 pub mod campaign;
@@ -31,6 +32,7 @@ pub mod event;
 pub mod event_layout;
 pub mod faction_observation;
 pub mod faction_view;
+pub mod fire;
 pub mod founding;
 pub mod growth;
 pub mod hash;
@@ -68,6 +70,9 @@ pub mod upgrade;
 pub mod weather;
 pub mod world;
 
+pub use action::{
+    ActionSchema, ActionShape, CandidateKind, PositionRow, Verb, VerbRow, ACTION_VERSION,
+};
 pub use balance::{Balance, RENOWN_TARGET};
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
 pub use census::{census, Census, CensusError};
@@ -84,17 +89,21 @@ pub use contest::{ContestError, Grievance, UnitFell};
 pub use controller::{
     CarrierAssignment, Choice, ControllerCommand, FactionRow, FactionState, FactionWeights,
     GameEnd, Terms, WinPath, ADVERT_PERIOD_DEFAULT, ADVERT_PHASE_DEFAULT, CARRIER_ASSIGNMENT_BYTES,
-    COMMAND_ADVERTISE, COMMAND_BUILD, COMMAND_CAMPAIGN, COMMAND_CARRY, COMMAND_GATHER,
-    COMMAND_PROJECT, COMMAND_QUEUE, COMMAND_RELATION, COMMAND_TRADE, CONTRACT_CARRIERS_DEFAULT,
-    CONTRACT_TERM_DEFAULT, EVALUATIONS_DEFAULT, SURPLUS_MARK_DEFAULT, TICK_LIMIT_DEFAULT,
-    WEIGHT_HIGH, WEIGHT_LOW,
+    CONTRACT_CARRIERS_DEFAULT, CONTRACT_TERM_DEFAULT, CONTROLLER_COMMAND_BYTES,
+    EVALUATIONS_DEFAULT, SURPLUS_MARK_DEFAULT, TICK_LIMIT_DEFAULT, WEIGHT_HIGH, WEIGHT_LOW,
 };
 pub use conversion::{ConversionError, Convert, UnitConverted};
 pub use descent::{
     Descent, DescentError, DescentId, HouseId, Parents, DESCENT_CEILING, RELATION_DEPTH,
 };
-pub use event::{ResourceTaken, TileChanged};
+pub use event::{FactionEliminated, ResourceTaken, SiteTaken, TileChanged};
 pub use faction_view::{Admit, FactionTile, Ground, MaskedSummary, SeenTile, SeenUnit, Sighting};
+pub use fire::{
+    FireEnded, FireField, FireStarted, FireTile, GroundReading, UnitBurned, BURN_FOR_EACH_TICK,
+    CHANCE_WHOLE, DOUSE_WORK_FOR_EACH_UNIT, END_CAUSE_BURNT_OUT, END_CAUSE_DOUSED,
+    INTENSITY_CEILING, LIGHTNING_WHOLE, START_CAUSE_LIGHTNING, START_CAUSE_ORDERED,
+    START_CAUSE_SPREAD,
+};
 pub use founding::{
     Founding, FoundingError, FoundingOutcome, Provision, SettleError, SettleOutcome, Survey,
 };
@@ -130,7 +139,8 @@ pub use resource::{
     TileGround,
 };
 pub use site::{
-    CommodityId, SettlementArena, SettlementError, Store, StoreUpdate, COMMODITY_COUNT,
+    CommodityId, SettlementArena, SettlementError, SiegeRules, Store, StoreUpdate, COMMODITY_COUNT,
+    SIEGE_RAZE_MULTIPLE, SIEGE_WORK_FOR_EACH_RESIDENT,
 };
 pub use slots::{Candidate, SlotError, Slots};
 pub use soldier::{SoldierArena, SoldierError};
@@ -157,12 +167,15 @@ pub use upgrade::{
     UPGRADE_CATEGORY_COUNT, UPGRADE_LEVEL_COUNT,
 };
 pub use weather::{
-    CellGround, Drops, Latitudes, Storm, WeatherError, WeatherField, WeatherScale, Wind,
-    AIR_SATURATION, COOLDOWN_TICKS, HEAT_CEILING, LATITUDE_FINE, LATITUDE_POLE, PASS_CEILING,
-    PLACES_CEILING, SPEED_CEILING, STRENGTH_CEILING, WARMTH_FINE, WARMTH_FLOOR, WET_MARK,
+    CellGround, Cyclone, CycloneSetting, Drops, Latitudes, Storm, WeatherError, WeatherField,
+    WeatherScale, Wind, AIR_SATURATION, COOLDOWN_TICKS, CYCLONE_CEILING, CYCLONE_DEPTH_CEILING,
+    CYCLONE_DEPTH_FLOOR, CYCLONE_LIFE_CEILING, CYCLONE_RADIUS_CEILING, HEAT_CEILING, LATITUDE_FINE,
+    LATITUDE_POLE, PASS_CEILING, PLACES_CEILING, SPEED_CEILING, STRENGTH_CEILING, WARMTH_FINE,
+    WARMTH_FLOOR, WET_MARK,
 };
 pub use world::{
     CampaignError, CensusBasis, CensusRow, ConvertError, IdentityError, MoveRelationError,
-    SeedError, Standing, StepError, World, WorldConfig, WorldError, FOUNDING_GROUP_DEFAULT,
-    LUXURY_DEPOSITS_DEFAULT, STOCK_CEILING_OF_ONE_SETTLEMENT, SUBSYSTEM_CENSUS,
+    RazeError, SeedError, Standing, StepError, World, WorldConfig, WorldError,
+    FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, STOCK_CEILING_OF_ONE_SETTLEMENT,
+    SUBSYSTEM_CENSUS,
 };
