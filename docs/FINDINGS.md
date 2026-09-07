@@ -15742,6 +15742,15 @@ them against it. The check is mechanical and it costs one pass: for each term,
 name its zero, and name what the published constant it rides on already averages
 over.
 
+**Do not wait for each term to fail.** A rule stated once, beside the one
+instance that produced it, reaches that instance and nothing else. It was four
+decisions above the term it should have governed, in the same file, and it did
+not reach it. Apply the rule to every radiative and terrain term deliberately,
+as a pass. Three terms have now been found with a wrong zero, and the third was
+found by reading the rule rather than by watching a table go wrong. That is the
+first time the rule has caught anything before the symptom did, and it is the
+argument for doing the pass.
+
 
 ### FND-615 — The belt kept a share of the sun and the season kept all of it
 
