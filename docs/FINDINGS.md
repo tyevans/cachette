@@ -3720,6 +3720,36 @@ library takes an object rather than calling a function, drive the real call:
 build the library's own dispatcher, push the handler onto it, and send one
 event. That needs no display and it catches what the name check cannot.
 
+### FND-596 — Every graphics test read a texture back, so none of them looked at the screen
+
+**Believed.** The device draws into a frame buffer of its own and reads the
+result back, so one path serves a window, a picture on a disk and a test with
+no display. The tests read the pixels back and compared them against the
+processor path, and they agreed. The graphics path was therefore held to work
+in a window.
+
+**True.** The device takes the application's context when the application has
+a window, because a second context would hold a second copy of every texture.
+Each pass points the frame buffer at a texture the device owns and leaves it
+pointed there. The window then presented into that texture instead of onto the
+screen, and the screen stayed black. The pixels the tests read were correct
+the whole time, because they came from the texture.
+
+**Evidence.** The demonstration drew a black window under the sketch flag on a
+machine with a display. Binding the frame buffer back to the window after the
+read fixes it. Removing that line again makes the new test fail, and the test
+reports the binding as 1 where it must be 0.
+
+**What follows.** A test that reads a target back proves the drawing is
+right. It cannot prove the screen shows it. When a module borrows a caller's
+state, test that the state is handed back, not only that the work was done.
+This is the second finding in one day where a test checked the work and not
+the hand-over.[^FND596A]
+
+**References**
+
+[^FND596A]: Findings register, FND-595. `docs/FINDINGS.md`
+
 ### FND-026 — Games do not document their implementations
 
 Eight subsystems across seven games are community-wiki only, with no developer

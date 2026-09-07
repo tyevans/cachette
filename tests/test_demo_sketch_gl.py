@@ -355,3 +355,42 @@ def test_the_shader_takes_every_constant_from_the_module_that_declares_it() -> N
     for source in (sketch_gl.source.HATCH, sketch_gl.source.COMPOSITE):
         assert "CONTOUR_STEP =" not in source
         assert "HATCH_SPACING =" not in source
+
+
+def test_the_window_keeps_its_own_frame_buffer_after_a_page() -> None:
+    """A borrowed context must be handed back the way it was found.
+
+    Every pass points the frame buffer at a texture the device owns. The
+    device borrows the application's context when the application has a
+    window, so a binding left in place sends the window's own presentation
+    into that texture and the screen stays black.
+
+    No test in this file saw it, because every one of them reads the target
+    back rather than presenting a window. This drives the same calls and
+    then asks the graphics library what is bound.[^1]
+
+    [^1]: Findings register, FND-596. `docs/FINDINGS.md`
+    """
+    import ctypes
+
+    import pyglet
+    from pyglet import gl
+
+    from cachette.demo.glpage import Device
+
+    window = pyglet.window.Window(width=64, height=48, visible=False)
+    try:
+        window.switch_to()
+        device = Device()
+        assert device._borrowed, "the device must take the window's context"
+
+        device._target(32, 32, "rgba8")
+        device.read(32, 32)
+
+        bound = gl.GLint(0)
+        gl.glGetIntegerv(gl.GL_FRAMEBUFFER_BINDING, ctypes.byref(bound))
+        assert bound.value == 0, (
+            f"the window frame buffer must be bound and it is {bound.value}"
+        )
+    finally:
+        window.close()

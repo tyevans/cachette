@@ -396,7 +396,27 @@ class Device:
             gl.GL_UNSIGNED_BYTE,
             into.ctypes.data_as(ctypes.c_void_p),
         )
+        self.release()
         return into
+
+    def release(self) -> None:
+        """Give the window back its own frame buffer and viewport.
+
+        Every pass points the frame buffer at a texture of this module's own
+        and leaves it pointed there. A borrowed context is the window's
+        context, so the window then presents into that texture instead of
+        onto the screen, and the screen stays black. Reading a target back
+        does not need the binding, so the binding is dropped here.
+
+        A test that reads pixels back never sees this, because it reads the
+        texture and never the screen.[^3]
+
+        [^3]: Findings register, FND-596. `docs/FINDINGS.md`
+        """
+        gl = self.gl
+        gl.glBindFramebuffer(gl.GL_FRAMEBUFFER, 0)
+        if self._borrowed and self._window is not None:
+            gl.glViewport(0, 0, self._window.width, self._window.height)
 
     def close(self) -> None:
         """Give the context back, and close the one this module opened."""
