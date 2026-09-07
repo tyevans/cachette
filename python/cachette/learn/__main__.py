@@ -214,7 +214,27 @@ def main() -> int:
     parser.add_argument("--generations", type=int, default=20)
     parser.add_argument("--population", type=int, default=24)
     parser.add_argument("--seeds", type=int, default=6)
-    parser.add_argument("--workers", type=int, default=16)
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=16,
+        help=(
+            "how many engine workers one process gives its batch. This is a "
+            "per process count, so a run of five shards with twelve workers "
+            "asks for sixty workers on the machine"
+        ),
+    )
+    parser.add_argument(
+        "--shards",
+        type=int,
+        default=1,
+        help=(
+            "how many worker processes score one generation. One process "
+            "scores it here and starts nothing. The candidates are split "
+            "across the processes and the scores are combined in candidate "
+            "order, so the weights do not depend on this number"
+        ),
+    )
     parser.add_argument("--holdout", type=int, default=24)
     parser.add_argument("--hidden", type=int, default=24)
     # Sigma is a relative size, and its working range was measured rather
@@ -296,6 +316,8 @@ def main() -> int:
         "sigma": arguments.sigma,
         "learning_rate": arguments.learning_rate,
         "learner_seats": list(learner_seats),
+        "workers": arguments.workers,
+        "shards": arguments.shards,
         "relative_scoring": bool(learner_seats) and not arguments.absolute_scoring,
         "world": asdict(WORLD),
         "strategies": {},
@@ -339,6 +361,7 @@ def main() -> int:
             sigma=arguments.sigma,
             learning_rate=arguments.learning_rate,
             workers=arguments.workers,
+            shards=arguments.shards,
             seed=index,
             learner_seats=learner_seats,
             relative=not arguments.absolute_scoring,
