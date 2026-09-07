@@ -48,6 +48,11 @@ from cachette.names import Names
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    # How a caller fills one frame: a camera, a size, the pixels and the
+    # settings of the frame. The drawing method of the world has this shape,
+    # and so does every other renderer.
+    Renderer = Callable[..., "FrameReading"]
+
     # How a caller builds one picture: a width, a height, a byte layout, the
     # bytes and a pitch.
     MakePicture = Callable[[int, int, str, bytes, int], "Picture"]
@@ -58,6 +63,7 @@ if TYPE_CHECKING:
     from cachette._core import FoundingReport, FrameReading, GameEnd
 from cachette.demo.clock import SPEEDS, Clock, says
 from cachette.demo.settings import Settings, load_video, save_video
+from cachette.demo.sketch import RELIEF, BoundaryGap, Sketch
 from cachette.demo.surface import Surface
 from cachette.demo.toasts import Announcer
 
@@ -226,6 +232,7 @@ class Demo:
         "panels",
         "pointer",
         "reference",
+        "renderer",
         "seconds",
         "settings",
         "surface",
@@ -250,6 +257,11 @@ class Demo:
         """
         self.world = world
         self.names = names
+        # **The renderer fills one frame and reports what it read.** The
+        # engine is the one a watcher opens on, and a flag replaces it with
+        # another that takes the same arguments. Nothing else in the loop
+        # knows which one is here.
+        self.renderer: Renderer = world.draw
         self.surface = Surface(width, height)
         self.threads = threads if threads > 0 else min(os.cpu_count() or 1, 12)
         # The reference layer names the colours while a key is held. It holds
@@ -534,7 +546,11 @@ class Demo:
         #
         # The ticks above ran first, so the phase belongs to the tick the
         # world is now part way through.
-        reading = self.world.draw(
+        #
+        # **The renderer is a choice, and the frame is one call.** The engine
+        # is the renderer a watcher opens on. A flag puts another one here,
+        # and everything around this line stays as it was.
+        reading = self.renderer(
             self.camera,
             self.surface.width,
             self.surface.height,
@@ -815,6 +831,31 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--sketch",
+        action="store_true",
+        help=(
+            "draw the world as an isometric pencil study in ink on paper, "
+            "lifted by the height of the ground, instead of as a flat map; "
+            "the frame costs seconds rather than milliseconds, so a window "
+            "in this mode draws slowly"
+        ),
+    )
+    parser.add_argument(
+        "--sketch-relief",
+        type=float,
+        default=0.0,
+        help=(
+            "how far the tallest ground rises in the sketch, as a share of "
+            "the width of the page; zero takes the share the sketch chooses"
+        ),
+    )
+    parser.add_argument(
+        "--sketch-sky",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="draw the cloud layer over the ground in the sketch",
+    )
+    parser.add_argument(
         "--seed",
         type=lambda given: int(given, 0),
         default=0,
@@ -915,6 +956,25 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.tile > 0:
         demo.camera = Camera(tile_size=arguments.tile)
         demo.open_on(opening_place(foundings))
+
+    if arguments.sketch:
+        # **The sketch is a renderer, not a second demonstration.** It takes
+        # the place of the engine at the one call that fills a frame, and the
+        # clock, the panels, the keys and the window memory stay shared.
+        print(
+            "the sketch renderer draws one frame in seconds, not in "
+            "milliseconds, so the window will feel slow"
+        )
+        try:
+            demo.renderer = Sketch(
+                demo.world,
+                seed=seed,
+                relief=arguments.sketch_relief or RELIEF,
+                sky=arguments.sketch_sky,
+            )
+        except BoundaryGap as gap:
+            print(f"the sketch renderer cannot run: {gap}")
+            return 2
 
     if arguments.overlay:
         demo.choose_overlay(arguments.overlay)
