@@ -66,6 +66,12 @@ from cachette.demo.clock import SPEEDS, Clock, says
 from cachette.demo.compass import Compass
 from cachette.demo.minimap import Minimap
 from cachette.demo.mouse import Controls
+from cachette.demo.pilot import (
+    Pilot,
+    PolicyChoiceError,
+    chosen_policies,
+    seat_policies,
+)
 from cachette.demo.player import TURN_TICKS, Seat
 from cachette.demo.settings import Settings, load_video, save_video
 from cachette.demo.sketch import RELIEF, BoundaryGap, Sketch
@@ -75,6 +81,7 @@ from cachette.demo.toasts import Announcer
 from cachette.demo.ui.binding import Keys
 from cachette.demo.ui.chrome import Chrome
 from cachette.demo.view import View
+from cachette.learn.policy import PolicyFitError
 
 # The size of the window in pixels.
 WINDOW_WIDTH = 960
@@ -243,6 +250,7 @@ class Demo:
         "names",
         "overlay",
         "panels",
+        "pilots",
         "pointer",
         "reference",
         "renderer",
@@ -352,6 +360,11 @@ class Demo:
         # The faction a person holds, or nothing while the engine plays every
         # faction. **This is the whole difference between the two modes.**
         self.seat: Seat | None = None
+        # The factions a stored policy holds. **A policy is not a person**, so
+        # it takes no turn and holds no clock. Each pilot counts its own ticks
+        # and decides at the cadence its weight file names, and several of
+        # them play one world at once.
+        self.pilots: list[Pilot] = []
         # How many ticks one turn runs, for a seat this run takes later.
         self.turn_ticks = TURN_TICKS
         # Whether the run was asked to close the window.
@@ -639,6 +652,11 @@ class Demo:
             self.world.step(self.threads)
             if self.seat is not None:
                 self.seat.tick_ran()
+            # **A pilot counts the ticks the world actually ran.** A frame
+            # that ran several ticks therefore gives a policy every decision
+            # those ticks earned, and a frozen frame gives it none.
+            for pilot in self.pilots:
+                pilot.tick_ran()
             self.announce_relations()
             self.announce_campaigns()
             self.announce_trade()
@@ -758,6 +776,12 @@ class Demo:
             self.turn_ticks = self.seat.turn_ticks
             self.seat.release()
             self.seat = None
+
+    def release_pilots(self) -> None:
+        """Give every faction a policy holds back to the engine controller."""
+        for pilot in self.pilots:
+            pilot.release()
+        self.pilots = []
 
     def faction_name(self, faction: int) -> str:
         """Give back the name of one faction."""
@@ -1093,6 +1117,23 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--policy",
+        action="append",
+        default=[],
+        metavar="[FACTION=]FILE",
+        help=(
+            "let a stored policy hold a faction, instead of the built-in "
+            "controller; the value is the path of a weight file that a "
+            "training run wrote, and a leading number and equals sign names "
+            "the faction, as in 1=weights.npz. Give the option again for a "
+            "second policy, so several play one world and a watcher compares "
+            "them. A policy takes no turn: it decides at the cadence its own "
+            "file names, and the title block says which file holds each "
+            "faction. A file trained against another world is refused, and "
+            "the message names what disagreed"
+        ),
+    )
+    parser.add_argument(
         "--turn-ticks",
         type=int,
         default=TURN_TICKS,
@@ -1108,6 +1149,22 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     arguments = parser.parse_args(argv)
+
+    # **The policies are read before the world is built.** A watcher who
+    # mistyped a path or asked for one faction twice reads one sentence, and
+    # the run stops before it spends a second on a world nobody will watch.
+    try:
+        policies = chosen_policies(arguments.policy)
+    except PolicyChoiceError as refusal:
+        print(refusal)
+        return 2
+    if policies and arguments.run_to_end:
+        print(
+            "a policy plays through the frames of the window, and --run-to-end "
+            "opens no window and draws no frame. Drop one of the two."
+        )
+        return 2
+
     seed = arguments.seed if arguments.seed else draw_seed()
 
     # The panels a watcher named, and the tile a watcher named. Both are
@@ -1272,6 +1329,29 @@ def main(argv: list[str] | None = None) -> int:
     # flag is the way in for a run that opens already playing. The menu is the
     # way in for a person who started watching and decided to join.
     demo.turn_ticks = arguments.turn_ticks
+    # **A policy takes its faction before a person takes theirs.** A person
+    # who asked for a faction a policy already holds must be refused, and the
+    # refusal needs the policy seats to be known.
+    if policies:
+        try:
+            demo.pilots = seat_policies(demo.world, policies)
+        except (PolicyChoiceError, PolicyFitError) as refusal:
+            print(refusal)
+            return 2
+        for pilot in demo.pilots:
+            print(
+                f"{demo.faction_name(pilot.faction)} is played by "
+                f"{pilot.name}, deciding every {pilot.interval} ticks"
+            )
+        if arguments.play >= 0 and any(
+            pilot.faction == arguments.play for pilot in demo.pilots
+        ):
+            demo.release_pilots()
+            print(
+                f"faction {arguments.play} is held by a policy, so you cannot "
+                "hold it as well. Name another faction, or drop the policy."
+            )
+            return 2
     if arguments.play >= 0:
         if arguments.play >= demo.world.faction_count:
             print(

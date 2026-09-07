@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from cachette.demo.clock import Clock
     from cachette.demo.compass import Compass
     from cachette.demo.minimap import Minimap
+    from cachette.demo.pilot import Pilot
     from cachette.demo.player import Seat
     from cachette.demo.settings import Settings
     from cachette.demo.surface import Surface
@@ -44,6 +45,7 @@ class Host(Protocol):
     pointer: tuple[int, int] | None
     foundings: list[FoundingReport]
     seat: Seat | None
+    pilots: list[Pilot]
     stopping: bool
     chrome: Chrome
 

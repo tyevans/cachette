@@ -57,11 +57,12 @@ WAY_TO_KEYS = "/ KEYS"
 def height_of(host: Host) -> int:
     """Give back how tall the title block is now, in pixels.
 
-    The block grows by one row while a person holds a faction. **One function
-    states the height**, so the drawing and everything that must clear the
-    block read one number.
+    The block grows by one row while a person holds a faction, and by one row
+    for each faction a stored policy holds. **One function states the
+    height**, so the drawing and everything that must clear the block read one
+    number.
     """
-    rows = 3 if host.seat is not None else 2
+    rows = (2 if host.seat is None else 3) + len(host.pilots)
     return (
         theme.PADDING
         + theme.row_height(theme.TITLE_SCALE)
@@ -90,6 +91,19 @@ def paint(surface: Surface, host: Host) -> None:
     if seat is not None:
         state = "CHOOSING" if seat.frozen else f"RUNNING {seat.left}"
         row = theme.pair(surface, LEFT, row, WIDTH, f"TURN {seat.turn}", state)
+    # **A watcher comparing two policies must see which one is playing.**
+    # Three checkpoints of one run play alike, and a card that named none of
+    # them would leave the watcher guessing which they were looking at. Each
+    # row names the faction and the file that holds it.
+    for pilot in host.pilots:
+        row = theme.pair(
+            surface,
+            LEFT,
+            row,
+            WIDTH,
+            host.faction_name(pilot.faction).upper(),
+            pilot.name.upper(),
+        )
     row = theme.pair(surface, LEFT, row, WIDTH, f"TICK {host.world.tick}", speed)
     theme.pair(
         surface,
