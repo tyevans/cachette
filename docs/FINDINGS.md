@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-604**
+**Next number: FND-610**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -15180,3 +15180,317 @@ was taken on 7 September 2026 on one development machine (x86-64).
 [^F594A]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
 [^F594B]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
 [^F595A]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+
+### FND-604 — The season is twice the published swing, and the oversized swing hides a cold pole
+
+**Believed.** The temperate band was missing because the world holds too little
+seasonal swing. A world with a correct annual mean and too small a swing grades
+every mid-latitude cell against one temperature, so no cell passes the
+temperate test anywhere.
+
+**True.** The swing is too large, not too small, and the register already said
+so. Reducing it puts the temperate band where the published classification puts
+it. **Reducing it also uncovers a second defect that the oversized swing was
+hiding.** The annual mean at a high latitude is so cold that only a very large
+summer lifted the warmest month above freezing. With a realistic swing the
+polar summer stays below freezing, and the ice cap grows from 1 percent of the
+land to 22 percent.
+
+**Neither term reaches the temperate band alone.** The season decides where the
+band forms. The mean decides whether the pole survives it.
+
+**Evidence.** Four runs of the Köppen probe over one demonstration world, at an
+extent of 128, at seed `0x2f`, at the tile pitch, settled for 400 ticks and
+sampled every 8 ticks over one season period, on 6 September 2026 on one
+development machine (x86-64). Every figure is derived and none is measured on
+the target platform.[^F601A]
+
+At the swing the engine carries, the mid-latitude band at 37 degrees holds 1
+percent temperate, 36 percent continental and 61 percent arid. Its coldest
+month averages −7 °C and its annual range is 40 °C. **The published range that
+the classification is built on is about half that**, and the season term is
+built to reach its whole reserved swing at 45 degrees and then to clamp, so
+every latitude poleward of about 50 degrees receives the same swing.
+
+Halving the season moves that band from 1 percent temperate to 36 percent, and
+the continental share of it from 36 percent to 1 percent. Over the whole land
+the temperate share moves from 1 percent to 3 percent and the ice cap from 1
+percent to 22 percent.
+
+Restoring the constant returned every figure to the first run, cell for cell.
+
+**Raising the season instead does not build.** The heat scale reserves the belt
+and the season together, and a larger season fails the assertion that the
+coldest cell must not clamp at the bottom of the scale. **So the direction the
+hypothesis asked for is not merely wrong. It is unreachable.**
+
+**What follows.** **A share over the whole land is not the measurement here,
+because the land of this world is not distributed as the land of the Earth
+is.** The two bands around the equator hold 3 percent of the land cells of this
+world, and the two polar bands hold 23 percent. The published shares are shares
+of the land of the Earth.[^F601B] **Compare a latitude band against its own
+published class, and do not compare the totals.**
+
+The second defect has no term to repair it. The belt maps the annual mean
+insolation onto the temperature with no transport term, and the published
+energy balance models flatten that profile with a diffusion of heat toward the
+poles.[^F601C] The engine carries the temperature on the wind and mixes it
+nowhere, so it holds no such term. **Adding one is a decision and not a
+constant**, and this finding does not make it.
+
+**Do not reduce the season until the pole has a floor.** The change is correct
+at the middle latitudes and it regresses the poles, and the poles were repaired
+immediately before this work.
+
+## References
+
+[^F601A]: The Köppen probe. `crates/cachette-core/examples/weather_koppen_probe.rs`
+[^F601B]: Research report 30, the published atmospheric math, section 8. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^F601C]: Research report 30, the published atmospheric math, section 4.4. `docs/research/reports/30-the-published-atmospheric-math.md`
+
+
+### FND-605 — A diffusion on the carried temperature cannot flatten the profile, because the driver pins it
+
+**Believed.** The mid-latitudes and the poles stand too cold because the
+temperature follows the insolation with no transport term. A published energy
+balance model carries a diffusion of heat toward the poles, and the engine
+carries none.[^F601C] Adding one would flatten the profile and lift the polar
+summer above freezing.
+
+**True.** The first half holds. The engine carries no transport term and a
+published model does. **The second half does not.** A diffusion on the carried
+temperature plane changes nothing that a reader can see, at any pass count the
+engine can afford.
+
+**The driver is the reason.** Each pass moves the temperature of a cell one
+eighth of the way toward what the world asks of that cell. That is a
+relaxation to a local value, and it competes with the diffusion. The diffusion
+smooths over the square root of the ratio between the two, which is about one
+cell at one pass and about seven cells at thirty-two. **The profile it must
+flatten is 128 cells from pole to pole.** Flattening it needs about 10,900
+passes for each tick.
+
+**Evidence.** Three runs of the Köppen probe over one demonstration world, at
+an extent of 128, at seed `0x2f`, at the tile pitch, settled for 400 ticks and
+sampled every 8 ticks over one season period, on 6 September 2026 on one
+development machine (x86-64). Every figure is derived.[^F601A]
+
+The mean temperature of every latitude band is the same to the whole degree
+with no transport pass, with one, and with thirty-two: −26, −19, −5, 12, 23,
+26, 25, 22, 12, −5, −17, −24. The ice cap holds 1 percent of the land in all
+three. **Thirty-two passes are indistinguishable from none.**
+
+**The term is not merely inert. It is slightly harmful.** The temperate band
+falls from 123 cells to 109, because the pass smooths the local contrast that
+was carrying a few marginal cells over the threshold. It costs a pass over
+every cell and it returns less than nothing.
+
+**What follows.** **A transport term belongs in what the field is driven
+toward, and not in what it carries.** The published model diffuses against a
+radiative relaxation whose timescale is a tenth of a year. The engine relaxes
+to a prescribed profile in eight ticks of a 2048-tick year, which is not a
+relaxation but an assignment. **Nothing can compete with an assignment.**
+
+So the profile must be flattened where it is prescribed, which is the belt
+that the insolation table builds. That is the same answer the project already
+reached for the circulation bands: a single-layer field cannot grow the eddies
+that do the transport on the Earth, so the result of that transport is imposed
+rather than awaited.[^F602C]
+
+**That change needs a published target profile, and this work could not verify
+one.** No zonal mean land temperature against latitude was reachable from an
+accessible source. The next attempt needs that data before it starts.
+
+## References
+
+[^F602C]: Research report 30, the published atmospheric math, section 5.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+
+
+### FND-606 — The published energy balance produces the classes, and the ground term has no unit to meet it in
+
+**Believed.** The belt of a latitude and the season are locked together, so
+neither can be corrected alone, and correcting both against a published energy
+balance would put each climate class where the published classification puts
+it.[^F603A]
+
+**True, for the two terms it names.** A driver built from the published
+diffusive energy balance moved every class in the right direction at once, in
+one run, with no constant fitted to the result. The temperate band appeared
+where the published classification puts it, the equatorial band became wholly
+tropical, and the ice cap went to nothing.
+
+**False for the run as a whole, and one term is the reason.** The heat a cell
+takes from its ground is a count on an abstract scale with no unit and no zero.
+The old driver hid that, because its base was derived from the heat scale and
+absorbed whatever the ground term averaged. **A driver stated in degrees has no
+such slack.** A blocker now holds the missing unit.[^F603B]
+
+**Evidence.** Runs of the Köppen probe over one demonstration world, at an
+extent of 128, at seed `0x2f`, at the tile pitch, settled for 400 ticks and
+sampled every 8 ticks over one season period, on 6 September 2026 on one
+development machine (x86-64). Every figure is derived.[^F601A]
+
+The band at 37 degrees north, which is where the published classification puts
+the temperate climates, moved from 1 percent temperate and 36 percent
+continental to 56 percent temperate and no continental. Its coldest month moved
+from −7 °C to +10 °C and its annual range from 40 °C to 16 °C. The equatorial
+band moved from 81 percent tropical to 100 percent. The ice cap moved from 1
+percent of the land to none.
+
+In the same run the polar band moved from 95 percent tundra to 76 percent
+desert, its annual mean from −24 °C to 0 °C. **Two causes, and they are
+separable.** The published model holds the albedo constant, so it carries no ice
+feedback and is known to settle warmer at a pole than a planet with ice
+does.[^F603D] The larger cause is the ground term, which the driver adds whole
+rather than as a perturbation, and which lifts the poles about 8 degrees.
+
+Centring that term on the middle of its own range cooled the whole world by
+about 16 degrees and put 97 percent of the equatorial band under tundra. **The
+midpoint of a range is not where the ground of a world sits**, so the correction
+is not a centring.
+
+**What follows.** **A term with no unit cannot join a model that has one.** The
+belt and the season are now stated in degrees against published constants. The
+ground term is not, and no offset for it can be chosen without either a
+measurement of this world or a physical scale for the terrain. The first is
+fitting and the second is the blocker.
+
+**Do not close the gap with an offset.** Both attempts above are offsets, both
+are defensible in a sentence, and both are wrong by more than ten degrees over
+most of the world. The scale of the error is the evidence that the quantity is
+missing rather than mis-set.
+
+## References
+
+[^F603A]: Findings register, FND-604. `docs/FINDINGS.md`
+[^F603B]: Blockers register, BLK-156. `docs/BLOCKERS.md`
+[^F603D]: ADR-0182, the temperature a cell is driven toward is a published energy balance, the consequences. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+
+
+### FND-607 — The lapse rate is right and the terrain stands too high for it
+
+**Believed.** Giving the terrain a height in metres would let the ground term
+read the published lapse rate, which would give it a unit and a zero, and the
+energy balance driver would then land.[^F603B]
+
+**True in the mechanism and false in the result.** The lapse rate reads
+correctly, sea level is its zero, and it repairs the polar band. It also cools
+the whole world by between eleven and eighteen degrees, because **the land of
+this world stands two to three times higher in its own range than the land of
+the Earth stands in its**.
+
+**Evidence.** The Köppen probe and a water probe over the demonstration world,
+at an extent of 128, at seed `0x2f`, at the tile pitch, settled 400 ticks, on
+6 September 2026 on one development machine (x86-64). Every figure is
+derived.[^F604B]
+
+The mean height of the land runs from 41 percent of the range at the equator to
+69 percent at the southern pole. At the chosen relief that is 1650 to 2750
+metres, and at the published lapse rate it is 10.7 to 17.8 degrees of cooling.
+**The mean land elevation of the Earth is near 800 metres**, which is about
+5 degrees.
+
+The polar band moved from 85 percent desert to 3 percent, which is the repair
+the lapse rate was wanted for. In the same run the equatorial band lost every
+tropical cell, and the bands at 52 and 66 degrees went to ice cap and tundra.
+
+**What follows.** **The relief of a world and the height distribution of its
+terrain are one quantity declared in two places, and nothing fails when they
+disagree.**[^F590A] The relief says what the whole fraction is worth. The
+terrain decides where in that fraction the land sits. Only their product
+reaches the lapse rate, and only their product is wrong.
+
+**Do not repair this by changing the lapse rate.** The rate is published and it
+is not the free variable. The free variables are the relief and the terrain,
+and both are choices that belong to the project owner.
+
+### FND-608 — Two terms had no zero, and both were found by the same question
+
+**Believed.** Restating the temperature driver in degrees was a change of unit.
+The terms that fed it would carry over unchanged.
+
+**True.** Two of them could not, and neither was visible until the driver
+carried a level of its own. **A relative driver hides a term that has no zero**,
+because a base tuned to the scale silently absorbs whatever that term averages.
+
+**The ground term had no zero.** It was a count on an abstract scale that only
+ever added. Added whole to an absolute balance it lifted the poles about 8
+degrees; centred on the middle of its own range it cooled the world about 16
+degrees. Both are choices and both are wrong by more than ten degrees. The
+answer was a physical zero, which is sea level, and that needed a unit.[^F603B]
+
+**The cloud term double-counted the albedo.** The balance takes the albedo of a
+planet that already carries its mean cloud, so subtracting a whole cloud effect
+on top counted the same cloud twice. It cooled the equator by about 16 degrees
+and took every tropical cell off the map. The answer was an anomaly about the
+mean cover.
+
+**Evidence.** Runs of the Köppen probe over the demonstration world on 6
+September 2026 on one development machine (x86-64), each isolating one term.
+Every figure is derived.[^F604B]
+
+**What follows.** **Ask of every term what its zero is and why.** Both defects
+answer that question the same way and neither answers it in the old code,
+because a relative driver never asks. A record now states the rule for any
+radiative term the project adds.[^F605A]
+
+**A third defect of the same shape was in this work and not in the code.** The
+land share of a cell was read as the water share, so the relief term was
+multiplied by the water fraction and vanished over land. Three measurements
+were taken and reported before an ablation at forty thousand metres returned a
+result identical to the cell. **A term that does nothing looks exactly like a
+term that is not needed**, and only an absurd input separated them.
+
+## References
+
+[^F604B]: The Köppen probe and the water probe. `crates/cachette-core/examples/`
+[^F605A]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+
+
+### FND-609 — The field is not over-blended, and the plane that looks smoothest is the one carrying a gradient
+
+**Believed.** The weather reads as one colour, so the field mixes more than it
+needs and it should keep more local contrast.
+
+**True in the impression and false in the field.** Every water plane already
+carries more local contrast than the terrain under it. The temperature carries
+more than its own driver supplies. **Nothing measured here is over-blended.**
+
+**Evidence.** A contrast probe over the demonstration world, at an extent of
+128, at seed `0x2f`, settled 400 ticks, on 7 September 2026 on one development
+machine (x86-64). The probe reports, for each plane, the mean absolute
+deviation over the world beside the mean step between two neighbours. Every
+figure is derived.[^F606A]
+
+At the tile pitch the terrain steps 702 of a spread of 10,407 between
+neighbours. The air steps 232 of 2,870 and the ground steps 1,836 of 8,453, so
+both stand rougher than the terrain. The temperature steps 1 of 44.
+
+**Two things had to be ruled out and both were.** Quartering the share that the
+warmth carry mixes changed the temperature roughness by nothing at all: still a
+step of 1 in a spread of 44. And the ratio between the temperature roughness
+and the terrain roughness holds between a third and a half across four lattice
+pitches, so it is not an averaging effect of the pitch either.
+
+**The metric flattered the wrong conclusion, and this is the correction.** The
+temperature plane carries a large smooth latitude gradient and the terrain
+carries none, so the temperature spread is inflated by a signal that has no
+local step. Comparing the two ratios is unfair to the temperature. Read in one
+unit instead: the terrain steps about one percent of its height range between
+neighbours, which through the ground term is about half a warmth unit of
+driver, against a measured step of one whole unit. **The temperature carries
+about twice the local contrast its driver supplies.**
+
+**What follows.** **A ratio of two spreads is not a measure of blending when
+one plane carries a gradient and the other does not.** The metric is still
+useful for comparing one plane against itself under a change, and it is
+misleading for comparing two planes with different large-scale structure.
+
+**Do not reach for the ground divisor.** Roughness is a ratio, so dividing the
+ground term scales the spread and the step together and changes the contrast by
+nothing. It sets how much of the heat scale the terrain claims, not how sharp
+the field is.
+
+## References
+
+[^F606A]: The contrast probe. `crates/cachette-core/examples/weather_contrast_probe.rs`

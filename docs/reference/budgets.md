@@ -65,6 +65,7 @@ that held it and says how the value was reached.
 | Constant | Value | Blocker | How reached |
 |---|---|---|---|
 | Tile edge | 80 m | BLK-001 | Owner decision, from the report 17 calibration |
+| Terrain height range | 0 to 4000 m | BLK-156 | Owner decision, 6 September 2026. The terrain declares a height as a unit fraction and this is what the whole fraction is worth. At the published lapse rate it gives a spread of 26 degrees from the lowest ground to the highest, which puts the snow line inside the world at most latitudes. **A world states it, in the way a world states its latitude span**, so a world that wants a different vertical range changes a value and not the physics |
 | World extent | about 330 km across | BLK-001 | Derived from the tile edge at 16.7 million tiles |
 | March rate | 24 km in a simulated day | BLK-001 | Historical rate, held fixed through the calibration |
 | Dwell | 2 ticks | BLK-001 | Derived from the tile edge and the march rate |
