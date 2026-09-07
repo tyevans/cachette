@@ -145,6 +145,17 @@ train_args="${CACHETTE_TRAIN_ARGS:-$default_args}"
 # every one the trainer declares.
 generations="$(printf '%s' "$train_args" | sed -n 's/.*--generations \([0-9]*\).*/\1/p')"
 generations="${generations:-20}"
+
+# How many worlds one generation holds. The trainer plays every candidate on
+# every seed, and it puts the whole set in one batch, so this product is the
+# batch the throughput probe must measure. **The probe once gave each worker
+# one world, and the trainer never runs that shape.** A figure taken that way
+# describes the probe and not a training run.
+population="$(printf '%s' "$train_args" | sed -n 's/.*--population \([0-9]*\).*/\1/p')"
+population="${population:-24}"
+probe_seeds="$(printf '%s' "$train_args" | sed -n 's/.*--seeds \([0-9]*\).*/\1/p')"
+probe_seeds="${probe_seeds:-6}"
+probe_worlds=$((population * probe_seeds))
 if printf '%s' "$train_args" | grep -q -- '--only'; then
     strategies="$(printf '%s' "$train_args" \
         | sed -n 's/.*--only \([^ ]*\).*/\1/p' | tr ',' '\n' | grep -c .)"
@@ -641,6 +652,34 @@ uv run python -c "import numpy; print('numpy', numpy.__version__, numpy.show_con
 cores="$(nproc)"
 printf '# cores\t%s\n' "$cores"
 
+# **One thread for each matrix library, because this run holds one process
+# for each strategy.** numpy starts a pool of one thread for every core, and
+# it does that in every process. Five processes on a machine of sixty four
+# cores then hold three hundred and twenty threads, and the machine spends
+# its time changing between them. The matrices here are small, so a pool
+# wins nothing even in one process.
+export OPENBLAS_NUM_THREADS=1
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export NUMEXPR_NUM_THREADS=1
+
+# **One trainer process for each strategy, all at once.** One process of
+# every core does not use them: the batch crosses into the engine once for
+# each tick and waits for the slowest world, and one interpreter picks the
+# actions for every world between the decisions while the workers wait.
+# Several processes keep one batch and one interpreter each, and they run
+# together.
+#
+# The strategy names come from the trainer, so this script declares no list
+# of its own. A second list here would go stale the first time a strategy is
+# added, and nothing would fail.
+names="$(uv run python -c \
+    'from cachette.learn.__main__ import STRATEGIES; print(" ".join(STRATEGIES))')"
+count="$(printf '%s' "$names" | wc -w)"
+each="$((cores / count))"
+[ "$each" -ge 1 ] || each=1
+printf '# strategies\t%s\n# workers each\t%s\n' "$count" "$each"
+
 # --------------------------------------------------- the throughput figure
 #
 # **This is the first throughput measurement this project owns on the
@@ -648,8 +687,13 @@ printf '# cores\t%s\n' "$cores"
 # x86-64. It runs before the training, because it takes about a minute and
 # because a run that is interrupted later still brings this back.
 mark measuring
+# One row, in the shape this run trains in. It costs about half a minute and
+# it says what the machine reached, which is what the costs register wants.
+# A sweep of other shapes belongs in a probe-only run, not here, because
+# every second it takes is a second the training does not get.
 uv run python scripts/train_throughput.py \
-    --workers "1,$((cores / 4)),$((cores / 2)),$cores" \
+    --workers "$each" \
+    --worlds "${PROBE_WORLDS:-144}" \
     --decisions 20 --price "${PRICE:-0}" --out /tmp/throughput.txt \
     2>&1 | tee -a /tmp/throughput-console.txt
 cat /tmp/throughput.txt
@@ -661,16 +705,36 @@ fi
 # ------------------------------------------------------------- the training
 mark running
 mkdir -p runs/learn
-# The worker count is the core count. The batch step takes it, and the
-# throughput rows above say what each worker contributed.
-uv run python -m cachette.learn --out runs/learn --workers "$cores" \
-    $TRAIN_ARGS 2>&1 | tee runs/learn/train.log
+
+# Each process writes its own log, and appends to the one the follower reads.
+# A line of the log is short and each process writes whole lines, so the
+# combined file stays readable.
+for name in $names; do
+    (
+        # **Every strategy records how it ended, whether it worked or not.**
+        # Without this, a strategy that dies leaves no line, the others
+        # finish, and the run reports done while a fifth of it is missing.
+        # The status comes from the trainer and not from the tee after it.
+        set +e
+        uv run python -u -m cachette.learn --only "$name" \
+            --out "runs/learn/$name" --workers "$each" $TRAIN_ARGS 2>&1 \
+            | tee -a runs/learn/train.log > "runs/learn/$name.log"
+        printf '%s exited %s\n' "$name" "${PIPESTATUS[0]}" >> runs/learn/status
+    ) &
+done
+wait
+printf '=== how each strategy ended ===\n'
+cat runs/learn/status 2>/dev/null
+# The run failed if any strategy failed. A marker that says done over a
+# dead strategy is worse than no marker.
+! grep -qv 'exited 0$' runs/learn/status
 REMOTE
 
 say "Building and measuring on the instance. It runs detached"
 scp "${ssh_options[@]}" "$out_dir/remote.sh" "$remote:remote.sh" >/dev/null
 ssh "${ssh_options[@]}" "$remote" \
     "TRAIN_ARGS='$train_args' PRICE='$price' \
+     PROBE_WORLDS='$probe_worlds' \
      PROBE_ONLY='${CACHETTE_TRAIN_PROBE_ONLY:-0}' \
      nohup setsid bash remote.sh > run.log 2>&1 < /dev/null & echo started"
 

@@ -252,6 +252,11 @@ train-progress dir:
         --instance-type "$INSTANCE_TYPE" --zone "$ZONE" --run-id "$RUN_ID" \
         --report {{dir}}/report.json
 
+# Print one screen of what a training run is doing. Made for a watch loop:
+#   watch -n1 just train-watch
+train-watch dir="":
+    @./scripts/train-watch.sh {{dir}}
+
 # Follow a training run this machine started, without ending it.
 train-attach dir:
     ./scripts/graviton-train.sh --attach {{dir}}

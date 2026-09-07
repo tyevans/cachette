@@ -64,6 +64,12 @@ from .league import run_seated_population
 from .policy import LinearPolicy, MLPPolicy, Policy, PolicyFit, load_policy
 from .reward import Weighting
 
+# How often a long call says that it is still working. A generation of the
+# usual size takes several minutes, so a reader needs a line inside it. Thirty
+# seconds is often enough to tell a slow generation from a stopped one, and
+# rare enough to leave the log readable.
+HEARTBEAT_SECONDS = 30.0
+
 # A policy the trainer can perturb. Both kinds answer ``flat`` and
 # ``rebuild``, so the trainer never asks which kind it holds.
 Trainable = LinearPolicy | MLPPolicy
@@ -144,8 +150,13 @@ def run_population(
     policies: Sequence[Policy],
     seeds: list[int],
     workers: int,
+    label: str = "",
 ) -> tuple[np.ndarray, list[dict[str, float]], int]:
     """Play every policy on every seed, and return the returns and the readings.
+
+    The label names what is playing, for example ``conquer generation  3``. A
+    call that gives one reports progress while it runs. A call that gives none
+    stays silent, which is what a short call wants.
 
     The world at index ``candidate * len(seeds) + seed`` belongs to that pair.
     The batch reports in index order, so the mapping holds for every step.
@@ -158,6 +169,9 @@ def run_population(
     vector.reset([seeds[s] for _, s in pairs])
 
     returns = np.zeros(len(pairs))
+    started = time.perf_counter()
+    spoke = started
+    decisions = 0
     while not vector.done:
         observations = np.stack([env.observation() for env in vector.envs])
         masks = vector.action_masks()
@@ -171,6 +185,30 @@ def run_population(
             actions[first:last] = chosen
         for index, result in enumerate(vector.step(actions)):
             returns[index] += result.reward
+        decisions += 1
+
+        # **A generation says it is working while it works.** A generation of
+        # this size takes several minutes, and the row that reports it comes
+        # only at the end. Without this line, a slow generation and a stopped
+        # one look the same from outside, and a reader can only guess from the
+        # load of the machine.
+        #
+        # **The clock decides when to print, and nothing else.** No simulated
+        # value reads it, and the printing changes no state, so this cannot
+        # move a result. It is not a time budget and it ends nothing.
+        now = time.perf_counter()
+        if label and now - spoke >= HEARTBEAT_SECONDS:
+            spoke = now
+            live = sum(1 for env in vector.envs if not env.done)
+            elapsed = now - started
+            rate = vector.world_ticks / elapsed if elapsed else 0.0
+            print(
+                f"  {label} working  decisions {decisions:5d} "
+                f"live {live:4d}/{len(pairs):<4d} "
+                f"ticks {vector.world_ticks:9d} rate {rate:8.1f} t/s "
+                f"[{elapsed:.0f}s]",
+                flush=True,
+            )
 
     ticks = vector.world_ticks
     starts = field_starts(vector.envs[0])
@@ -208,6 +246,7 @@ def score_generation(
     candidates: Sequence[Policy],
     seeds: list[int],
     train_config: TrainConfig,
+    label: str = "",
 ) -> Generation:
     """Play one generation, and return the score the update ranks.
 
@@ -218,7 +257,7 @@ def score_generation(
     """
     if not train_config.learner_seats:
         returns, readings, ticks = run_population(
-            env_config, weighting, candidates, seeds, train_config.workers
+            env_config, weighting, candidates, seeds, train_config.workers, label
         )
         absolute = returns.mean(axis=1)
         return Generation(
@@ -436,6 +475,7 @@ def train(
                 [policy],
                 validation,
                 train_config.workers,
+                f"{name} yardstick",
             )[0].mean()
         )
         print(f"  {name} controller yardstick {yardstick:9.1f}", flush=True)
@@ -447,7 +487,12 @@ def train(
             return None
         scored = float(
             run_population(
-                env_config, weighting, [current], validation, train_config.workers
+                env_config,
+                weighting,
+                [current],
+                validation,
+                train_config.workers,
+                f"{name} validation {generation:2d}",
             )[0].mean()
         )
         if scored > best_score:
@@ -484,7 +529,12 @@ def train(
             for sign in (1.0, -1.0)
         ]
         played = score_generation(
-            env_config, weighting, candidates, seeds, train_config
+            env_config,
+            weighting,
+            candidates,
+            seeds,
+            train_config,
+            f"{name} generation {generation:2d}",
         )
         scores, ticks, won = played.ranked, played.ticks, played.won
         shaped = rank_shape(scores)

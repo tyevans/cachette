@@ -173,6 +173,23 @@ def parse(text: str) -> Progress:
     """Read a training log, and return what it says."""
     progress = Progress()
     current: Strategy | None = None
+    # **A log can hold several strategies at once.** A run starts one trainer
+    # process for each strategy, and they all append to one file, so the
+    # heading of one strategy is not the owner of the next line. A generation
+    # row names its own strategy, so the row goes to the strategy it names.
+    # This index is how a row finds it.
+    by_name: dict[str, Strategy] = {}
+
+    def strategy_named(name: str, kind: str = "") -> Strategy:
+        """Return the strategy of this name, and make it if it is new."""
+        found = by_name.get(name)
+        if found is None:
+            found = Strategy(name=name, kind=kind)
+            by_name[name] = found
+            progress.strategies.append(found)
+        elif kind and not found.kind:
+            found.kind = kind
+        return found
 
     for line in text.splitlines():
         heading = HEADING.match(line)
@@ -180,8 +197,7 @@ def parse(text: str) -> Progress:
             name = heading.group("name")
             if name == "controller baseline":  # pragma: no cover - unreachable
                 continue
-            current = Strategy(name=name, kind=heading.group("kind") or "")
-            progress.strategies.append(current)
+            current = strategy_named(name, heading.group("kind") or "")
             continue
 
         # The controller baseline sits under its own heading, which the
@@ -199,9 +215,13 @@ def parse(text: str) -> Progress:
             continue
 
         row = GENERATION.match(line)
-        if row and current is not None:
+        if row:
+            # The row names its strategy, so it does not go to whichever
+            # heading came last. With several trainers writing one file, the
+            # last heading is usually another strategy entirely.
+            owner = strategy_named(row.group("name"))
             validation = row.group("validation")
-            current.generations.append(
+            owner.generations.append(
                 Generation(
                     name=row.group("name"),
                     generation=int(row.group("generation")),
@@ -230,6 +250,10 @@ def parse(text: str) -> Progress:
             )
             continue
 
+        # **A baseline row does not name its strategy.** It goes to the
+        # heading that came last, which is right when one trainer writes the
+        # file. When several write it, a baseline can land on the wrong
+        # strategy. The trainer must print the name for this to be safe.
         baseline = BASELINE.match(line)
         if baseline and current is not None:
             current.baselines[baseline.group("label")] = {
@@ -306,12 +330,19 @@ def clock(seconds: float) -> str:
     return f"{minutes // 60}h{minutes % 60:02d}m"
 
 
+# How many generations of each strategy the dashboard prints. A strategy runs
+# to twenty or more, and the last few say only what just happened. Fifteen
+# shows the shape of the search without pushing the bar off the screen.
+RECENT_GENERATIONS = 15
+
+
 def render(
     progress: Progress,
     price_per_hour: float,
     total_generations: int,
     instance_type: str = "",
     zone: str = "",
+    recent_generations: int = RECENT_GENERATIONS,
 ) -> str:
     """Return the dashboard a person reads to decide whether to keep paying."""
     money = projection(progress, price_per_hour, total_generations)
@@ -359,7 +390,7 @@ def render(
                 )
             )
         if rows:
-            recent = rows[-5:]
+            recent = rows[-recent_generations:] if recent_generations > 0 else rows
             lines.append("      generation  mean       best       spread   won")
             for row in recent:
                 spread = "     -" if row.spread is None else f"{row.spread:9.1f}"
@@ -438,6 +469,13 @@ def main() -> int:
         default=0,
         help="how many generations the whole run will take",
     )
+    parser.add_argument(
+        "--recent",
+        type=int,
+        default=RECENT_GENERATIONS,
+        help="how many generations of each strategy to print. Zero prints "
+        f"every one. Default {RECENT_GENERATIONS}",
+    )
     parser.add_argument("--instance-type", type=str, default="")
     parser.add_argument("--zone", type=str, default="")
     parser.add_argument("--run-id", type=str, default="local")
@@ -486,6 +524,7 @@ def main() -> int:
             arguments.generations,
             arguments.instance_type,
             arguments.zone,
+            arguments.recent,
         )
     )
     return 0
