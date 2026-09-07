@@ -109,6 +109,8 @@ struct Band {
     cells: usize,
     warmth: Vec<i64>,
     air: Vec<i64>,
+    capacity: Vec<i64>,
+    wet: Vec<i64>,
     cloud: Vec<i64>,
     overcast: usize,
 }
@@ -119,15 +121,19 @@ impl Band {
             cells: 0,
             warmth: Vec::new(),
             air: Vec::new(),
+            capacity: Vec::new(),
+            wet: Vec::new(),
             cloud: Vec::new(),
             overcast: 0,
         }
     }
 
-    fn add(&mut self, warmth: i64, air: i64, cloud: i64) {
+    fn add(&mut self, warmth: i64, air: i64, capacity: i64, wet: i64, cloud: i64) {
         self.cells += 1;
         self.warmth.push(warmth);
         self.air.push(air);
+        self.capacity.push(capacity);
+        self.wet.push(wet);
         self.cloud.push(cloud);
         if cloud >= OVERCAST {
             self.overcast += 1;
@@ -136,13 +142,18 @@ impl Band {
 
     fn say(&self) -> String {
         if self.cells == 0 {
-            return format!("{:>7} {:>7} {:>7} {:>7}", 0, "-", "-", "-");
+            return format!(
+                "{:>6} {:>6} {:>6} {:>6} {:>6} {:>6}",
+                0, "-", "-", "-", "-", "-"
+            );
         }
         format!(
-            "{:>7} {:>7} {:>7} {:>6}%",
+            "{:>6} {:>6} {:>6} {:>6} {:>6} {:>5}%",
             self.cells,
             mean(&self.warmth),
             mean(&self.air),
+            mean(&self.capacity),
+            mean(&self.wet),
             self.overcast * 100 / self.cells,
         )
     }
@@ -214,18 +225,20 @@ fn main() {
             // The share of the sky that the overlay paints. The reader is the
             // field, so the probe never restates the ceiling itself.
             let cloud = field.cloud_share_at(index as u32);
-            all[band].add(degrees, held, cloud);
+            let capacity = field.capacity_at_cell(index as u32).0;
+            let wet = field.ground_at(index as u32).0;
+            all[band].add(degrees, held, capacity, wet, cloud);
             if water[index] * 2 < tiles[index] {
-                land[band].add(degrees, held, cloud);
+                land[band].add(degrees, held, capacity, wet, cloud);
             }
             if distance[index] >= inland_from {
-                inland[band].add(degrees, held, cloud);
+                inland[band].add(degrees, held, capacity, wet, cloud);
             }
         }
 
         println!("--- tick {tick}, air ceiling {ceiling} drops");
-        println!("     band |   cells  warmth     air  overcast |   cells  warmth     air  overcast |   cells  warmth     air  overcast");
-        println!("          |                  every cell                      land cells alone                    inland cells alone");
+        println!("     band |  cells warmth    air    cap ground  over |  cells warmth    air    cap ground  over |  cells warmth    air    cap ground  over");
+        println!("          |               every cell                          land cells alone                        inland cells alone");
         for band in 0..bands as usize {
             println!(
                 "  {band:>3} ({:>4}) | {} | {} | {}",

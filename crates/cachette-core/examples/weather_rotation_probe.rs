@@ -11,7 +11,7 @@
 //! ticks, and the weather scale.
 
 use cachette_core::hex::{NEIGHBOURS, NEIGHBOUR_COUNT};
-use cachette_core::weather::AIR_SATURATION;
+use cachette_core::weather::CLOUD_SHARE_WHOLE;
 use cachette_core::{TileIdx, WeatherScale, World, WorldConfig};
 
 fn argument(position: usize, fallback: u64) -> u64 {
@@ -92,7 +92,7 @@ fn clusters(world: &World, mark: i64, floor: usize) -> Vec<((i64, i64), usize)> 
     let mut seen = vec![false; air.len()];
     let mut out = Vec::new();
     for start in 0..air.len() {
-        if seen[start] || air[start].0 < mark {
+        if seen[start] || field.cloud_share_at(start as u32) < mark {
             continue;
         }
         let mut stack = vec![start];
@@ -151,10 +151,15 @@ fn main() {
     )
     .expect("the settings describe a world");
 
-    // A storm is a run of at least this many neighbouring cells whose air
-    // stands at or above three quarters of the mark. The floor keeps a single
-    // wet cell from counting as a storm.
-    let mark = AIR_SATURATION.0 * 3 / 4;
+    // A storm is a run of at least this many neighbouring cells whose sky
+    // stands at or above three quarters full. The floor keeps a single wet
+    // cell from counting as a storm.
+    //
+    // **The mark is a share of a sky and not a count of drops.** Warm air
+    // holds a lot of water and cold air holds very little, so a count of
+    // drops names a storm in the tropics and never names one at a high
+    // latitude, whatever the sky there looks like.
+    let mark = CLOUD_SHARE_WHOLE * 3 / 4;
     let floor = 6usize;
     // A tracked storm keeps its identity while a cluster appears within this
     // many cells of where it stood.
@@ -162,7 +167,7 @@ fn main() {
 
     let ceiling = circulation_ceiling();
     println!("extent {extent} seed {seed:#x} ticks {ticks} scale bits {bits}");
-    println!("circulation ceiling {ceiling}, storm mark {mark} drops, storm floor {floor} cells");
+    println!("circulation ceiling {ceiling}, storm mark {mark} of a whole sky of {CLOUD_SHARE_WHOLE}, storm floor {floor} cells");
 
     let mut live: Vec<Tracked> = Vec::new();
     let mut done: Vec<Tracked> = Vec::new();
