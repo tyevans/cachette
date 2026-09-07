@@ -82,8 +82,14 @@ class Strategy:
     """What one strategy has done and is doing."""
 
     name: str
-    done: list[tuple[int, float, float, float | None, float | None]] = field(
-        default_factory=list
+    # One row for each finished generation: the number, the mean, the best,
+    # the spread, the win share, and the validation score when the generation
+    # validated. **The validation is the only figure that compares across
+    # generations.** The seed set moves every generation, so the mean and the
+    # win share answer a different question each time. The validation seeds
+    # never move.
+    done: list[tuple[int, float, float, float | None, float | None, float | None]] = (
+        field(default_factory=list)
     )
     last_working: dict[str, str] | None = None
     yardstick: float | None = None
@@ -113,6 +119,7 @@ def read(text: str) -> tuple[dict[str, Strategy], dict[str, float] | None]:
             best = values["best"]
             if mean is None or best is None:
                 continue
+            valid = values.get("valid")
             strategy.done.append(
                 (
                     int(row.group("generation")),
@@ -120,9 +127,9 @@ def read(text: str) -> tuple[dict[str, Strategy], dict[str, float] | None]:
                     best,
                     values.get("spread"),
                     values.get("won"),
+                    valid,
                 )
             )
-            valid = values.get("valid")
             if valid is not None:
                 strategy.validations.append(valid)
             continue
@@ -204,11 +211,15 @@ def render(
         f"  {'strategy':<14}{'gen':>5} {'mean':>10} {'best':>10} "
         f"{'spread':>9} {'won':>5}  now"
     )
+    recent_header = (
+        f"  {'strategy':<14}{'gen':>5} {'mean':>10} {'best':>10} "
+        f"{'spread':>9} {'won':>5} {'valid':>9}"
+    )
     lines.append(header)
     for name in sorted(strategies):
         strategy = strategies[name]
         if strategy.done:
-            generation, mean, best, spread, won = strategy.done[-1]
+            generation, mean, best, spread, won, _ = strategy.done[-1]
             spread_text = "        -" if spread is None else f"{spread:9.1f}"
             won_text = "    -" if won is None else f"{won:5.2f}"
             body = (
@@ -228,17 +239,19 @@ def render(
 
     lines.append("")
     lines.append("  --- recent generations")
+    lines.append(recent_header)
     rows: list[tuple[int, str, str]] = []
     for name in sorted(strategies):
-        for generation, mean, best, spread, won in strategies[name].done:
+        for generation, mean, best, spread, won, valid in strategies[name].done:
             spread_text = "        -" if spread is None else f"{spread:9.1f}"
             won_text = "    -" if won is None else f"{won:5.2f}"
+            valid_text = "        -" if valid is None else f"{valid:9.1f}"
             rows.append(
                 (
                     generation,
                     name,
                     f"  {name:<14}{generation:>5} {mean:>10.1f} {best:>10.1f} "
-                    f"{spread_text} {won_text}",
+                    f"{spread_text} {won_text} {valid_text}",
                 )
             )
     rows.sort(key=lambda row: (row[0], row[1]))
@@ -246,6 +259,38 @@ def render(
         lines.append(text)
     if not rows:
         lines.append("  none finished yet. The rows above say what is running.")
+
+    # **The learning curve.** Every other column moves with the seed set of
+    # its generation, so two of them do not compare. These play the same
+    # seeds every time, so this row is the one that says whether the run is
+    # learning.
+    for name in sorted(strategies):
+        strategy = strategies[name]
+        series = [
+            (generation, valid)
+            for generation, _, _, _, _, valid in strategy.done
+            if valid is not None
+        ]
+        if not series:
+            continue
+        lines.append("")
+        yard = strategy.yardstick
+        lines.append(
+            f"  --- {name}: the validation seeds, which never move"
+            + (f"   the controller reaches {yard:.1f}" if yard is not None else "")
+        )
+        lines.append(
+            "      "
+            + "  ".join(f"g{generation}:{value:.0f}" for generation, value in series)
+        )
+        if len(series) >= 2:
+            first, last = series[0][1], series[-1][1]
+            moved = last - first
+            way = "toward the controller" if moved > 0 else "away from the controller"
+            gap = f", {yard - last:.0f} short" if yard is not None else ""
+            lines.append(
+                f"      moved {moved:+.0f} over {len(series)} validations, {way}{gap}"
+            )
 
     for name in sorted(strategies):
         strategy = strategies[name]
