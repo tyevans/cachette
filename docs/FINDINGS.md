@@ -16082,7 +16082,124 @@ holder column pins the palette and the tile order, the height column pins the
 ramp, and the cloud column pins the map from a tile to its weather cell.
 
 
+### FND-630 — A clamp inside one pass is not a clamp, because the next pass undoes it
+
+**Believed.** The latent heat clamp holds a cell at the melting point while it
+carries ice, so putting the clamp on the driver pass holds every cell that
+carries ice.
+
+**False.** The temperature of a cell moves twice in one solve. The driver moves
+it toward what the world asks, and the wind then carries heat onto it from its
+neighbours. The clamp guarded the first and the second lifted a polar cell one
+warmth unit above the melting point with its ice still standing. The wind
+carries the temperature and it never reads the bank, so nothing paid for that
+rise.
+
+**Evidence.** The world test asserted the invariant at every tick and named the
+cell, the temperature and the bank it held. The clamp then moved out of the
+driver and into its own pass, after the driver and after the carry. Restoring
+the old order fails the test again in a fraction of a second.[^F630A]
+
+**What follows, and it generalises past this term.** **Ask what else writes the
+plane before you clamp it.** A guard placed inside one producer of a value
+constrains that producer and not the value. A field with two writers needs the
+guard after both, or it needs two guards and a rule that keeps them in step,
+which is one fact in two places.[^F590A]
+
+**A per-tick assertion is worth more than an end-state one.** The first draft of
+this test read the warmest reading of each cell over a whole season period and
+compared it against the melting point. That would have caught this leak only
+where the leak happened to be the peak. The assertion that caught it reads the
+temperature and the bank on the same tick, so it fails on the first cell that
+breaks the rule.
+
+
+### FND-631 — The class error the register quotes has no instrument in the tree
+
+**Believed.** The class error against the published climate shares is a figure
+the weather probe reports, so a later worker can measure it before and after a
+change.[^F631A]
+
+**False.** The probe reports the class share of each latitude band and the class
+share over the land of the world. It never reported the error against the
+published shares, and it never reported the reweighting onto the land
+distribution of Earth. Both of the register figures were computed by hand,
+outside the tree, and the weights were not written down anywhere.
+
+**Why it matters here.** This world holds far more of its land at high latitude
+than Earth does, and the register says so.[^F631B] So the unweighted error over
+the land of this world moves the wrong way when the poles are corrected: making
+the polar cells polar grows the polar class, which is already near its published
+share over this world's land and far under it over Earth's. **A worker who takes
+the unweighted figure for the reweighted one reads a correction as a
+regression.**
+
+**What was done and what was not.** The probe now reports the class error over
+the land of this world, so that figure is reproducible from the tree. The
+reweighted figure is still not, because the land area of Earth in each band is
+not in the tree and this worker could not verify it. The unweighted figure
+compares one run of the probe with another run of it. **It does not compare this
+world with Earth.**
+
+**What follows.** **A figure that a register quotes needs an instrument that a
+later reader can run.** A number computed by hand in a session is gone when the
+session ends, and the register then states a figure that nobody can reproduce or
+refute. Put the weights in the tree beside the probe, or state in the register
+that the figure was taken by hand.
+
+
+### FND-632 — The latent heat clamp binds over the whole high-latitude belt, because the belt of this model is nearly flat
+
+**Believed.** The polar summer of this model is too warm and the band below the
+pole is about right, so a clamp at the melting point corrects the first and
+leaves the second alone.[^F632A]
+
+**False.** The clamp binds over the whole of the high latitudes. It takes the
+warmest month of the polar band from far above the melting point down to the
+melting point, which is the correction that was wanted. It takes the warmest
+month of the band below the pole down with it, and the published reading of
+that band stands well above the melting point.
+
+**The size of the clamp is not the cause, so no value of the melt cost fixes
+it.** The two bands of this model are nearly the same cell. Before the change
+their annual means, their coldest months and their warmest months all sit
+within a few degrees of each other. The freeze bank is a function of how far
+below the melting point a cell stands and for how long, so two bands that cold
+in the same way bank in the same way. A melt cost that empties one bank in time
+empties the other in nearly the same time, and one that holds one holds both.
+
+**The cause is the record that this term extends, and that record names it.**
+The belt of the published energy balance that this project imposes is flatter
+than the profile the world needs, and the record states that consequence in its
+own text.[^F603D] The clamp did not create that flatness. It made it visible, by
+removing the one thing that used to separate the two bands: an unbounded polar
+summer.
+
+**Evidence.** Measured 7 September 2026 on one development machine, an x86-64
+Intel Core i7-1260P, on a 256-row world at seed 0x2f. The probe settled for one
+whole season period before it sampled, and the commit body holds each figure and
+the command that produced it.
+
+**A polar reading needs a spin-up of one whole season period, and this is new.**
+The freeze bank is carried state that a winter fills, so a world sampled before
+its first full winter reads a pole that never banked. The first measurement of
+this change settled for less than one period, and it clamped one hemisphere and
+not the other. **A field that gains carried state gains a spin-up**, and a probe
+that settled long enough for the old field may not settle long enough for the
+new one.
+
+**What follows.** The next work on this model is the shape of the belt at high
+latitude, and it is not the size of this clamp. A worker who tunes the melt cost
+against the band below the pole is tuning one term against a defect in another,
+and the register already holds one instance of that mistake.[^F618C]
+
+
 ## References
+
+[^F632A]: Findings register, FND-619. `docs/FINDINGS.md`
+[^F630A]: The polar clamp test. `crates/cachette-core/tests/polar_ground_holds_at_the_melting_point.rs`
+[^F631A]: Findings register, FND-616 and FND-618. `docs/FINDINGS.md`
+[^F631B]: Findings register, FND-616. `docs/FINDINGS.md`
 
 [^F612A]: The motion probe. `crates/cachette-core/examples/weather_motion_probe.rs`
 [^F612C]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`

@@ -51,6 +51,19 @@ const THREADS: usize = 4;
 /// of the Earth.
 const MEAN_ANNUAL_RAIN: i64 = 800;
 
+/// The published share of the land of the Earth that each first-letter
+/// Köppen class holds, in tenths of a percent, in the order A, B, C, D, E.
+///
+/// **Published.** The five shares come from the updated world map of the
+/// Köppen-Geiger classification, and the register holds three of them
+/// already.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Peel, Finlayson and McMahon, updated world map of the Koppen-Geiger climate classification, 2007. Hydrology and Earth System Sciences 11, 1633 to 1644.
+/// [^2]: Findings register, FND-616. `docs/FINDINGS.md`
+const PUBLISHED_SHARE_FINE: [i64; 5] = [190, 302, 134, 246, 128];
+
 fn argument(position: usize, fallback: u64) -> u64 {
     std::env::args()
         .nth(position)
@@ -446,6 +459,49 @@ fn main() {
                 totals[at] * 100 / land_count
             );
         }
+
+        // **The class error, over the land of this world and not over the
+        // land of Earth.** The five first-letter classes gather the seven
+        // groups above: B takes the desert and the steppe, and E takes the
+        // tundra and the ice cap. The error is the total absolute difference
+        // against the published shares, in tenths of a point.
+        //
+        // A reader who wants the figure the register quotes must weight each
+        // latitude band by the land Earth holds in it, and that weighting is
+        // not in this tree. **This figure grades the land this world has**,
+        // so it compares one run of this probe against another run of it and
+        // it does not compare this world with Earth.[^4]
+        //
+        // [^4]: Findings register, FND-616 and FND-618. `docs/FINDINGS.md`
+        let held = [
+            totals[0],
+            totals[1] + totals[2],
+            totals[3],
+            totals[4],
+            totals[5] + totals[6],
+        ];
+        let mut error = 0i64;
+        println!();
+        println!("  class     held    published    apart");
+        for (at, published) in PUBLISHED_SHARE_FINE.iter().enumerate() {
+            let share = (held[at] * 1000 / land_count) as i64;
+            error += (share - published).abs();
+            println!(
+                "  {:<8} {:>4}.{:<3} {:>6}.{:<4} {:>4}.{}",
+                ["A", "B", "C", "D", "E"][at],
+                share / 10,
+                share % 10,
+                published / 10,
+                published % 10,
+                (share - published).abs() / 10,
+                (share - published).abs() % 10
+            );
+        }
+        println!(
+            "the class error over the land of this world is {}.{} points",
+            error / 10,
+            error % 10
+        );
     }
     // The two headline questions, in one line each.
     let band_of = |degrees: i32| -> Vec<&Record> {
