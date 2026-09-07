@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-585**
+**Next number: FND-586**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -14382,6 +14382,84 @@ and the verb then refuses is a defect.[^F581A] Nothing else in the tree would
 have found this: the verb was correct, the answer was correct on its own terms,
 and neither had a test that read the other.
 
+### FND-581 — The world invariant read the ground alone, so a mariner that crossed lost it
+
+**Believed.** A demonstration run at eight seeds lost a world invariant, and the
+reading was that the settler order had walked a unit onto ground that refuses
+it. The session that turned the target red moved several balance figures, so the
+first reading blamed one of those.
+
+**True.** The engine broke nothing. The invariant states a stricter rule than
+the movement pass. The movement pass admits a step by the terrain capacity
+table, and that table takes the water crossing column of the type that steps. A
+nonzero column means the type may stand on a water tile. The invariant called
+the reader that passes no crossing, so it refused every unit on water whatever
+its type. The offending unit was a mariner, whose row carries the
+crossing.[^F581B]
+
+**Evidence.** Measured on 6 September 2026 on one development machine
+(ty001-ubuntu, x86-64). A bisect over 110 revisions named the commit that sends
+the settlers of a faction at ground worth founding on. That commit gives each
+faction three destination planes rather than one, and the third is the plane the
+crossing order had always asked for and never received. Mariners therefore began
+to cross for the first time. The invariant was instrumented to name its own
+failing branch, and it named the passability branch and printed the unit: a live
+unit of unit type 5, the mariner row, standing on a water tile. The commit body
+holds the bisect log.
+
+**What follows.** Two things.
+
+**One rule declared twice, and only one copy took the new column.** The
+capability column landed in the terrain capacity table and in the movement pass.
+The invariant kept the older, narrower reader, and nothing failed until a unit
+reached the case. This is the shape the recurring defect rule names first, and
+this is a local instance of it.[^F581C]
+
+**A check that states a stricter rule than the code is a defect in the check.**
+It reads back correctly, it passes every test that does not reach the case, and
+when it does fail it accuses the engine.
+
+### FND-585 — Two tests asserted that a value stands still, and a rule neither test models moves it
+
+**Believed.** A test may read a rule by asserting that a state does not change
+while the input to that rule is absent. Two tests did so. One asserted that a
+faction with no speaker does not move its relation entry. The other asserted
+that every carrier the controller assigned is sent on the plane of its faction.
+
+**True.** Both assertions state the absence of a change, and in each case an
+engine rule that reads none of the inputs of the test makes that change. The
+relation drift moves every entry outside the peace band one step toward it, on a
+schedule, and it reads no speaker. The release frees a sent unit when its
+destination plane stops steering it, which is what lets an arrived carrier read
+its option row and deliver at all.[^F585B]
+
+**Evidence.** Measured on 6 September 2026 on one development machine
+(ty001-ubuntu, x86-64). A per-tick trace of the relation fixture showed the
+entry rising from minus one to zero on the failing tick, with no relation
+command by that faction on that tick, and with the other entry of the pair
+rising by one on the same tick. Zero is the peace edge, and one is the drift
+step, so the drift explains both. The trace also showed that the faction planned
+no relation command on any of the two hundred ticks, so the assertion the test
+did hold was near vacuous as well. A second run that gave that faction the
+leader row planned thirty commands, none of them on a tick it held no speaker.
+For the carrier, removing the one assertion made the test pass: the contract
+bound, the controller assigned a carrier, and the engine moved a quantity.
+
+**What follows.** Three things.
+
+**Assert what the rule produces, not what its absence leaves alone.** A state
+has many writers. An assertion that a state did not change is an assertion about
+every writer, and a test states only the one it knows.
+
+**Compare two runs that differ in one input.** The relation test now runs the
+same world twice and differs only in the unit type of one faction. The command
+count goes from zero to thirty, so the gate is what stops the silent run, and
+not the fixture.
+
+**A test may go vacuous without going red.** The relation fixture reached its
+case when it was written and stopped reaching it later. Nothing failed, because
+a test that asserts a zero passes hardest when the case never arrives.
+
 
 ## References
 
@@ -14505,4 +14583,7 @@ and neither had a test that read the other.
 [^F580B]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the alternatives it rejects. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F581A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F582A]: Backlog item 0516. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
-[^F582B]: The flat observation array and its schema. `crates/cachette-core/src/faction_observation.rs`
+[^F585B]: The flat observation array and its schema. `crates/cachette-core/src/faction_observation.rs`
+[^F581B]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+[^F581C]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+[^F585B]: Findings register, FND-572. `docs/FINDINGS.md`

@@ -639,3 +639,80 @@ fn the_controller_sends_a_settler_across_the_water() {
         "a settler must stand on water, which is what the crossing column buys it"
     );
 }
+
+/// The world invariant reads the crossing column of the unit, and not the
+/// ground alone.
+///
+/// **A check that reads the ground alone states a second, stricter rule.**
+/// The movement pass admits a step by the terrain capacity table, and that
+/// table takes the crossing column of the type that steps. A check that drops
+/// the column refuses a mariner the movement pass has just admitted, so a run
+/// in which a mariner crosses loses an invariant the engine never broke.[^6]
+///
+/// The test reads the rule in both directions on one world. It steps until a
+/// mariner stands on water, and it asserts that the world holds its
+/// invariants. It then puts the defect back: it demotes that mariner to a
+/// worker, whose row states no crossing, and it asserts that the invariant now
+/// fails. A check that reads the ground alone fails the first assertion. A
+/// check that reads nothing fails the second.[^7]
+///
+/// # References
+///
+/// [^6]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+/// [^7]: Testing rules, section 2a. `.agents/rules/testing.md`
+#[test]
+fn the_invariant_admits_a_mariner_on_water_and_refuses_a_worker_there() {
+    let world = fixture_world(true);
+    let island = smallest_island(&world);
+    let (mut world, seat) = seated_world(true, &island);
+    // The controller stands down, so the cohort keeps the order this test
+    // gives it and the run reads one send.
+    world.set_externally_controlled(ISLAND, true);
+    let cohort: Vec<Entity> = (0..COHORT)
+        .map(|_| {
+            world
+                .spawn_soldier(seat, ISLAND)
+                .expect("the seat admits the cohort")
+        })
+        .collect();
+    world.set_unit_type_set(&cohort, MARINER);
+    let target = nearest_shore_beyond(&world, &island, seat);
+    world
+        .send_units_to(&cohort, &[target], CROSSING_PLANE)
+        .expect("the world holds the plane and every unit is live");
+
+    let mut afloat = None;
+    for _ in 0..TICKS {
+        world.step(THREADS).expect("the step must run");
+        assert!(
+            world.check_invariants(),
+            "the world lost an invariant while a mariner crossed"
+        );
+        afloat = cohort.iter().copied().find(|unit| {
+            world
+                .soldiers()
+                .address(*unit)
+                .is_some_and(|at| world.tile_kind(at) == Some(TileKind::Water))
+        });
+        if afloat.is_some() {
+            break;
+        }
+    }
+    let afloat = afloat.expect("a mariner of the cohort must stand on open water");
+    let at = world
+        .soldiers()
+        .address(afloat)
+        .expect("the mariner is live");
+    println!("the mariner stands on water at {at:?}");
+
+    // Put the defect back. The worker row states no crossing, so the same
+    // unit on the same tile is a unit the ground refuses.
+    assert!(
+        world.set_unit_type(afloat, WORKER),
+        "the arena must take the worker row for a live unit"
+    );
+    assert!(
+        !world.check_invariants(),
+        "the invariant admitted a worker that stands on open water"
+    );
+}

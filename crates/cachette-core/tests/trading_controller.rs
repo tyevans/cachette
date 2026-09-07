@@ -621,12 +621,26 @@ fn a_contract_binds_and_a_carrier_delivers() {
         let before = delivered(&world);
         world.step(1).expect("the step runs");
         // Every carrier the controller assigned is a live unit of the faction
-        // that owes, its type carries, and it is sent on the plane of its
-        // faction. A carrier that failed any of those would be a row that the
-        // engine wrote and nothing acted on.
+        // that owes, and its type carries. A carrier that failed either of
+        // those would be a row that the engine wrote and nothing acted on.
+        //
+        // **A carrier is sent on the plane of its own faction, or it is not
+        // sent at all.** The engine releases a sent unit when the plane it
+        // climbs stops steering it, which is what lets an arrived carrier read
+        // its option row and deliver. A sent carrier reads its plane and never
+        // that row, so a rule that kept every carrier sent would keep it from
+        // ever gathering or delivering. The assertion therefore refuses a
+        // carrier on the plane of another faction, and admits a released
+        // one.[^8]
+        //
+        // [^8]: Findings register, FND-572. `docs/FINDINGS.md`
         for (unit, _, faction) in world.carrier_units() {
             assert_eq!(world.soldiers().faction(unit), Some(faction));
-            assert_eq!(world.sent_to(unit), Some(Some(faction.0)));
+            let sent = world.sent_to(unit);
+            assert!(
+                sent == Some(None) || sent == Some(Some(faction.0)),
+                "a carrier of {faction:?} was sent as {sent:?}"
+            );
             let unit_type = world.soldiers().unit_type(unit).expect("the unit is live");
             assert!(
                 world.unit_types().row(unit_type).carry_capacity > 0,

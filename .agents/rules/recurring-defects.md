@@ -34,6 +34,13 @@ Local instance. The registry records three record-number collisions during the
 research phase, because agents chose their own numbers instead of taking one
 from the registry.[^3] Three declaration sites for one number.
 
+Local instance. The rule for which ground admits a unit was declared twice. The
+terrain capacity table takes the water crossing column of the type of the unit,
+and the movement pass calls it that way. The world invariant called the reader
+that passes no crossing, so it stated a stricter rule. Nothing failed until a
+mariner first crossed open water, and the check then accused the engine of a
+defect the engine did not have.[^11]
+
 **Rule.** Declare a value once. When a second site must exist, add a check that
 fails when the copies disagree. Do not add a comment that names the winner. A
 comment that explains which copy loses is evidence that the second copy should
@@ -154,3 +161,4 @@ Before you claim work is done, check each line.
 [^8]: Findings, the scope of a decision record. `docs/research/adr-scope-findings.md`
 [^9]: Definition of Done. `.agents/rules/definition-of-done.md`
 [^10]: Findings register, FND-541. `docs/FINDINGS.md`
+[^11]: Findings register, FND-581. `docs/FINDINGS.md`

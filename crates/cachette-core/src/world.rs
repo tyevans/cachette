@@ -4099,6 +4099,37 @@ impl World {
             .is_some_and(TileKind::is_passable)
     }
 
+    /// Returns the water crossing column of the type of one unit.
+    ///
+    /// **This is the one place that reads the column for a unit.** A unit
+    /// whose type the arena cannot answer for crosses nothing, which is the
+    /// answer every type gave before the column existed.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    fn crossing_of(&self, unit: Entity) -> u32 {
+        self.soldiers
+            .unit_type(unit)
+            .map_or(0, |unit_type| self.unit_types.row(unit_type).water_crossing)
+    }
+
+    /// Reports whether the ground at an address admits one named unit.
+    ///
+    /// The ground states a capacity for the crossing the type of the unit
+    /// holds, and a capacity above zero admits it. A type with no crossing
+    /// therefore gets the answer the ground alone gives, and a type that
+    /// crosses open water may stand on it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    fn admits_this_unit(&self, unit: Entity, address: Axial) -> bool {
+        self.terrain
+            .kind(address)
+            .is_some_and(|kind| kind.is_passable_for(self.crossing_of(unit)))
+    }
+
     /// Refuses an address that lies inside the world on ground that admits
     /// no unit.
     ///
@@ -4881,17 +4912,23 @@ impl World {
             return false;
         }
 
-        // No soldier stands on ground that admits no unit. The spawn, the
-        // placement and the movement each refuse such a tile, and this check
-        // is what fails when a later path forgets to.[^1]
+        // No soldier stands on ground that admits no unit of its own type.
+        // The spawn, the placement and the movement each refuse such a tile,
+        // and this check is what fails when a later path forgets to.[^1]
+        //
+        // **The gate is the capacity table, and the crossing column of the
+        // unit is an argument to it.** The movement pass admits a step by
+        // that table, so a check that read the ground alone would state a
+        // second, stricter rule and fail on a mariner that crossed open
+        // water exactly as its row permits.[^11]
         //
         // [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D4. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
-        if self
-            .soldiers
-            .iter()
-            .filter_map(|soldier| self.soldiers.address(soldier))
-            .any(|address| !self.admits_a_unit(address))
-        {
+        // [^11]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+        if self.soldiers.iter().any(|soldier| {
+            self.soldiers
+                .address(soldier)
+                .is_some_and(|address| !self.admits_this_unit(soldier, address))
+        }) {
             return false;
         }
         // The terrain holds a second copy of the seed and of the extent. One
