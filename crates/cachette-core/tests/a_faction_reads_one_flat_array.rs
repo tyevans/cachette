@@ -554,7 +554,10 @@ fn the_held_counts_tell_own_ground_from_other_ground() {
     // the truth of the world. A test that compared the array against itself
     // would pass whatever the reader summed.
     let (truth_own, truth_other) = held_by_hand(&world, WATCHER, cell);
-    assert_eq!(own, truth_own, "the own count is the ground the watcher holds");
+    assert_eq!(
+        own, truth_own,
+        "the own count is the ground the watcher holds"
+    );
     assert_eq!(
         other, truth_other,
         "the other count is the ground every rival holds together"

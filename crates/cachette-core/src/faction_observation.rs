@@ -342,10 +342,9 @@ impl ObsField {
             Self::GameOver | Self::WonderClaim => (0, 1),
             Self::HeldTiles => (0, shape.tile_count as i64),
             Self::SeatsHeld => (0, shape.faction_count as i64),
-            Self::LiveUnits
-            | Self::Population
-            | Self::CellOwnUnits
-            | Self::CellOtherUnits => (0, shape.unit_capacity as i64),
+            Self::LiveUnits | Self::Population | Self::CellOwnUnits | Self::CellOtherUnits => {
+                (0, shape.unit_capacity as i64)
+            }
             Self::StoreTotal => (0, i64::MAX),
             Self::BestRenown => (0, Fix32::MAX.0 as i64),
             Self::Relation => (i32::MIN as i64, i32::MAX as i64),
