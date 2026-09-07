@@ -1989,6 +1989,54 @@ it.[^DEC279C]
 
 **The two values are balance rows and this decision states neither.** One
 blocker holds every value of the downstream game.[^DEC278C]
+### DEC-280 — Which mouse gesture moves which axis of the view?
+
+**Closed. The conventions a person arrives with, and not a scheme of our own.**
+
+The demonstration had no mouse control except a press that named a tile. It
+scrolled and zoomed on the keyboard alone. A person who opens a map expects to
+drag it and to zoom on the wheel, and a person who opens a view of a scene
+expects a second button to turn it.
+
+**The left button drags the ground, and the ground stays under the cursor.**
+The other reading is push-the-camera, where the ground runs away from the hand.
+Every map a person has used takes hold of the ground, so the other reading is
+not a real option. The engine offers a pan verb in pixels, so this costs one
+call with the sign turned round.
+
+**The wheel zooms about the cursor, and not about the middle of the frame.**
+The engine zoom verb holds the middle of the frame, which is the wrong anchor
+for a mouse and the right one for a key. The control layer therefore reads the
+address under the cursor, changes the scale, and puts that address back. A
+zoom about the middle throws away the one thing the person was pointing at, and
+it is the failure a reader does not see and a person feels at once. Two tests
+name it.
+
+**One wheel notch is worth three zoom presses.** A press is small because a
+person holds a key down. A notch is one act. Three notches then about double
+the size of a tile, which is the range a map gives. The factor comes from the
+engine, so the wheel and the keys cannot part company.
+
+**The right button and the middle button both turn and lean.** Two buttons
+carry one gesture on purpose. A trackpad has no middle button, and a mouse with
+a wheel has no comfortable middle drag, so a person reaches for whichever one
+their hardware gives them. Neither button had a meaning before this, so nothing
+was repurposed.
+
+**A drag down leans the view towards a plan, in the same sense as the left
+drag.** The hand takes hold of the ground and the ground follows it. A drag
+down pulls the near edge towards the watcher and lays the ground flat. The
+opposite sense is also in use in the field, and this one was chosen because it
+agrees with the left drag rather than because it is more common.
+
+**The lean stops at both ends, and the turn wraps.** A lean over a plan turns
+the picture over, and a lean of nothing puts the watcher in the ground. A turn
+that has gone all the way round stands where it started, so it needs no bound.
+
+**The camera holds no angle, so the turn and the lean live beside it.** The
+engine camera is a flat map camera. A view object holds it together with the
+two angles, and that object is the one source of truth for where the watcher
+stands. The mouse writes there, and a renderer reads there.
 
 ### DEC-278 — When does the engine keep a city it takes, and when does it burn it?
 

@@ -11,11 +11,15 @@ them. It touches no simulated value, no state hash and no step.
 What the sketch shows
 ---------------------
 
-The picture is an isometric view of the ground. The page turns the world an
-eighth of a circle, leans it away from the watcher, and lifts every tile by
-the height of the ground under it. A tile that stands high moves up the page,
-and the face below it becomes a cliff. The flat view cannot show this, and the
-world holds real terrain.
+The picture is a view of the ground from above and to one side. The page turns
+the world about the up direction, leans it away from the watcher, and lifts
+every tile by the height of the ground under it. A tile that stands high moves
+up the page, and the face below it becomes a cliff. The flat view cannot show
+this, and the world holds real terrain.
+
+**The turn and the lean come from the view, and a mouse drives them.** The page
+opens at an eighth of a circle and a lean of one half, which is an isometric
+drawing. A drag with the right button or the middle button moves both.
 
 What the hatching carries
 -------------------------
@@ -48,10 +52,15 @@ holds the weight.
 What costs what
 ---------------
 
-**The ground is built once for each camera.** The terrain never moves, so the
-page that carries it is a function of the camera and the size of the frame
-alone. The pass that turns the world, lifts it and hatches it therefore runs
-when the camera moves, and a frame that only steps the world reuses it.
+**The ground is built once for each view.** The terrain never moves, so the
+page that carries it is a function of the window of tiles the camera covers,
+the two angles the view stands at, and the size of the frame. The pass that
+turns the world, lifts it and hatches it therefore runs when the view moves,
+and a frame that only steps the world reuses it.
+
+**A drag moves the view on every frame, so a drag pays that pass on every
+frame.** The cost is the reason the console warns that this renderer draws
+slowly. It is a property of drawing each pixel on the processor.
 
 **The layers that change are read and drawn every frame.** The cloud, the wind
 and the faction that holds each tile change with the world, so they cross the
@@ -68,9 +77,12 @@ ADR-0067, the viewer reads the world and never writes to it, decision D3.
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+
+from cachette.demo.view import View
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -105,11 +117,10 @@ SKY_INK = np.array([0x5A, 0x62, 0x6E], dtype=np.float32)
 # handed person holding a pencil puts it.
 LIGHT = np.array([-0.55, -0.62, 0.56], dtype=np.float32)
 
-# How far the page leans away from the watcher.
-#
-# One is a plan seen from above and zero is a plan seen edge on. This is the
-# two to one of an isometric drawing.
-LEAN = 0.5
+# How far the page turns the ground, and how far it leans away from the
+# watcher, live on the view. **This module holds no copy of either.** They are
+# what a person drives with a mouse, so a second copy here would be read back
+# correctly and would show a page that stood somewhere else.
 
 # How far the tallest ground rises, as a share of the width of the page.
 RELIEF = 0.115
@@ -311,16 +322,19 @@ class Ground:
         "sample",
         "shape",
         "sheet",
+        "stand",
         "take",
         "tone",
         "water",
         "window",
     )
 
-    # The window of tiles this page covers, and the size of the frame it was
-    # built for. The rest is what the build put on the page.
+    # The window of tiles this page covers, the size of the frame it was built
+    # for, and the two angles the view stood at. The rest is what the build
+    # put on the page.
     window: tuple[int, int, int, int]
     shape: tuple[int, int]
+    stand: tuple[float, float]
     sample: tuple[np.ndarray, np.ndarray] | None
     held: np.ndarray
     take: np.ndarray
@@ -339,10 +353,12 @@ class Ground:
         self,
         window: tuple[int, int, int, int],
         shape: tuple[int, int],
+        stand: tuple[float, float],
     ) -> None:
-        """Record which window and which size this page was built for."""
+        """Record which window, which size and which angles built this page."""
         self.window = window
         self.shape = shape
+        self.stand = stand
         # Where the engine drew each tile of the window on its own flat map.
         # It is built only when a wash needs it.
         self.sample = None
@@ -362,7 +378,6 @@ class Sketch:
         "_ground",
         "_heights",
         "_kinds",
-        "_lean",
         "_level",
         "_relief",
         "_scratch",
@@ -370,21 +385,26 @@ class Sketch:
         "_water",
         "_whole_sky",
         "_world",
+        "view",
     )
 
     def __init__(
         self,
         world: World,
         *,
+        view: View | None = None,
         relief: float = RELIEF,
-        lean: float = LEAN,
         sky: bool = True,
     ) -> None:
         """Build the renderer for one world.
 
         The relief is how far the tallest ground rises, as a share of the
-        width of the page. The lean is how far the page tips away from the
-        watcher, where one is a plan and zero is an edge.
+        width of the page.
+
+        **The view says where the watcher stands, and this module holds no
+        angle of its own.** The turn and the lean are read from it on every
+        frame, so a mouse that moves the view moves the page. A caller that
+        names no view gets one at the opening angles.
 
         **The terrain crosses the boundary once.** The engine generates the
         ground from the seed and never changes it, so the height and the kind
@@ -402,7 +422,7 @@ class Sketch:
                 raise BoundaryGap(message)
         self._world = world
         self._relief = relief
-        self._lean = lean
+        self.view = view if view is not None else View()
         self._sky = sky
         rows, columns = world.height, world.width
         self._heights = (
@@ -529,17 +549,32 @@ class Sketch:
         return first_q, first_r, max(last_q, first_q + 1), max(last_r, first_r + 1)
 
     def _for(self, camera: Camera, width: int, height: int) -> Ground:
-        """Give back the page of the ground, building it if the camera moved."""
+        """Give back the page of the ground, building it if the view moved.
+
+        **The page follows the two angles as well as the window.** A turn or a
+        lean moves every point of the page, so a page built at one pair of
+        angles says nothing about another pair.
+        """
         window = self._window(camera, width, height)
+        stand = (self.view.turn, self.view.lean)
         held = self._ground
-        if held is not None and held.window == window and held.shape == (height, width):
+        if (
+            held is not None
+            and held.window == window
+            and held.shape == (height, width)
+            and held.stand == stand
+        ):
             return held
-        built = self._build(window, width, height)
+        built = self._build(window, width, height, stand)
         self._ground = built
         return built
 
     def _build(
-        self, window: tuple[int, int, int, int], width: int, height: int
+        self,
+        window: tuple[int, int, int, int],
+        width: int,
+        height: int,
+        stand: tuple[float, float],
     ) -> Ground:
         """Turn the window of tiles into a page, and hatch the ground on it.
 
@@ -547,7 +582,7 @@ class Sketch:
         it names the tile that stands there, so the page holds no hole and
         nothing is scattered.
         """
-        ground = Ground(window, (height, width))
+        ground = Ground(window, (height, width), stand)
         first_q, first_r, last_q, last_r = window
         heights = self._heights[first_r:last_r, first_q:last_q]
         water = self._water[first_r:last_r, first_q:last_q]
@@ -606,10 +641,16 @@ class Sketch:
     def _turn(
         self, window: tuple[int, int, int, int], width: int, height: int
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Turn the window an eighth of a circle and lean it away from the page.
+        """Turn the window about the up direction and lean it away from the page.
 
         A world seen square to the page reads as a flat map however far the
         ground is lifted, so the page turns before it lifts.
+
+        **The two angles come from the view.** The turn is how far the ground
+        is rotated about the up direction, and the lean is how far the page
+        tips away from the watcher. The view opens at an eighth of a circle
+        and a lean of one half, which is the isometric drawing this page was
+        first written as.
 
         **The pass reads backwards, one tile for each point of the page.** A
         pass that scattered the tiles forward would leave a hole between two
@@ -626,18 +667,27 @@ class Sketch:
         # grid steps half a column across and less than a row down.
         plan_wide = across + down * 0.5
         plan_tall = down * ROW_PITCH
+        lean = self.view.lean
+        turn_x, turn_y = math.cos(self.view.turn), math.sin(self.view.turn)
+        # How far the turned plan reaches across the page and down it. A
+        # rectangle turned through an angle covers this much of each
+        # direction, and the page is cut to fit it.
+        span_x = plan_wide * abs(turn_x) + plan_tall * abs(turn_y)
+        span_y = plan_wide * abs(turn_y) + plan_tall * abs(turn_x)
         scale = min(
-            width / max(plan_wide + plan_tall, 1e-3),
-            height / max((plan_wide + plan_tall) * self._lean, 1e-3),
+            width / max(span_x, 1e-3),
+            height / max(span_y * lean, 1e-3),
         )
-        page_cols = max(int((plan_wide + plan_tall) * scale) + 2, 2)
-        page_rows = max(int((plan_wide + plan_tall) * scale * self._lean) + 2, 2)
+        page_cols = max(int(span_x * scale) + 2, 2)
+        page_rows = max(int(span_y * scale * lean) + 2, 2)
         column = (np.arange(page_cols, dtype=np.float32) - page_cols / 2.0)[None, :]
-        row = ((np.arange(page_rows, dtype=np.float32) - page_rows / 2.0) / self._lean)[
+        row = ((np.arange(page_rows, dtype=np.float32) - page_rows / 2.0) / lean)[
             :, None
         ]
-        plan_x = (column + row) / (2.0 * scale) + plan_wide / 2.0
-        plan_y = (row - column) / (2.0 * scale) + plan_tall / 2.0
+        # Turn the point of the page back into the plan of the world. The lean
+        # is already taken out of the row above, so this is a plain rotation.
+        plan_x = (column * turn_x + row * turn_y) / scale + plan_wide / 2.0
+        plan_y = (row * turn_x - column * turn_y) / scale + plan_tall / 2.0
         tile_r = plan_y / ROW_PITCH
         tile_q = plan_x - tile_r * 0.5
         take_r = np.rint(tile_r).astype(np.int32)
@@ -938,11 +988,15 @@ class Sketch:
         wind_q = winds["q"].reshape(rows, columns).astype(np.float32)
         wind_r = winds["r"].reshape(rows, columns).astype(np.float32)
         # The wind stands on the axes of the hex grid. The page turns those
-        # axes, so the wind turns with them.
+        # axes, so the wind turns with them. This is the forward turn, and the
+        # page is built from the backward one, so the two use one pair of
+        # angles and cannot part company.
         plan_x = wind_q + wind_r * 0.5
         plan_y = wind_r * ROW_PITCH
-        page_dx = plan_x - plan_y
-        page_dy = (plan_x + plan_y) * self._lean
+        along_turn = math.cos(self.view.turn)
+        across_turn = math.sin(self.view.turn)
+        page_dx = plan_x * along_turn - plan_y * across_turn
+        page_dy = (plan_x * across_turn + plan_y * along_turn) * self.view.lean
         length = np.hypot(page_dx, page_dy)
         moving = length > 0.0
         page_dx = np.where(moving, page_dx / np.where(moving, length, 1.0), 1.0)

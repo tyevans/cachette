@@ -12,8 +12,10 @@ import pytest
 from cachette import Camera, World
 from cachette.demo import sketch as ink
 from cachette.demo.app import Demo, main
+from cachette.demo.mouse import RIGHT_BUTTON, Controls
 from cachette.demo.sketch import BoundaryGap, Sketch
 from cachette.demo.surface import Surface
+from cachette.demo.view import View
 from cachette.names import Names
 
 # A small world and a small frame. The sketch reads the frame and not the
@@ -261,3 +263,64 @@ def read_png(path: str, into: Surface) -> None:
     into.pixels[:] = (
         (packed[..., 0] << 16) | (packed[..., 1] << 8) | packed[..., 2]
     ).ravel()
+
+
+def test_a_mouse_drag_turns_and_leans_the_page_the_sketch_draws() -> None:
+    """The sketch reads the view, so the mouse reaches the page.
+
+    **This drives the handler the window library calls.** A test that set the
+    angle on the renderer would prove that the renderer can turn. It would not
+    prove that a drag reaches it.
+    """
+    world, camera = build()
+    demo = Demo(world, Names(SEED), width=WIDTH, height=HEIGHT, threads=1)
+    demo.camera = camera
+    demo.clock.pause()
+    demo.renderer = Sketch(world, view=demo.view)
+    demo.advance()
+    was = demo.surface.pixels.copy()
+    stood = demo.view.turn, demo.view.lean
+
+    controls = Controls(demo)
+    controls.on_mouse_press(200, 120, RIGHT_BUTTON, 0)
+    controls.on_mouse_drag(260, 90, 60, -30, RIGHT_BUTTON, 0)
+    controls.on_mouse_release(260, 90, RIGHT_BUTTON, 0)
+    assert (demo.view.turn, demo.view.lean) != stood
+
+    demo.advance()
+    assert not np.array_equal(demo.surface.pixels, was)
+
+
+def test_the_page_holds_no_second_copy_of_the_angles_it_stands_at() -> None:
+    """One object says where the watcher stands.
+
+    A page built at one pair of angles says nothing about another pair, so the
+    ground it holds is rebuilt when either angle moves.
+    """
+    world, camera = build()
+    view = View()
+    sketch = Sketch(world, view=view)
+    frame_of(sketch, world, camera)
+    first = sketch._ground
+    assert first is not None
+    frame_of(sketch, world, camera)
+    assert sketch._ground is first, "a still view rebuilt the ground"
+
+    view.tilt_by(0.2)
+    frame_of(sketch, world, camera)
+    assert sketch._ground is not first, "a lean did not rebuild the ground"
+
+
+def test_the_lean_changes_how_far_the_page_reaches_down_the_frame() -> None:
+    """A view near the ground draws a short page. A plan draws a tall one."""
+    world, camera = build()
+    view = View()
+    sketch = Sketch(world, view=view)
+    heights = []
+    for lean in (0.15, 0.5, 1.0):
+        view.lean = lean
+        frame_of(sketch, world, camera)
+        ground = sketch._ground
+        assert ground is not None
+        heights.append(ground.drawn.shape[0])
+    assert heights[0] < heights[1] < heights[2]

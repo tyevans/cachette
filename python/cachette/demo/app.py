@@ -63,10 +63,12 @@ if TYPE_CHECKING:
     from cachette._core import FoundingReport, FrameReading, GameEnd
 from cachette.demo.clock import SPEEDS, Clock, says
 from cachette.demo.minimap import Minimap
+from cachette.demo.mouse import Controls
 from cachette.demo.settings import Settings, load_video, save_video
 from cachette.demo.sketch import RELIEF, BoundaryGap, Sketch
 from cachette.demo.surface import Surface
 from cachette.demo.toasts import Announcer
+from cachette.demo.view import View
 
 # The size of the window in pixels.
 WINDOW_WIDTH = 960
@@ -226,7 +228,6 @@ class Demo:
     __slots__ = (
         "announced_end",
         "announcer",
-        "camera",
         "clock",
         "minimap",
         "names",
@@ -239,8 +240,24 @@ class Demo:
         "settings",
         "surface",
         "threads",
+        "view",
         "world",
     )
+
+    @property
+    def camera(self) -> Camera:
+        """The engine camera the frame is drawn with.
+
+        **The view holds it, and the view is the one source of truth for where
+        the watcher stands.** This reads through to the view, so a caller that
+        held the camera before still holds the same camera.
+        """
+        return self.view.camera
+
+    @camera.setter
+    def camera(self, camera: Camera) -> None:
+        """Put another camera on the view, keeping the angles it stands at."""
+        self.view.camera = camera
 
     def __init__(
         self,
@@ -270,7 +287,11 @@ class Demo:
         # no state between frames: the keyboard says what the watcher wants,
         # and the answer lives for one frame.
         self.reference = False
-        self.camera = Camera()
+        # **The view is the one place the position of the watcher is held.**
+        # It carries the engine camera, which says where the flat map sits,
+        # and the two angles a page that stands over the ground needs. The
+        # mouse writes here and every renderer reads here.
+        self.view = View()
         # The engine tick and the wall clock are separate. The window draws at
         # its own rate and this says how far the world moves between two
         # drawings.
@@ -848,10 +869,11 @@ def main(argv: list[str] | None = None) -> int:
         "--sketch",
         action="store_true",
         help=(
-            "draw the world as an isometric pencil study in ink on paper, "
-            "lifted by the height of the ground, instead of as a flat map; "
-            "the frame costs seconds rather than milliseconds, so a window "
-            "in this mode draws slowly"
+            "draw the world as a pencil study in ink on paper, lifted by the "
+            "height of the ground, instead of as a flat map; it opens at an "
+            "isometric angle, and a drag with the right button turns and "
+            "leans it; the frame costs seconds rather than milliseconds, so "
+            "a window in this mode draws slowly"
         ),
     )
     parser.add_argument(
@@ -982,6 +1004,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             demo.renderer = Sketch(
                 demo.world,
+                view=demo.view,
                 relief=arguments.sketch_relief or RELIEF,
                 sky=arguments.sketch_sky,
             )
@@ -1006,6 +1029,8 @@ def main(argv: list[str] | None = None) -> int:
         f"{demo.world.soldier_count} people, {demo.threads} threads"
     )
     print("arrow keys or WASD scroll, minus and equals zoom")
+    print("drag with the left button to move the map, the wheel zooms")
+    print("drag with the right or middle button to turn and lean the sketch")
     print("hold tab to name the colours")
     print("m shows and hides the minimap")
     print("space pauses, full stop steps one tick, brackets change the speed")
@@ -1427,12 +1452,10 @@ def _run_window(demo: Demo, frame_limit: int, restore_size: bool = True) -> int:
         window.clear()
         picture.image.blit(0, 0)
 
-    def on_mouse_press(x: int, y: int, _button: int, _modifiers: int) -> None:
-        # The window numbers its rows from the bottom and the engine numbers
-        # them from the top, so the height turns one into the other.
-        demo.point_at(float(x), float(demo.surface.height - y))
-        q, r = demo.pointer if demo.pointer is not None else (0, 0)
-        print(f"pointing at tile ({q}, {r})")
+    # **The mouse is its own layer.** It writes to the view and it draws
+    # nothing, so the window pushes it as a handler and the loop above never
+    # names a button. The methods carry the names the library calls.
+    controls = Controls(demo, print)
 
     def on_key_press(symbol: int, _modifiers: int) -> None:
         key = pyglet.window.key
@@ -1476,11 +1499,8 @@ def _run_window(demo: Demo, frame_limit: int, restore_size: bool = True) -> int:
     # The handlers are registered by name rather than by decorator. The
     # library ships no type information, so a decorator from it would make
     # every function it wraps untyped.
-    window.push_handlers(
-        on_draw=on_draw,
-        on_key_press=on_key_press,
-        on_mouse_press=on_mouse_press,
-    )
+    window.push_handlers(controls)
+    window.push_handlers(on_draw=on_draw, on_key_press=on_key_press)
 
     pyglet.clock.schedule_interval(frame, 1.0 / FRAMES_EACH_SECOND)
     pyglet.app.run()
