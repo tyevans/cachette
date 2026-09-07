@@ -18,6 +18,7 @@ References
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 import numpy as np
@@ -195,3 +196,101 @@ def test_the_vector_gives_what_the_single_environments_give() -> None:
                 batched[index].append(result.reward)
 
     assert batched == alone
+
+
+# A world small enough to run to the end of the game in a test, and wide
+# enough that the games end at different ticks. The seeds below resolve by
+# domination at ticks 1, 1, 150 and 589, and by the territory comparison at
+# the tick limit twice.
+#
+# **The spread is the point.** The vector drops a world from the batch when
+# its episode ends, and a fixture whose episodes all end together never
+# reaches that path. A fixture that models the typical case supplies no
+# extreme, and the test then measures the fixture.
+ENDING = EnvConfig(
+    width=24,
+    height=24,
+    faction_count=3,
+    seat=0,
+    tick_limit=600,
+    horizon=75,
+    decision_interval=8,
+)
+
+
+def test_the_vector_matches_the_singles_when_the_episodes_end_apart() -> None:
+    """Six episodes that end at six different decisions still agree.
+
+    The vector drops each world from the batch as its episode ends, so the
+    later decisions of this run go through a batch that is smaller than the
+    vector. The rewards and the outcomes must not move.
+    """
+    seeds = viable_seeds(ENDING, 6, 900)
+    plan = [
+        [int(value) for value in np.random.default_rng(index).integers(0, 29, 75)]
+        for index in range(len(seeds))
+    ]
+
+    alone: list[list[float]] = []
+    outcomes: list[str] = []
+    for index, seed in enumerate(seeds):
+        env = Env(ENDING, WEIGHTING)
+        env.reset(seed)
+        rewards = []
+        for action in plan[index]:
+            if env.done:
+                break
+            mask = env.action_mask()
+            rewards.append(env.step(action if mask[action] else 0).reward)
+        alone.append(rewards)
+        outcomes.append(env.outcome)
+
+    vector = VectorEnv(ENDING, WEIGHTING, count=len(seeds), workers=3)
+    vector.reset(seeds)
+    batched: list[list[float]] = [[] for _ in seeds]
+    for turn in range(75):
+        if vector.done:
+            break
+        masks = vector.action_masks()
+        actions = [
+            plan[index][turn] if masks[index][plan[index][turn]] else 0
+            for index in range(len(seeds))
+        ]
+        for index, result in enumerate(vector.step(actions)):
+            if not result.info.get("skipped"):
+                batched[index].append(result.reward)
+
+    # The fixture must supply the case the assertion is for. A run whose
+    # episodes all end together would pass this test and prove nothing.
+    lengths = {len(row) for row in alone}
+    assert len(lengths) >= 3, f"the episodes ended together, at {lengths}"
+
+    assert batched == alone
+    assert [env.outcome for env in vector.envs] == outcomes
+    assert all(outcome in ("won", "lost") for outcome in outcomes)
+
+
+def test_the_controller_baseline_plays_the_seat_and_the_learner_does_not() -> None:
+    """A configuration that is not controlled leaves the seat to the engine.
+
+    The learner sends the no-op in both runs. The controlled run therefore
+    measures a faction that does nothing, and the other measures the
+    built-in controller. The two must not end in the same place.
+    """
+    seeds = viable_seeds(ENDING, 4, 900)
+    held: dict[bool, list[int]] = {}
+    for controlled in (True, False):
+        config = replace(ENDING, controlled=controlled)
+        vector = VectorEnv(config, WEIGHTING, count=len(seeds), workers=2)
+        vector.reset(seeds)
+        while not vector.done:
+            vector.step([0] * len(seeds))
+        starts = {
+            row["name"]: int(row["start"])
+            for row in vector.envs[0].world.observation_schema()["fields"]
+        }
+        held[controlled] = [
+            int(env.observation()[starts["held_tiles"]]) for env in vector.envs
+        ]
+
+    assert held[True] != held[False]
