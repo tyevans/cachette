@@ -57,6 +57,7 @@ if TYPE_CHECKING:
     # importing them at run time would fail.
     from cachette._core import FoundingReport, FrameReading, GameEnd
 from cachette.demo.clock import SPEEDS, Clock, says
+from cachette.demo.minimap import Minimap
 from cachette.demo.settings import Settings, load_video, save_video
 from cachette.demo.surface import Surface
 from cachette.demo.toasts import Announcer
@@ -221,6 +222,7 @@ class Demo:
         "announcer",
         "camera",
         "clock",
+        "minimap",
         "names",
         "overlay",
         "panels",
@@ -275,6 +277,10 @@ class Demo:
         # Whether the game end was printed. The record is written once, and
         # the line is printed once.
         self.announced_end = False
+        # The round wide view in the top right corner. It reads the summary
+        # level of the engine and paints over the frame, and it holds its own
+        # reading between frames.
+        self.minimap = Minimap()
         # The lines that appear over the map, and the reader that makes them.
         self.announcer = Announcer(names)
         # Where the deck reads the wall clock. **A toast lives for a number of
@@ -555,6 +561,12 @@ class Demo:
         # are chrome and not the world: nothing here reads a tile or an
         # entity, so the two drawing paths cannot disagree about the world.
         self.announcer.toasts.paint(self.surface, now)
+        # **The minimap goes on last, and it stands down for the key.** The
+        # engine puts a card in the top right corner while the reference key
+        # is held, and two things in one corner means a watcher reads
+        # neither.
+        if not self.reference:
+            self.minimap.paint(self.world, self.camera, self.surface)
         return reading
 
 
@@ -934,6 +946,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     print("arrow keys or WASD scroll, minus and equals zoom")
     print("hold tab to name the colours")
+    print("m shows and hides the minimap")
     print("space pauses, full stop steps one tick, brackets change the speed")
     print(f"the speeds are {', '.join(says(speed) for speed in SPEEDS)}")
     print(
@@ -1379,6 +1392,10 @@ def _run_window(demo: Demo, frame_limit: int, restore_size: bool = True) -> int:
         if symbol == key.BRACKETRIGHT:
             demo.clock.faster()
             print(f"speed {demo.clock.says()}")
+            return
+        if symbol == key.M:
+            shown = demo.minimap.toggle()
+            print(f"the minimap is {'on' if shown else 'off'}")
             return
         if symbol == key.F10:
             demo.settings.toggle()
