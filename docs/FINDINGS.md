@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-574**
+**Next number: FND-576**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -14032,6 +14032,61 @@ founding housing of the world governs nothing in it.
 a need rule of no decay, and it says so, because a reader who found the rule
 there without the reason would take it for balance.
 
+
+
+### FND-574 — A housing bound of 1024 was read as the population ceiling, and the food is the ceiling
+
+**Believed.** A settlement holds as many people as its housing admits. Raising
+the founding housing to 1024 therefore raises the population a faction reaches
+toward 1024, and the run climbs toward that bound over its length.
+
+**True.** The housing was not the bind, and it had not been the bind since the
+raise. A founding sets the production of a site from the food its survey read,
+and the rule is that one unit of that food feeds one person. A resident then
+costs the ration plus a quarter of it, so the ground of a new site feeds about
+four fifths of the food it reached. The store therefore stops the growth long
+before the housing does. A lodging raised a bound that nothing reached, so the
+lodging was inert.
+
+**Evidence.** A probe stepped a seeded world of extent 256 with four factions
+and read the first site of faction zero every 250 ticks, on one development
+machine (ty001-ubuntu, x86-64). At a founding housing of 1024 the site held
+between 3 and 32 people over 6000 ticks and its store read zero at most
+samples, while its housing read 2048. The survey of the first seat reached 32
+to 61 food over six seeds. The commit body holds the tables and the command.
+
+**Follows.** Three things.
+
+**A bound above the thing it bounds is not a bound.** A value that admits more
+than the system can reach removes the mechanism it belongs to, and nothing
+fails, because a bound that never binds is silent.
+
+**Derive a bound from the mechanism that fills it.** The repair reads the
+capacity of one tile of ordinary ground for the founding housing and for the
+housing one lodging level gives, so both follow the ground and neither is a
+number somebody liked.
+
+**A ceiling a player asks for is a target for the whole faction, not for one
+site.** The same probe read a faction at 655 people over 80 sites at tick 4000,
+so a faction reaches hundreds by founding cities, and one city reaches tens.
+
+### FND-575 — A lodging that wears away leaves the housing it gave
+
+**Believed.** The housing of a site follows the lodgings that stand near it. A
+level that wears away therefore takes back the housing it gave.
+
+**True.** The raise is written once, when the level rises, and the site stores
+it. No pass lowers it. A site whose lodgings have all worn away keeps every
+place they gave, for ever.
+
+**Evidence.** The growth probe read the first site of faction zero at a
+founding housing of 8 over 3000 ticks. The lodging levels beside the site read
+2 from tick 600 and 0 from tick 2200, and the housing read 16 at both samples
+and at every sample after.
+
+**Follows.** The wear path and the housing column are one fact in two places
+with nothing that fails when they disagree, which is the redundant declaration
+shape. A blocker holds the question of which one moves.
 
 
 ## References

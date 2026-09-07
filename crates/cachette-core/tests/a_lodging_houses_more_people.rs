@@ -66,6 +66,21 @@ const BOUND: Fix32 = Fix32::from_int(4);
 /// with room for the ticks the fixture spends settling.
 const PATIENCE: u64 = (LODGING_LEVEL_1_WORK as u64) * 4;
 
+/// How many ticks a growth is given before a test gives up.
+///
+/// **This bounds a loop that leaves early. It is not a count of ticks that a
+/// test takes.** A site with a free place and a store that pays grows on the
+/// first application of the growth stage, so a test that waits this long has
+/// found a defect and not a slow world.
+const GROWTH_PATIENCE: u64 = 1024;
+
+/// How many births the store of a fixture pays for when a test fills it.
+///
+/// A site pays a share of its store to hold it, so a store fills above the
+/// cost of the births one application makes. The margin is far above that
+/// share and far below the ceiling of the fixed-point scale.
+const STORE_MARGIN: i32 = 64;
+
 /// Returns every address of the extent, in row-major order.
 fn addresses() -> Vec<Axial> {
     let mut all = Vec::with_capacity((WIDTH * HEIGHT) as usize);
@@ -250,6 +265,13 @@ fn a_finished_lodging_raises_the_housing_of_the_site_beside_it() {
         .upgrade_table()
         .row(UpgradeCategory::LODGING, 1)
         .expect("the default table holds the first level");
+    // **A row that housed nobody would pass the comparison below.** The test
+    // reads the row rather than a number of its own, so it states here that
+    // the row houses somebody.
+    assert!(
+        first.housing_change > 0,
+        "the first level of a lodging houses nobody"
+    );
     assert_eq!(
         world.site_housing(site),
         Some(before + first.housing_change),
@@ -311,9 +333,17 @@ fn a_lodging_far_from_every_site_raises_no_housing() {
 /// housing is written to exactly the resident count, so the site has no free
 /// place at the moment the test begins.[^1]
 ///
+/// **The store is refilled on every tick, and the test asserts that it
+/// pays.** A site pays a share of its store to hold it, so a store written
+/// once empties over a long window. The window here follows the work of a
+/// lodging, so a fixture that filled the store once would end with an empty
+/// store, and the site would grow nobody because it could not pay. The test
+/// would then read as a housing bound and would measure the store.[^2]
+///
 /// # References
 ///
 /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+/// [^2]: Testing Rules, section 2a. `.agents/rules/testing.md`
 #[test]
 fn a_site_at_its_housing_grows_again_once_a_lodging_finishes() {
     let Ground {
@@ -322,11 +352,8 @@ fn a_site_at_its_housing_grows_again_once_a_lodging_finishes() {
         beside,
         ..
     } = ground();
-    // The store pays for many births, so the store never decides this test.
-    world
-        .set_settlement_store(site, GOOD, Fix32::from_int(1000))
-        .expect("the good is in the set");
     world.set_birth_chance(Fix32::ONE);
+    fill_the_store(&mut world, site);
     let residents = world.site_residents(site).expect("the site is live");
     assert!(
         world.set_site_housing(site, residents),
@@ -339,8 +366,11 @@ fn a_site_at_its_housing_grows_again_once_a_lodging_finishes() {
         "the fixture must reach a site with no free place"
     );
 
+    // A site with no free place grows nobody, however long the run is and
+    // however much the store holds.
     let stopped = world.site_residents(site).expect("the site is live");
     for _ in 0..PATIENCE {
+        fill_the_store(&mut world, site);
         world.step(1).expect("the step must run");
     }
     assert_eq!(
@@ -348,22 +378,74 @@ fn a_site_at_its_housing_grows_again_once_a_lodging_finishes() {
         Some(stopped),
         "a site with no free place grew somebody"
     );
+    assert!(
+        pays_for_a_birth(&world, site),
+        "the fixture must still pay for a birth, or the store refused and not the housing"
+    );
 
     // The builder is a resident of nowhere, so it never fills the site it
     // builds beside.
+    let closed = world.site_housing(site).expect("the site is live");
     let unit = order_a_lodging(&mut world, beside);
     step_until_level(&mut world, unit, beside, 1);
     assert!(
-        world.site_free_places(site).unwrap_or(0) > 0,
-        "a finished lodging left the site with no free place"
+        world.site_housing(site).expect("the site is live") > closed,
+        "a finished lodging did not raise the housing of the site beside it"
     );
-    for _ in 0..PATIENCE {
-        world.step(1).expect("the step must run");
-    }
+    // **The test drives the engine until the site grows, and not for a fixed
+    // count of ticks.** A count taken from a work value or from a birth
+    // chance would fail the next time somebody changes one of them, and the
+    // test would then measure the balance register.
+    //
+    // The site may have grown already. Growth runs in the tick that finished
+    // the level, so the loop reads the state before it steps again.
+    let grew = world.site_residents(site).expect("the site is live") > stopped
+        || step_until(&mut world, site, |world| {
+            world.site_residents(site).expect("the site is live") > stopped
+        });
     assert!(
-        world.site_residents(site).expect("the site is live") > stopped,
-        "a site whose housing rose did not grow again"
+        grew,
+        "a site whose housing rose did not grow again inside {GROWTH_PATIENCE} ticks"
     );
+}
+
+/// Writes a store that pays for every birth the housing of a site admits.
+///
+/// The quantity is the proposals one application makes, times the cost of
+/// one birth, times a margin for the share a site pays to hold its store.
+/// The test reads the cost from the world and states no quantity of its
+/// own.
+fn fill_the_store(world: &mut World, site: Entity) {
+    let cost = world.food_per_birth()[0];
+    let full = Fix32(cost.0.saturating_mul(STORE_MARGIN));
+    world
+        .set_settlement_store(site, GOOD, full)
+        .expect("the good is in the set");
+}
+
+/// Reports whether the store of a site pays for one birth.
+fn pays_for_a_birth(world: &World, site: Entity) -> bool {
+    let cost = world.food_per_birth()[0];
+    world
+        .settlements()
+        .store(site)
+        .and_then(|held| held.quantity(GOOD))
+        .is_some_and(|held| held.0 >= cost.0)
+}
+
+/// Steps the world until a state arrives, and reports whether it arrived.
+///
+/// The store of the site is refilled on every tick, so the store never
+/// decides what the caller reads.
+fn step_until(world: &mut World, site: Entity, reached: impl Fn(&World) -> bool) -> bool {
+    for _ in 0..GROWTH_PATIENCE {
+        fill_the_store(world, site);
+        world.step(1).expect("the step must run");
+        if reached(world) {
+            return true;
+        }
+    }
+    false
 }
 
 // ---------------------------------------------------------------------------

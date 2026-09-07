@@ -629,14 +629,45 @@ pub const LODGING_LEVEL_2_WORK: u32 = 432;
 /// The housing that one level of a lodging adds to the settlement on or beside
 /// its tile.
 ///
-/// The value is half the housing a founding gives, so two levels of one
-/// lodging double the people a founded site holds. It is a quantity of housing
-/// and not a count of people.[^1]
+/// **A finished lodging houses one tile of people.** The housing of a
+/// finished level reaches a settlement on its own tile or on one of the six
+/// tiles beside it, so a lodging stands on ground that could carry people of
+/// its own. One level is therefore the capacity of one tile of ordinary
+/// ground, divided by the levels a category holds. The value reads the
+/// terrain declaration and the level count rather than restating either, so
+/// no second declaration can disagree with them.[^1]
+///
+/// It is a quantity of housing and not a count of people.[^2]
 ///
 /// # References
 ///
-/// [^1]: Balance register, the lodging housing by level. `docs/reference/balance.md`
-pub const LODGING_LEVEL_HOUSING: u32 = crate::growth::FOUNDING_HOUSING_DEFAULT / 2;
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: Balance register, the lodging housing by level. `docs/reference/balance.md`
+pub const LODGING_LEVEL_HOUSING: u32 =
+    crate::terrain::ORDINARY_CAPACITY / UPGRADE_LEVEL_COUNT as u32;
+
+/// The tiles beside a settlement, which are the ground a lodging reaches it
+/// from.
+///
+/// A hex tile has six neighbours. The settlement stands on the seventh tile,
+/// and the founding already houses that one.
+const LODGING_RING: u32 = 6;
+
+/// The tiles that a fully built settlement houses people on.
+///
+/// The seat holds one tile of people at the founding, and each of the six
+/// tiles beside it holds one more when its lodging stands at its top level.
+const LODGED_TILES: u32 = 1 + LODGING_RING;
+
+// A settlement with a finished lodging on every tile beside it houses seven
+// tiles of people. The assertion states that ceiling, so a reader finds it in
+// the code and no document has to repeat it.
+const _: () = assert!(
+    crate::growth::FOUNDING_HOUSING_DEFAULT
+        + LODGING_RING * UPGRADE_LEVEL_COUNT as u32 * LODGING_LEVEL_HOUSING
+        == LODGED_TILES * crate::terrain::ORDINARY_CAPACITY,
+    "a settlement with a lodging on every tile beside it must house seven tiles of people"
+);
 
 /// The work that finishes a wall.[^1] [^2]
 ///

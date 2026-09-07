@@ -324,7 +324,7 @@ pub const SOME_WATER_CROSSING: u32 = 1;
 /// # References
 ///
 /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
-const ORDINARY_CAPACITY: u32 = 8;
+pub const ORDINARY_CAPACITY: u32 = 8;
 
 /// The number of units that stand on a tile that a unit crosses quickly.
 ///
