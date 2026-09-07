@@ -6,7 +6,7 @@ import argparse
 import sys
 
 from . import guide as guide_module
-from . import loop, render, session
+from . import loop, render, session, setrun, subjects
 from .client import BASE_URL, MODEL, ClientError
 
 
@@ -45,6 +45,31 @@ def _run(arguments: argparse.Namespace) -> int:
             f"{result.prompt_tokens + result.completion_tokens}"
         )
     return 0
+
+
+def _set(arguments: argparse.Namespace) -> int:
+    """Run the whole asset set for one style, and print a summary table."""
+    names = None
+    if arguments.subjects:
+        names = [item.strip() for item in arguments.subjects.split(",") if item.strip()]
+    try:
+        results = setrun.run_set(
+            style=arguments.style,
+            rounds=arguments.rounds,
+            variants=arguments.variants,
+            names=names,
+            exemplar_limit=arguments.exemplars,
+        )
+    except guide_module.GuideError as error:
+        print(f"guide error: {error}", file=sys.stderr)
+        return 2
+    except KeyError as error:
+        print(f"subject error: {error}", file=sys.stderr)
+        return 2
+
+    print()
+    print(setrun.format_table(arguments.style, results))
+    return 0 if any(item.best_score is not None for item in results) else 3
 
 
 def _guide(arguments: argparse.Namespace) -> int:
@@ -127,6 +152,35 @@ def main(argv: list[str] | None = None) -> int:
         help="how many exemplar images to attach to a critique",
     )
     run.set_defaults(handler=_run)
+
+    run_set = commands.add_parser(
+        "set", help="run the whole asset set for one style"
+    )
+    run_set.add_argument(
+        "--style",
+        required=True,
+        help="the style, which is also the asset type, for example 'cartoon'",
+    )
+    run_set.add_argument("--rounds", type=int, default=2, help="how many rounds")
+    run_set.add_argument(
+        "--variants", type=int, default=4, choices=[1, 2, 3, 4],
+        help="how many variants in each round",
+    )
+    run_set.add_argument(
+        "--subjects",
+        default=None,
+        help=(
+            "a comma separated subject list. The default is the whole set: "
+            + ", ".join(subjects.SUBJECT_ORDER)
+        ),
+    )
+    run_set.add_argument(
+        "--exemplars",
+        type=int,
+        default=guide_module.DEFAULT_EXEMPLAR_LIMIT,
+        help="how many exemplar images to attach to a critique",
+    )
+    run_set.set_defaults(handler=_set)
 
     commands.add_parser("guide", help="report what the guide holds").set_defaults(
         handler=_guide
