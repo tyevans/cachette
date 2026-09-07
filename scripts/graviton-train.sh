@@ -62,7 +62,9 @@
 #   [^1]: The benchmark launcher. `scripts/graviton-benchmark.sh`
 set -euo pipefail
 
-readonly REGION="${CACHETTE_TRAIN_REGION:-us-west-2}"
+# Not readonly: the stop path sources instance.env, which sets this
+# again for the run it names, and a readonly name makes that fail.
+REGION="${CACHETTE_TRAIN_REGION:-us-west-2}"
 # A 64 core Graviton. The evolution strategy plays one episode for each pair
 # of a candidate and a seed, and the episodes share nothing, so the work
 # divides over the cores. The throughput probe below measures whether it
@@ -147,12 +149,16 @@ total_generations=$((generations * strategies))
 
 # **The trainer does not write its weights after every generation.** It
 # writes them when a validation pass finds a centre better than the best it
-# has seen, and it validates every few generations. A run with no validation
-# seeds therefore writes nothing until a whole strategy ends, so stopping it
-# early throws the whole strategy away. This was measured rather than read.[^2]
+# has seen, and it validates every few generations.
 #
-# The launcher refuses that combination, because an early stop is the whole
-# point of being able to watch a run.
+# The trainer once wrote nothing until a whole strategy ended, so an early stop
+# threw the strategy away, and this launcher refused a run with no validation
+# seeds for that reason. That defect is fixed: the trainer now writes a resume
+# point every generation, unconditionally, beside the best validated centre.[^2]
+# An interruption costs one generation.
+#
+# The refusal is gone. Validation still decides which centre is kept as the
+# best, so a run with none keeps only its resume point, and the preview says so.
 #
 # References
 #   [^2]: Findings register, FND-625. `docs/FINDINGS.md`
@@ -161,11 +167,7 @@ validation="${validation:-6}"
 validate_every="$(printf '%s' "$train_args" \
     | sed -n 's/.*--validate-every \([0-9]*\).*/\1/p')"
 validate_every="${validate_every:-3}"
-if [ "$validation" -lt 1 ]; then
-    die "The trainer arguments set --validation 0, so it would write no weights
-until a whole strategy finished. Stopping the run early would then lose it.
-Set --validation to at least one, or accept that the run cannot be stopped."
-fi
+
 
 # ------------------------------------------------------------------ the price
 
@@ -435,10 +437,11 @@ cat >&2 <<PLAN
   The cap is the bound, not the estimate. The run stops when the trainer
   finishes, when the search stops, or at the cap, whichever comes first.
 
-  Stopping early keeps the weights, from generation $validate_every onward. The
-  trainer validates every $validate_every generations and writes the centre only when
-  it improved, so a stop before then keeps nothing for that strategy.
-  A spot instance can be taken back at any time, and the same rule holds.
+  Stopping early keeps the weights. The trainer writes a resume point every
+  generation, so an interruption costs one generation and never a strategy.
+  It validates every $validate_every generations and keeps the best centre
+  beside that. A spot instance can be taken back at any time, and the same
+  rule holds.
 
 PLAN
 

@@ -1,0 +1,9 @@
+training seeds 128, validation seeds [20000, 20001, 20002, 20003, 20004, 20005], holdout seeds 24
+
+=== controller baseline ===
+  controller {'return': -475.7458333333332, 'episodes': 24.0, 'held_tiles': 242.54166666666666, 'seats_held': 1.0, 'live_units': 5.583333333333333, 'population': 5.583333333333333, 'store_total': 7564212.583333333, 'best_renown': 473088.0, 'wonder_progress': 357.5, 'won': 0.375, 'lost': 0.625, 'drawn': 0.0, 'unresolved': 0.0, 'end_tick': 1263.3333333333333}
+
+=== conquer (linear) ===
+  conquer generation  0 mean   -1594.6 best    -638.9 spread   1353.5 won  0.10 valid - [154s]
+  conquer generation  1 mean   -1738.3 best    -652.7 spread   1343.2 won  0.06 valid   -1327.4 [288s]
+  conquer generation  2 mean   -1643.9 best    -634.3 spread   1350.7 won  0.08 valid - [419s]
