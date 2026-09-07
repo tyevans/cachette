@@ -346,13 +346,13 @@ impl WeatherScale {
     /// `SPEED_CEILING / SEND_DENOMINATOR`. A solve runs `transport_passes` of
     /// them, so a solve carries air that many times as far.
     ///
-    /// A cell fills its air from empty at `LIFT_DROPS` on each tick that it
-    /// lifts, and it stops at `AIR_SATURATION`. So a mass forms in
-    /// `AIR_SATURATION / LIFT_DROPS` ticks, rounded up. This is the time for
-    /// a parcel that lifts on every tick, which is the parcel that crosses a
-    /// run of open sea. A single cell lifts less often than that, and the
-    /// measurement in the commit body says what the margin then leaves
-    /// undone.
+    /// A sea cell lifts into the room below its own capacity, and it takes
+    /// `LIFT_OF_ROOM_NUMERATOR` of `LIFT_OF_ROOM_DENOMINATOR` of that room on
+    /// the frames it lifts, which is one frame in `LIFT_PERIOD`. So a mass
+    /// forms in the frames one lift needs, times the lifts that fill the
+    /// room. This is the time for a parcel that crosses a run of open sea. A
+    /// single cell lifts less often than that, and the measurement in the
+    /// commit body says what the margin then leaves undone.
     ///
     /// The margin is the product of the two, rounded up to whole cells.
     ///
@@ -372,8 +372,13 @@ impl WeatherScale {
     /// [^1]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
     #[must_use]
     pub const fn margin_cells(self) -> u32 {
-        // The ticks a cell needs to fill its air from empty, rounded up.
-        let forming = (AIR_SATURATION.0 + LIFT_DROPS - 1) / LIFT_DROPS;
+        // The ticks a cell needs to fill its air from empty, rounded up. The
+        // lift takes a share of the room each time, so the lifts that fill it
+        // are the denominator over the numerator, and each lift waits a
+        // period.
+        let lifts = (LIFT_OF_ROOM_DENOMINATOR + LIFT_OF_ROOM_NUMERATOR - 1)
+            / LIFT_OF_ROOM_NUMERATOR;
+        let forming = lifts * LIFT_PERIOD as i64;
         let reach = (self.transport_passes() as i64) * (SPEED_CEILING as i64) * forming;
         ((reach + SEND_DENOMINATOR - 1) / SEND_DENOMINATOR) as u32
     }
