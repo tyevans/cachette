@@ -57,8 +57,14 @@ FACTIONS = 3
 RING_PARTS = 24
 
 # The window these tests draw into.
+#
+# **The frame must be tall enough for the disc and the title block.** The
+# interface keeps a card in the lower left at every moment, and the disc sits
+# in the upper right. In a frame shorter than this the two meet, the card goes
+# on top of the rim, and a test that reads the rim then reads the card. The
+# smallest window a watcher can open is far taller than this.
 WINDOW_WIDTH = 480
-WINDOW_HEIGHT = 360
+WINDOW_HEIGHT = 480
 
 
 def build() -> Demo:
@@ -507,8 +513,17 @@ def test_the_camera_holds_a_minimap_of_its_own() -> None:
     demo.advance()
     first = corner(demo)
     fresh = Minimap()
+    # **The frame under the disc must be the same frame.** The disc keeps a
+    # little of it, so a second drawing at another speed or another phase
+    # changes pixels inside the disc. The frame the demonstration drew took
+    # both from the clock, so this takes them from the clock as well.
     demo.world.draw(
-        demo.camera, demo.surface.width, demo.surface.height, demo.surface.pixels
+        demo.camera,
+        demo.surface.width,
+        demo.surface.height,
+        demo.surface.pixels,
+        phase=demo.clock.phase,
+        speed_milli=demo.clock.speed_milli,
     )
     fresh.paint(demo.world, demo.camera, demo.surface)
     assert np.array_equal(first, corner(demo))

@@ -12,14 +12,20 @@ of verb numbers.
 from __future__ import annotations
 
 from collections import Counter
+from typing import TYPE_CHECKING
 
 import numpy as np
 
 from .env import Env, EnvConfig, VectorEnv
 from .reward import Weighting
 
+if TYPE_CHECKING:
+    # The shape of the dictionary the engine returns. It lives in the stub
+    # beside the compiled module, so importing it at run time would fail.
+    from cachette._core import ActionSchema
 
-def verb_of(schema: dict, action: int) -> str:
+
+def verb_of(schema: ActionSchema, action: int) -> str:
     """Name the verb of one action integer, through the schema."""
     for row in schema["verbs"]:
         if row["first"] <= action < row["first"] + row["rows"]:

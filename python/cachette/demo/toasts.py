@@ -268,12 +268,17 @@ class Toasts:
             if now - when < max(LIFETIME_SECONDS, SAME_AGAIN_SECONDS)
         }
 
-    def paint(self, surface: Surface, now: float) -> int:
+    def paint(self, surface: Surface, now: float, foot: int = FOOT_MARGIN) -> int:
         """Paint the lines over the frame, and give back how many were drawn.
 
         The lines sit at the foot of the frame, in the middle, with the newest
         at the bottom. The corners of the window hold the cards of the deck,
         and the middle of the foot holds none of them.
+
+        The foot is how many rows at the bottom of the frame the lines must
+        keep clear. **The interface holds a card in the lower left**, and it
+        is wider than the corner a card of the deck takes, so the caller says
+        what to clear rather than this holding a second copy of that height.
         """
         self.forget_old(now)
         if not self._shown:
@@ -286,7 +291,7 @@ class Toasts:
                 continue
             wide = text_width(toast.text, SCALE) + PADDING * 2
             left = (surface.width - wide) // 2
-            top = surface.height - FOOT_MARGIN - tall - above * (tall + LINE_GAP)
+            top = surface.height - foot - tall - above * (tall + LINE_GAP)
             paint_block(
                 surface, left, top, wide, tall, BACKING_COLOUR, BACKING_WEIGHT * weight
             )

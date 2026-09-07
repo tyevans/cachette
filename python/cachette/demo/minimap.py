@@ -35,11 +35,13 @@ decision D1.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 import numpy as np
 
 from cachette import Camera, faction_colours
+from cachette.demo.page import INK
+from cachette.demo.page import PAPER as PAGE_PAPER
 
 if TYPE_CHECKING:
     from cachette import World
@@ -48,10 +50,14 @@ if TYPE_CHECKING:
 # How wide the disc is, in pixels.
 #
 # **A minimap that shows everything shows nothing.** At this size one level 1
-# block covers about twenty pixels in the demonstration world, which carries a
+# block covers about thirty pixels in the demonstration world, which carries a
 # coast and a slope and carries no detail below that. The layers stop at
 # three for the same reason.
-DIAMETER = 168
+#
+# The disc was 168 pixels across and a watcher could not read the holders on
+# it. Every number that shapes the disc derives from this one, and the stride
+# of the coarse grid divides it, so the size is the only edit the change needs.
+DIAMETER = 252
 
 # How far the disc sits from the top right corner of the window, in pixels.
 #
@@ -139,6 +145,33 @@ WATER_COLOUR = 0x14324F
 LOW_COLOUR = 0x3C6B40
 HIGH_COLOUR = 0xD8CCA6
 
+# The same three colours for a page of ink on paper.
+#
+# **The disc belongs to the drawing it sits on.** The sketch draws the world
+# as ink on one paper, and a polished instrument in saturated colour over that
+# page reads as a widget from another program. On paper the water is a pale
+# wash, the low ground is near the paper itself, and the high ground is the
+# ground the pencil worked hardest.
+#
+# The faction colours are not repeated here. The engine states them, the
+# sketch washes the ground with them, and the pips take the same table.
+PAPER_WATER_COLOUR = 0xB9CAD8
+PAPER_LOW_COLOUR = 0xEBE3D1
+PAPER_HIGH_COLOUR = 0x9C917C
+PAPER_OUTSIDE_COLOUR = 0xD9D1BF
+
+# The rim and the outline of the view are drawn in the ink of the page, and
+# the page declares it. Nothing here holds a second copy of that colour.
+PAPER_VIEW_COLOUR = INK
+PAPER_INK = INK
+
+# How much ink the drawn rim of the paper disc takes at its edges.
+#
+# The rim is two rules with paper between them. A drawn instrument on a page
+# has an edge and no shine, and two rules give it that edge.
+PAPER_RIM_INK = 0.85
+PAPER_RIM_INNER = 0.34
+
 # The colour of the outline that marks where the camera is looking.
 VIEW_COLOUR = 0xF2F2F2
 
@@ -181,6 +214,37 @@ STRIDE = 4
 # names the coast. Half is the value that puts the coast where a watcher of
 # the main map sees it.
 WATER_SHARE = 0.5
+
+
+class Palette(NamedTuple):
+    """The colours one disc is drawn in.
+
+    Two palettes exist. One belongs to the flat map the engine draws, and one
+    belongs to the page of ink on paper the sketch draws. **The palette
+    crosses as one value**, so a caller cannot take the water of one and the
+    rim of the other.
+    """
+
+    water: int
+    low: int
+    high: int
+    view: int
+    outside: int
+    paper: bool
+
+
+# The palette of the flat map, and the palette of the drawn page.
+SCREEN = Palette(
+    WATER_COLOUR, LOW_COLOUR, HIGH_COLOUR, VIEW_COLOUR, OUTSIDE_COLOUR, False
+)
+PAPER = Palette(
+    PAPER_WATER_COLOUR,
+    PAPER_LOW_COLOUR,
+    PAPER_HIGH_COLOUR,
+    PAPER_VIEW_COLOUR,
+    PAPER_OUTSIDE_COLOUR,
+    True,
+)
 
 
 def _block_edge(world: World) -> int:
@@ -367,11 +431,27 @@ class Minimap:
     it last read and how old that reading is, and nothing else.
     """
 
-    __slots__ = ("_age", "_colour", "_key", "_summary", "_turn", "_weight", "visible")
+    __slots__ = (
+        "_age",
+        "_colour",
+        "_key",
+        "_summary",
+        "_turn",
+        "_weight",
+        "palette",
+        "visible",
+    )
 
-    def __init__(self, visible: bool = True) -> None:
-        """Build a minimap that has read nothing yet."""
+    def __init__(self, visible: bool = True, palette: Palette = SCREEN) -> None:
+        """Build a minimap that has read nothing yet.
+
+        The palette says which page the disc belongs to. A caller that swaps
+        the renderer swaps this, and the disc is built again on the next
+        frame because the palette is part of what the built disc was built
+        for.
+        """
         self.visible = visible
+        self.palette = palette
         self._summary: Summary | None = None
         self._age = 0
         # Which reading of the lattice the built disc came from. A number and
@@ -427,9 +507,16 @@ class Minimap:
         summary = self.summary(world)
         wide, zoom = self._window(world, camera, surface.width, surface.height)
         seen = _corners(camera, surface.width, surface.height)
-        key = (self._turn, _corners(wide, DIAMETER, DIAMETER).tobytes(), seen.tobytes())
+        key = (
+            self._turn,
+            self.palette,
+            _corners(wide, DIAMETER, DIAMETER).tobytes(),
+            seen.tobytes(),
+        )
         if key != self._key or self._colour is None or self._weight is None:
-            self._colour, self._weight = _build(world, summary, wide, zoom, seen)
+            self._colour, self._weight = _build(
+                world, summary, wide, zoom, seen, self.palette
+            )
             self._key = key
         left = surface.width - MARGIN - DIAMETER
         _mix(surface, left, MARGIN, self._colour, self._weight)
@@ -473,6 +560,7 @@ def _build(
     wide: Camera,
     zoom: float,
     seen: np.ndarray,
+    palette: Palette = SCREEN,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Build the colour of every pixel of the disc, and how much reaches.
 
@@ -488,11 +576,14 @@ def _build(
     rows, columns = _grid()
     q, r, step = _address_field(wide, columns + 0.5, rows + 0.5, zoom)
     coarse = _address_field(wide, *_coarse_grid(), zoom)
-    colour = _paint_layers(world, summary, q, r, coarse[0], coarse[1], step)
-    _outline(colour, seen, q, r)
+    colour = _paint_layers(world, summary, q, r, coarse[0], coarse[1], step, palette)
+    _outline(colour, seen, q, r, palette)
     # The rim goes on last, so it covers the map and the camera outline. A rim
     # that the outline crossed would read as a broken ring.
-    _bezel(colour, rows, columns)
+    if palette.paper:
+        _paper_bezel(colour, rows, columns)
+    else:
+        _bezel(colour, rows, columns)
     # The frame holds blue, green and red in that order, and the layers give
     # red, green and blue in that order.
     packed = np.clip(colour[..., ::-1] * 255.0, 0.0, 255.0).astype(np.uint16)
@@ -649,6 +740,7 @@ def _paint_layers(
     coarse_q: np.ndarray,
     coarse_r: np.ndarray,
     step: np.ndarray,
+    palette: Palette = SCREEN,
 ) -> np.ndarray:
     """Mix the three layers of the summary into one colour for every pixel.
 
@@ -671,9 +763,9 @@ def _paint_layers(
     holder = _nearest(summary.holder, summary, coarse_q, coarse_r)
     height = layers[..., 1:2]
     wet = np.clip((layers[..., 0] - WATER_SHARE) * 6.0 + 0.5, 0.0, 1.0)[..., None]
-    low = _flat(LOW_COLOUR)
-    ground = (low + height * (_flat(HIGH_COLOUR) - low)) * (1.0 - wet) + _flat(
-        WATER_COLOUR
+    low = _flat(palette.low)
+    ground = (low + height * (_flat(palette.high) - low)) * (1.0 - wet) + _flat(
+        palette.water
     ) * wet
     tint = summary.table[np.where(holder == NOBODY, summary.table.shape[0] - 1, holder)]
     wash = np.where(holder == NOBODY, 0.0, layers[..., 2])[..., None] * (1.0 - wet)
@@ -689,7 +781,7 @@ def _paint_layers(
     outside = ((q < 0.0) | (r < 0.0) | (q >= world.width) | (r >= world.height))[
         ..., None
     ]
-    return np.where(outside, _flat(OUTSIDE_COLOUR), painted)
+    return np.where(outside, _flat(palette.outside), painted)
 
 
 def _pips(
@@ -728,7 +820,11 @@ def _pips(
 
 
 def _outline(
-    colour: np.ndarray, seen: np.ndarray, q: np.ndarray, r: np.ndarray
+    colour: np.ndarray,
+    seen: np.ndarray,
+    q: np.ndarray,
+    r: np.ndarray,
+    palette: Palette = SCREEN,
 ) -> None:
     """Draw the edge of what the window shows onto the disc.
 
@@ -767,7 +863,7 @@ def _outline(
         return
     for at, shift in enumerate((16, 8, 0)):
         channel = colour[..., at]
-        colour[..., at] = np.where(near, _channel(VIEW_COLOUR, shift), channel)
+        colour[..., at] = np.where(near, _channel(palette.view, shift), channel)
 
 
 def _polar(
@@ -841,6 +937,31 @@ def _bezel(colour: np.ndarray, rows: np.ndarray, columns: np.ndarray) -> None:
     on_rim = away >= inner
     for at, channel in enumerate(channels):
         colour[..., at] = np.where(on_rim, channel, colour[..., at])
+
+
+def _paper_bezel(colour: np.ndarray, rows: np.ndarray, columns: np.ndarray) -> None:
+    """Draw the rim of the disc as ink on paper, in place.
+
+    **A drawn instrument has an edge and no shine.** The polished rim of the
+    flat map reads as a widget over a pencil drawing, so on paper the rim is
+    the paper itself between two ink rules. The outer rule is the heavier of
+    the two, in the way a person inks the outside of a circle first.
+
+    The colour holds red, green and blue in that order, each from zero to one.
+    """
+    away, _, _ = _polar(rows, columns)
+    inner = 1.0 - BEZEL_SHARE
+    band = np.clip((away - inner) / BEZEL_SHARE, 0.0, 1.0)
+    paper = _flat(PAGE_PAPER)
+    ink = _flat(PAPER_INK)
+    # Two rules across the rim: a heavy one at the outer edge and a light one
+    # at the inner edge, with paper between them.
+    outer = np.exp(-(((band - 0.90) / 0.13) ** 2)) * PAPER_RIM_INK
+    edge = np.exp(-(((band - 0.06) / 0.10) ** 2)) * PAPER_RIM_INNER
+    weight = np.clip(outer + edge, 0.0, 1.0)[..., None]
+    rim = paper * (1.0 - weight) + ink * weight
+    on_rim = (away >= inner)[..., None]
+    colour[...] = np.where(on_rim, rim, colour)
 
 
 def _fade(rows: np.ndarray, columns: np.ndarray) -> np.ndarray:

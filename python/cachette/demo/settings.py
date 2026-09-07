@@ -106,18 +106,27 @@ class Video:
     open window.
     """
 
-    __slots__ = ("_size", "fullscreen", "vsync")
+    __slots__ = ("_size", "fullscreen", "sketch", "vsync")
 
     def __init__(
         self,
         size: int = OPENING_SIZE,
         fullscreen: bool = False,
         vsync: bool = True,
+        sketch: bool = True,
     ) -> None:
-        """Build the video settings a run opens with."""
+        """Build the video settings a run opens with.
+
+        **The sketch is the renderer a run opens on.** The engine renderer
+        stays, because it is the reference the sketch is read against and
+        because a machine that cannot draw the sketch must still show the
+        world. A watcher who chose it keeps it, because this setting is
+        written to the file with the rest.
+        """
         self._size = self._held(size)
         self.fullscreen = fullscreen
         self.vsync = vsync
+        self.sketch = sketch
 
     @staticmethod
     def _held(size: int) -> int:
@@ -173,6 +182,7 @@ class Video:
             "size": self._size,
             "fullscreen": self.fullscreen,
             "vsync": self.vsync,
+            "sketch": self.sketch,
         }
 
     @classmethod
@@ -190,6 +200,7 @@ class Video:
             size=_whole(state.get("size"), OPENING_SIZE),
             fullscreen=_yes_or_no(state.get("fullscreen"), False),
             vsync=_yes_or_no(state.get("vsync"), True),
+            sketch=_yes_or_no(state.get("sketch"), True),
         )
 
     def rows(self) -> Iterator[tuple[str, str]]:
@@ -201,6 +212,7 @@ class Video:
         yield ("window size", f"{width} x {height}")
         yield ("fullscreen", "on" if self.fullscreen else "off")
         yield ("vertical sync", "on" if self.vsync else "off")
+        yield ("renderer", "sketch" if self.sketch else "engine")
 
 
 class Settings:
