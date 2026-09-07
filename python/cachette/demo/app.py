@@ -1032,6 +1032,14 @@ def main(argv: list[str] | None = None) -> int:
             # the machine that gives no context must say so before the run.
             if isinstance(demo.renderer, GlSketch) and not opens_window:
                 demo.renderer.device  # noqa: B018
+            # **The sketch draws the whole world, so it opens on the whole
+            # world.** The engine says which size of tile fits the world in
+            # the frame. The camera then magnifies the page rather than
+            # choosing how much of it is drawn, so a view that opened part
+            # way in would hide the map the watcher asked to see.
+            demo.camera = Camera.fitting(
+                demo.world, demo.surface.width, demo.surface.height
+            )
         except BoundaryGap as gap:
             print(f"the sketch renderer cannot run: {gap}")
             return 2

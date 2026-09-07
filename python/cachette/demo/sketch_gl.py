@@ -200,19 +200,18 @@ class Page:
     ground.
     """
 
-    __slots__ = ("box", "sample", "shape", "stand", "stood")
+    __slots__ = ("box", "shape", "stand", "stood")
 
     stood: Projection
     shape: tuple[int, int]
-    stand: tuple[float, float]
+    stand: tuple[float, float, float]
     box: tuple[int, int, int, int]
-    sample: tuple[np.ndarray, np.ndarray] | None
 
     def __init__(
         self,
         stood: Projection,
         shape: tuple[int, int],
-        stand: tuple[float, float],
+        stand: tuple[float, float, float],
         box: tuple[int, int, int, int],
     ) -> None:
         """Record the projection, the frame, the angles and the part in use."""
@@ -220,9 +219,6 @@ class Page:
         self.shape = shape
         self.stand = stand
         self.box = box
-        # Where the engine drew each tile on its own flat map. It is built
-        # only when a wash needs it.
-        self.sample = None
 
     @property
     def window(self) -> tuple[int, int, int, int]:
@@ -320,7 +316,8 @@ class GlSketch(Sketch):
         pass draws it against these numbers.
         """
         window = self._window(camera, width, height)
-        stand = (self.view.turn, self.view.lean)
+        detail = self.detail_of(camera, width, height)
+        stand = (self.view.turn, self.view.lean, float(detail))
         held = self._held
         if (
             held is not None
@@ -329,7 +326,7 @@ class GlSketch(Sketch):
             and held.stand == stand
         ):
             return held
-        stood = self.projection(window, width, height)
+        stood = self.projection(window, width, height, detail)
         built = Page(stood, (height, width), stand, self.box_of(stood))
         self._held = built
         return built
@@ -521,13 +518,13 @@ class GlSketch(Sketch):
         plain = ink._channels(bare, width, height)
         painted = ink._channels(tinted, width, height)
         flow = self._sampled(
-            page, np.abs(painted - plain).max(axis=-1) / 255.0, camera, width, height
+            np.abs(painted - plain).max(axis=-1) / 255.0, camera, width, height
         )
         if not flow.any():
             return False
         hue = np.stack(
             [
-                self._sampled(page, painted[..., band], camera, width, height)
+                self._sampled(painted[..., band], camera, width, height)
                 for band in range(3)
             ],
             axis=-1,
@@ -537,7 +534,7 @@ class GlSketch(Sketch):
         return True
 
     def _sampled(
-        self, page: Page, frame: np.ndarray, camera: Camera, width: int, height: int
+        self, frame: np.ndarray, camera: Camera, width: int, height: int
     ) -> np.ndarray:
         """Read a field the engine painted on the flat map, tile by tile.
 
@@ -545,29 +542,14 @@ class GlSketch(Sketch):
         tiles in another place, so the reading finds where the engine drew
         each tile and then gives that value for that tile.
 
-        **The engine answers where a tile is.** The pass asks it over a coarse
-        grid of pixels and takes the middle of the pixels that named each
-        tile, so this module holds no layout of its own for the flat map.
+        **The array renderer answers where each tile is, and this asks it.**
+        One pass holds that answer, against the camera and the frame that
+        produced it, so the two renderers cannot read a wash at two places.
+        A tile that the frame does not show carries no value at all.
         """
-        rows, columns = self._world.height, self._world.width
-        if page.sample is None:
-            found_x = np.zeros((rows, columns), dtype=np.int64)
-            found_y = np.zeros((rows, columns), dtype=np.int64)
-            counted = np.zeros((rows, columns), dtype=np.int64)
-            for y in range(0, height, ink.SAMPLE_STEP):
-                for x in range(0, width, ink.SAMPLE_STEP):
-                    tile_q, tile_r = camera.tile_at(float(x), float(y))
-                    if 0 <= tile_q < columns and 0 <= tile_r < rows:
-                        found_x[tile_r, tile_q] += x
-                        found_y[tile_r, tile_q] += y
-                        counted[tile_r, tile_q] += 1
-            safe = np.clip(counted, 1, None)
-            page.sample = (
-                np.clip(found_x // safe, 0, width - 1).astype(np.int32),
-                np.clip(found_y // safe, 0, height - 1).astype(np.int32),
-            )
-        at_x, at_y = page.sample
-        whole: np.ndarray = frame[at_y, at_x]
+        at_x, at_y, seen = self.tile_pixels(camera, width, height)
+        read = frame[at_y, at_x]
+        whole: np.ndarray = np.where(seen, read, np.zeros((), dtype=read.dtype))
         return whole
 
     # ------------------------------------------------------------------
@@ -633,7 +615,7 @@ class GlSketch(Sketch):
         device.ensure("wash_settled", "r32f")
         device.ensure("wash_blurred", "rg32f", bands=2)
 
-        fit_w, fit_h = self._send_fit(page, width, height)
+        self._send_fit(page, camera, width, height)
         program = self._program(
             "composite", source.TONE + source.HATCH + source.COMPOSITE
         )
@@ -673,8 +655,7 @@ class GlSketch(Sketch):
         program["draws_wash"] = 1 if washes else 0
         program["cloud_step"] = max(int(page_cols * ink.CLOUD_SHADOW_STEP), 1)
         program["cloud_lift"] = int(stood.rise * ink.CLOUD_HEIGHT)
-        program["fit_size"] = (fit_w, fit_h)
-        program["fit_at"] = ((width - fit_w) // 2, (height - fit_h) // 2)
+        program["fit_size"] = (width, height)
         program.stop()
 
         device.run(program, width, height, "rgba8")
@@ -689,31 +670,21 @@ class GlSketch(Sketch):
         ).astype(np.uint32)
         return result
 
-    def _send_fit(self, page: Page, width: int, height: int) -> tuple[int, int]:
+    def _send_fit(self, page: Page, camera: Camera, width: int, height: int) -> None:
         """Say which point of the paper each pixel of the frame shows.
 
-        The paper is wider and shorter than the frame, because the turn
-        spreads the world across it. It is scaled to fit rather than cut, so a
-        watcher sees the whole world the camera covers.
+        The paper holds the whole world. The camera says which point of it the
+        middle of the frame shows and how far it is magnified, so a drag moves
+        the drawing and a zoom makes it larger.
 
         **Both renderers take this mapping from one rule.** The mapping is two
         short lists, so it crosses to the device whole rather than being
         worked out again for each pixel.
-
-        Gives back the size of the fitted paper in pixels.
         """
-        first_row, last_row, first_col, last_col = page.box
-        rows = last_row - first_row
-        cols = last_col - first_col
-        scale = min(width / cols, height / rows)
-        fit_w = max(int(cols * scale), 1)
-        fit_h = max(int(rows * scale), 1)
-        take_x = np.clip((np.arange(fit_w) / scale).astype(np.int32), 0, cols - 1)
-        take_y = np.clip((np.arange(fit_h) / scale).astype(np.int32), 0, rows - 1)
+        take_x, take_y = self.fit_lists(page.stood, page.box, camera, width, height)
         device = self.device
-        device.upload("fit_x", (take_x + first_col)[None, :], "r32i")
-        device.upload("fit_y", (take_y + first_row)[None, :], "r32i")
-        return fit_w, fit_h
+        device.upload("fit_x", take_x[None, :], "r32i")
+        device.upload("fit_y", take_y[None, :], "r32i")
 
     def _blur_wash(self, page_cols: int, page_rows: int) -> None:
         """Blur the settled pigment at both reaches, down the paper and across.

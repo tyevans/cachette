@@ -82,10 +82,10 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from cachette.demo.view import View
+from cachette.demo.view import TINY, View
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     import numpy.typing as npt
 
@@ -138,11 +138,13 @@ ROW_PITCH = 0.8660254
 # needs room at both ends, and this is the room it keeps.
 LIFT_MARGIN = 4
 
-# How many tiles of margin the window takes around the tiles the camera names.
+# How much finer than the frame the page may be drawn.
 #
-# The rows of a hex grid interlock, so a rectangle of pixels covers a slanted
-# band of tiles. The margin keeps the corners of that band inside the window.
-WINDOW_MARGIN = 3
+# The page holds the whole world, and the camera magnifies it. A page drawn at
+# the size of the frame goes soft as soon as a watcher zooms in, so the page is
+# drawn finer as the camera zooms. A page costs the square of this, so it stops
+# here and a closer view softens.
+PAGE_DETAIL_CAP = 2
 
 # The spacing of the contour hatch, in shares of the full height range.
 #
@@ -285,6 +287,32 @@ def _grown(mask: np.ndarray, radius: int) -> np.ndarray:
     return wide
 
 
+def _edge_below(
+    holds: Callable[[float], bool],
+    place: float,
+    pitch: float,
+    halvings: int = 24,
+) -> float:
+    """Say how far a place stands past the edge below it, in shares of a pitch.
+
+    The caller gives a test that answers whether a place still lies in the
+    same tile as the place it asks about. The edge below stands within one
+    pitch, and halving the range finds it.
+
+    **This asks the engine where the edge is.** A module that worked the edge
+    out from the size of a tile would hold a second copy of a layout the
+    engine owns, and the two would part company without anything failing.
+    """
+    low, high = place - pitch, place
+    for _ in range(halvings):
+        middle = (low + high) / 2.0
+        if holds(middle):
+            high = middle
+        else:
+            low = middle
+    return min(max((place - high) / max(pitch, TINY), 0.0), 1.0)
+
+
 class Projection:
     """Where each tile of the window falls on the page, before the lift.
 
@@ -407,7 +435,6 @@ class Ground:
         "page_x",
         "page_y",
         "rise",
-        "sample",
         "shape",
         "sheet",
         "stand",
@@ -422,8 +449,7 @@ class Ground:
     # put on the page.
     window: tuple[int, int, int, int]
     shape: tuple[int, int]
-    stand: tuple[float, float]
-    sample: tuple[np.ndarray, np.ndarray] | None
+    stand: tuple[float, float, float]
     held: np.ndarray
     take: np.ndarray
     drawn: np.ndarray
@@ -448,15 +474,12 @@ class Ground:
         self,
         window: tuple[int, int, int, int],
         shape: tuple[int, int],
-        stand: tuple[float, float],
+        stand: tuple[float, float, float],
     ) -> None:
         """Record which window, which size and which angles built this page."""
         self.window = window
         self.shape = shape
         self.stand = stand
-        # Where the engine drew each tile of the window on its own flat map.
-        # It is built only when a wash needs it.
-        self.sample = None
 
 
 class Sketch:
@@ -477,6 +500,8 @@ class Sketch:
         "_level",
         "_raised",
         "_relief",
+        "_sample",
+        "_sample_at",
         "_scratch",
         "_sky",
         "_water",
@@ -562,6 +587,10 @@ class Sketch:
         self._scratch: dict[str, npt.NDArray[np.uint32]] = {}
         self._grain: np.ndarray | None = None
         self._grain_size = (0, 0)
+        # Where the engine drew each tile of the world on its own flat map,
+        # and the camera and frame that answer stands for.
+        self._sample: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+        self._sample_at: tuple[float, float, float, float, int, int] | None = None
 
     def window(self) -> tuple[int, int, int, int] | None:
         """Give back the window of tiles the last frame drew, or nothing.
@@ -619,7 +648,10 @@ class Sketch:
         page = self._draw(ground, overlay, camera, width, height)
         kept = self._panels(pixels, camera, width, height, overlay, phase)
         frame = pixels.reshape(height, width)
-        frame[...] = np.where(kept, frame, self._fit(page, ground.box, width, height))
+        stood = self.projection(ground.window, width, height, int(ground.stand[2]))
+        frame[...] = np.where(
+            kept, frame, self._fit(page, ground.box, stood, camera, width, height)
+        )
         return reading
 
     def _panels(
@@ -646,25 +678,102 @@ class Sketch:
     def _window(
         self, camera: Camera, width: int, height: int
     ) -> tuple[int, int, int, int]:
-        """Give back the tiles the camera covers, as a window of the world.
+        """Give back the tiles the page covers: every tile of the world.
 
-        **The engine answers which tile a pixel shows.** The rows of a hex
-        grid interlock, so a rectangle of pixels covers a slanted band of
-        tiles, and the corners of the frame therefore name the band. A margin
-        keeps the whole band inside the window.
+        **The page holds the whole world, and the camera does not choose
+        it.** A page cut to the tiles the camera covers made the camera pick
+        an extent rather than a view. Panning towards the edge of the world
+        then widened the extent, and the page drew the world smaller instead
+        of moving it, so a drag with the left button did the opposite of what
+        a hand expects.
+
+        The camera now moves the view of the page, and the extent is the
+        world.
         """
-        corners = [
-            camera.tile_at(float(x), float(y))
-            for x in (0.0, width / 2.0, width - 1.0)
-            for y in (0.0, height / 2.0, height - 1.0)
-        ]
-        columns = [place[0] for place in corners]
-        rows = [place[1] for place in corners]
-        first_q = max(min(columns) - WINDOW_MARGIN, 0)
-        last_q = min(max(columns) + WINDOW_MARGIN + 1, self._world.width)
-        first_r = max(min(rows) - WINDOW_MARGIN, 0)
-        last_r = min(max(rows) + WINDOW_MARGIN + 1, self._world.height)
-        return first_q, first_r, max(last_q, first_q + 1), max(last_r, first_r + 1)
+        del camera, width, height
+        return 0, 0, self._world.width, self._world.height
+
+    def detail_of(self, camera: Camera, width: int, height: int) -> int:
+        """Say how much finer than the frame the page is drawn.
+
+        The page holds the whole world and the camera magnifies it, so a page
+        drawn at the size of the frame goes soft as soon as a watcher zooms
+        in. The page is therefore drawn finer as the camera zooms, and the
+        cost of a page is the square of this, so it stops at a bound.
+        """
+        plain = self.projection(self._window(camera, width, height), width, height)
+        zoom = float(camera.tile_width) / max(plain.scale, TINY)
+        return int(min(max(round(zoom), 1), PAGE_DETAIL_CAP))
+
+    def page_middle(
+        self, stood: Projection, camera: Camera, width: int, height: int
+    ) -> tuple[float, float]:
+        """Say which point of the page the middle of the frame shows.
+
+        **The engine answers which tile stands at a pixel, and this asks it.**
+        The answer is a whole tile, and the page needs the place inside that
+        tile as well. The engine draws its flat map at a fixed number of
+        pixels for each column and each row, so the edge between two tiles
+        stands at a fixed place. This finds that edge by halving, which costs
+        a few dozen questions and states no layout of its own.
+        """
+        middle_x, middle_y = width / 2.0, height / 2.0
+        column, row = camera.tile_at(middle_x, middle_y)
+        into_x = _edge_below(
+            lambda place: camera.tile_at(place, middle_y)[0] == column,
+            middle_x,
+            float(camera.tile_width),
+        )
+        into_y = _edge_below(
+            lambda place: camera.tile_at(middle_x, place)[1] == row,
+            middle_y,
+            float(camera.tile_height),
+        )
+        tile_q = column + into_x
+        tile_r = row + into_y
+        at_column, at_row = stood.to_page(
+            np.array([tile_q], dtype=np.float64), np.array([tile_r], dtype=np.float64)
+        )
+        # The projection answers the flat page. The lift moves every point up
+        # by the height of the ground, and ground with no height stands this
+        # far down the lifted page.
+        return float(at_column[0]), float(at_row[0]) + stood.rise + LIFT_MARGIN
+
+    def fit_lists(
+        self,
+        stood: Projection,
+        box: tuple[int, int, int, int],
+        camera: Camera,
+        width: int,
+        height: int,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Say which point of the page each pixel of the frame shows.
+
+        The answer is one list for the columns of the frame and one for the
+        rows. A value below nought names a pixel the page does not reach, and
+        a caller draws bare paper there.
+
+        **Both renderers take this mapping from one rule.** A mapping worked
+        out twice is one value declared twice: the two divide by the same
+        scale at different widths, and near a boundary they land on
+        neighbouring points of a hatched page.
+        """
+        first_row, last_row, first_col, last_col = box
+        # **The page says how many of its points one tile covers, and the
+        # camera says how many pixels one tile covers.** The ratio is
+        # therefore how many pixels one point of the page covers, and a drag
+        # moves the drawing by the pixels the hand moved.
+        scale = max(float(camera.tile_width) / max(stood.scale, TINY), TINY)
+        middle_col, middle_row = self.page_middle(stood, camera, width, height)
+        take_x = np.floor(
+            middle_col + (np.arange(width) + 0.5 - width / 2.0) / scale
+        ).astype(np.int32)
+        take_y = np.floor(
+            middle_row + (np.arange(height) + 0.5 - height / 2.0) / scale
+        ).astype(np.int32)
+        take_x = np.where((take_x >= first_col) & (take_x < last_col), take_x, -1)
+        take_y = np.where((take_y >= first_row) & (take_y < last_row), take_y, -1)
+        return take_x, take_y
 
     def _for(self, camera: Camera, width: int, height: int) -> Ground:
         """Give back the page of the ground, building it if the view moved.
@@ -674,7 +783,8 @@ class Sketch:
         angles says nothing about another pair.
         """
         window = self._window(camera, width, height)
-        stand = (self.view.turn, self.view.lean)
+        detail = self.detail_of(camera, width, height)
+        stand = (self.view.turn, self.view.lean, float(detail))
         held = self._ground
         if (
             held is not None
@@ -692,7 +802,7 @@ class Sketch:
         window: tuple[int, int, int, int],
         width: int,
         height: int,
-        stand: tuple[float, float],
+        stand: tuple[float, float, float],
     ) -> Ground:
         """Turn the window of tiles into a page, and hatch the ground on it.
 
@@ -706,7 +816,7 @@ class Sketch:
         raised = self._raised[first_r:last_r, first_q:last_q]
         deep = self._deep[first_r:last_r, first_q:last_q]
 
-        stood = self.projection(window, width, height)
+        stood = self.projection(window, width, height, int(stand[2]))
         take, held = self._turn(stood)
         ground.held = held
         plan = np.where(held, raised.ravel()[take], 0.0).astype(np.float32)
@@ -761,7 +871,11 @@ class Sketch:
         return ground
 
     def projection(
-        self, window: tuple[int, int, int, int], width: int, height: int
+        self,
+        window: tuple[int, int, int, int],
+        width: int,
+        height: int,
+        detail: int = 1,
     ) -> Projection:
         """Give back where each tile of the window falls on the page.
 
@@ -771,7 +885,12 @@ class Sketch:
         and a lean of one half, which is an isometric drawing.
         """
         return Projection(
-            window, width, height, self.view.turn, self.view.lean, self._relief
+            window,
+            width * detail,
+            height * detail,
+            self.view.turn,
+            self.view.lean,
+            self._relief,
         )
 
     def box_of(self, stood: Projection) -> tuple[int, int, int, int]:
@@ -1094,6 +1213,60 @@ class Sketch:
         )
         return glazed
 
+    def tile_pixels(
+        self, camera: Camera, width: int, height: int
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Say where the engine drew each tile of the world on its flat map.
+
+        The answer is three arrays the size of the world: the column of the
+        frame, the row of the frame, and whether any pixel named that tile at
+        all. A tile the frame does not show carries a false flag, and a caller
+        must read no value for it.
+
+        **The engine answers where a tile is.** The pass asks it over a coarse
+        grid of pixels and takes the middle of the pixels that named each
+        tile, so this module holds no layout of its own for the flat map.
+
+        **The answer belongs to one camera and one frame, and nothing else.**
+        It is held against the numbers that produced it and built again when
+        one of them moves. An answer held against the window of tiles instead
+        would be reused at another camera that covers the same whole tiles,
+        and every tile would then take the colour of a neighbour.[^4]
+
+        [^4]: Findings register, FND-610. `docs/FINDINGS.md`
+        """
+        stands = (
+            camera.origin_x,
+            camera.origin_y,
+            camera.tile_width,
+            camera.tile_height,
+            width,
+            height,
+        )
+        held = self._sample
+        if held is not None and self._sample_at == stands:
+            return held
+        rows, columns = self._world.height, self._world.width
+        found_x = np.zeros((rows, columns), dtype=np.int64)
+        found_y = np.zeros((rows, columns), dtype=np.int64)
+        counted = np.zeros((rows, columns), dtype=np.int64)
+        for y in range(0, height, SAMPLE_STEP):
+            for x in range(0, width, SAMPLE_STEP):
+                tile_q, tile_r = camera.tile_at(float(x), float(y))
+                if 0 <= tile_q < columns and 0 <= tile_r < rows:
+                    found_x[tile_r, tile_q] += x
+                    found_y[tile_r, tile_q] += y
+                    counted[tile_r, tile_q] += 1
+        safe = np.clip(counted, 1, None)
+        built = (
+            np.clip(found_x // safe, 0, width - 1).astype(np.int32),
+            np.clip(found_y // safe, 0, height - 1).astype(np.int32),
+            counted > 0,
+        )
+        self._sample = built
+        self._sample_at = stands
+        return built
+
     def _by_tile(
         self, ground: Ground, frame: np.ndarray, camera: Camera, width: int, height: int
     ) -> np.ndarray:
@@ -1102,38 +1275,10 @@ class Sketch:
         The engine paints an overlay on its own map. The page shows the same
         tiles in another place, so the reading finds where the engine drew
         each tile and then puts the value where the page shows that tile.
-
-        **The engine answers where a tile is.** The pass asks it over a coarse
-        grid of pixels and takes the middle of the pixels that named each
-        tile, so this module holds no layout of its own for the flat map.
         """
-        first_q, first_r, last_q, last_r = ground.window
-        across = last_q - first_q
-        down = last_r - first_r
-        if ground.sample is None:
-            columns = np.arange(0, width, SAMPLE_STEP)
-            rows = np.arange(0, height, SAMPLE_STEP)
-            found_q = np.zeros((down, across), dtype=np.int64)
-            found_y = np.zeros((down, across), dtype=np.int64)
-            counted = np.zeros((down, across), dtype=np.int64)
-            for y in rows:
-                for x in columns:
-                    tile_q, tile_r = camera.tile_at(float(x), float(y))
-                    at_q = tile_q - first_q
-                    at_r = tile_r - first_r
-                    if 0 <= at_q < across and 0 <= at_r < down:
-                        found_q[at_r, at_q] += x
-                        found_y[at_r, at_q] += y
-                        counted[at_r, at_q] += 1
-            safe = np.clip(counted, 1, None)
-            ground.sample = (
-                np.clip(found_q // safe, 0, width - 1).astype(np.int32),
-                np.clip(found_y // safe, 0, height - 1).astype(np.int32),
-            )
-        at_x, at_y = ground.sample
-        window = frame[at_y, at_x]
-        whole = np.zeros((self._world.height, self._world.width), dtype=window.dtype)
-        whole[first_r:last_r, first_q:last_q] = window
+        at_x, at_y, seen = self.tile_pixels(camera, width, height)
+        read = frame[at_y, at_x]
+        whole = np.where(seen, read, np.zeros((), dtype=read.dtype))
         return self._gather(ground, whole)
 
     def _sky_over(self, page: np.ndarray, ground: Ground, rise: int) -> np.ndarray:
@@ -1210,27 +1355,23 @@ class Sketch:
         self,
         page: np.ndarray,
         box: tuple[int, int, int, int],
+        stood: Projection,
+        camera: Camera,
         width: int,
         height: int,
     ) -> npt.NDArray[np.uint32]:
-        """Put the page into the frame, whole, on paper, and pack the bytes.
+        """Put the page into the frame under the camera, and pack the bytes.
 
-        The page is wider and shorter than the frame it goes into, because the
-        turn spreads the world across the paper. It is scaled to fit rather
-        than cropped, so a watcher sees the whole world the camera covers.
+        The page holds the whole world. The camera says which point of the
+        page the middle of the frame shows and how far the page is magnified,
+        so a drag moves the drawing and a zoom makes it larger. A pixel the
+        page does not reach carries bare paper.
         """
-        first_row, last_row, first_col, last_col = box
-        page = page[first_row:last_row, first_col:last_col]
-        rows, cols = page.shape[:2]
-        scale = min(width / cols, height / rows)
-        fit_w = max(int(cols * scale), 1)
-        fit_h = max(int(rows * scale), 1)
-        take_x = np.clip((np.arange(fit_w) / scale).astype(np.int32), 0, cols - 1)
-        take_y = np.clip((np.arange(fit_h) / scale).astype(np.int32), 0, rows - 1)
+        take_x, take_y = self.fit_lists(stood, box, camera, width, height)
         frame = np.broadcast_to(PAPER * 0.98, (height, width, 3)).copy()
-        left = (width - fit_w) // 2
-        top = (height - fit_h) // 2
-        frame[top : top + fit_h, left : left + fit_w] = page[take_y][:, take_x]
+        inside = (take_y >= 0)[:, None] & (take_x >= 0)[None, :]
+        drawn = page[np.clip(take_y, 0, None)][:, np.clip(take_x, 0, None)]
+        frame = np.where(inside[..., None], drawn, frame)
         packed: Any = frame.astype(np.uint32)
         bytes_of: np.ndarray = (
             (packed[..., 0] << 16) | (packed[..., 1] << 8) | packed[..., 2]

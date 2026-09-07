@@ -279,7 +279,6 @@ uniform int draws_wash;
 uniform int cloud_step;
 uniform int cloud_lift;
 uniform ivec2 fit_size;
-uniform ivec2 fit_at;
 uniform isampler2D fit_x;
 uniform isampler2D fit_y;
 
@@ -362,9 +361,8 @@ vec3 shade(ivec2 at) {
 void main() {
     ivec2 pixel = ivec2(gl_FragCoord.xy);
     vec3 out_colour = PAPER * 0.98;
-    ivec2 inside = pixel - fit_at;
-    if (inside.x >= 0 && inside.x < fit_size.x
-        && inside.y >= 0 && inside.y < fit_size.y) {
+    if (pixel.x >= 0 && pixel.x < fit_size.x
+        && pixel.y >= 0 && pixel.y < fit_size.y) {
         // **The two lists say which point of the page each pixel shows.**
         // The array renderer builds them, and the shader reads them rather
         // than working the mapping out again. A mapping worked out twice is
@@ -372,11 +370,16 @@ void main() {
         // scale at different widths, and near a boundary they land on
         // neighbouring points. On a hatched page those two points are far
         // apart in colour, so the picture differs where nothing is wrong.
+        //
+        // A value below nought names a pixel the page does not reach, and
+        // that pixel carries bare paper.
         ivec2 source = ivec2(
-            texelFetch(fit_x, ivec2(inside.x, 0), 0).r,
-            texelFetch(fit_y, ivec2(inside.y, 0), 0).r
+            texelFetch(fit_x, ivec2(pixel.x, 0), 0).r,
+            texelFetch(fit_y, ivec2(pixel.y, 0), 0).r
         );
-        out_colour = shade(source);
+        if (source.x >= 0 && source.y >= 0) {
+            out_colour = shade(source);
+        }
     }
     // The array renderer packs the colour by cutting the fraction away, so
     // the shader writes the whole number it would have kept. A target of one
