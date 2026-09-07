@@ -604,3 +604,40 @@ fn the_set_verbs_count_what_the_arena_refuses() {
         1
     );
 }
+
+/// Every command the stage writes states whether its action column is an
+/// encoding, and the stage counts the ones that are not.
+///
+/// **The zero below is not the thing under test.** A stage that never wrote
+/// the column would report zero as well. The first assertion proves the
+/// stage wrote commands at all, and the encoding check proves the column
+/// separates a refused choice from the no-op row: a relation move against a
+/// faction the world does not hold gives nothing, and the no-op row is
+/// zero.[^1]
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[test]
+fn a_choice_the_table_cannot_express_is_counted_and_not_read_as_the_no_op() {
+    let mut world = World::new(config(3, 23)).expect("the extent describes a world");
+    seat(&mut world, 3);
+    world.step(THREADS).expect("the step runs");
+    let log = log_of(&world);
+    assert!(!log.is_empty(), "the stage must write commands");
+    assert!(
+        log.iter().all(|entry| entry.encoded == 1),
+        "the engine emits no choice the table cannot express"
+    );
+    assert_eq!(world.controller_unencodable(), 0);
+
+    // The one case that reaches the refusal: the faction position of the
+    // relation verb is bounded by the faction count of the world.
+    let schema = world.action_schema();
+    let outside = cachette_core::Choice::Relation(FactionId(3));
+    assert_eq!(outside.action(&schema), None);
+    let inside = cachette_core::Choice::Relation(FactionId(2));
+    assert!(inside.action(&schema).is_some());
+    // The refused choice and the no-op row are one integer without the
+    // encoded column, so a reader must not take the action column of a
+    // refused choice for a choice.
+    assert_eq!(schema.encode(Verb::NoOp, &[]), Some(0));
+}

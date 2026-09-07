@@ -206,7 +206,10 @@ fn a_learner_acts_by_one_integer_and_the_world_changes() {
     assert_eq!(row.action, action);
     assert_eq!(row.faction, FactionId(0));
     assert_eq!(row.applied, 1);
-    assert_eq!(row.padding, [0; 5]);
+    // The schema decoded the integer before the verb ran, so the row states
+    // that its action column is an encoding.
+    assert_eq!(row.encoded, 1);
+    assert_eq!(row.padding, [0; 4]);
     assert_eq!(
         schema.decode(row.action),
         Some((Verb::Gather, vec![1])),

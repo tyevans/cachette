@@ -15630,6 +15630,22 @@ impl World {
         self.controller.log()
     }
 
+    /// Returns how many choices of the last step the action table could not
+    /// express.
+    ///
+    /// **A choice the table refuses is counted and never dropped.** Its row
+    /// of the log states zero in the encoded column, and its action column
+    /// holds the no-op row. A caller that reads the action column alone
+    /// therefore reads a refused choice as a decision to do nothing.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn controller_unencodable(&self) -> u32 {
+        self.controller.unencodable()
+    }
+
     /// Returns how many relation moves the controller made through the verb
     /// on the tick the log holds.
     fn relation_moves_of_the_log(&self) -> i64 {
@@ -16965,14 +16981,22 @@ impl World {
             // field of either lives in a second log.[^14]
             //
             // [^14]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-            let action = choice.action(&schema).unwrap_or(0);
+            // **A choice the table cannot express is counted, not dropped.**
+            // The row states zero in its encoded column, and the stage keeps
+            // the count of the tick. A row that stated the no-op and nothing
+            // else would be read as a controller that chose to do
+            // nothing.[^15]
+            //
+            // [^15]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+            let encoded = choice.action(&schema);
             self.controller.push(ControllerCommand {
                 tick,
-                action,
+                action: encoded.unwrap_or(0),
                 sequence,
                 faction,
                 applied,
-                padding: [0; 5],
+                encoded: u8::from(encoded.is_some()),
+                padding: [0; 4],
             });
         }
     }
@@ -17805,7 +17829,10 @@ impl World {
             action,
             sequence: 0,
             applied: u8::from(applied),
-            padding: [0; 5],
+            // The schema decoded the integer above, so the column holds the
+            // action the caller named.
+            encoded: 1,
+            padding: [0; 4],
         });
         applied
     }

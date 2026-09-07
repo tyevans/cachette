@@ -51,7 +51,7 @@ from cachette._core import Batch, World
 from .reward import Reward, RewardStep, Weighting
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
     import numpy.typing as npt
 
@@ -75,6 +75,9 @@ FACTION_SCOPED_READERS: frozenset[str] = frozenset(
         "action_schema",
         # The legality answer holds only what the faction observes.
         "legal_actions",
+        # What the built-in controller did in one seat on the last tick. It
+        # answers for one faction and reads no other.
+        "controller_actions",
         # The verbs the faction may run. These write; they do not read out.
         "act",
         # The end of a game is a public fact, and it is recorded once.
@@ -310,7 +313,9 @@ class Env:
         """Whether the episode has ended, for any reason."""
         return self._terminated or self._truncated
 
-    def step(self, action: int) -> StepResult:
+    def step(
+        self, action: int, on_tick: Callable[[World], None] | None = None
+    ) -> StepResult:
         """Take one decision, run the world, and score the change.
 
         The environment applies the action, then runs the world for the
@@ -318,6 +323,13 @@ class Env:
         is not an error: the engine reports the refusal and the world runs
         anyway, in the way it runs for a controller whose choice fell
         through.
+
+        The tick reader runs once after each tick of the interval, at the
+        frame barrier. A caller that records what the built-in controller
+        did needs it, because the engine empties the command log at the
+        start of each tick. **The reader must not write the world.** It runs
+        between two ticks of one decision, and a write there would land in
+        the middle of a decision the caller thinks is one step.
         """
         world = self._require_world()
         if self._reward is None:  # pragma: no cover - reset builds both
@@ -334,6 +346,8 @@ class Env:
         )
         for _ in range(self._config.decision_interval):
             world.step(self._config.threads)
+            if on_tick is not None:
+                on_tick(world)
         self._decisions += 1
 
         reading = self._reward.read(world)
