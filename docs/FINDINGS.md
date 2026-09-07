@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-589**
+**Next number: FND-591**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -11087,6 +11087,55 @@ serves the product record that asks a developer to set what a settlement holds
 and to read the value back.[^F485G]
 
 
+### FND-589 — The economy was believed to deadlock on hunger, and the population never walks to the food
+
+**Believed.** A unit must be fed to deliver a load and hungry to fill one, so a
+world whose store starts empty can never begin: the units stay hungry, they
+never deliver, and the store stays empty. The dispatcher stated this as the
+likely cause of an economy that moves almost nothing.
+
+**True.** There is no deadlock. Measured in the demonstration world, 256 by 256,
+four factions, seed 0x0123456789abcdef, 300 ticks, two threads, on
+ty001-ubuntu (x86-64): the mean need holds between 23808 and 37012 of a full
+65536, and 151 of 166 units are fed at tick 300. The store cycles, because the
+production fills it and the ration draws it in the same tick. Hunger never pins
+to zero, so the term that drives the delivery row is not what blocks it.
+
+**What blocks it is that the population never travels.** The units occupy 22 to
+26 distinct tiles at a mean distance of 2 from their home site. They strip that
+ground in about ninety ticks and then stand on it. Every live unit holds a
+gather order every tick and the grant is zero, because no unit stands on
+remaining stock of the kind it ordered. The world still holds 53611 food on
+11631 tiles against 83 ever taken.
+
+**The cause has a shape this project has met before.** The exit field of an
+option answers at the level 1 pitch, and the stock of a tile is a level 0
+property. A unit standing on barren ground inside the cell that holds the most
+food is told that its cell is the right cell, and nothing tells it to step two
+tiles sideways. A field that answers at one pitch about a fact that lives at
+another is the same defect as a flow field that ran out inside its destination
+cell.[^F589A]
+
+**What follows.** The option rows are not at fault and must not be changed to
+compensate. The movement and steering of a unit toward stock is the subject.
+
+### FND-590 — The gather order of a unit is written in two places, and the comment that forbids it is in one of them
+
+**Believed.** A laden unit stops gathering, and that rule lives in the option
+row rather than in a second place that could disagree with it. The delivery row
+says so in its own doc comment.
+
+**True.** The choice pass clears the gather order when a unit takes a row that
+names no resource kind, and the faction controller then sets the order for every
+unit of the faction at the last stage of the same step. Measured over the run
+above: the units holding a gather order equal the live unit count at every tick,
+while the intent to forage is only 18 to 118. So the rule holds in a world with
+no controller and fails in every world that has one.
+
+**What follows.** This is the recurring shape of one value with two declaration
+sites and no check that fails when they disagree. The comment states the rule
+the code does not keep, which is worse than no comment.[^F590A]
+
 ## References
 
 [^F443A]: Review of backlog item 0390, section 5. `docs/reviews/0390-the-fallen-log.md`
@@ -11094,6 +11143,8 @@ and to read the value back.[^F485G]
 
 [^F470A]: PRD-0015, a unit has parents and children. `docs/product/accepted/prd-0015-a-unit-has-parents-and-children.md`
 [^F470B]: PRD-0016, somebody is in charge. `docs/product/accepted/prd-0016-somebody-is-in-charge.md`
+[^F589A]: Findings register, FND-576, the release of a sent unit that arrives, in this document.
+[^F590A]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F470D]: Findings register, FND-360, in this document.
 [^F471A]: Backlog item 0461, tell a caller which arena an identity belongs to. `docs/backlog/proposed/0461-tell-a-caller-which-arena-an-identity-belongs-to.md`
 [^F471B]: Decisions register, DEC-265. `docs/DECISIONS.md`
