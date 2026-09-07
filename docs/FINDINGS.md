@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-579**
+**Next number: FND-581**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -912,6 +912,57 @@ the interior of a polar continent.
 **A fixture must supply the input the assertion needs.** A test that asks
 whether a model destroys the water reaching a pole must give the pole water.
 The landlocked fixture supplied none, so it measured the fixture.[^F487C]
+
+
+### FND-579 — The flat observation array carries one win threshold and not the other
+
+**Believed.** Item 0516 put the victory claim into the observation array of a
+faction, so the array now carries every quantity a win reader compares. A
+learner that reads the array can therefore tell how close each path is.[^F579A]
+
+**True.** The array carries the tick limit, which is the threshold of the
+territory path. It carries no renown target, which is the threshold of the
+renown path. The renown reader fires for the first faction whose best renown
+reaches that target, and a learner that reads the array alone cannot tell how
+far it is from it.[^F579B]
+
+**Evidence.** Read on 6 September 2026 from the schema of a world of extent 32
+with three factions. The field list holds the tick and the tick limit as two
+fields, and it holds the best renown with no matching target. The world states
+the target through a public accessor, so the value exists and the array omits
+it. The commit body holds the command.
+
+**What follows.** The omission is an asymmetry and not a rule. The reward of a
+faction reads the array, so it can weigh the best renown and it cannot weigh
+the distance to the target. A later item may add the field. Until then, a
+caller that wants the distance reads the target from the world, which is a
+public rule of the game and not a fact about a rival.
+
+### FND-580 — A faction that loses every unit is not eliminated, because it keeps its ground
+
+**Believed.** A faction that loses every unit and every person is eliminated.
+Its run is over, so a reward may pay a terminal value for the elimination and
+stop the episode there.
+
+**True.** Such a faction keeps its held tiles and its seat. The territory reader
+compares held tiles at the tick limit, so the faction may still win. A terminal
+that fired on the loss of the last unit would end an episode the faction could
+still win.
+
+**Evidence.** Measured on 6 September 2026 on one development machine
+(ty001-ubuntu, x86-64), over nine seeds at two and three factions, on a world of
+extent 24, to 800 ticks or to the game end. A faction that had been alive and
+then held no unit and no person appeared in 4907 sampled tick and faction pairs.
+In none of them did the same faction reach zero held tiles. On one seed the
+faction with no unit at all held 187 tiles against the winner's 179. No
+ever-alive faction reached zero on all four of held tiles, seats held, live
+units and population. The commit body holds the probe and the command.
+
+**What follows.** The reward of a faction states three terminal outcomes and no
+elimination. It reports one boolean beside them, which is true while the faction
+holds a unit or a person. A caller that wants to stop a run early reads it. A
+faction the seeding never seated reads the same boolean, because it holds the
+same nothing.
 
 
 ## C. Defects found in specified rules
@@ -14333,3 +14384,5 @@ way.[^F572E]
 [^F568B]: ADR-0059, fog storage grows with observed area, not with world area, the context. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^F568C]: The observation module of the core crate. `crates/cachette-core/src/observation.rs`
 [^F568D]: Research report 31, the state of the learner surface, claim 1. `docs/research/reports/31-the-state-of-the-learner-surface.md`
+[^F579A]: Backlog item 0516. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
+[^F579B]: The flat observation array and its schema. `crates/cachette-core/src/faction_observation.rs`
