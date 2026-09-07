@@ -109,6 +109,28 @@ fn short_cohort_under(rule: NeedRule, fed: u32, threads: usize) -> (World, Entit
     })
     .expect("the extent must describe a world");
     world.set_need_rule(rule);
+    // **Nobody is born into this world.** The tests here count the units this
+    // fixture seats, and a birth adds a unit that no test counts. A full site
+    // holds no free place, so a full site takes no birth, and the housing
+    // below fills the site exactly.[^3]
+    //
+    // **That is only true while nobody dies, and the whole point here is that
+    // somebody does.** A death frees a place, the site takes a birth into it,
+    // and the group grows back. The new people are not in the list the tests
+    // read, so the count they report falls while the site refills. The
+    // returning people raise the bill of the site, drain the store the
+    // survivors were living on, and starve the last of the seated group. That
+    // was measured: over a run of 400 frames the seated group fell to three by
+    // frame 16 and held there, while the residents of the site climbed back
+    // from four to nineteen, and the last three died at frame 384.
+    //
+    // The birth chance is a parameter of the world, so the fixture states it
+    // rather than working around it. At no chance the site takes no birth, the
+    // residents track the seated group exactly, and the run measures the
+    // rationing rule for the whole of its length.
+    //
+    // [^3]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    world.set_birth_chance(Fix32::ZERO);
     world
         .set_economy_schedule(1, 0)
         .expect("the period is inside the range");
@@ -126,7 +148,8 @@ fn short_cohort_under(rule: NeedRule, fed: u32, threads: usize) -> (World, Entit
     // nothing here.
     //
     // A full site also has no free place, so nobody is born into the group
-    // and the headcount the tests count stays at what this loop seats.[^2]
+    // while the group is whole. The birth chance above holds that once the
+    // group is not whole, because a death frees a place.[^2]
     //
     // [^1]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
     // [^2]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
