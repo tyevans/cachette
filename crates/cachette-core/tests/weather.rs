@@ -557,6 +557,14 @@ fn cold_ground_holds_less_air_than_warm_ground() {
             *slot = slot.combine(weather::CellGround::of_tile(tile));
         }
     }
+    // **The reference is the mean land height of this world, not sea level.**
+    // The published lapse rate is measured about the mean height the balance
+    // constants already average over, so a cell reads its own height against
+    // that mean. The engine computes the reference over the same plane, so
+    // the test asks for it the way the engine does.[^2]
+    //
+    // [^2]: ADR-0182, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    let reference = weather::mean_land_height_over(&under);
     let mut lowest = i64::MAX;
     let mut highest = i64::MIN;
     for ground in under {
@@ -569,8 +577,11 @@ fn cold_ground_holds_less_air_than_warm_ground() {
         // no longer produces.[^1]
         //
         // [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
-        let cooling =
-            i64::from(weather::relief_cooling_of(ground, weather::HeightRange::DEFAULT));
+        let cooling = i64::from(weather::relief_cooling_of(
+            ground,
+            weather::HeightRange::DEFAULT,
+            reference,
+        ));
         lowest = lowest.min(cooling);
         highest = highest.max(cooling);
     }

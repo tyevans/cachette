@@ -2081,7 +2081,54 @@ fn part_of(whole: i32, fraction: Fix32) -> i32 {
 /// [^2]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 /// [^3]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 #[must_use]
-pub fn relief_cooling_of(ground: CellGround, relief: HeightRange) -> i32 {
+/// Returns the mean height of the land of a world, weighted by how much land
+/// each cell holds.
+///
+/// **This is the zero of the relief term.** The balance temperature is an
+/// observed global mean, and the land of a planet already stands at its mean
+/// elevation inside that observation, so a term that cooled every cell from
+/// sea level would count that elevation twice. A cell at this height therefore
+/// receives the balance unchanged, one above it is colder, and one below it is
+/// warmer.[^1]
+///
+/// **This reads the world and not the Earth, and that is a modelling choice.**
+/// The strict reading of the rule would take the mean elevation of the Earth,
+/// because that is what the published constants average over, and a world whose
+/// land really does stand higher would then be genuinely colder. That reading is
+/// correct physics and it leaves the height ceiling controlling the temperature
+/// of the whole world, which is what cost this project two decisions. Reading
+/// the world's own mean makes the ceiling decide how dramatic the ground looks
+/// and nothing else. **The two agree at a ceiling where the world's land
+/// happens to average what the Earth's does, and they part as the ceiling
+/// rises.**
+///
+/// The answer is a reduction over the ground of the world in ascending cell
+/// order, and the ground does not change, so it is the same integer on every
+/// tick and at every thread count.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+/// [^2]: ADR-0004, iteration order is explicit. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+#[must_use]
+pub fn mean_land_height_over(ground: &[CellGround]) -> Fix32 {
+    let mut total = 0i64;
+    let mut counted = 0i64;
+    for cell in ground {
+        let Some(height) = cell.mean_land_height() else {
+            continue;
+        };
+        let land = i64::from(to_unit(cell.open_share().unwrap_or(Fix32::ZERO)).0);
+        total += i64::from(to_unit(height).0) * land;
+        counted += land;
+    }
+    if counted <= 0 {
+        return Fix32::ZERO;
+    }
+    Fix32(clamp_to_fix(total / counted))
+}
+
+pub fn relief_cooling_of(ground: CellGround, relief: HeightRange, reference: Fix32) -> i32 {
     if ground.tiles() <= 0 {
         return 0;
     }
@@ -2103,7 +2150,11 @@ pub fn relief_cooling_of(ground: CellGround, relief: HeightRange) -> i32 {
     // warmer than it.[^3]
     //
     // [^3]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
-    let metres = i64::from(part_of(relief.metres(), land_height));
+    // **The height stands against the mean land of the world and not against
+    // sea level.** Ground at that mean receives the balance unchanged, ground
+    // above it is colder, and ground below it is warmer.
+    let metres = i64::from(part_of(relief.metres(), land_height))
+        - i64::from(part_of(relief.metres(), reference));
     let cooling = narrow(sim_math::share(
         Accum(LAPSE_RATE_FINE * metres),
         Accum(1),
@@ -3898,6 +3949,10 @@ impl WeatherField {
         // [^3]: The padded lattice. [`PaddedLattice::inner_row_of`]
         let height = self.lattice.inner().height();
         let latitudes = self.latitudes;
+        // **The zero of the relief term, read once for the pass.** It is a
+        // reduction over ground that never changes, so it is the same integer
+        // on every tick.
+        let reference = mean_land_height_over(ground);
         for (cell, under) in ground.iter().enumerate() {
             let row = self.lattice.inner_row_of(cell as u32);
             let air = self.air.get(cell).copied().unwrap_or(Drops::ZERO);
@@ -3907,7 +3962,7 @@ impl WeatherField {
             // overcast, and a warm cell holding the same water is clear.
             let capacity = capacity_at(self.warmth.get(cell).copied().unwrap_or(0));
             let asked = asked_warmth(
-                relief_cooling_of(*under, self.relief),
+                relief_cooling_of(*under, self.relief, reference),
                 season_at(tick, latitudes.of_row(row, height)),
                 cloud_at(air, capacity),
                 self.warmth.get(cell).copied().unwrap_or(0),

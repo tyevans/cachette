@@ -51,6 +51,19 @@ range, so 4000 metres put the mean land near 2000 metres against a published
 mean near 800 for the Earth. The lapse rate then took 11 to 18 degrees off every
 land cell.[^BLK156D]
 
+**The zero of the term is no longer sea level, and the row below says it is.**
+The ground term now reads a cell against the mean land height of the world,
+because the balance constants already average over the land of a planet. Read
+the paragraphs below as the statement of the question, and not as the current
+statement of the term.[^BLK156E]
+
+**This weakens the objection to the larger range.** The objection was that 4000
+metres puts the mean land of this world near 2000 metres, so the lapse rate
+takes 11 to 18 degrees off every land cell. An anomaly subtracts that mean, so
+the range now sets how far cells stand apart and not how cold the world is. The
+figure stays at 1500 metres, and a change to it is a measurement the owner calls
+for rather than a consequence of this one.
+
 **What the row held.** The question below is the one the answer settles.
 
 **Owner:** the project owner. **Blocks:** ADR-0182, and every weather term that
@@ -956,3 +969,4 @@ normally.
 [^BLK152D]: ADR-0177, the row axis of a world is a latitude that the world states, decision D5. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
 [^BLK152E]: Findings register, FND-586. `docs/FINDINGS.md`
 [^BLK152F]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+[^BLK156E]: Findings register, FND-614. `docs/FINDINGS.md`

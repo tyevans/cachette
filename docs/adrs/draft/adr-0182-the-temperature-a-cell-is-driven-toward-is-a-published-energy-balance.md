@@ -126,16 +126,31 @@ geometry makes it grow, and no latitude receives another latitude's season.
 normaliser at the middle latitude makes every latitude beyond it clamp, which
 replaces the geometry with one number over the whole of the high latitudes.
 
-### D4. The ground term is a lapse rate on elevation, and sea level is its zero
+### D4. The ground term is a lapse rate on the height anomaly of a cell
 
-The ground of a cell takes a temperature off the balance, and that temperature
-is the published lapse rate multiplied by the mean height of the land of the
-cell. **The term is never positive.** Air cools as it rises, so high ground
-stands below the balance and no ground stands above it.
+The ground of a cell moves its temperature off the balance, and that change is
+the published lapse rate multiplied by the height of the cell above a reference
+height. High ground stands below the balance and low ground stands above it.
 
-**Sea level is the zero, and that is what gives the term a unit.** The balance
-of D2 is a sea-level temperature, so a cell at sea level receives it unchanged.
-Open water sits at the sea mark, so it cools nothing.
+**The reference is the mean land height of the world, and it is not sea level.**
+This is decision D5 applied to the ground. The constants of D2 are fitted to a
+planet that already carries its own land, so the balance they give is the
+temperature of the mean land height, not the temperature of the sea mark. A term
+measured from sea level takes the whole height off every land cell, and it
+therefore cools all the land of the world by the same amount twice: once in the
+constants, and once again here.
+
+**The engine derives the reference from the world it is running.** It reads the
+mean over the ground plane on each pass, so a world states nothing extra and no
+second copy of the value exists. The alternative is to state the mean land
+height of Earth as a published constant. That is the stricter reading of D5,
+because it keeps the balance tied to the planet the constants came from, and it
+leaves the declared relief load-bearing. The engine takes the world mean instead,
+which asserts that every world sits at the balance temperature whatever its land
+looks like. A world of nothing but mountains is therefore warm at its peaks.
+
+**Open water carries no height, so it takes the reference as a warming.** Sea
+level stands below the mean land of any world with land above the sea.
 
 **A world states its own relief, in the way it states its latitude span.** The
 terrain declares a height as a unit fraction, and the relief is what the whole
