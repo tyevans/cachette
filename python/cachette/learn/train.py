@@ -36,7 +36,7 @@ from pathlib import Path
 import numpy as np
 
 from .env import Env, EnvConfig, VectorEnv, viable_seeds
-from .policy import LinearPolicy, MLPPolicy
+from .policy import LinearPolicy, MLPPolicy, load_policy
 from .reward import Weighting
 
 # A policy the trainer can perturb. Both kinds answer ``flat`` and
@@ -139,6 +139,7 @@ def train(
     seed_pool: list[int],
     kind: str = "linear",
     hidden: int = 32,
+    resume: bool = False,
 ) -> dict[str, object]:
     """Train one policy, and return what each generation scored.
 
@@ -183,6 +184,13 @@ def train(
         policy = MLPPolicy.zeros(probe.action_length, probe.observation_length, hidden)
     else:
         policy = LinearPolicy.zeros(probe.action_length, probe.observation_length)
+    if resume and path.exists():
+        # A run that continues an earlier one starts from the weights that
+        # run stored. The projection of a network is a function of one fixed
+        # seed, so the stored network is the network this run would build.
+        stored, _ = load_policy(path)
+        policy = policy.rebuild(stored.flat())
+        print(f"  {name} resumes from {path}", flush=True)
     rng = np.random.default_rng(train_config.seed)
     pairs = train_config.population // 2
     history: list[dict[str, float]] = []

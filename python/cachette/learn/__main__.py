@@ -208,6 +208,11 @@ def main() -> int:
     parser.add_argument("--learning-rate", type=float, default=0.06)
     parser.add_argument("--only", type=str, default="")
     parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="start each strategy from the weights already stored under --out",
+    )
+    parser.add_argument(
         "--behaviour",
         action="store_true",
         help="read the stored policies and report what they do, and train nothing",
@@ -287,6 +292,7 @@ def main() -> int:
             pool,
             kind=kind,
             hidden=arguments.hidden,
+            resume=arguments.resume,
         )
         trained, _ = load_policy(Path(str(result["weights"])))
         untrained = no_op(kind)
