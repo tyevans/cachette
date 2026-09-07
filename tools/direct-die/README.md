@@ -19,8 +19,8 @@ gate.
 4. The critique comes back as JSON with a verdict, a fault list, and a
    score. The tool validates it, and asks once more when the answer is
    malformed.
-5. The next round revises the parent that the critique or the human
-   chose.
+5. The next round revises the parents that the human liked, one lens
+   each.
 
 Each round makes up to four variants, `a` to `d`. Each variant has its
 own direction and its own temperature, so the four drawings differ. One
@@ -70,21 +70,54 @@ interface shows the score that comes back.
 ## The human outranks the model
 
 The review interface writes `feedback.json` into a round directory. This
-tool reads that file and never writes it. When the file names a choice,
-the chosen variant becomes the parent of the next round. When the file
-holds text, that text goes into the next prompt above the model
-critique, and the prompt says that the human direction outranks every
-model note.
+tool reads that file and never writes it.
 
-The file names the round that it belongs to. This tool refuses the file
-when that name disagrees with the directory, because a mismatch means
+The file holds four things. It names the drawings that a person liked, the
+drawings they refused, an order between the liked drawings, and two notes.
+
+Every liked drawing becomes a parent of the next round. The round cycles the
+parents across the four variant lenses, so each parent gets a spread of
+directions. One like gives every lens that one parent.
+
+Every refused drawing goes into the next prompt as SVG source, under a
+heading that says not to draw like it. The refusal holds for the whole
+session, and the prompt carries the two newest.
+
+The standing note holds for the whole session. The round note holds for the
+next round only. Both go above the model critique, and the prompt says that
+the human direction outranks every model note.
+
+The file names the round that it belongs to, by index. This tool refuses the
+file when that index disagrees with the directory, because a mismatch means
 one of the two is wrong, and neither is safe to guess from.
 
-When no feedback exists, the parent is the highest scoring variant of
-every round so far, and not only of the last round. A critique names a
-fault even in a good drawing, and a revision that acts on that fault can
-make the drawing worse. The loop must not walk away from its best work
-when that happens. A later round wins a tie, so the loop still moves.
+When nobody liked anything, the parent is the highest scoring variant of
+every round so far, and not only of the last round. A critique names a fault
+even in a good drawing, and a revision that acts on that fault can make the
+drawing worse. The loop must not walk away from its best work when that
+happens. A later round wins a tie, so the loop still moves. A refused drawing
+is never the parent, whatever it scored.
+
+## The analysis
+
+The analysis compares what a person liked with what they refused. It runs
+between two rounds, and not inside one.
+
+```
+python3 -m direct_die analyse --asset hex-tile --session 20260906-190000 --round 1
+```
+
+It shows the model the display render of each liked drawing and of each
+refused drawing, beside the rules. It answers with three things: a sentence
+that says what the liked drawings share, an order between the liked drawings,
+and one rule that the guide does not state. It writes `analysis.json` into
+the round directory.
+
+It gives an order and not a score. A large change to a drawing moves the
+absolute score by a few points, which the known limits below record. A
+comparison of two drawings does not have that defect. The order does not
+replace the score. The score still decides which drawing wins when no person
+chose.
 
 ## The layout on disk
 
@@ -98,6 +131,7 @@ sessions/<asset>/<session-id>/
     variant-a.large.png      the inspection size render
     variant-a.critique.json
     feedback.json            the review interface writes this file
+    analysis.json            this tool writes this file
   round-01/
 ```
 
