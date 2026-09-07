@@ -20,6 +20,8 @@
 - **The variant letters are `a`, `b`, `c`, `d`.** `session.VARIANT_LETTERS` and `store.VARIANT_LETTERS` both declare them today. Do not add a third declaration.
 - **Two declaration sites need a check.** The feedback shape has a reader in the tool and a reader in the front end. Task 10 adds the test that fails when they disagree. Do not skip it.
 - **No test asserts on wall clock time.**
+- **A test count in a step is approximate.** The gate is that every test in the named file passes, not that the number matches.
+- **`create_app` binds the style guide directory as `styleguide_root`.** Use that name in a new route.
 - **Commit after each task.** End every commit message with:
   ```
   Co-Authored-By: Claude Opus 5 (1M context) <noreply@anthropic.com>
@@ -3680,7 +3682,7 @@ Add the two routes below `submit_feedback`:
         return no_store(RedirectResponse(f"{target}{joiner}ruled=1", status_code=303))
 ```
 
-`styleguide_root` is the name that `create_app` already binds for the promotion routes. Read `create_app` and use the name it holds.
+`styleguide_root` is the name that `create_app` binds. The `/promote` route already closes over it.
 
 In `round_page`, pass the two new banner flags:
 
