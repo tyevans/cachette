@@ -338,6 +338,7 @@ mod declarations {
         ChangeKind, FactionEliminated, ResourceTaken, SettlementFounded, SiteTaken, TakeKind,
         TileChanged, UpgradeCollapsed, UpgradeFinished, WearCause,
     };
+    use crate::fire::{EndCause, FireEnded, FireStarted, StartCause, UnitBurned};
     use crate::holding::Holder;
     use crate::promotion::UnitPromoted;
     use crate::rates::SiteShortfall;
@@ -474,6 +475,29 @@ mod declarations {
             released: u64 => "released",
             faction: FactionId => "faction",
             padding: [u8; 6] => pad,
+        };
+
+        FireStarted, "fire_started", {
+            tick: Tick => "tick",
+            tile: TileIdx => "tile",
+            cause: StartCause => "cause",
+            padding: [u8; 3] => pad,
+        };
+
+        FireEnded, "fire_ended", {
+            tick: Tick => "tick",
+            tile: TileIdx => "tile",
+            cause: EndCause => "cause",
+            padding: [u8; 3] => pad,
+        };
+
+        UnitBurned, "unit_burned", {
+            tick: Tick => "tick",
+            unit: u64 => "unit",
+            tile: TileIdx => "tile",
+            faction: FactionId => "faction",
+            unit_type: UnitTypeId => "unit_type",
+            padding: [u8; 1] => pad,
         };
 
         CampaignEvent, "campaign_event", {

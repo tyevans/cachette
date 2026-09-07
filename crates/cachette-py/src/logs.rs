@@ -32,6 +32,7 @@ use cachette_core::event::{
     UpgradeFinished,
 };
 use cachette_core::event_layout::EventLayout;
+use cachette_core::fire::{FireEnded, FireStarted, UnitBurned};
 use cachette_core::hex::Axial;
 use cachette_core::promotion::UnitPromoted;
 use cachette_core::rates::SiteShortfall;
@@ -106,6 +107,9 @@ log_registry! {
     founded_log: SettlementFounded;
     taken_log: SiteTaken;
     eliminated_log: FactionEliminated;
+    fires_started: FireStarted;
+    fires_ended: FireEnded;
+    units_burned: UnitBurned;
 }
 
 /// Reads the campaign log, and adds the axial address of the objective.
