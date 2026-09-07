@@ -739,6 +739,34 @@ class Sketch:
         # far down the lifted page.
         return float(at_column[0]), float(at_row[0]) + stood.rise + LIFT_MARGIN
 
+    def ground_step(
+        self, camera: Camera, across: float, down: float
+    ) -> tuple[float, float]:
+        """Turn a step across the frame into a step across the flat map.
+
+        The page turns the ground about the up direction and then leans it
+        away from the watcher. A hand that drags across the frame therefore
+        asks the ground to move in another direction, and this is the inverse
+        of the page: the answer is the step the flat map must take so that the
+        drawing moves the way the hand went.
+
+        **The two angles come from the view, which is the one place that holds
+        them.** This module keeps no copy of either, so a page that stands
+        somewhere else cannot be dragged as though it stood here.
+        """
+        lean = max(self.view.lean, TINY)
+        turn_x, turn_y = math.cos(self.view.turn), math.sin(self.view.turn)
+        # The lean squashes the page down, so a step down the frame asks for a
+        # longer step across the ground before the turn is taken out.
+        deep = down / lean
+        plan_x = across * turn_x + deep * turn_y
+        plan_y = -across * turn_y + deep * turn_x
+        # The flat map spaces its rows by the height of a tile, and the plan
+        # of a hex grid spaces them closer, so the two differ by the pitch.
+        height_of = max(float(camera.tile_height), TINY)
+        width_of = max(float(camera.tile_width), TINY)
+        return plan_x, plan_y * width_of / (height_of * ROW_PITCH)
+
     def fit_lists(
         self,
         stood: Projection,

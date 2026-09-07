@@ -93,6 +93,9 @@ class Watched(Protocol):
     surface: Surface
     pointer: tuple[int, int] | None
 
+    def drag_ground(self, across: float, down: float) -> None:
+        """Move the ground under the hand by a step across the frame."""
+
 
 class Controls:
     """The mouse of the demonstration, as the window library delivers it.
@@ -162,7 +165,13 @@ class Controls:
         if buttons & LEFT_BUTTON:
             # The window counts the rows up and the frame counts them down,
             # so the drag down the screen is the drag up the frame.
-            self._demo.view.pan_by(float(dx), float(-dy))
+            #
+            # **The mouse asks for a step across the frame and no more.** A
+            # page that stands at an angle turns the ground, so the step the
+            # camera must take is not the step the hand made. The renderer
+            # that draws the angles is the one that inverts them, and this
+            # layer holds no copy of either.
+            self._demo.drag_ground(float(dx), float(-dy))
             self._hold()
             return
         if buttons & (RIGHT_BUTTON | MIDDLE_BUTTON):

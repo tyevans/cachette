@@ -62,6 +62,7 @@ if TYPE_CHECKING:
     # importing them at run time would fail.
     from cachette._core import FoundingReport, FrameReading, GameEnd
 from cachette.demo.clock import SPEEDS, Clock, says
+from cachette.demo.compass import Compass
 from cachette.demo.minimap import Minimap
 from cachette.demo.mouse import Controls
 from cachette.demo.settings import Settings, load_video, save_video
@@ -230,6 +231,7 @@ class Demo:
         "announced_end",
         "announcer",
         "clock",
+        "compass",
         "minimap",
         "names",
         "overlay",
@@ -315,6 +317,10 @@ class Demo:
         # level of the engine and paints over the frame, and it holds its own
         # reading between frames.
         self.minimap = Minimap()
+        # **The compass says which way the ground now lies.** The page of the
+        # sketch turns and leans under a drag, and nothing else on the frame
+        # says that it can, or how far it has.
+        self.compass = Compass()
         # The lines that appear over the map, and the reader that makes them.
         self.announcer = Announcer(names)
         # Where the deck reads the wall clock. **A toast lives for a number of
@@ -605,7 +611,29 @@ class Demo:
         # neither.
         if not self.reference:
             self.minimap.paint(self.world, self.camera, self.surface)
+        # **The compass belongs to a page that stands at an angle.** The flat
+        # map has no angle, so a compass over it would point at nothing and
+        # would advertise a gesture that does nothing.
+        if isinstance(self.renderer, Sketch) and not self.reference:
+            self.compass.paint(self.view, self.surface)
         return reading
+
+    def drag_ground(self, across: float, down: float) -> None:
+        """Move the ground under the hand by a step across the frame.
+
+        **The renderer says how a step across the frame reaches the ground.**
+        A page that stands at an angle turns the ground and leans it, so a
+        hand that drags across the frame asks the ground to move in another
+        direction. A renderer that draws the map square to the ground answers
+        nothing, and the step reaches the camera as it was given.
+
+        The mouse therefore holds no angle of its own, and neither does this.
+        The renderer that draws the angles is the one that inverts them.
+        """
+        step = getattr(self.renderer, "ground_step", None)
+        if step is not None:
+            across, down = step(self.camera, across, down)
+        self.view.pan_by(across, down)
 
 
 def draw_seed() -> int:

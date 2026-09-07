@@ -434,13 +434,16 @@ def test_a_zoom_does_not_walk_the_wash_across_the_ground() -> None:
 # extent, and the page drew the world smaller instead of moving it, so a drag
 # with the left button did the opposite of what a hand expects.
 
-# How far the test drags, in pixels.
+# How far the test drags, in pixels, and how far the drawing may fall short of
+# the hand and still count as following it.
 #
-# **A drag across the screen moves the drawing across it and down it.** The
-# page turns the ground, so the ground moves along its own axes and those
-# stand at an angle on the paper. The drawing therefore travels diagonally,
-# and the test states that rather than hiding it.
+# **The drawing follows the hand, one pixel for one pixel, and it does not
+# travel sideways.** The page turns the ground and leans it, so the step the
+# camera takes is not the step the hand made. The renderer inverts its own
+# angles, so the drawing moves the way the hand went. The slack below is for
+# the whole page point that each pixel of the frame lands on.
 DRAG_ACROSS = 40
+DRAG_SLACK = 3
 
 # How much of the change a drag makes must be a move of the drawing.
 #
@@ -486,7 +489,7 @@ def travel_between(before: np.ndarray, after: np.ndarray, reach: int) -> tuple:
     return at[0], at[1], explains
 
 
-def test_a_left_drag_moves_the_drawing_and_does_not_resize_it() -> None:
+def test_a_left_drag_moves_the_drawing_the_way_the_hand_went() -> None:
     """The sketch follows the hand, and the drawing keeps its size.
 
     **This asserts on the frame the renderer drew, not on the view.** A test
@@ -523,9 +526,13 @@ def test_a_left_drag_moves_the_drawing_and_does_not_resize_it() -> None:
 
     assert not np.array_equal(before, after), "a drag drew the same frame"
     across, down, explains = travel_between(before, after, DRAG_ACROSS)
-    assert across > 0, (
+    assert abs(across - DRAG_ACROSS) <= DRAG_SLACK, (
         f"a drag of {DRAG_ACROSS} pixels to the right moved the drawing "
-        f"{across} across and {down} down; the map must follow the hand"
+        f"{across} across; the map must follow the hand"
+    )
+    assert abs(down) <= DRAG_SLACK, (
+        f"a drag straight across moved the drawing {down} down the frame; "
+        f"the map must not travel sideways under the hand"
     )
     assert explains >= MOVE_EXPLAINS, (
         f"a shift of ({across}, {down}) takes away only {explains:.2%} of the "
@@ -549,3 +556,97 @@ def test_the_page_holds_every_tile_of_the_world_at_every_camera() -> None:
         assert sketch.window() == whole, (
             f"at zoom {factor} the page held {sketch.window()} and not {whole}"
         )
+
+
+# ----------------------------------------------------------------------
+# The compass.
+#
+# **A control nobody finds is a control that does not exist.** The right drag
+# and the middle drag turn the page and lean it, and nothing on the frame said
+# so. The compass says that the ground turns, and it says how far it is turned
+# now, which a line of instructions cannot.
+
+# The corner the compass must stay out of, as a share of the frame. The
+# minimap holds the upper right, and the engine puts a card there while the
+# reference key is held.
+KEPT_CORNER = 0.34
+
+# The frame the compass tests draw in.
+#
+# **The compass stands down in a frame too small to leave it a margin**, and
+# the frame the other tests use is that small. This is the size a watcher
+# opens.
+ROOM_WIDTH = 640
+ROOM_HEIGHT = 480
+
+
+def in_a_window(world: World) -> Demo:
+    """Give back a paused demonstration drawing the sketch in a real window."""
+    demo = Demo(world, Names(SEED), width=ROOM_WIDTH, height=ROOM_HEIGHT, threads=1)
+    demo.camera = Camera.fitting(world, ROOM_WIDTH, ROOM_HEIGHT)
+    demo.clock.pause()
+    demo.renderer = Sketch(world, view=demo.view)
+    return demo
+
+
+def test_the_compass_shows_the_turn_the_page_stands_at() -> None:
+    """The needle moves when the view turns, and it moves nothing else.
+
+    **This drives the frame the renderer drew.** A test that read the compass
+    directly would prove that a compass can be drawn. It would not prove that
+    a watcher sees one.
+    """
+    world, _ = build()
+    demo = in_a_window(world)
+    demo.advance()
+    before = demo.surface.pixels.reshape(ROOM_HEIGHT, ROOM_WIDTH).copy()
+
+    controls = Controls(demo)
+    controls.on_mouse_press(320, 240, RIGHT_BUTTON, 0)
+    controls.on_mouse_drag(380, 240, 60, 0, RIGHT_BUTTON, 0)
+    controls.on_mouse_release(380, 240, RIGHT_BUTTON, 0)
+    demo.advance()
+    after = demo.surface.pixels.reshape(ROOM_HEIGHT, ROOM_WIDTH).copy()
+
+    corner = (slice(ROOM_HEIGHT - 120, ROOM_HEIGHT), slice(0, 120))
+    assert not np.array_equal(before[corner], after[corner]), (
+        "the compass drew the same needle after the view turned"
+    )
+
+
+def test_the_compass_keeps_out_of_the_corner_the_minimap_holds() -> None:
+    """Two things in one corner means a watcher reads neither."""
+    world, _ = build()
+    demo = in_a_window(world)
+    demo.advance()
+    with_compass = demo.surface.pixels.reshape(ROOM_HEIGHT, ROOM_WIDTH).copy()
+    demo.compass.visible = False
+    demo.advance()
+    without = demo.surface.pixels.reshape(ROOM_HEIGHT, ROOM_WIDTH).copy()
+
+    changed = with_compass != without
+    assert changed.any(), "the compass painted nothing at all"
+    rows, columns = np.nonzero(changed)
+    assert rows.min() > ROOM_HEIGHT * (1.0 - KEPT_CORNER), (
+        "the compass reaches the upper part of the frame"
+    )
+    assert columns.max() < ROOM_WIDTH * KEPT_CORNER, (
+        "the compass reaches the right of the frame, where the minimap stands"
+    )
+
+
+def test_the_flat_map_carries_no_compass() -> None:
+    """The flat map stands square to the ground, so it has no angle to show.
+
+    A compass over it would point at nothing and would name a gesture that
+    does nothing.
+    """
+    world, camera = build()
+    demo = Demo(world, Names(SEED), width=WIDTH, height=HEIGHT, threads=1)
+    demo.camera = camera
+    demo.clock.pause()
+    demo.advance()
+    shown = demo.surface.pixels.copy()
+    demo.compass.visible = False
+    demo.advance()
+    assert np.array_equal(demo.surface.pixels, shown), "the flat map drew a compass"
