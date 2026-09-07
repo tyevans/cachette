@@ -66,7 +66,7 @@ use crate::text;
 pub const MARGIN: i32 = 14;
 
 /// The width of a panel, in pixels.
-pub const WIDTH: i32 = 268;
+pub const WIDTH: i32 = 310;
 
 /// The gap between the panel edge and its text, in pixels.
 pub const PAD: i32 = 13;
