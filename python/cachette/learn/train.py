@@ -489,6 +489,29 @@ def train(
         )
         print(f"  {name} controller yardstick {yardstick:9.1f}", flush=True)
 
+    def score_on_validation(current: Trainable, label: str, seeds: list[int]) -> float:
+        """Return what one policy scores on the validation seeds.
+
+        **This chooses nothing.** It plays the seeds and reports. The caller
+        that keeps the best centre is `validate` below, and it is the only
+        one that may move the best. A candidate must never replace the centre,
+        because a candidate is the highest of many draws on a few seeds and
+        the highest draw is usually the luckiest one.
+
+        The caller passes the seeds, because the only caller has already
+        checked that there are some.
+        """
+        return float(
+            run_population(
+                env_config,
+                weighting,
+                [current],
+                seeds,
+                train_config.workers,
+                label,
+            )[0].mean()
+        )
+
     def validate(current: Trainable, generation: int) -> float | None:
         """Play the centre on the validation seeds, and return what it scored."""
         nonlocal best_policy, best_score, best_generation
@@ -570,11 +593,34 @@ def train(
         # that reported one of them could not be compared with the other.
         absolute_spread = float(played.absolute.max() - played.absolute.min())
         last = generation == train_config.generations - 1
-        checked = (
-            validate(policy, generation)
-            if last or generation % validate_every == validate_every - 1
-            else None
-        )
+        validating = last or generation % validate_every == validate_every - 1
+        checked = validate(policy, generation) if validating else None
+
+        # **The highest candidate of a generation is the highest of many
+        # draws on a few seeds, so it is usually the luckiest and not the
+        # best.** The reported best therefore says nothing about whether the
+        # population found a policy the centre should move toward. Playing
+        # that candidate on the validation seeds says it: a candidate that
+        # holds its score there is a real gain the centre is not taking, and
+        # a candidate that falls back to the score of the centre was luck.
+        #
+        # This chooses nothing. The stored best centre is decided by
+        # `validate` above and by nothing here.
+        candidate_checked: float | None = None
+        if validating and validation and checked is not None:
+            highest = int(np.argmax(played.absolute))
+            candidate_checked = score_on_validation(
+                candidates[highest],
+                f"{name} candidate {generation:2d}",
+                list(validation),
+            )
+            print(
+                f"  {name} generation {generation:2d} "
+                f"candidate {highest:4d} scored {played.absolute[highest]:9.1f} "
+                f"on its own seeds and {candidate_checked:9.1f} on the "
+                f"validation seeds, where the centre scored {checked:9.1f}",
+                flush=True,
+            )
 
         # **The latest centre is written every generation, unconditionally.**
         # No validation gate and no improvement gate. This is the resume

@@ -97,6 +97,37 @@ WORLD = EnvConfig(
 # is the baseline the run is judged against.
 CONTROLLER_WORLD = replace(WORLD, controlled=False)
 
+
+def use_decision_interval(interval: int) -> None:
+    """Set how many ticks one decision covers, everywhere it is read.
+
+    **The interval reaches three places and the horizon is derived from it.**
+    The world the strategies play holds it, the controller world holds it, and
+    the horizon is the tick limit divided by it. A caller that sets one and
+    not the others ends an episode before the game ends, and nothing fails.
+    This function is the only place that derives the horizon, so the copies
+    cannot disagree.
+
+    The learner takes one action for each decision, and the built-in
+    controller issues many commands in the same span, so a shorter interval
+    gives the learner more of the say.
+    """
+    global WORLD, CONTROLLER_WORLD, STRATEGIES
+    if interval < 1:
+        message = "the decision interval must be one tick or more"
+        raise ValueError(message)
+    horizon = TICK_LIMIT // interval
+    WORLD = replace(WORLD, decision_interval=interval, horizon=horizon)
+    CONTROLLER_WORLD = replace(WORLD, controlled=False)
+    STRATEGIES = {
+        name: (
+            replace(config, decision_interval=interval, horizon=horizon),
+            weighting,
+            kind,
+        )
+        for name, (config, weighting, kind) in STRATEGIES.items()
+    }
+
 # The store total crosses as a raw Q16.16 integer, so its numbers are about
 # five orders of magnitude above a tile count. This weight brings one store
 # into the range of one territory.
@@ -225,6 +256,17 @@ def main() -> int:
     parser.add_argument("--learning-rate", type=float, default=0.3)
     parser.add_argument("--validation", type=int, default=6)
     parser.add_argument("--validate-every", type=int, default=3)
+    parser.add_argument(
+        "--decision-interval",
+        type=int,
+        default=DECISION_INTERVAL,
+        help=(
+            "how many ticks one decision covers. The learner takes one action "
+            "for each decision, and the built-in controller issues many "
+            "commands in the same span, so a shorter interval gives the "
+            f"learner more of the say. Default {DECISION_INTERVAL}"
+        ),
+    )
     parser.add_argument("--only", type=str, default="")
     parser.add_argument(
         "--league",
@@ -256,6 +298,10 @@ def main() -> int:
         help="read the stored policies and report what they do, and train nothing",
     )
     arguments = parser.parse_args()
+
+    # The interval is set before anything reads a world, so every strategy,
+    # the controller world and the report all state the same one.
+    use_decision_interval(arguments.decision_interval)
 
     names = [name for name in arguments.only.split(",") if name] or list(STRATEGIES)
     learner_seats = tuple(
