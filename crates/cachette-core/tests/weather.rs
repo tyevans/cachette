@@ -516,7 +516,7 @@ fn the_lift_draw_is_keyed_on_the_seed() {
 }
 
 #[test]
-fn cold_ground_takes_more_out_of_the_air_than_warm_ground() {
+fn cold_ground_holds_less_air_than_warm_ground() {
     let mut world = coastal_world();
     for _ in 0..8 {
         world.step(4).expect("the step must run");
@@ -545,13 +545,13 @@ fn cold_ground_takes_more_out_of_the_air_than_warm_ground() {
         if ground.tiles() == 0 {
             continue;
         }
-        let numerator = weather::fall_numerator(weather::heat_of(ground), 0, 0);
-        lowest = lowest.min(numerator);
-        highest = highest.max(numerator);
+        let capacity = weather::capacity_at(weather::heat_of(ground)).0;
+        lowest = lowest.min(capacity);
+        highest = highest.max(capacity);
     }
     assert!(
         highest > lowest,
-        "every cell takes the same share out of the air, so the ground does nothing"
+        "every cell holds the same air, so the ground does nothing"
     );
 }
 
@@ -566,13 +566,20 @@ fn cold_ground_takes_more_out_of_the_air_than_warm_ground() {
 ///
 /// [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D2. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 #[test]
-fn air_that_cooled_on_the_way_drops_more_than_air_that_did_not() {
-    let cold = cachette_core::HEAT_CEILING / 4;
-    let no_cooling = weather::fall_numerator(cold, 0, 0);
-    let cooled = weather::fall_numerator(cold, cachette_core::HEAT_CEILING / 2, 0);
+fn air_that_cooled_on_the_way_holds_less_than_air_that_did_not() {
+    let base = weather::capacity_at(cachette_core::HEAT_CEILING / 4);
+    let no_cooling = weather::travelling_capacity(base, 0, 0);
+    let cooled = weather::travelling_capacity(base, cachette_core::HEAT_CEILING / 2, 0);
     assert!(
-        cooled > no_cooling,
-        "cooling added nothing, so a ridge has no near side and no far side"
+        cooled.0 < no_cooling.0,
+        "cooling shed nothing, so a ridge has no near side and no far side"
+    );
+    // Air that lost capacity holds less, so the water it carries above the
+    // smaller mark leaves the air. That excess is what the settle pass pours
+    // onto the ground.
+    assert!(
+        no_cooling.0 - cooled.0 > 0,
+        "the shed moved no water out of the air of a cooling cell"
     );
 }
 
@@ -1030,8 +1037,8 @@ fn each_pole_holds_its_own_winter() {
 /// The cloud is in the air, so a full sky is colder than an empty one.
 #[test]
 fn a_full_sky_takes_more_warmth_than_an_empty_one() {
-    let empty = weather::cloud_at(weather::Drops(0));
-    let full = weather::cloud_at(weather::AIR_SATURATION);
+    let empty = weather::cloud_at(weather::Drops(0), weather::AIR_SATURATION);
+    let full = weather::cloud_at(weather::AIR_SATURATION, weather::AIR_SATURATION);
     assert!(
         full > empty,
         "the cloud takes the same at every quantity of air"
@@ -1153,19 +1160,19 @@ fn the_peak_of_the_air_plane_keeps_moving() {
 /// is horizontal over a flat lattice, so without it a parcel blown at a range
 /// of hills passes through it and no cloud forms over land.
 #[test]
-fn air_that_climbed_drops_more_than_air_that_ran_level() {
-    let warm = cachette_core::HEAT_CEILING / 2;
-    let level = weather::fall_numerator(warm, 0, 0);
-    let climbed = weather::fall_numerator(warm, 0, cachette_core::Fix32::ONE.0 / 4);
-    let fell = weather::fall_numerator(warm, 0, -cachette_core::Fix32::ONE.0 / 4);
+fn air_that_climbed_holds_less_than_air_that_ran_level() {
+    let base = weather::capacity_at(cachette_core::HEAT_CEILING / 2);
+    let level = weather::travelling_capacity(base, 0, 0);
+    let climbed = weather::travelling_capacity(base, 0, cachette_core::Fix32::ONE.0 / 4);
+    let fell = weather::travelling_capacity(base, 0, -cachette_core::Fix32::ONE.0 / 4);
     assert!(
-        climbed > level,
-        "air that climbed dropped no more than air that ran level, \
+        climbed.0 < level.0,
+        "air that climbed held as much as air that ran level, \
          so the height map does not reach the water"
     );
     assert!(
-        fell < level,
-        "air that descended dropped as much as air that ran level, \
+        fell.0 > level.0,
+        "air that descended held no more than air that ran level, \
          so the lee of a range is as wet as the windward side"
     );
 }
@@ -1241,3 +1248,208 @@ fn shallow_water_is_warmer_than_deep_water_and_lags_less() {
         "an abyss tracks the season as fast as a shelf does"
     );
 }
+
+/// A cold sky holding little water is grey, and a warm sky holding the same
+/// water is clear.
+///
+/// **This is the whole of the missing physics in one assertion.** Warm air
+/// holds a lot of water and cold air holds very little, so the visible cloud
+/// is the air held against the capacity of that air, and never the air held
+/// against one mark that every cell shares. Without it a high latitude is
+/// structurally cloudless. Nothing lifts water there, and the water that
+/// arrives stands below a mark that the tropics set.
+#[test]
+fn one_quantity_of_water_is_cloud_when_it_is_cold_and_clear_when_it_is_warm() {
+    let cold = cachette_core::HEAT_CEILING / 8;
+    let warm = cachette_core::HEAT_CEILING;
+    let polar = weather::capacity_at(cold);
+    let tropical = weather::capacity_at(warm);
+    assert!(
+        polar.0 < tropical.0,
+        "the cold sky holds {} drops and the warm sky holds {}, so the capacity ignores the cold",
+        polar.0,
+        tropical.0
+    );
+    // One quantity of water. It fills the cold sky and not the warm one.
+    let water = weather::Drops(polar.0);
+    assert_eq!(
+        weather::cloud_at(water, polar),
+        weather::cloud_at(weather::AIR_SATURATION, weather::AIR_SATURATION),
+        "the cold sky is not fully overcast at its own capacity"
+    );
+    assert!(
+        weather::cloud_at(water, tropical) < weather::cloud_at(water, polar) / 4,
+        "the same water shades the warm sky nearly as much as the cold one"
+    );
+}
+
+/// A sky that loses capacity puts its water on the ground, never into
+/// nothing.
+///
+/// **This is the account across a temperature change, and it is the hard
+/// part.** The capacity of a cell falls when the cell cools, so air that was
+/// invisible vapour on one solve stands above the mark on the next. The pass
+/// must move that water onto the ground of the same cell. A pass that
+/// assigned the air to the capacity, or that scaled it, would destroy water,
+/// and nothing else in the field would notice.
+///
+/// The test drives the engine and not the capacity function. A god fills the
+/// sky over held ground far past what any capacity allows, and the account
+/// must hold on every tick while the field carries that water away.[^1]
+///
+/// # References
+///
+/// [^1]: Testing Rules, section 5. `.agents/rules/testing.md`
+#[test]
+fn a_sky_that_loses_capacity_puts_its_water_on_the_ground() {
+    let (mut world, _unit, address) = a_congregation_on_the_ground();
+    let before = world.weather().air_total().0 + world.weather().ground_total().0;
+    let storm = world
+        .inflict_weather(FactionId(0), &[address], weather::STRENGTH_CEILING)
+        .expect("the faction holds the ground");
+    assert!(storm.drops > 0, "the god raised no water");
+    assert!(
+        world.weather().air_total().0 + world.weather().ground_total().0 > before,
+        "the storm put no water into the world"
+    );
+    for _ in 0..64 {
+        world.step(4).expect("the step must run");
+        assert!(
+            world.weather().check_account(),
+            "water was created or destroyed while the sky lost capacity"
+        );
+    }
+    let field = world.weather();
+    assert_eq!(
+        field.raised(),
+        field.air_total().0 + field.ground_total().0 + field.evaporated(),
+        "the account is not exact after the storm drained"
+    );
+}
+
+/// The air over a cell never stands above the capacity of that cell.
+///
+/// The capacity replaced one mark that every cell shared, so the bound is now
+/// a different figure for each cell. A cell above its own capacity would
+/// paint as more than a whole sky, and the excess would be water that the
+/// field forgot to rain out.
+#[test]
+fn the_air_never_stands_above_the_capacity_of_its_own_cell() {
+    let mut world = World::with_weather_scale(
+        WorldConfig {
+            width: WET_EXTENT,
+            height: WET_EXTENT,
+            seed: WET_SEED,
+            faction_count: 2,
+            unit_capacity: 1024,
+        },
+        weather::WeatherScale::PER_TILE,
+    )
+    .expect("the extent must describe a world");
+    for _ in 0..20 {
+        world.step(4).expect("the step must run");
+    }
+    let field = world.weather();
+    let mut worst = 0i64;
+    let mut worst_cell = 0u32;
+    for cell in 0..field.air_plane().len() as u32 {
+        let over = field.air_at(cell).0 - field.capacity_at_cell(cell).0;
+        if over > worst {
+            worst = over;
+            worst_cell = cell;
+        }
+    }
+    assert!(
+        worst <= 0,
+        "cell {worst_cell} stands {worst} drops above its own capacity"
+    );
+    // The share that the overlay paints follows from the same pair, so it
+    // never passes a whole sky.
+    let highest = (0..field.air_plane().len() as u32)
+        .map(|cell| field.cloud_share_at(cell))
+        .max()
+        .unwrap_or(0);
+    assert!(
+        highest <= weather::CLOUD_SHARE_WHOLE,
+        "a cell painted {highest} of a whole sky of {}",
+        weather::CLOUD_SHARE_WHOLE
+    );
+}
+
+/// The inland high latitudes hold cloud.
+///
+/// **This is the acceptance test the owner asked for.** He watches at one
+/// cell for each tile, and he reports that the inland north and the inland
+/// south never hold cloud. Cloud happened only over water and near the
+/// equator. The cause was structural. The lift rose with the heat, the fall
+/// rose with the cold, and the capacity was one constant. Water could only be
+/// created near the sun, and it was destroyed as soon as it travelled toward
+/// a pole.
+///
+/// The test reads the two polar bands of rows, over the land cells alone, and
+/// asks whether a watcher would see a sky there. **The bars are set against a
+/// measurement of the same world under the old rule**, which held a mean of
+/// five parts of a sky in 255 and left 97 cells in every hundred blank. The
+/// commit that made this change holds both readings.
+#[test]
+fn the_inland_high_latitudes_hold_cloud() {
+    let mut world = World::with_weather_scale(
+        WorldConfig {
+            width: WET_EXTENT,
+            height: WET_EXTENT,
+            seed: WET_SEED,
+            faction_count: 2,
+            unit_capacity: 1024,
+        },
+        weather::WeatherScale::PER_TILE,
+    )
+    .expect("the extent must describe a world");
+    // **The field must be given time to spin up.** The world starts dry, the
+    // sea fills its own sky one frame in two, and the transport then has to
+    // carry that water inland. A short run measures the fixture warming up
+    // and not the field it settles into.
+    for _ in 0..SPIN_UP_TICKS {
+        world.step(4).expect("the step must run");
+    }
+    let field = world.weather();
+    let cells = field.cells();
+    let high = cells.height();
+    // A polar band is the outer tenth of the rows at each end. The sun swings
+    // along the row axis, so the first row and the last row are the poles.
+    let mut polar: Vec<i64> = Vec::new();
+    for cell in 0..field.air_plane().len() as u32 {
+        let Some(address) = cells.address_of(cachette_core::TileIdx(cell)) else {
+            continue;
+        };
+        let row = address.r.max(0) as u32;
+        if row * 10 >= high && (row + 1) * 10 <= high * 9 {
+            continue;
+        }
+        let Some(tile) = world.tile_terrain(address) else {
+            continue;
+        };
+        if !tile.kind.is_passable() {
+            continue;
+        }
+        polar.push(field.cloud_share_at(cell));
+    }
+    assert!(polar.len() > 32, "the fixture holds no polar land");
+    let mean = polar.iter().sum::<i64>() / polar.len() as i64;
+    let blank = polar
+        .iter()
+        .filter(|share| **share * 16 < weather::CLOUD_SHARE_WHOLE)
+        .count();
+    assert!(
+        mean * 16 >= weather::CLOUD_SHARE_WHOLE,
+        "the polar land holds a mean of {mean} of a whole sky of {}",
+        weather::CLOUD_SHARE_WHOLE
+    );
+    assert!(
+        blank * 4 <= polar.len() * 3,
+        "{blank} of {} polar land cells hold under a sixteenth of a sky, mean {mean}",
+        polar.len()
+    );
+}
+
+/// The ticks that the acceptance fixture runs before it reads the field.
+const SPIN_UP_TICKS: usize = 300;
