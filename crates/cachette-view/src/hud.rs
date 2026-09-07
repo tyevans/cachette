@@ -1644,6 +1644,23 @@ impl Readout {
         for (slot, count) in self.by_faction.iter().enumerate().take(self.legend_rows()) {
             lines.push(Line::Legend(slot, *count));
         }
+        // **Six colours cannot separate sixty-three factions.** The world
+        // holds up to sixty-three, the colour table holds six, and a faction
+        // past the table shares a colour with an earlier one. The count on a
+        // row is therefore the sum of every faction of that colour, and the
+        // rows are fewer than the factions.
+        //
+        // A watcher who reads six rows in a world of ten cannot tell a whole
+        // list from a short one, and cannot tell the count of one faction
+        // from the sum of two. The panel states both.
+        if usize::from(self.factions) > COLOURED_FACTIONS {
+            lines.push(Line::Text(
+                "factions in the world".to_string(),
+                grouped(u64::from(self.factions)),
+            ));
+            lines.push(Line::Note("each row above counts every"));
+            lines.push(Line::Note("faction of its colour."));
+        }
         lines.push(Line::Bar);
 
         // The region rows sit under their own heading, because a count of a

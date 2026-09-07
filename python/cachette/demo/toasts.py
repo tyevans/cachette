@@ -481,12 +481,17 @@ class Announcer:
         The engine once published a count of the settlements and nothing else.
         The count falls when a settlement is lost, so a founding and a loss in
         one tick cancelled and the watcher saw neither.
+
+        **The line names the nation, and it does not print the index.** The
+        engine holds an index, the control plane holds the words, and every
+        other line of this deck reads the words. This line read the index and
+        showed a watcher a number beside a name.
         """
         columns = world.log("settlement_founded")
         for row in range(len(columns["tick"])):
             faction = int(columns["faction"][row])
             self.toasts.show(
-                f"Faction {faction} founds a settlement",
+                f"{self.names.faction(faction)} founds a settlement",
                 faction_colour(faction),
                 now,
                 rank=RANK_MILESTONE,
@@ -500,6 +505,10 @@ class Announcer:
         and not a moment. A wonder is the largest thing a faction builds, so
         it is the one level worth a line. **It ends no game**, because the
         wealth-or-wonder path has no reader.
+
+        **The line names the nation, and it does not print the index.** A
+        wonder that nobody holds takes the word "A" instead, because the
+        holder is nobody and no nation owns it.
         """
         columns = world.log("upgrade_finished")
         for row in range(len(columns["tick"])):
@@ -507,7 +516,7 @@ class Announcer:
                 continue
             holder = int(columns["holder"][row])
             level = int(columns["level"][row])
-            whose = "A" if holder == NOBODY else f"Faction {holder}"
+            whose = "A" if holder == NOBODY else self.names.faction(holder)
             verb = "stands" if holder == NOBODY else "finishes"
             colour = NEUTRAL_COLOUR if holder == NOBODY else faction_colour(holder)
             self.toasts.show(

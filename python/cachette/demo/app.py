@@ -647,8 +647,10 @@ def print_census(world: World) -> None:
 def report(foundings: list[FoundingReport], names: Names) -> tuple[int, int]:
     """Print what each faction got, and give back how many were seated and fed.
 
-    The loop is over factions, of which there are four. It is not a loop over
-    entities, and it reads a summary the engine already made.
+    The loop is over the foundings, and the run makes one for each faction.
+    The caller sets the faction count, so this loop follows that count and
+    names no number of its own. It is not a loop over entities, and it reads a
+    summary the engine already made.
 
     **The line keeps the address beside the name.** A watcher reads the name
     to follow the story and reads the address to point the camera at the
