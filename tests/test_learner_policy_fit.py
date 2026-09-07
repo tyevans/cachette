@@ -205,7 +205,12 @@ def test_the_engine_owns_the_version_the_file_states(tmp_path: Path) -> None:
     stating the old number.
     """
     env = Env(TRAINED, WEIGHTING)
-    world = env.reset(0) is not None and env.world
+    # **The reset is asserted, not folded into the value.** Writing this as
+    # `env.reset(0) is not None and env.world` gives a value that is either
+    # False or a world, and a reader of it must then handle a boolean that
+    # cannot happen.
+    assert env.reset(0) is not None
+    world = env.world
     fit = PolicyFit.of_env(env)
 
     assert fit.observation_version == int(world.observation_schema()["version"])

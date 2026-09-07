@@ -217,11 +217,25 @@ class EnvLike(Protocol):
 
 
 class ConfigLike(Protocol):
-    """The world parameters a fit reads from an environment configuration."""
+    """The world parameters a fit reads from an environment configuration.
 
-    width: int
-    height: int
-    faction_count: int
+    **The three are read-only, because the fit only reads them.** A protocol
+    that declares a plain attribute asks for one that can be written, and a
+    frozen configuration cannot answer that. Declaring what this actually
+    needs lets a frozen dataclass satisfy it.
+    """
+
+    @property
+    def width(self) -> int:
+        """How many tiles the world holds across."""
+
+    @property
+    def height(self) -> int:
+        """How many tiles the world holds down."""
+
+    @property
+    def faction_count(self) -> int:
+        """How many factions play the world."""
 
 
 class Policy(Protocol):
@@ -280,7 +294,7 @@ class LinearPolicy:
         """Return a policy of this shape with the given weights."""
         return LinearPolicy(flat.reshape(self.weights.shape))
 
-    def save(self, path: Path, meta: dict[str, object]) -> None:
+    def save(self, path: Path, meta: Mapping[str, object]) -> None:
         """Write the weights and what they were trained against.
 
         The action version and the observation version go into the file. A
@@ -382,7 +396,7 @@ class MLPPolicy:
         """Return a policy with this projection and the given second layer."""
         return MLPPolicy(self.first, flat.reshape(self.second.shape))
 
-    def save(self, path: Path, meta: dict[str, object]) -> None:
+    def save(self, path: Path, meta: Mapping[str, object]) -> None:
         """Write both layers and what they were trained against."""
         path.parent.mkdir(parents=True, exist_ok=True)
         np.savez(
