@@ -21,6 +21,19 @@ therefore cannot be paid for a win it never reached.
 The horizon of this run covers the tick limit exactly, so every episode ends
 with a win or a loss.
 
+# A league run scores a candidate against the seats it played
+
+The run puts one candidate in one world by default. A seat list turns that
+into a league: two or more candidates take seats of the same world, and each
+is scored by its return minus the mean return of the other learner seats of
+that world. Two candidates in one game share the map, the weather and the
+opponents, so the margin between them holds almost none of the variance that
+either return holds on its own.
+
+**One seat always stays with the built-in controller.** The runner refuses a
+seat list that fills every seat, because that removes the opponent the run is
+measured against and pins the win rate at one over the faction count.
+
 # Three baselines, and the controller is the one that matters
 
 The untrained policy takes the no-op at every decision, so it measures a
@@ -203,6 +216,25 @@ def main() -> int:
     parser.add_argument("--validate-every", type=int, default=3)
     parser.add_argument("--only", type=str, default="")
     parser.add_argument(
+        "--league",
+        type=str,
+        default="",
+        help=(
+            "seat two or more candidates in each world, named as a comma "
+            "separated seat list such as 0,1. A candidate is then scored by "
+            "its margin against the other seats of its own world, and its "
+            "seat turns by one position at each seed"
+        ),
+    )
+    parser.add_argument(
+        "--absolute-scoring",
+        action="store_true",
+        help=(
+            "rank a seated generation by the raw return rather than by the "
+            "margin against the other seats of one world"
+        ),
+    )
+    parser.add_argument(
         "--resume",
         action="store_true",
         help="start each strategy from the weights already stored under --out",
@@ -215,6 +247,13 @@ def main() -> int:
     arguments = parser.parse_args()
 
     names = [name for name in arguments.only.split(",") if name] or list(STRATEGIES)
+    learner_seats = tuple(
+        int(seat) for seat in arguments.league.split(",") if seat.strip()
+    )
+    # **A relative score cannot say whether the population improved**, so a
+    # league run measures the centre against the built-in controller on every
+    # generation rather than every third one.
+    validate_every = 1 if learner_seats else arguments.validate_every
     out = arguments.out
     out.mkdir(parents=True, exist_ok=True)
     if arguments.behaviour:
@@ -245,6 +284,8 @@ def main() -> int:
         "validation": validation,
         "sigma": arguments.sigma,
         "learning_rate": arguments.learning_rate,
+        "learner_seats": list(learner_seats),
+        "relative_scoring": bool(learner_seats) and not arguments.absolute_scoring,
         "world": asdict(WORLD),
         "strategies": {},
     }
@@ -288,6 +329,8 @@ def main() -> int:
             learning_rate=arguments.learning_rate,
             workers=arguments.workers,
             seed=index,
+            learner_seats=learner_seats,
+            relative=not arguments.absolute_scoring,
         )
         result = train(
             name,
@@ -300,7 +343,7 @@ def main() -> int:
             hidden=arguments.hidden,
             resume=arguments.resume,
             validation=validation,
-            validate_every=arguments.validate_every,
+            validate_every=validate_every,
         )
         trained, _ = load_policy(Path(result["weights"]))
         untrained = no_op(kind)

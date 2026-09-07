@@ -19,6 +19,27 @@ Every candidate of one generation plays the same worlds. That removes the
 variance that would otherwise drown a small population. The set moves at the
 next generation, so a policy cannot learn one map.
 
+# A candidate is scored against the seats it played, not against a constant
+
+A generation may put more than one candidate in one world. Two candidates in
+one game share the map, the weather and the opponents, so the difference
+between their returns holds almost none of the variance that either return
+holds on its own. The trainer then ranks that difference rather than the raw
+return.
+
+**A relative score cannot say whether the population improved.** It is zero
+on average by construction, so a population that got worse together reads the
+same as one that got better together. The trainer therefore plays the centre
+against the built-in controller on a held-out seed set as well, and reports
+that absolute number beside the relative one.
+
+**The yardstick is measured in the single-seat world, whatever the generation
+played.** A candidate in a league meets another candidate and one built-in
+controller. The centre on the validation seeds meets two built-in controllers,
+which is the game the run is judged on. A run that measured its centre inside
+its own league would move the opponent and the policy together, and no number
+of that run could be compared with a number of another.
+
 # The learner-side arithmetic is float, and the engine's is not
 
 The weights, the scores and the update are floating point. None of them
@@ -32,13 +53,14 @@ import json
 import math
 import time
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import NotRequired, TypedDict
 
 import numpy as np
 
 from .env import Env, EnvConfig, VectorEnv, viable_seeds
+from .league import run_seated_population
 from .policy import LinearPolicy, MLPPolicy, Policy, load_policy
 from .reward import Weighting
 
@@ -76,6 +98,14 @@ class TrainConfig:
     learning_rate: float = 0.3
     workers: int = 4
     seed: int = 0
+    # The seats a candidate may take. An empty list puts one candidate in one
+    # world, in the seat the environment names, and every other seat keeps the
+    # built-in controller. Two or more seats put that many candidates in one
+    # world, and the trainer then scores each of them against the others.
+    learner_seats: tuple[int, ...] = ()
+    # Whether a seated generation ranks the margin against the other seats of
+    # one world, or the raw return. This has no meaning without seated play.
+    relative: bool = True
 
 
 class TrainResult(TypedDict):
@@ -155,6 +185,61 @@ def run_population(
         row["end_tick"] = float(values[starts["tick"]])
         readings.append(row)
     return returns.reshape(len(policies), len(seeds)), readings, ticks
+
+
+@dataclass(frozen=True)
+class Generation:
+    """What one generation of candidates scored.
+
+    The ranked entry is the quantity the update ranks. The absolute entry is
+    the mean return of each candidate, which is reported whatever the update
+    ranks, so that a reader sees both instruments on every generation.
+    """
+
+    ranked: np.ndarray
+    absolute: np.ndarray
+    won: float
+    ticks: int
+
+
+def score_generation(
+    env_config: EnvConfig,
+    weighting: Weighting,
+    candidates: Sequence[Policy],
+    seeds: list[int],
+    train_config: TrainConfig,
+) -> Generation:
+    """Play one generation, and return the score the update ranks.
+
+    A run with no learner seats plays one candidate in one world, and the
+    score is the mean return over the seeds. A run with two or more learner
+    seats puts that many candidates in one world, and the score is the mean
+    margin against the other seats of the same world.
+    """
+    if not train_config.learner_seats:
+        returns, readings, ticks = run_population(
+            env_config, weighting, candidates, seeds, train_config.workers
+        )
+        absolute = returns.mean(axis=1)
+        return Generation(
+            ranked=absolute,
+            absolute=absolute,
+            won=float(np.mean([row["won"] for row in readings])),
+            ticks=ticks,
+        )
+    result = run_seated_population(
+        env_config,
+        weighting,
+        candidates,
+        seeds,
+        train_config.learner_seats,
+        train_config.workers,
+    )
+    absolute = result.absolute.mean(axis=1)
+    ranked = result.relative.mean(axis=1) if train_config.relative else absolute
+    return Generation(
+        ranked=ranked, absolute=absolute, won=result.won, ticks=result.ticks
+    )
 
 
 def unit(vector: np.ndarray) -> np.ndarray:
@@ -334,6 +419,25 @@ def train(
     best_score = resumed_best
     best_generation = -1
 
+    # **The absolute yardstick.** A relative score is zero on average by
+    # construction, so it cannot tell a population that improved from one that
+    # got worse together. The built-in controller plays the learner's own seat
+    # on the validation seeds, and the run reports every validation score
+    # against that number. The controller does not learn, so the yardstick is
+    # measured once and holds for the whole run.
+    yardstick: float | None = None
+    if validation:
+        yardstick = float(
+            run_population(
+                replace(env_config, controlled=False),
+                weighting,
+                [policy],
+                validation,
+                train_config.workers,
+            )[0].mean()
+        )
+        print(f"  {name} controller yardstick {yardstick:9.1f}", flush=True)
+
     def validate(current: Trainable, generation: int) -> float | None:
         """Play the centre on the validation seeds, and return what it scored."""
         nonlocal best_policy, best_score, best_generation
@@ -377,11 +481,10 @@ def train(
             for index in range(pairs)
             for sign in (1.0, -1.0)
         ]
-        returns, readings, ticks = run_population(
-            env_config, weighting, candidates, seeds, train_config.workers
+        played = score_generation(
+            env_config, weighting, candidates, seeds, train_config
         )
-        scores = returns.mean(axis=1)
-        won = float(np.mean([row["won"] for row in readings]))
+        scores, ticks, won = played.ranked, played.ticks, played.won
         shaped = rank_shape(scores)
         gradient = np.zeros_like(centre)
         for index in range(pairs):
@@ -401,6 +504,10 @@ def train(
         # that follows it carries no information. The run reports it, so the
         # failure that killed the first attempt is visible while it happens.
         spread = float(scores.max() - scores.min())
+        # The spread of the raw return is reported beside the spread of the
+        # ranked score, because the two answer different questions and a run
+        # that reported one of them could not be compared with the other.
+        absolute_spread = float(played.absolute.max() - played.absolute.min())
         last = generation == train_config.generations - 1
         checked = (
             validate(policy, generation)
@@ -440,16 +547,28 @@ def train(
                 "mean": float(scores.mean()),
                 "worst": float(scores.min()),
                 "spread": spread,
+                "absolute_spread": absolute_spread,
+                "absolute_mean": float(played.absolute.mean()),
                 "world_ticks": ticks,
                 "won": won,
                 "validation": checked,  # may be None on a generation that skips it
+                # What the centre scored above the built-in controller on the
+                # same seeds. This is the number that says whether the whole
+                # population improved, and a relative score cannot say it.
+                "yardstick": yardstick,
+                "above_controller": (
+                    None
+                    if checked is None or yardstick is None
+                    else checked - yardstick
+                ),
                 "seconds": round(time.time() - started, 1),
             }
         )
         print(
             f"  {name} generation {generation:2d} "
             f"mean {scores.mean():9.1f} best {scores.max():9.1f} "
-            f"spread {spread:8.1f} won {won:5.2f} "
+            f"spread {spread:8.1f} abs-spread {absolute_spread:8.1f} "
+            f"won {won:5.2f} "
             f"ticks {ticks} "
             f"valid {'-' if checked is None else f'{checked:9.1f}'} "
             f"[{history[-1]['seconds']:.0f}s]",
@@ -509,6 +628,7 @@ def write_report(path: Path, payload: Mapping[str, object]) -> None:
 
 __all__ = [
     "REPORT_FIELDS",
+    "Generation",
     "TrainConfig",
     "TrainResult",
     "asdict",
@@ -516,6 +636,7 @@ __all__ = [
     "field_starts",
     "rank_shape",
     "run_population",
+    "score_generation",
     "train",
     "viable_seeds",
     "write_report",

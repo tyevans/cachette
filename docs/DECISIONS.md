@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-280**
+**Next number: DEC-282**
 
 ## Open
 
@@ -4483,6 +4483,55 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 
 
 
+### DEC-281 — How does a generation compare two candidate policies?
+
+**Closed. Each candidate's return minus the mean return of the other learner
+seats of its own world.**
+
+A training run scored each candidate by its absolute return. That return
+carries the map, the weather and the opponents of the world it came from, so
+two candidates that never met were compared through all of it. A measured run
+improved nothing over sixteen generations, and the findings register holds the
+diagnosis.[^DEC281A]
+
+**Two candidates in one game share every one of those things.** The difference
+between their returns therefore holds almost none of the variance that either
+return holds on its own. That is the whole reason to prefer a margin, and it
+costs nothing: the multi-seat harness that puts two candidates in one world
+already existed.
+
+**Four other formulas were considered and rejected.**
+
+*The mean of every learner seat, the candidate's own included.* With two
+learner seats this differs from the chosen formula by one constant factor, so
+it ranks the same. With more seats it dilutes the margin by the candidate's own
+return, which is the quantity being measured. There is no case where it is
+better and one where it is worse.
+
+*A win or a loss against the other seat, and nothing else.* A two-seat game
+then scores each candidate zero or one. The instrument that failed took seven
+values, and this one takes two. It goes the wrong way.
+
+*A rank inside the game.* The same objection. A rank over two occupants is the
+previous option, and a rank over three is a three-valued score.
+
+*The candidate's return minus the mean return of the whole generation.* The
+candidates of a generation do not share a world, so this subtracts a constant
+from every score and changes no ranking at all. It removes none of the variance
+the margin removes.
+
+**A margin needs an opponent, so the runner refuses a single learner seat.** It
+also refuses a seat list that fills every seat, because that removes the
+built-in controller the run is measured against, and in a game with one winner
+it pins the win rate at one over the faction count whatever any policy does.
+
+**The relative score is not the only instrument, and it must not become one.**
+It is zero on average by construction, so a population that got worse together
+reads the same as one that got better together. The trainer therefore measures
+the centre against the built-in controller on the validation seeds, on every
+generation, and reports that number beside the relative one.
+
+
 ## References
 
 [^DEC279B]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
@@ -4490,6 +4539,7 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC278A]: ADR-0180, a site changes hands or the taker destroys it, decision D3. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
 [^DEC278B]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^DEC278C]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+[^DEC281A]: Findings register, FND-630. `docs/FINDINGS.md`
 
 [^DEC224A]: Review of backlog item 0345, section 10. `docs/reviews/0345-resolve-a-meeting.md`
 [^DEC224B]: Backlog item 0432, decide the lifetime of every log the bindings expose. `docs/backlog/proposed/0432-decide-the-lifetime-of-every-log-the-bindings-expose.md`
@@ -4801,3 +4851,4 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC276G]: Backlog item 0516, give a faction one flat observation array, and declare its layout in a schema. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
 [^DEC277B]: Research report 30, the published atmospheric math, section 9. `docs/research/reports/30-the-published-atmospheric-math.md`
 [^DEC277C]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+

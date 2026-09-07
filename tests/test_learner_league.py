@@ -11,6 +11,20 @@ seat 2 won 11. That is start-position luck with opponent quality held
 constant, so a layout that put one candidate in seat 1 and another in seat 2
 would rank the seats.
 
+**The seat also decides the score across a whole generation, and the pairing
+does not reach that.** The trainer ranks every candidate of a generation
+together, so a pair that held the good seat for every seed of a generation
+would rank above a pair that held the bad one. The seat therefore turns by one
+position at each seed index, and a test below checks that each candidate
+played every seat.
+
+**A candidate is scored by its margin against the other seats of its own
+world.** Two candidates in one game share the map, the weather and the
+opponents, so the difference between their returns holds almost none of the
+variance that either return holds on its own. The tests of that formula run
+on made-up returns, because the claim is arithmetic and a world would only
+hide it.
+
 These tests check the layout first, because it is cheap and it is where the
 error would be, and then drive a real world to check the parts that touch the
 engine.
@@ -18,6 +32,7 @@ engine.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -29,13 +44,17 @@ from cachette.learn.env import EnvConfig, viable_seeds
 from cachette.learn.league import (
     SeatedGame,
     controller_seats,
+    margins_of_world,
     run_seated_population,
+    seat_counts,
     seat_matched_plan,
 )
 from cachette.learn.policy import LinearPolicy
+from cachette.learn.train import TrainConfig, score_generation, train
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from pathlib import Path
 
 WORLD = EnvConfig(
     width=24,
@@ -211,11 +230,211 @@ def test_a_seated_population_scores_every_candidate() -> None:
     candidates: Sequence[LinearPolicy] = [
         LinearPolicy(rng.standard_normal((actions, features)) * 0.5) for _ in range(4)
     ]
-    returns, ticks = run_seated_population(
+    result = run_seated_population(
         WORLD, WEIGHTING, candidates, seeds, learner_seats=[0, 1], workers=2
     )
-    assert returns.shape == (4, 2)
+    assert result.absolute.shape == (4, 2)
+    assert result.relative.shape == (4, 2)
     # Every candidate played every seed, so no cell is untouched. A cell that
     # stayed at zero would mean a seat never reached its reward.
-    assert np.count_nonzero(returns) > 0
-    assert ticks > 0
+    assert np.count_nonzero(result.absolute) > 0
+    assert result.ticks > 0
+    # Two learner seats give two equal and opposite margins in each world, so
+    # every column of the relative array sums to zero. A runner that scored a
+    # candidate against a world it did not play would break this.
+    assert result.relative.sum(axis=0) == pytest.approx(np.zeros(2), abs=1e-9)
+    # The margin is not the return. A run where the two agreed would mean the
+    # subtraction never happened.
+    assert not np.allclose(result.relative, result.absolute)
+
+
+def test_a_relative_run_refuses_one_learner_seat() -> None:
+    """A margin with no opponent is an absolute return under another name."""
+    with pytest.raises(ValueError, match="at least two learner seats"):
+        run_seated_population(
+            WORLD, WEIGHTING, [], seeds=[900], learner_seats=[0], workers=1
+        )
+
+
+def test_a_relative_run_refuses_a_population_that_leaves_a_world_half_empty() -> None:
+    """A short group leaves one occupant in a world, and a margin needs two.
+
+    The plan groups the pairs the width of the seat list, and a group short of
+    a full width simply leaves the spare seats to the built-in controller. The
+    absolute runner can live with that. A margin cannot, so the runner refuses
+    the population rather than scoring one world against nothing.
+    """
+    rng = np.random.default_rng(0)
+    candidates = [LinearPolicy(rng.standard_normal((2, 2))) for _ in range(6)]
+    with pytest.raises(ValueError, match="multiple of 4"):
+        run_seated_population(
+            WORLD, WEIGHTING, candidates, seeds=[900], learner_seats=[0, 1], workers=1
+        )
+
+
+def test_a_relative_run_refuses_a_table_with_no_controller() -> None:
+    """Seating a candidate everywhere removes the yardstick of the run."""
+    with pytest.raises(ValueError, match=r"no\s+yardstick"):
+        run_seated_population(
+            WORLD, WEIGHTING, [], seeds=[900], learner_seats=[0, 1, 2], workers=1
+        )
+
+
+def test_each_candidate_plays_every_seat_across_a_generation() -> None:
+    """The pairing cancels the seat inside a pair, and not between two pairs.
+
+    The trainer ranks every candidate of a generation together. A pair that
+    held one seat for the whole generation would carry that seat's advantage
+    into that ranking, and no property of one pair would show it.
+    """
+    seats = [0, 1]
+    assignments, _ = seat_matched_plan(pairs=4, seeds=4, learner_seats=seats)
+    counted = seat_counts(assignments)
+    assert set(counted) == set(range(8))
+    for candidate, played in counted.items():
+        assert set(played) == set(seats), f"candidate {candidate} played {played}"
+
+
+def test_the_seat_rotation_is_balanced_when_the_seeds_divide_by_the_seats() -> None:
+    """A candidate that played one seat more often still carries that seat."""
+    assignments, _ = seat_matched_plan(pairs=6, seeds=4, learner_seats=[0, 1])
+    for candidate, played in seat_counts(assignments).items():
+        assert len(set(played.values())) == 1, f"candidate {candidate} played {played}"
+
+
+def test_a_margin_is_a_return_minus_the_mean_of_the_other_seats() -> None:
+    """State the formula on numbers, where nothing can hide it."""
+    assert margins_of_world({0: 12.0, 1: 0.0, 2: 6.0}) == pytest.approx(
+        {0: 9.0, 1: -9.0, 2: 0.0}
+    )
+
+
+def test_two_seats_give_equal_and_opposite_margins() -> None:
+    """With two learner seats the population mean of the score is zero."""
+    margins = margins_of_world({3: 10.0, 7: 4.0})
+    assert margins == pytest.approx({3: 6.0, 7: -6.0})
+
+
+def test_a_margin_removes_a_level_the_whole_world_shares() -> None:
+    """This is the whole point of the change, so assert it directly.
+
+    A hard map, a bad weather draw or a strong controller moves every return
+    of one world by about the same amount. That level is the variance the
+    absolute score carries and the margin does not.
+    """
+    plain = margins_of_world({0: 10.0, 1: 4.0, 2: -2.0})
+    shifted = margins_of_world({0: 1010.0, 1: 1004.0, 2: 998.0})
+    assert plain == pytest.approx(shifted)
+
+
+def test_a_margin_needs_an_opponent() -> None:
+    """One occupant has nothing to be relative to."""
+    with pytest.raises(ValueError, match="at least two learner seats"):
+        margins_of_world({0: 1.0})
+
+
+def test_a_seated_generation_gives_one_answer_at_two_worker_counts() -> None:
+    """A league is a new place for a completion order to reach the score.
+
+    The plan fixes which candidate sits in which seat of which world, the
+    batch reports its rows in world index order, and the accumulation runs
+    over the world index. None of that depends on which worker finished
+    first, so two worker counts must give the same array bit for bit.
+
+    **The comparison must be able to fail.** A run compared against itself
+    always passes, so the test also plays a different candidate set and
+    requires a different answer.
+    """
+    seeds = viable_seeds(WORLD, 2, 900)
+    probe = SeatedGame(WORLD, WEIGHTING, seats=[0])
+    world = probe.reset(seeds[0])
+    actions = int(world.action_schema()["length"])
+    features = int(world.observation_schema()["length"]) + 1
+
+    def population(draw: int) -> list[LinearPolicy]:
+        # **A different scale is not a different population.** A linear policy
+        # chooses by the highest score, and multiplying every weight by one
+        # positive number scales every score by the same factor. The control
+        # therefore draws different weights, not larger ones.
+        rng = np.random.default_rng(draw)
+        return [
+            LinearPolicy(rng.standard_normal((actions, features)) * 0.5)
+            for _ in range(4)
+        ]
+
+    def play(candidates: Sequence[LinearPolicy], workers: int) -> np.ndarray:
+        return run_seated_population(
+            WORLD, WEIGHTING, candidates, seeds, learner_seats=[0, 1], workers=workers
+        ).relative
+
+    one = play(population(0), workers=1)
+    four = play(population(0), workers=4)
+    assert np.array_equal(one, four)
+    assert not np.array_equal(one, play(population(11), workers=1))
+
+
+def test_a_seated_generation_ranks_the_margin_and_reports_the_return() -> None:
+    """Drive the trainer's own scoring pass, not the runner underneath it.
+
+    The runner returns both instruments. Whether the update ranks the margin
+    is a decision of the trainer, so the test starts at the trainer.
+    """
+    seeds = viable_seeds(WORLD, 2, 900)
+    probe = SeatedGame(WORLD, WEIGHTING, seats=[0])
+    world = probe.reset(seeds[0])
+    actions = int(world.action_schema()["length"])
+    features = int(world.observation_schema()["length"]) + 1
+    rng = np.random.default_rng(0)
+    candidates = [
+        LinearPolicy(rng.standard_normal((actions, features)) * 0.5) for _ in range(4)
+    ]
+    config = TrainConfig(workers=2, learner_seats=(0, 1), relative=True)
+    played = score_generation(WORLD, WEIGHTING, candidates, seeds, config)
+    assert played.ranked.shape == (4,)
+    assert float(played.ranked.sum()) == pytest.approx(0.0, abs=1e-9)
+    assert not np.allclose(played.ranked, played.absolute)
+    assert played.ticks > 0
+
+    absolute = score_generation(
+        WORLD, WEIGHTING, candidates, seeds, replace(config, relative=False)
+    )
+    assert np.allclose(absolute.ranked, absolute.absolute)
+
+
+def test_a_league_run_reports_the_controller_yardstick_every_generation(
+    tmp_path: Path,
+) -> None:
+    """A relative score cannot say whether the whole population improved.
+
+    It is zero on average by construction, so a population that got worse
+    together reads the same as one that got better together. The run must
+    therefore carry an absolute measurement against the built-in controller,
+    and it must carry it on every generation rather than on some of them.
+    """
+    pool = viable_seeds(WORLD, 2, 900)
+    validation = viable_seeds(WORLD, 1, 4000)
+    result = train(
+        "league-probe",
+        WORLD,
+        WEIGHTING,
+        TrainConfig(
+            generations=2,
+            population=4,
+            seeds_per_generation=2,
+            workers=2,
+            learner_seats=(0, 1),
+        ),
+        tmp_path,
+        pool,
+        validation=validation,
+        validate_every=1,
+    )
+    history = result["history"]
+    assert len(history) == 2
+    for row in history:
+        assert row["yardstick"] is not None
+        assert row["validation"] is not None
+        assert row["above_controller"] is not None
+        assert row["above_controller"] == pytest.approx(
+            row["validation"] - row["yardstick"]
+        )

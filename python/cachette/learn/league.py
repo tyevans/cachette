@@ -26,6 +26,37 @@ worlds of one seed host both halves of two pairs:
 
 Pair 1 is scored twice in seat 0 and pair 2 twice in seat 1, both on seed s.
 
+# The seat rotates with the seed, so no pair keeps one seat for a generation
+
+The layout above cancels the seat inside one pair. It does not cancel the seat
+between two pairs, because the trainer ranks the whole population together and
+not each pair on its own. A pair that held the good seat for every seed of a
+generation would rank above a pair that held the bad one, and the update would
+follow the seat.
+
+**The seat of a pair therefore turns by one position at each seed index.** The
+pair at offset ``o`` of its group takes learner seat ``(o + s) % width`` on
+seed index ``s``. Both halves of the pair sit in worlds of the same seed
+index, so they still share the seat and the antithetic difference is
+unchanged. Over a generation each pair plays every learner seat, and the
+rotation is exactly balanced when the seed count divides by the seat count.
+
+# A margin against the other seats of one game, not an absolute return
+
+An absolute return carries the map, the weather and the opponents of the world
+it came from. Two candidates that never met are then compared through all of
+that noise. **Two candidates in one game share every one of those things**, so
+the difference between their returns holds almost none of it.
+
+The score of a candidate in one world is its own return minus the mean return
+of the other learner seats of that world. With two learner seats the two
+margins are equal and opposite, so the population mean is zero and the
+ranking measures the play alone.
+
+**A margin needs an opponent, so it needs at least two learner seats.** A run
+with one learner seat has no other seat to subtract, and the runner refuses
+rather than giving back an absolute return under a relative name.
+
 **The pairing cancels the seat and the seed. It does not cancel the
 opponent.** The plus half of pair 1 meets the plus half of pair 2, and the
 minus half meets the minus half, so the difference between the two scores of
@@ -61,6 +92,7 @@ seat that a player of it could not see.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
@@ -72,7 +104,7 @@ from .env import EnvConfig
 from .reward import Reward, Weighting
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     from .policy import Policy
 
@@ -104,6 +136,12 @@ def seat_matched_plan(
     are grouped so that as many as there are learner seats share a world, and
     the plus halves and the minus halves go to two worlds of the same seed.
 
+    **The seat of a pair turns by one position at each seed index.** A pair
+    that kept one seat for a whole generation would carry that seat's
+    advantage into a ranking that compares every pair, so the ranking would
+    follow the seat. The turn keeps both halves of a pair together, because
+    both halves sit in worlds of the same seed index.
+
     Returns the assignments and the seed index of each world.
     """
     if not learner_seats:
@@ -126,11 +164,57 @@ def seat_matched_plan(
                     assignments.append(
                         SeatAssignment(
                             candidate=2 * pair + half,
-                            seat=learner_seats[offset],
+                            seat=learner_seats[(offset + seed) % width],
                             world=world,
                         )
                     )
     return assignments, world_seed
+
+
+def seat_counts(
+    assignments: Sequence[SeatAssignment],
+) -> dict[int, dict[int, int]]:
+    """Count how many worlds each candidate played in each seat.
+
+    A caller checks the balance of a plan with this. A candidate that played
+    one seat more often than another carries that seat's advantage into the
+    ranking, and no assertion on the plan alone would find it.
+    """
+    counted: dict[int, dict[int, int]] = {}
+    for row in assignments:
+        seats = counted.setdefault(row.candidate, {})
+        seats[row.seat] = seats.get(row.seat, 0) + 1
+    return counted
+
+
+def margins_of_world(scored: Mapping[int, float]) -> dict[int, float]:
+    """Return each occupant's return minus the mean return of the others.
+
+    The occupants of one world share the map, the seeds of the weather and
+    the opponents, so the difference between two of their returns holds
+    almost none of the variance that either return holds on its own.
+
+    **The sum runs over the candidate index, in ascending order.** Float
+    addition is not associative, so a sum taken in the order a mapping
+    happens to hold would make the score depend on that order.
+
+    Raises ``ValueError`` when the world holds fewer than two occupants,
+    because a margin with no opponent is an absolute return under another
+    name.
+    """
+    order = sorted(scored)
+    if len(order) < 2:
+        message = (
+            "a margin needs at least two learner seats in one world, "
+            f"and this world holds {len(order)}"
+        )
+        raise ValueError(message)
+    total = math.fsum(scored[candidate] for candidate in order)
+    others = len(order) - 1
+    return {
+        candidate: scored[candidate] - (total - scored[candidate]) / others
+        for candidate in order
+    }
 
 
 class SeatedGame:
@@ -340,6 +424,37 @@ class SeatedVector:
         return earned
 
 
+@dataclass(frozen=True)
+class SeatedResult:
+    """What one seated generation scored, on both instruments.
+
+    The absolute entry holds the return of each candidate on each seed, which
+    is the quantity the single-seat runner reports. The relative entry holds
+    the margin of each candidate against the other learner seats of the same
+    world.
+
+    **Both are kept, because they answer different questions.** The relative
+    score ranks the candidates of one generation against each other. It
+    cannot say whether the whole population improved, because it is zero on
+    average by construction. Only an absolute measurement answers that, and
+    the trainer takes that one against the built-in controller.
+
+    The won entry is the share of candidate games that ended in a win.
+    **It is not comparable with the win share of a single-seat run.** A game
+    has one winner, so two learner seats in one world can never both win, and
+    the share a whole population can reach is one over the number of learner
+    seats. A single-seat run has no such ceiling, because every candidate
+    plays its own world.
+
+    The ticks entry is how many world ticks the generation cost.
+    """
+
+    absolute: np.ndarray
+    relative: np.ndarray
+    won: float
+    ticks: int
+
+
 def run_seated_population(
     config: EnvConfig,
     weighting: Weighting,
@@ -347,14 +462,41 @@ def run_seated_population(
     seeds: Sequence[int],
     learner_seats: Sequence[int],
     workers: int,
-) -> tuple[np.ndarray, int]:
-    """Score every candidate by playing them together, and return the returns.
+) -> SeatedResult:
+    """Score every candidate by playing them together, and return both scores.
 
-    The result holds one row for each candidate and one column for each seed,
+    Each array holds one row for each candidate and one column for each seed,
     in the shape the single-seat runner returns, so a trainer swaps one for
     the other without changing how it ranks.
+
+    **Nothing here reads a completion order.** The plan fixes which candidate
+    sits in which seat of which world, the batch reports its rows in world
+    index order, the accumulation runs over the world index, and the margin
+    of a world sums over the candidate index.
     """
+    if len(learner_seats) < 2:
+        message = (
+            "a relative score needs at least two learner seats, and this run "
+            f"names {len(learner_seats)}"
+        )
+        raise ValueError(message)
+    if not controller_seats(config, learner_seats):
+        message = (
+            "every seat of the world is a candidate, so the run has no "
+            "yardstick and the win rate is pinned at one over the faction count"
+        )
+        raise ValueError(message)
     pairs = len(candidates) // 2
+    if pairs % len(learner_seats):
+        # The plan groups the pairs the width of the seat list. A group that
+        # is short of a full width leaves a world with one occupant, and a
+        # margin in that world would have nothing to subtract.
+        message = (
+            f"a population of {len(candidates)} gives {pairs} pairs, which "
+            f"does not divide by the {len(learner_seats)} learner seats. Use a "
+            f"population that is a multiple of {2 * len(learner_seats)}."
+        )
+        raise ValueError(message)
     assignments, world_seed = seat_matched_plan(pairs, len(seeds), learner_seats)
     vector = SeatedVector(
         config, weighting, learner_seats, count=len(world_seed), workers=workers
@@ -367,7 +509,9 @@ def run_seated_population(
     for row in assignments:
         by_world.setdefault(row.world, {})[row.seat] = row.candidate
 
-    returns = np.zeros((len(candidates), len(seeds)))
+    # The return of each occupant of each world. A candidate plays one world
+    # for each seed, so a world total is also a cell of the absolute array.
+    earned_in: list[dict[int, float]] = [{} for _ in world_seed]
     while not vector.done:
         rows: list[list[int]] = []
         for index, game in enumerate(vector.games):
@@ -387,8 +531,30 @@ def run_seated_population(
             rows.append(chosen)
         for index, earned in enumerate(vector.step(rows)):
             for seat, value in earned.items():
-                returns[by_world[index][seat], world_seed[index]] += value
-    return returns, vector.world_ticks
+                candidate = by_world[index][seat]
+                totals = earned_in[index]
+                totals[candidate] = totals.get(candidate, 0.0) + value
+
+    absolute = np.zeros((len(candidates), len(seeds)))
+    relative = np.zeros((len(candidates), len(seeds)))
+    wins = 0
+    games = 0
+    for index, seed in enumerate(world_seed):
+        scored = earned_in[index]
+        for candidate, value in scored.items():
+            absolute[candidate, seed] = value
+        for candidate, value in margins_of_world(scored).items():
+            relative[candidate, seed] = value
+        game = vector.games[index]
+        for seat in game.seats:
+            games += 1
+            wins += 1 if game.outcome(seat) == "won" else 0
+    return SeatedResult(
+        absolute=absolute,
+        relative=relative,
+        won=wins / games if games else 0.0,
+        ticks=vector.world_ticks,
+    )
 
 
 def controller_seats(config: EnvConfig, learner_seats: Sequence[int]) -> list[int]:
@@ -406,9 +572,12 @@ def controller_seats(config: EnvConfig, learner_seats: Sequence[int]) -> list[in
 __all__ = [
     "SeatAssignment",
     "SeatedGame",
+    "SeatedResult",
     "SeatedVector",
     "controller_seats",
+    "margins_of_world",
     "replace",
     "run_seated_population",
+    "seat_counts",
     "seat_matched_plan",
 ]
