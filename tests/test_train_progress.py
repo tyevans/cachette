@@ -146,3 +146,34 @@ def test_an_unreadable_line_is_skipped_rather_than_fatal() -> None:
     text = FINISHED + "\n  conquer generation 99 mean nonsense best [1s]\n"
     progress = progress_module.parse(text)
     assert len(progress.strategies[0].generations) == 3
+
+
+def test_the_parser_reads_a_generation_line_that_carries_the_tick_count() -> None:
+    """The trainer prints world-ticks, and the parser must not go blind.
+
+    The parser reads the stdout of the trainer, and that seam has no other
+    guard. A field added between two the parser already knew broke every
+    generation line in one edit, and the parser reported a run with no
+    generations rather than an error.
+    """
+    text = (LOGS / "with-ticks.log").read_text(encoding="utf-8")
+    progress = progress_module.parse(text)
+    rows = progress.strategies[0].generations
+    assert [row.generation for row in rows] == [0, 1, 2]
+    assert [row.ticks for row in rows] == [121248, 118904, 124016]
+    # The spread and the validation still arrive beside it.
+    assert rows[0].spread == 1350.1
+    assert rows[1].validation == -656.7
+    assert rows[0].validation is None
+
+
+def test_a_log_written_before_the_tick_count_still_parses() -> None:
+    """An older log names no ticks, and that is not zero work.
+
+    A reader that took a missing count for zero would report a run that ran
+    no ticks, which is worse than reporting that it does not know.
+    """
+    progress = progress_module.parse(FINISHED)
+    rows = progress.strategies[0].generations
+    assert rows, "the fixture holds no generation"
+    assert all(row.ticks is None for row in rows)

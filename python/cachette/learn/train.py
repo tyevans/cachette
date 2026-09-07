@@ -190,18 +190,46 @@ def train(
     at every generation, so a mean that rises may only mean that the new
     worlds are easier. Only the held-out measurement is evidence.
     """
-    path = out_dir / f"{name}.npz"
+    # **The latest centre and the best centre are two different things, and
+    # one file cannot be both.** The latest is the resume point and it must
+    # exist after every generation, whatever it scored. The best is what a
+    # reader loads to play or to measure, and it only moves when a validation
+    # pass finds something better.
+    #
+    # Conflating them cost this project twice. Writing only the best meant a
+    # run with no validation seeds wrote nothing at all until it ended, so an
+    # early stop lost everything. Writing only the latest meant the first full
+    # run stored a centre taken from inside a collapsed region.
+    best_path = out_dir / f"{name}.npz"
+    latest_path = out_dir / f"{name}-latest.npz"
     probe = Env(env_config, weighting)
 
-    def store(current: Trainable) -> None:
-        """Write the weights of the run so far, with what they were trained on.
+    def store(
+        current: Trainable,
+        target: Path,
+        generation: int,
+        spread: float,
+        validated: float,
+        best: float,
+    ) -> None:
+        """Write one centre, and everything needed to reason about it later.
 
-        The trainer writes after every generation. A run that takes hours
-        therefore leaves a usable policy behind when it stops early.
+        The generation entry says where the centre came from, so a file found
+        after a crash can be placed. The spread entry says whether the search
+        still had a population to rank when it stopped, which is the signal
+        that the first full run lost silently.
+
+        A weight that is absent is written as a quiet value rather than left
+        out, because a file that loads with a missing key fails somewhere
+        further away than the file.
         """
         current.save(
-            path,
+            target,
             {
+                "generation": generation,
+                "spread": spread,
+                "validation_score": validated,
+                "best_score": best,
                 "action_version": 1,
                 "observation_version": 1,
                 "observation_length": probe.observation_length,
@@ -222,14 +250,30 @@ def train(
         policy = MLPPolicy.zeros(probe.action_length, probe.observation_length, hidden)
     else:
         policy = LinearPolicy.zeros(probe.action_length, probe.observation_length)
-    if resume and path.exists():
-        # A run that continues an earlier one starts from the weights that
-        # run stored. The projection of a network is a function of one fixed
-        # seed, so the stored network is the network this run would build.
-        stored, _ = load_policy(path)
-        policy = policy.rebuild(stored.flat())
-        print(f"  {name} resumes from {path}", flush=True)
-    rng = np.random.default_rng(train_config.seed)
+    # The generation a resumed run starts at. A run that starts fresh starts
+    # at zero.
+    first_generation = 0
+    resumed_best = -np.inf
+    if resume and latest_path.exists():
+        # **A resumed run continues the run. It is not a fresh run wearing an
+        # old centre.** It takes the centre, the generation counter and the
+        # best score the earlier run reached, so it neither repeats the
+        # generations already paid for nor overwrites a better checkpoint
+        # with a worse one.
+        #
+        # The projection of a network is a function of one fixed seed, so the
+        # stored network is the network this run would build.
+        stored, meta = load_policy(latest_path)
+        policy = policy.rebuild(np.asarray(stored.flat()))
+        first_generation = int(meta.get("generation", -1)) + 1
+        if best_path.exists():
+            score = float(load_policy(best_path)[1].get("best_score", -np.inf))
+            resumed_best = score
+        print(
+            f"  {name} resumes from {latest_path} at generation "
+            f"{first_generation}",
+            flush=True,
+        )
     pairs = train_config.population // 2
     history: list[dict[str, float | None]] = []
     started = time.time()
@@ -243,7 +287,7 @@ def train(
     # held-out set, so keeping the best of them takes nothing from the
     # held-out measurement that the report is judged on.
     best_policy = policy
-    best_score = -np.inf
+    best_score = resumed_best
     best_generation = -1
 
     def validate(current: Trainable, generation: int) -> float | None:
@@ -258,10 +302,14 @@ def train(
         )
         if scored > best_score:
             best_score, best_policy, best_generation = scored, current, generation
-            store(current)
         return scored
 
-    for generation in range(train_config.generations):
+    for generation in range(first_generation, train_config.generations):
+        # **The noise of a generation is a function of the generation.** A
+        # single stream advanced by each generation would give a resumed run
+        # different perturbations from the run it continues, so a resume
+        # would silently be a different experiment.
+        rng = np.random.default_rng([train_config.seed, generation])
         # A fresh seed set for each generation, taken from the pool in a
         # fixed order, so a repeat of this run takes the same worlds.
         offset = generation * train_config.seeds_per_generation
@@ -315,6 +363,32 @@ def train(
             if last or generation % validate_every == validate_every - 1
             else None
         )
+
+        # **The latest centre is written every generation, unconditionally.**
+        # No validation gate and no improvement gate. This is the resume
+        # point, and a run that stops between two validation passes must
+        # still leave one behind.
+        quiet = float("nan")
+        store(
+            policy,
+            latest_path,
+            generation,
+            spread,
+            quiet if checked is None else checked,
+            quiet if best_score == -np.inf else best_score,
+        )
+        # The best centre moves only when a validation pass finds something
+        # better. A run with no validation seeds has no way to tell one
+        # centre from another, so its latest centre is also its best.
+        if not validation or best_generation == generation:
+            store(
+                best_policy,
+                best_path,
+                best_generation if validation else generation,
+                spread,
+                quiet if checked is None else checked,
+                quiet if best_score == -np.inf else best_score,
+            )
         history.append(
             {
                 "generation": generation,
@@ -338,16 +412,12 @@ def train(
             flush=True,
         )
 
-    # The stored file already holds the best centre, because validate wrote
-    # it when it found it. A run with no validation seeds keeps the last.
-    if not validation:
-        best_policy = policy
-        store(policy)
     return {
         "name": name,
         "kind": kind,
         "history": history,
-        "weights": str(path),
+        "weights": str(best_path),
+        "latest_weights": str(latest_path),
         "parameters": int(best_policy.flat().size),
         "best_generation": best_generation,
         "best_validation": None if best_score == -np.inf else best_score,

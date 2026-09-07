@@ -1,0 +1,9 @@
+training seeds 80, holdout seeds 24
+
+=== controller baseline ===
+  controller {'return': -475.7458333333332, 'episodes': 24.0, 'held_tiles': 242.5, 'won': 0.375, 'lost': 0.625}
+
+=== conquer (linear) ===
+  conquer generation  0 mean   -1565.5 best    -638.9 spread   1350.1 won  0.10 ticks 121248 valid - [504s]
+  conquer generation  1 mean   -1471.6 best     729.9 spread   2713.4 won  0.12 ticks 118904 valid    -656.7 [995s]
+  conquer generation  2 mean   -1690.2 best    -650.1 spread   1340.5 won  0.07 ticks 124016 valid - [1310s]

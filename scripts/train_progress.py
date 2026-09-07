@@ -61,6 +61,7 @@ GENERATION = re.compile(
     r"best\s+(?P<best>-?[\d.]+)"
     r"(?:\s+spread\s+(?P<spread>-?[\d.]+))?"
     r"(?:\s+won\s+(?P<won>-?[\d.]+))?"
+    r"(?:\s+ticks\s+(?P<ticks>\d+))?"
     r"(?:\s+valid\s+(?P<validation>-|-?[\d.]+))?"
     r"\s+\[(?P<seconds>[\d.]+)s\]"
 )
@@ -98,6 +99,10 @@ class Generation:
     best: float
     seconds: float
     spread: float | None = None
+    # How many world-ticks the generation ran. One world stepped one tick is
+    # one. A run started before the trainer counted them leaves this unset,
+    # and a reader must not read that as zero work.
+    ticks: int | None = None
     won: float | None = None
     validation: float | None = None
 
@@ -213,10 +218,13 @@ def parse(text: str) -> Progress:
                         if row.group("won") is not None
                         else None
                     ),
+                    ticks=(
+                        int(row.group("ticks"))
+                        if row.group("ticks") is not None
+                        else None
+                    ),
                     validation=(
-                        None
-                        if validation in (None, "-")
-                        else float(str(validation))
+                        None if validation in (None, "-") else float(str(validation))
                     ),
                 )
             )
@@ -352,9 +360,7 @@ def render(
             )
         if rows:
             recent = rows[-5:]
-            lines.append(
-                "      generation  mean       best       spread   won"
-            )
+            lines.append("      generation  mean       best       spread   won")
             for row in recent:
                 spread = "     -" if row.spread is None else f"{row.spread:9.1f}"
                 won = "    -" if row.won is None else f"{row.won:5.2f}"
@@ -384,15 +390,9 @@ def render(
         f"about {clock(money['seconds_remaining'])} and "
         f"${money['dollars_remaining']:.2f}"
     )
-    lines.append(
-        f"      full run   ${money['dollars_total']:.2f} at this rate"
-    )
-    lines.append(
-        "  The mean above is not a learning curve. The seed set moves every"
-    )
-    lines.append(
-        "  generation, so only the held-out row and the bar compare."
-    )
+    lines.append(f"      full run   ${money['dollars_total']:.2f} at this rate")
+    lines.append("  The mean above is not a learning curve. The seed set moves every")
+    lines.append("  generation, so only the held-out row and the bar compare.")
     return "\n".join(lines)
 
 
