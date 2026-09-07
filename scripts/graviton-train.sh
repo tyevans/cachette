@@ -69,7 +69,14 @@ REGION="${CACHETTE_TRAIN_REGION:-us-west-2}"
 # of a candidate and a seed, and the episodes share nothing, so the work
 # divides over the cores. The throughput probe below measures whether it
 # actually does, rather than assuming it.
-readonly INSTANCE_TYPE="${CACHETTE_TRAIN_INSTANCE:-c7g.16xlarge}"
+# Not readonly, for the same reason REGION is not: the stop path sources
+# instance.env, and that file sets this again for the run it names. A readonly
+# name makes the source fail and the stop path then cannot end the run.
+#
+# **Every name instance.env writes must be writable here.** REGION was fixed
+# alone and this one was left, so the stop path broke a second time on the same
+# cause. The names the file writes are listed where it is written.
+INSTANCE_TYPE="${CACHETTE_TRAIN_INSTANCE:-c7g.16xlarge}"
 readonly ROOT_VOLUME_GB=30
 readonly TAG_PROJECT="cachette"
 readonly TAG_PURPOSE="learner-training-run"
