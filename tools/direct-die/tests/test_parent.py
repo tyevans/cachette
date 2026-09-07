@@ -49,7 +49,7 @@ def test_a_human_choice_wins_over_a_higher_score_in_an_earlier_round(tmp_path):
         store.round_path(1) / "feedback.json",
         {
             "round": 1,
-            "choice": "b",
+            "likes": ["b"],
             "text": "I like the dark palette",
             "at": "2026-09-06T00:00:00+00:00",
         },
@@ -68,7 +68,7 @@ def test_feedback_text_alone_keeps_the_best_parent(tmp_path):
         store.round_path(1) / "feedback.json",
         {
             "round": 1,
-            "choice": None,
+            "likes": [],
             "text": "make it darker",
             "at": "2026-09-06T00:00:00+00:00",
         },

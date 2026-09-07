@@ -7,13 +7,6 @@ and the walk over a session that turns it into one record.
 The reader is total. It never raises. A malformed field becomes an empty
 field, because the loop must keep running when a person edits the file by
 hand. The front end refuses bad input at the moment of the write.
-
-## The old field
-
-The file held a `choice` field, which named one variant. Nothing writes that
-field now. A file that holds `choice` and no `likes` reads as one like and a
-one-entry order, so every session already on disk still opens. This rule
-lives in one function.
 """
 
 from __future__ import annotations
@@ -68,11 +61,7 @@ def read_feedback(value: dict | None) -> Feedback:
 
     denies = _letters(value.get("denies"))
 
-    if "likes" in value:
-        likes = _letters(value.get("likes"))
-    else:
-        choice = value.get("choice")
-        likes = (choice,) if isinstance(choice, str) and choice in VARIANT_LETTERS else ()
+    likes = _letters(value.get("likes"))
 
     # A refusal beats a like. The two lists must not hold the same letter, and
     # the front end refuses that write, but a hand-edited file can hold it.

@@ -221,12 +221,14 @@ def build(root: Path, clean: bool = True) -> Path:
             "d": "round-00/variant-d",
         }
         write_json(meta_path, meta)
-    # round-00 of the healthy session keeps the old "choice" field on purpose.
-    # It is the regression proof that a session already on disk still opens.
     write_json(
         healthy / "round-00" / "feedback.json",
         {
-            "choice": "b",
+            "round": 0,
+            "likes": ["b"],
+            "denies": [],
+            "order": ["b"],
+            "note": "",
             "text": "B reads best at tile size. The outline of A is too heavy.",
             "at": (created + timedelta(minutes=6))
             .isoformat(timespec="seconds")

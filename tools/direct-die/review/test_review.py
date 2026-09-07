@@ -298,9 +298,13 @@ def test_the_page_reads_the_disk_again_after_a_change(
 ) -> None:
     # The generation loop writes under the person, so no page may cache.
     path = root / PARTIAL / "round-04" / "feedback.json"
-    path.write_text('{"choice": "d", "text": "changed on disk", "at": "2026-01-01Z"}')
+    path.write_text(
+        '{"likes": ["d"], "text": "changed on disk", "at": "2026-01-01Z"}'
+    )
     assert "changed on disk" in client.get(f"/s/{PARTIAL}/round-04").text
-    path.write_text('{"choice": "a", "text": "changed once more", "at": "2026-01-01Z"}')
+    path.write_text(
+        '{"likes": ["a"], "text": "changed once more", "at": "2026-01-01Z"}'
+    )
     assert "changed once more" in client.get(f"/s/{PARTIAL}/round-04").text
 
 
@@ -339,7 +343,6 @@ def test_the_writer_records_the_likes_and_the_refusals(root: Path) -> None:
     assert written["order"] == ["d", "b"]
     assert written["note"] == "keep it flat"
     assert written["text"] == "darker base"
-    assert "choice" not in written
 
 
 def test_the_writer_refuses_a_letter_that_is_in_both_lists(root: Path) -> None:
@@ -363,15 +366,6 @@ def test_the_writer_refuses_a_letter_that_is_not_a_variant(root: Path) -> None:
     asset, session_id = HEALTHY.split("/")
     with pytest.raises(ContractError):
         store.write_feedback(asset, session_id, "round-02", ["z"], [], ["z"], "", "")
-
-
-def test_an_old_choice_file_reads_as_one_like(root: Path) -> None:
-    store = SessionStore(root)
-    asset, session_id = HEALTHY.split("/")
-    current = store.load_round(asset, session_id, "round-00")
-    assert current.likes == ("b",)
-    assert current.winner == "b"
-    assert current.denies == ()
 
 
 def test_a_round_with_no_feedback_reads_as_nothing(root: Path) -> None:

@@ -101,18 +101,28 @@ def test_feedback_comes_back_when_the_round_matches(tmp_path):
     store = session.Session("hex-tile", "s1", root=tmp_path)
     session.write_json(
         store.round_path(1) / "feedback.json",
-        {"round": 1, "choice": "b", "text": "more contrast", "at": "2026-09-06T00:00:00+00:00"},
+        {
+            "round": 1,
+            "likes": ["b"],
+            "text": "more contrast",
+            "at": "2026-09-06T00:00:00+00:00",
+        },
     )
     found = store.feedback(1)
     assert found is not None
-    assert found["choice"] == "b"
+    assert found["likes"] == ["b"]
 
 
 def test_feedback_is_refused_when_the_round_disagrees(tmp_path):
     store = session.Session("hex-tile", "s1", root=tmp_path)
     session.write_json(
         store.round_path(1) / "feedback.json",
-        {"round": 7, "choice": "b", "text": "more contrast", "at": "2026-09-06T00:00:00+00:00"},
+        {
+            "round": 7,
+            "likes": ["b"],
+            "text": "more contrast",
+            "at": "2026-09-06T00:00:00+00:00",
+        },
     )
     assert store.feedback(1) is None
 

@@ -120,10 +120,8 @@ def read_feedback(
     The function never raises. It drops what it cannot read, because a person
     can edit the file by hand and a page must still render.
 
-    The file held a `choice` field, which named one variant. Nothing writes
-    that field now. A file that holds `choice` and no `likes` reads as one
-    like, so every session already on disk still opens. The generation loop
-    holds the same rule in its own reader, and one test compares the two.[^1]
+    The generation loop holds the same rule in its own reader, and one test
+    compares the two.[^1]
 
     ## References
 
@@ -132,13 +130,7 @@ def read_feedback(
     if not isinstance(value, dict):
         return (), (), (), "", ""
     denies = _letters(value.get("denies"))
-    if "likes" in value:
-        likes = _letters(value.get("likes"))
-    else:
-        choice = value.get("choice")
-        likes = (
-            (choice,) if isinstance(choice, str) and choice in VARIANT_LETTERS else ()
-        )
+    likes = _letters(value.get("likes"))
     likes = tuple(letter for letter in likes if letter not in denies)
     ranked = [letter for letter in _letters(value.get("order")) if letter in likes]
     ranked.extend(letter for letter in likes if letter not in ranked)
@@ -215,11 +207,7 @@ class Round:
 
     @property
     def parents(self) -> dict[str, str]:
-        """Give the parent that each variant of this round revised.
-
-        The loop wrote one `parent` string before it could branch. A round
-        that holds the old field gives that one value to every variant.
-        """
+        """Give the parent that each variant of this round revised."""
         if self.meta is None:
             return {}
         found = self.meta.get("parents")
@@ -229,9 +217,6 @@ class Round:
                 for letter, value in found.items()
                 if letter in VARIANT_LETTERS and isinstance(value, str)
             }
-        single = self.meta.get("parent")
-        if isinstance(single, str):
-            return {variant.letter: single for variant in self.present_variants}
         return {}
 
     @property
