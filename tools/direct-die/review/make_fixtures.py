@@ -210,6 +210,19 @@ def build(root: Path, clean: bool = True) -> Path:
     write_round(
         healthy, 2, parent="round-01/variant-c", summary="lift the value against grass"
     )
+    for round_name in ("round-01", "round-02"):
+        meta_path = healthy / round_name / "meta.json"
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
+        del meta["parent"]
+        meta["parents"] = {
+            "a": "round-00/variant-b",
+            "b": "round-00/variant-d",
+            "c": "round-00/variant-b",
+            "d": "round-00/variant-d",
+        }
+        write_json(meta_path, meta)
+    # round-00 of the healthy session keeps the old "choice" field on purpose.
+    # It is the regression proof that a session already on disk still opens.
     write_json(
         healthy / "round-00" / "feedback.json",
         {
@@ -223,11 +236,27 @@ def build(root: Path, clean: bool = True) -> Path:
     write_json(
         healthy / "round-01" / "feedback.json",
         {
-            "choice": None,
-            "text": "None of these. The canopy lost its silhouette. Go back to B.",
-            "at": (created + timedelta(minutes=14))
-            .isoformat(timespec="seconds")
-            .replace("+00:00", "Z"),
+            "round": 1,
+            "likes": ["b", "d"],
+            "denies": ["a"],
+            "order": ["d", "b"],
+            "note": "keep the palette flat",
+            "text": "raise the contrast of the base",
+            "at": "2026-09-01T10:20:00Z",
+        },
+    )
+    write_json(
+        healthy / "round-01" / "analysis.json",
+        {
+            "round": 1,
+            "preference": "The accepted drawings hold three shapes and one flat fill.",
+            "order": ["d", "b"],
+            "reasons": {"d": "the silhouette reads at 64 pixels", "b": ""},
+            "guide_edit": {
+                "section": "Shape language",
+                "rule": "Use three shapes or fewer inside the hexagon.",
+            },
+            "at": "2026-09-01T10:25:00Z",
         },
     )
 
@@ -239,8 +268,16 @@ def build(root: Path, clean: bool = True) -> Path:
     write_round(partial, 0, summary="first pass at the mountain hex")
     # A round that holds one variant only.
     write_round(partial, 1, letters=("a",), summary="only variant a is written")
-    # A round whose variants have no critique.
-    write_round(partial, 2, with_critique=False, summary="the critique is not written")
+    # A round whose variants have no critique. Its meta.json keeps the old
+    # "parent" string on purpose, as the regression proof that a round with
+    # the old metadata shape still gives every variant the same parent.
+    write_round(
+        partial,
+        2,
+        parent="round-00/variant-a",
+        with_critique=False,
+        summary="the critique is not written",
+    )
     # A round with an SVG and no render, and no meta.json.
     write_round(partial, 3, letters=("a", "b"), with_renders=False, with_meta=False)
     # A round whose critique file holds broken JSON.
@@ -280,15 +317,37 @@ def build_style_sessions(root: Path, created: datetime) -> None:
     chosen.mkdir(parents=True, exist_ok=True)
     write_manifest(chosen, "cartoon", created + timedelta(days=3), 2)
     write_round(chosen, 0, summary="a dense stand of trees")
+    # This round keeps the old "parent" string in meta.json on purpose. It is
+    # the fixture of the old metadata shape, and one test reads it.
     write_round(
         chosen, 1, parent="round-00/variant-b", summary="a dense stand of trees"
     )
     write_json(
         chosen / "round-01" / "feedback.json",
         {
-            "choice": "b",
-            "text": "B reads at tile size. Keep the canopy shape.",
+            "round": 1,
+            "likes": ["b", "d"],
+            "denies": ["a"],
+            "order": ["b", "d"],
+            "note": "Keep the canopy shape.",
+            "text": "B reads at tile size.",
             "at": (created + timedelta(days=3, minutes=5))
+            .isoformat(timespec="seconds")
+            .replace("+00:00", "Z"),
+        },
+    )
+    write_json(
+        chosen / "round-01" / "analysis.json",
+        {
+            "round": 1,
+            "preference": "The accepted drawings hold three shapes and one flat fill.",
+            "order": ["d", "b"],
+            "reasons": {"d": "the silhouette reads at 64 pixels", "b": ""},
+            "guide_edit": {
+                "section": "Shape language",
+                "rule": "Use three shapes or fewer inside the hexagon.",
+            },
+            "at": (created + timedelta(days=3, minutes=8))
             .isoformat(timespec="seconds")
             .replace("+00:00", "Z"),
         },
