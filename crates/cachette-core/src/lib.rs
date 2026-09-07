@@ -160,9 +160,11 @@ pub use upgrade::{
     UPGRADE_CATEGORY_COUNT, UPGRADE_LEVEL_COUNT,
 };
 pub use weather::{
-    CellGround, Drops, Latitudes, Storm, WeatherError, WeatherField, WeatherScale, Wind,
-    AIR_SATURATION, COOLDOWN_TICKS, HEAT_CEILING, LATITUDE_FINE, LATITUDE_POLE, PASS_CEILING,
-    PLACES_CEILING, SPEED_CEILING, STRENGTH_CEILING, WARMTH_FINE, WARMTH_FLOOR, WET_MARK,
+    CellGround, Cyclone, CycloneSetting, Drops, Latitudes, Storm, WeatherError, WeatherField,
+    WeatherScale, Wind, AIR_SATURATION, COOLDOWN_TICKS, CYCLONE_CEILING, CYCLONE_DEPTH_CEILING,
+    CYCLONE_DEPTH_FLOOR, CYCLONE_LIFE_CEILING, CYCLONE_RADIUS_CEILING, HEAT_CEILING, LATITUDE_FINE,
+    LATITUDE_POLE, PASS_CEILING, PLACES_CEILING, SPEED_CEILING, STRENGTH_CEILING, WARMTH_FINE,
+    WARMTH_FLOOR, WET_MARK,
 };
 pub use world::{
     CampaignError, CensusBasis, CensusRow, ConvertError, IdentityError, MoveRelationError,
