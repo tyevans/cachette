@@ -430,7 +430,8 @@ class SessionStore:
 
         ## References
 
-        [^1]: The rule against a misfiled feedback. `tools/direct-die/review/test_readers_agree.py`
+        [^1]: The rule against a misfiled feedback.
+            `tools/direct-die/review/test_readers_agree.py`
         """
         if not isinstance(feedback, dict):
             return feedback
