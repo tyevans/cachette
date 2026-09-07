@@ -1238,7 +1238,7 @@ const GROUND_DIVISOR: i64 = 4;
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 /// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D3. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-const SEASON_SWING: i32 = LATITUDE_SWING + SEASON_ANOMALY_SWING;
+pub const SEASON_SWING: i32 = LATITUDE_SWING + SEASON_ANOMALY_SWING;
 
 /// The ticks in which the sun completes one whole swing.
 ///
@@ -1257,16 +1257,34 @@ const SEASON_SWING: i32 = LATITUDE_SWING + SEASON_ANOMALY_SWING;
 /// hold a wet part of the year and a dry part.
 pub const SEASON_PERIOD_TICKS: i64 = 2048;
 
-/// The degrees that a saturated sky takes away from a cell.
+/// The published net effect of cloud on the energy the Earth keeps, in whole
+/// watts for each square metre.
 ///
-/// **Cloud stands between the ground and the sun.** The term rises with the
-/// water in the air over the cell and it stops at the saturation mark, so it
-/// is bounded whatever a god puts into the sky.[^1]
+/// **The published effect is negative, and this is its size.** Cloud reflects
+/// sunlight away and it holds heat in, and the reflection wins. The figure is
+/// the whole-Earth net of the two, over the cover the Earth carries.[^1]
+///
+/// **The author of this constant did not read a primary source for it.** It
+/// is the figure a reader meets in the standard account of the energy budget
+/// of the Earth, and the research report that this module follows states no
+/// figure of its own for cloud.[^2]
 ///
 /// # References
 ///
-/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const CLOUD_SWING: i32 = 32;
+/// [^1]: The net effect of cloud on the energy budget of the Earth, from the standard account of that budget. It is reported near twenty watts for each square metre.
+/// [^2]: Research report 30, the published atmospheric math. `docs/research/reports/30-the-published-atmospheric-math.md`
+const CLOUD_EFFECT_WATTS: i64 = 20;
+
+/// The published share of the Earth that cloud covers, in hundredths.
+///
+/// **The effect above is the effect of this cover, and not of a whole sky.**
+/// The term in this module answers a whole sky, so the build divides the one
+/// by the other.[^1]
+///
+/// # References
+///
+/// [^1]: The mean cloud cover of the Earth, from the standard account of the energy budget of the Earth. It is reported near two thirds.
+const CLOUD_COVER_FINE: i64 = 68;
 
 /// The part of the way to the asked temperature that one pass moves.
 const WARMTH_NUMERATOR: i64 = 1;
@@ -1821,17 +1839,17 @@ const LIFT_DRAW: u32 = 0;
 /// reading that once made wetness separate nothing.[^1]
 ///
 /// **The share fell from a thirty-second to a sixty-fourth at the same time.**
-/// The world runs cold against the temperature scale it now declares, so the
-/// water it holds sits well under what the ceiling allows, and a thirty-second
-/// of the ceiling stood above the wettest cell of a coarse world. A blocker
-/// holds where the heat base should stand, and the share follows it.[^3] The
-/// commit body holds the readings.
+/// The ceiling is the capacity of a cell at the top of the heat scale, which
+/// is far above the temperature that any land of any world holds. So the
+/// wettest cell of a world stands well under the ceiling, and a thirty-second
+/// of the ceiling stood above the wettest cell of a coarse world. **Nobody has
+/// measured the share again since the heat terms were derived**, and the
+/// blocker that holds what weather should be worth governs it.[^1]
 ///
 /// # References
 ///
 /// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
 /// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-/// [^3]: Blockers register, BLK-152. `docs/BLOCKERS.md`
 pub const WET_MARK: Drops = Drops(AIR_SATURATION.0 / 64);
 
 /// The largest strength that a god may inflict.
@@ -2152,6 +2170,16 @@ pub fn declination_at(tick: Tick) -> i32 {
 /// flat, rather than stretching a four percent change across the whole
 /// scale.[^1]
 ///
+/// **The sum of the two parts is normalised against what that sum can
+/// actually reach, and not against the sum of the two amplitudes.** The belt
+/// peaks at the equator, where the season is near nothing, and the season
+/// peaks at the middle latitudes, where the belt is near nothing. So the two
+/// amplitudes added together name a swing that no place and no moment holds.
+/// The table therefore walks its own geometry once, records the highest and
+/// the lowest sum it holds, and maps that range onto the swing the heat scale
+/// reserves. The two amplitudes above are then the ratio between the belt and
+/// the season, and the reserved swing is the whole of the sun term.[^3]
+///
 /// The term reads the tick and the latitude. It reads no clock and takes no
 /// draw.
 ///
@@ -2162,28 +2190,11 @@ pub fn declination_at(tick: Tick) -> i32 {
 ///
 /// [^1]: Research report 30, the published atmospheric math, sections 4.3, 4.4 and 9. `docs/research/reports/30-the-published-atmospheric-math.md`
 /// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D3. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+/// [^3]: ADR-0177, the row axis of a world is a latitude that the world states, decision D5. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
 #[must_use]
 pub fn season_at(tick: Tick, latitude: i32) -> i32 {
     let table = insolation();
-    let daily = table.daily_at(latitude, declination_at(tick));
-    let mean = table.mean_at(latitude);
-    // The belt of the latitude. It runs from the whole swing at the equator
-    // to the whole swing the other way at a pole.
-    let belt = narrow(sim_math::share(
-        Accum(i64::from(LATITUDE_SWING)),
-        Accum(2 * mean - i64::from(table.top) - i64::from(table.floor)),
-        Accum(i64::from(table.top) - i64::from(table.floor)),
-    ))
-    .clamp(-LATITUDE_SWING, LATITUDE_SWING);
-    // The season. It is the daily value against the annual mean of the same
-    // latitude, so it is zero at the equinox everywhere.
-    let season = narrow(sim_math::share(
-        Accum(i64::from(SEASON_ANOMALY_SWING)),
-        Accum(daily - mean),
-        Accum(i64::from(table.reference)),
-    ))
-    .clamp(-SEASON_ANOMALY_SWING, SEASON_ANOMALY_SWING);
-    (belt + season).clamp(-SEASON_SWING, SEASON_SWING)
+    table.normalise(table.shape_at(latitude, declination_at(tick)))
 }
 
 /// Returns the pressure that the banded circulation adds at one latitude.
@@ -2262,6 +2273,13 @@ struct Insolation {
     /// The daily value at the solstice against the annual mean, at the middle
     /// latitude. It is the normaliser of the season part.
     reference: i16,
+    /// The highest sum of the belt and the season that the geometry holds,
+    /// over every latitude and every declination.
+    reach_top: i32,
+    /// The lowest such sum.
+    reach_floor: i32,
+    /// The degrees that a saturated sky takes away from a cell.
+    cloud_swing: i32,
 }
 
 /// The latitude bands that the insolation table holds.
@@ -2362,13 +2380,127 @@ impl Insolation {
             - i64::from(mean[middle]))
         .abs()
         .max(1);
-        Self {
+        let mut table = Self {
             daily,
             mean,
             top,
             floor,
             reference: clamp_to_watts(reference),
+            // The scan below needs a table to read, and it reads only the
+            // three normalisers above. These are what the scan writes.
+            reach_top: 0,
+            reach_floor: 0,
+            cloud_swing: 0,
+        };
+        // **The walk over the geometry that gives the reach of the sun
+        // term.** It reads every latitude band and every declination step,
+        // which are the whole domain of the term, and it records the highest
+        // and the lowest sum it finds. The interpolation between two samples
+        // is monotone and each clamp is monotone, so no latitude and no tick
+        // between two samples passes either end.
+        let mut reach_top = i32::MIN;
+        let mut reach_floor = i32::MAX;
+        for band in 0..INSOLATION_BANDS {
+            let mean = i64::from(table.mean[band]);
+            for step in 0..=DECLINATION_STEPS {
+                let daily = i64::from(table.daily[band * (DECLINATION_STEPS + 1) + step]);
+                let shape = table.shape_of(daily, mean);
+                reach_top = reach_top.max(shape);
+                reach_floor = reach_floor.min(shape);
+            }
         }
+        table.reach_top = reach_top;
+        table.reach_floor = reach_floor;
+
+        // **What a whole sky takes away, derived and not written down.** The
+        // sun term already states what one watt of insolation is worth in
+        // degrees of warmth: the belt maps the annual mean range of the globe
+        // onto twice the belt amplitude, and the normaliser then maps the sum
+        // onto twice the swing the heat scale reserves. So the cloud reads
+        // the published effect of cloud in watts and converts it on the same
+        // scale. A cloud that shades the ground is worth what the sun it
+        // shades is worth, and nothing else.
+        let full_sky = CLOUD_EFFECT_WATTS * 100 / CLOUD_COVER_FINE.max(1);
+        let numerator = 2 * i64::from(LATITUDE_SWING) * 2 * i64::from(SEASON_SWING);
+        let denominator = ((i64::from(top) - i64::from(floor))
+            * (i64::from(reach_top) - i64::from(reach_floor)))
+        .max(1);
+        table.cloud_swing = ((full_sky * numerator + denominator / 2) / denominator)
+            .clamp(0, i64::from(HEAT_BASE)) as i32;
+
+        // **The coldest cell must not clamp at the bottom of the scale.** The
+        // top of the scale needs no check, because the base is derived from
+        // it. The check is here and not at a declaration, because the cloud
+        // reads the table and a constant cannot read a table.
+        assert!(
+            HEAT_BASE - SEASON_SWING - table.cloud_swing >= 0,
+            "the coldest cell must not clamp at the bottom of the heat scale"
+        );
+        table
+    }
+
+    /// Returns the sum of the belt and the season at one latitude and one
+    /// declination, before the sum is normalised.
+    fn shape_at(&self, latitude: i32, declination: i32) -> i32 {
+        self.shape_of(self.daily_at(latitude, declination), self.mean_at(latitude))
+    }
+
+    /// Returns the sum of the belt and the season from one daily value and
+    /// one annual mean.
+    ///
+    /// **Each part carries its own amplitude and its own clamp.** The
+    /// amplitudes are the ratio between the two, and the normaliser gives the
+    /// sum its size. The clamp on the season is what keeps a summer pole
+    /// below the equator: the top of the atmosphere over a summer pole
+    /// receives about a third more daily energy than the equator, and a
+    /// surface does not hold it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Research report 30, the published atmospheric math, section 4.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+    fn shape_of(&self, daily: i64, mean: i64) -> i32 {
+        // The belt of the latitude. It runs from the whole belt amplitude at
+        // the equator to the whole of it the other way at a pole.
+        let belt = narrow(sim_math::share(
+            Accum(i64::from(LATITUDE_SWING)),
+            Accum(2 * mean - i64::from(self.top) - i64::from(self.floor)),
+            Accum((i64::from(self.top) - i64::from(self.floor)).max(1)),
+        ))
+        .clamp(-LATITUDE_SWING, LATITUDE_SWING);
+        // The season. It is the daily value against the annual mean of the
+        // same latitude, so it is zero at the equinox everywhere.
+        let season = narrow(sim_math::share(
+            Accum(i64::from(SEASON_ANOMALY_SWING)),
+            Accum(daily - mean),
+            Accum(i64::from(self.reference).max(1)),
+        ))
+        .clamp(-SEASON_ANOMALY_SWING, SEASON_ANOMALY_SWING);
+        belt + season
+    }
+
+    /// Returns the degrees the sun adds, from one sum of the two parts.
+    ///
+    /// **The map is affine and both of its ends come from the geometry.** The
+    /// lowest sum the geometry holds takes the whole swing away, and the
+    /// highest sum it holds adds the whole swing. So the sun term spans
+    /// exactly what the heat scale reserves for it, whatever the geometry, the
+    /// obliquity, the amplitudes or the size of the table are. Nothing here is
+    /// written down against a reading.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D5. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    fn normalise(&self, shape: i32) -> i32 {
+        let span = i64::from(self.reach_top) - i64::from(self.reach_floor);
+        if span <= 0 {
+            return 0;
+        }
+        let lifted = narrow(sim_math::share(
+            Accum(2 * i64::from(SEASON_SWING)),
+            Accum(i64::from(shape) - i64::from(self.reach_floor)),
+            Accum(span),
+        ));
+        (lifted - SEASON_SWING).clamp(-SEASON_SWING, SEASON_SWING)
     }
 
     /// Returns the latitude of one band, in hundredths of a degree.
@@ -2509,20 +2641,30 @@ pub fn daily_insolation(latitude: i32, declination: i32) -> i64 {
 /// The term stops at the whole swing, so a god who fills the sky cannot drive
 /// the temperature below the bound.[^1]
 ///
+/// **The whole swing is derived and it is not written down.** The sun term
+/// states what one watt of insolation is worth in degrees of warmth, and the
+/// build converts the published effect of cloud on the same scale. A written
+/// figure here made a full sky worth about three times the published effect,
+/// and it cooled the wet equator far more than the dry poles. So the equator
+/// stood colder than the subtropics, and no land graded tropical.[^2] [^3]
+///
 /// **This is public so that a test can move one input and watch the answer
 /// move.**
 ///
 /// # References
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+/// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D5. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+/// [^3]: Findings register, FND-586. `docs/FINDINGS.md`
 #[must_use]
 pub fn cloud_at(air: Drops, capacity: Drops) -> i32 {
+    let swing = insolation().cloud_swing;
     if capacity.0 <= 0 {
-        return CLOUD_SWING;
+        return swing;
     }
     let held = air.0.clamp(0, capacity.0);
     narrow(sim_math::share(
-        Accum(i64::from(CLOUD_SWING)),
+        Accum(i64::from(swing)),
         Accum(held),
         Accum(capacity.0),
     ))
@@ -2559,38 +2701,35 @@ pub fn asked_warmth(ground: i32, season: i32, cloud: i32) -> i32 {
 
 /// The degrees a cell holds before any of the three terms moves it.
 ///
-/// **The four terms reach the bottom of the scale and they no longer reach
-/// the top of it.** The two checks below still hold, because they read the
-/// swing the sun term reserves. The sun term cannot reach that swing any
-/// more: its two parts are the belt of a latitude and the season, and the
-/// published geometry never peaks both at one place at one moment. The belt
-/// peaks at the equator, where the season is near nothing, and the season
-/// peaks at the middle latitudes, where the belt is near nothing.[^1]
+/// **The base is what the top of the scale leaves for it, and it is not a
+/// figure that anyone chose.** The warmest cell of the world is low ground
+/// under the strongest sun with a clear sky, and it stands at the top of the
+/// scale. So the base is the top of the scale, less the whole ground term,
+/// less the swing the sun reserves. The sun term now reaches that swing at
+/// both ends, because it is normalised against what its two parts can
+/// actually reach together.[^1]
 ///
-/// **So the top of the scale is out of reach by about the season part, and
-/// the world runs cold against the temperature that the scale now
-/// declares.** A blocker holds the question of where the base should
-/// stand.[^2]
+/// **The base did not move when this was repaired, and that is the point.**
+/// A base that rose would warm a pole as much as it warmed the equator, and
+/// it would flatten the latitude gradient. What was wrong was the shape of
+/// the sun term and the size of the cloud term, and both are now derived.[^2]
 ///
 /// A clamp would put a flat region into the temperature field, the pressure
 /// gradient would read the edge of that region as a step, and the wind would
-/// hold a straight line across the map. The bottom of the scale is reachable,
-/// at a winter pole, and nothing clamps there.
+/// hold a straight line across the map. The build checks that neither end
+/// clamps.
+///
+/// **The scale carries headroom at its cold end.** The cloud term is a
+/// published quantity and not a free lever, and it is smaller than the room
+/// the base leaves under it. So the coldest cell the field can express stands
+/// above the bottom of the scale, and nothing clamps there.
 ///
 /// # References
 ///
-/// [^1]: Research report 30, the published atmospheric math, section 4.3. `docs/research/reports/30-the-published-atmospheric-math.md`
-/// [^2]: Blockers register, BLK-152. `docs/BLOCKERS.md`
-const HEAT_BASE: i32 = 112;
-
-// The four terms reach the bottom of the scale together. The second check
-// reads the swing the sun term reserves at the top, and the sun term no
-// longer reaches that swing. Both checks fail the build rather than a test.
-const _: () = assert!(HEAT_BASE - SEASON_SWING - CLOUD_SWING == 0);
-const _: () = assert!(
-    HEAT_BASE + (HEAT_FROM_WATER + HEAT_FROM_LOW_GROUND) / GROUND_DIVISOR as i32 + SEASON_SWING
-        == HEAT_CEILING
-);
+/// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D5. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+/// [^2]: Findings register, FND-586. `docs/FINDINGS.md`
+const HEAT_BASE: i32 =
+    HEAT_CEILING - (HEAT_FROM_WATER + HEAT_FROM_LOW_GROUND) / GROUND_DIVISOR as i32 - SEASON_SWING;
 
 /// Returns the numerator of the share of the air that falls on one cell.
 ///

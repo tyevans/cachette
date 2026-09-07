@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-579**
+**Next number: FND-587**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -2234,6 +2234,54 @@ fails. The earlier row stands for that part.[^F321A]
 **Evidence.** Adding a field to an event, and declaring it, leaves the stub
 short. The check prints the missing annotation and exits non-zero, and the
 test that runs it goes red.
+
+### FND-586 — The heat scale ran cold because two terms were written down, and the repair was to derive both
+
+**Believed.** The four terms that drive the temperature of a cell were balanced
+so that they reach the bottom of the heat scale together and the top of it
+together. The sun term reserves a swing, and that swing is the sum of the two
+amplitudes its two parts carry.
+
+**True.** The sum of the two parts never reaches the sum of the two amplitudes.
+The belt of a latitude peaks at the equator, where the season contributes
+nothing. The season peaks at the middle latitudes, where the belt contributes
+nothing. So the highest sum the geometry holds is a little over half of the
+reserved swing, and the top of the scale was out of reach.
+
+**A second term was wrong beside it, and the first repair exposed it.** A whole
+sky took away about three times the published net effect of cloud. The equator
+is the wettest band of the world, so the cloud cooled the equator far more than
+the dry poles. The equator therefore stood colder than the subtropics, and the
+latitude order of the temperature was inverted at its warm end.
+
+**Evidence.** A probe grades the land of a world against the published Köppen
+thresholds. Before the repair no land graded tropical on either seed, and
+between 44 and 58 percent graded ice cap. After it the land grades tropical near
+the equator, desert in the subtropics, continental at the middle latitudes and
+tundra and ice at the poles. The commit body holds both grades, both seeds, the
+mean land temperature of each band, and the command that produced them.
+
+**The defect was put back twice.** A test asserts that the sun term reaches the
+reserved swing at each end, and it fails when the normaliser is written down
+rather than derived. A second test asserts that a whole sky is worth the
+published effect of cloud on the scale the sun states, and it fails when the
+cloud swing is written down.
+
+**Follows.** Three things.
+
+**A term normalised on each part is not normalised on the sum.** Two parts that
+each span a range do not span the sum of the two ranges, unless they peak
+together. Normalise against the reach of the sum, and measure that reach from
+the thing that produces it.
+
+**The heat base did not move.** A base carries the same degrees to a pole that
+it carries to the equator. Raising it was the obvious repair, and it would have
+flattened the latitude gradient rather than restoring the warm equator. The
+defect was the shape of one term and the size of another.
+
+**Five of the weather defects this project has found were a value written down
+where it should have been derived.** Both halves of this one are that shape
+again.
 
 ## D. Cost estimates that were wrong
 
