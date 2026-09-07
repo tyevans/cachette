@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-606**
+**Next number: FND-607**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -15200,3 +15200,52 @@ term that is not needed**, and only an absurd input separated them.
 
 [^F604B]: The Köppen probe and the water probe. `crates/cachette-core/examples/`
 [^F605A]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+
+
+### FND-606 — The field is not over-blended, and the plane that looks smoothest is the one carrying a gradient
+
+**Believed.** The weather reads as one colour, so the field mixes more than it
+needs and it should keep more local contrast.
+
+**True in the impression and false in the field.** Every water plane already
+carries more local contrast than the terrain under it. The temperature carries
+more than its own driver supplies. **Nothing measured here is over-blended.**
+
+**Evidence.** A contrast probe over the demonstration world, at an extent of
+128, at seed `0x2f`, settled 400 ticks, on 7 September 2026 on one development
+machine (x86-64). The probe reports, for each plane, the mean absolute
+deviation over the world beside the mean step between two neighbours. Every
+figure is derived.[^F606A]
+
+At the tile pitch the terrain steps 702 of a spread of 10,407 between
+neighbours. The air steps 232 of 2,870 and the ground steps 1,836 of 8,453, so
+both stand rougher than the terrain. The temperature steps 1 of 44.
+
+**Two things had to be ruled out and both were.** Quartering the share that the
+warmth carry mixes changed the temperature roughness by nothing at all: still a
+step of 1 in a spread of 44. And the ratio between the temperature roughness
+and the terrain roughness holds between a third and a half across four lattice
+pitches, so it is not an averaging effect of the pitch either.
+
+**The metric flattered the wrong conclusion, and this is the correction.** The
+temperature plane carries a large smooth latitude gradient and the terrain
+carries none, so the temperature spread is inflated by a signal that has no
+local step. Comparing the two ratios is unfair to the temperature. Read in one
+unit instead: the terrain steps about one percent of its height range between
+neighbours, which through the ground term is about half a warmth unit of
+driver, against a measured step of one whole unit. **The temperature carries
+about twice the local contrast its driver supplies.**
+
+**What follows.** **A ratio of two spreads is not a measure of blending when
+one plane carries a gradient and the other does not.** The metric is still
+useful for comparing one plane against itself under a change, and it is
+misleading for comparing two planes with different large-scale structure.
+
+**Do not reach for the ground divisor.** Roughness is a ratio, so dividing the
+ground term scales the spread and the step together and changes the contrast by
+nothing. It sets how much of the heat scale the terrain claims, not how sharp
+the field is.
+
+## References
+
+[^F606A]: The contrast probe. `crates/cachette-core/examples/weather_contrast_probe.rs`
