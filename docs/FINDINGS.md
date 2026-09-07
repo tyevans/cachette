@@ -13844,9 +13844,15 @@ item that builds the flat observation carries this.
 **Two facts found beside it.** A victory claim holds a value of zero or one, so
 the wonder path has no threshold to tune, and neither has domination. Only the
 renown target and the tick limit are thresholds. Separately, the cost of one
-tick rises with the state the world holds: 32 milliseconds at tick 500, 75 at
-2500 and 120 at 5000, on a loaded development machine. That figure bounds the
-throughput of any training run and belongs in the sizing of the batch step.
+tick rises with the state the world holds rather than with the area of the map.
+Measured on a loaded development machine (ty001-ubuntu, x86-64), four factions,
+one thread, at an extent of 128: 28.5 milliseconds at tick 500, 29.3 at 1000,
+52.6 at 2500 and 66.2 at 5000, and 233 seconds for a whole run of 5000 ticks.
+The same measurement at an extent of 256 read about 120 milliseconds at tick
+5000, so four times the tiles cost under twice the time. **A figure here means
+nothing without its extent and its depth**, and the first reading of this row
+carried neither. That figure bounds the throughput of any training run and
+belongs in the sizing of the batch step.
 
 
 ## References
