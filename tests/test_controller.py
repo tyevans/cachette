@@ -172,9 +172,14 @@ def test_the_demonstration_runs_to_the_end_and_prints_the_census(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     """The headless run names the winner once and prints every census row."""
+    # The seed is named. The demonstration draws its own seed when none is
+    # given, so a test that leaves it out builds a different world on every
+    # run, and some of those worlds seat no faction at all.
     status = main(
         [
             "--run-to-end",
+            "--seed",
+            hex(SEED),
             "--extent",
             str(EXTENT),
             "--factions",
@@ -188,8 +193,13 @@ def test_the_demonstration_runs_to_the_end_and_prints_the_census(
     assert status == 0
     out = capsys.readouterr().out
     lines = out.splitlines()
+    # The demonstration names a faction, so the line carries a name and not
+    # the word "faction". The test asserts the shape of the line and that
+    # exactly one appears, because the run must name the winner once.
     wins = [line for line in lines if "wins by territory" in line]
-    assert wins == ["tick 4: faction " + wins[0].split("faction ")[1]]
+    assert len(wins) == 1, f"the run must name the winner once, and it gave {wins}"
+    assert wins[0].startswith("tick 4: ")
+    assert wins[0].endswith(" wins by territory")
     assert any(line.startswith("the game ended at tick 4:") for line in lines)
     assert any(line.startswith("census of the run at tick 4") for line in lines)
     for name in CENSUS_NAMES:
