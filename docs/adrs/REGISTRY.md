@@ -432,6 +432,7 @@ without stating a constraint is worse than no record.
 | 0174 | A wonder is a win path and a stock total is not. Supersedes ADR-0173, whose D1 gave the path no reader; its D2 on the stored number carries over | Draft | 0002, 0148, 0151, 0165, 0173, 0175 | `draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md` |
 | 0175 | A win threshold decides when a reader fires and never what the simulation does, so each win value is world configuration a caller sets without a rebuild | Draft | 0002, 0148, 0151, 0164, 0174 | `draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md` |
 | 0171 | The ground a world generates may be shaped by a climate the world stores, and the shaping is available and not the default. Changes ADR-0068 D1, which states the terrain function reads the seed and the address and nothing else; the other decisions of ADR-0068 stand | Draft | 0001, 0002, 0004, 0005, 0068, 0088, 0140, 0164 | `draft/adr-0171-the-ground-may-be-shaped-by-a-climate-the-world-stores.md` |
+| 0174 | An action integer is a mixed radix over the argument positions each verb declares. Changes ADR-0154 D4, the fixed verb, target and magnitude factorisation, which the controller's choice enumeration never had; the rest of ADR-0154 D4 and every other decision of ADR-0154 stand | Draft | 0075, 0144, 0149, 0154, 0156, 0158, 0159 | `draft/adr-0174-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md` |
 
 ### Retired numbers
 
