@@ -315,7 +315,14 @@ def test_the_writer_records_the_likes_and_the_refusals(root: Path) -> None:
     store = SessionStore(root)
     asset, session_id = HEALTHY.split("/")
     path = store.write_feedback(
-        asset, session_id, "round-02", ["b", "d"], ["a"], ["d", "b"], "keep it flat", "darker base"
+        asset,
+        session_id,
+        "round-02",
+        ["b", "d"],
+        ["a"],
+        ["d", "b"],
+        "keep it flat",
+        "darker base",
     )
     written = json.loads(path.read_text(encoding="utf-8"))
     assert written["round"] == 2
@@ -338,7 +345,9 @@ def test_the_writer_refuses_an_order_that_is_not_the_likes(root: Path) -> None:
     store = SessionStore(root)
     asset, session_id = HEALTHY.split("/")
     with pytest.raises(ContractError):
-        store.write_feedback(asset, session_id, "round-02", ["b", "d"], [], ["b"], "", "")
+        store.write_feedback(
+            asset, session_id, "round-02", ["b", "d"], [], ["b"], "", ""
+        )
 
 
 def test_the_writer_refuses_a_letter_that_is_not_a_variant(root: Path) -> None:

@@ -39,7 +39,7 @@ import exemplars as exemplar_module  # noqa: E402
 import packs as pack_module  # noqa: E402
 from app import create_app  # noqa: E402
 from make_fixtures import build_workspace  # noqa: E402
-from store import SessionStore  # noqa: E402
+from store import SessionStore, write_json_atomically  # noqa: E402
 
 # The sessions of the fixture workspace that the front end tests read.
 CHOSEN = "cartoon/20260904-090000-forest"
@@ -681,3 +681,93 @@ def test_a_broken_job_record_drops_out_of_the_list(
     response = client.get("/runs")
     assert response.status_code == 200
     assert "Traceback" not in response.text
+
+
+# -- which drawing stands for an asset ---------------------------------------
+
+
+def _one_session_tree(tmp_path: Path, scores: dict, feedback: dict | None) -> Path:
+    """Write one style, one session and one round, and give the sessions root.
+
+    The fixture takes a score for each variant, so a test can put the highest
+    score on the drawing that the person refused. A fixture that scores every
+    variant the same cannot prove that the refusal changed the answer.
+    """
+    root = tmp_path / "sessions"
+    directory = root / "cartoon" / "forest-20260901-1000" / "round-00"
+    directory.mkdir(parents=True)
+    write_json_atomically(
+        root / "cartoon" / "forest-20260901-1000" / "session.json",
+        {
+            "asset": "forest",
+            "created": "2026-09-01T10:00:00Z",
+            "model": "m",
+            "guide_version": "v",
+        },
+    )
+    write_json_atomically(
+        directory / "meta.json",
+        {"round": 0, "prompt_summary": "a forest", "parents": {}},
+    )
+    for letter, score in scores.items():
+        (directory / f"variant-{letter}.svg").write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"/>',
+            encoding="utf-8",
+        )
+        (directory / f"variant-{letter}.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+        write_json_atomically(
+            directory / f"variant-{letter}.critique.json",
+            {"verdict": "x", "faults": [], "score": score},
+        )
+    if feedback is not None:
+        write_json_atomically(directory / "feedback.json", feedback)
+    return root
+
+
+def test_the_first_of_the_order_stands_for_the_asset(tmp_path: Path) -> None:
+    root = _one_session_tree(
+        tmp_path,
+        scores={"b": 30, "d": 90},
+        feedback={
+            "round": 0,
+            "likes": ["b", "d"],
+            "denies": [],
+            "order": ["b", "d"],
+            "note": "",
+            "text": "",
+        },
+    )
+    store = SessionStore(root)
+    pick = pack_module.pick_for(store, "cartoon", "forest")
+    assert pick is not None
+    assert pick.letter == "b"
+    assert pick.source == "human"
+
+
+def test_a_refused_drawing_never_wins_on_score(tmp_path: Path) -> None:
+    root = _one_session_tree(
+        tmp_path,
+        scores={"a": 95, "c": 30},
+        feedback={
+            "round": 0,
+            "likes": [],
+            "denies": ["a"],
+            "order": [],
+            "note": "",
+            "text": "",
+        },
+    )
+    store = SessionStore(root)
+    pick = pack_module.pick_for(store, "cartoon", "forest")
+    assert pick is not None
+    assert pick.letter == "c"
+    assert pick.source == "score"
+
+
+def test_the_highest_score_still_wins_when_nobody_said_anything(tmp_path: Path) -> None:
+    root = _one_session_tree(tmp_path, scores={"a": 40, "c": 80}, feedback=None)
+    store = SessionStore(root)
+    pick = pack_module.pick_for(store, "cartoon", "forest")
+    assert pick is not None
+    assert pick.letter == "c"
+    assert pick.source == "score"

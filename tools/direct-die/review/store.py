@@ -112,7 +112,9 @@ def _letters(value: object) -> tuple[str, ...]:
     return tuple(found)
 
 
-def read_feedback(value: dict | None) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...], str, str]:
+def read_feedback(
+    value: dict | None,
+) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...], str, str]:
     """Read one feedback object into likes, refusals, order, note and text.
 
     The function never raises. It drops what it cannot read, because a person
@@ -134,7 +136,9 @@ def read_feedback(value: dict | None) -> tuple[tuple[str, ...], tuple[str, ...],
         likes = _letters(value.get("likes"))
     else:
         choice = value.get("choice")
-        likes = (choice,) if isinstance(choice, str) and choice in VARIANT_LETTERS else ()
+        likes = (
+            (choice,) if isinstance(choice, str) and choice in VARIANT_LETTERS else ()
+        )
     likes = tuple(letter for letter in likes if letter not in denies)
     ranked = [letter for letter in _letters(value.get("order")) if letter in likes]
     ranked.extend(letter for letter in likes if letter not in ranked)
