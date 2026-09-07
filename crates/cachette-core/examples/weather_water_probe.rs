@@ -118,8 +118,8 @@ fn main() {
                     // The height of a land tile, as thousandths of the whole
                     // height range. The lapse rate reads this, so it decides
                     // how far below the sea-level balance the land stands.
-                    land_height[band] += i64::from(tile.height.0) * 1000
-                        / i64::from(cachette_core::Fix32::ONE.0);
+                    land_height[band] +=
+                        i64::from(tile.height.0) * 1000 / i64::from(cachette_core::Fix32::ONE.0);
                     land_height_counted[band] += 1;
                 } else {
                     open[band] += 1;
@@ -151,9 +151,8 @@ fn main() {
             continue;
         }
         let n = counted[band];
-        let degrees =
-            (warmth[band] / n * i64::from(WARMTH_FINE) + i64::from(WARMTH_FLOOR))
-                / i64::from(LATITUDE_FINE);
+        let degrees = (warmth[band] / n * i64::from(WARMTH_FINE) + i64::from(WARMTH_FLOOR))
+            / i64::from(LATITUDE_FINE);
         let cap = capacity[band] / n;
         let vapour = air[band] / n;
         let wet = ground[band] / n;

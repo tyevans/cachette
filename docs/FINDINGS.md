@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-614**
+**Next number: FND-622**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -15496,7 +15496,7 @@ the field is.
 [^F606A]: The contrast probe. `crates/cachette-core/examples/weather_contrast_probe.rs`
 
 
-### FND-607 — The height ceiling was the whole of the cooling error, and none of the rest
+### FND-620 — The height ceiling was the whole of the cooling error, and none of the rest
 
 **Believed.** The land of this world stands two to three times higher in its own
 range than the land of the Earth stands in its, so the published lapse rate took
@@ -15527,7 +15527,7 @@ term, and the next finding holds the measurement.
 table.** The first was wrong by a factor of two and a half. The second was
 checked against a probe before anything was built on it, and it held.
 
-### FND-608 — The cloud term is load-bearing in both directions, and it reads the wrong quantity
+### FND-621 — The cloud term is load-bearing in both directions, and it reads the wrong quantity
 
 **Believed.** With the height corrected, the published energy balance would give
 the classes their published latitudes.
