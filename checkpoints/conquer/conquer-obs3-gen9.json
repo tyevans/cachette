@@ -10,5 +10,8 @@
   "observation_version": 3,
   "action_version": 1,
   "policy_kind": "linear",
-  "sha256": "321160ff70891d72c9003db533a08bde26a334d8c2f2189ea6f3551d4cfbca71"
+  "sha256": "321160ff70891d72c9003db533a08bde26a334d8c2f2189ea6f3551d4cfbca71",
+  "role": "best validated centre of the run",
+  "wins_of_eight": 3,
+  "decision_interval": 10
 }
