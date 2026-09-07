@@ -83,6 +83,20 @@ struct Record {
     water: [i64; MONTHS],
     /// The samples taken in each month.
     counted: [i64; MONTHS],
+    /// The least freeze bank the cell held over the sampled year.
+    ///
+    /// **This is the margin of the clamp, and it is what says whether a
+    /// different melt cost would release this cell.** A cell whose bank runs
+    /// down to nothing only just covers its own summer, so a larger melt cost
+    /// lets it warm. A cell that never spends its bank down covers its summer
+    /// many times over, and only a much larger cost reaches it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-632. `docs/FINDINGS.md`
+    bank_low: i64,
+    /// The greatest freeze bank the cell held over the sampled year.
+    bank_high: i64,
     /// The row of the world that the cell stands on.
     row: u32,
     /// Whether the cell holds more land than water.
@@ -95,6 +109,8 @@ impl Record {
             warmth: [0; MONTHS],
             water: [0; MONTHS],
             counted: [0; MONTHS],
+            bank_low: i64::MAX,
+            bank_high: 0,
             row,
             land,
         }
@@ -377,6 +393,11 @@ fn main() {
             record.warmth[month] += i64::from(field.warmth_at(cell));
             record.water[month] += field.ground_at(cell).0;
             record.counted[month] += 1;
+            // **The freeze bank of the cell, at its lowest and its highest over
+            // the year.** The low mark is the margin of the clamp.
+            let bank = i64::from(field.frozen_at(cell));
+            record.bank_low = record.bank_low.min(bank);
+            record.bank_high = record.bank_high.max(bank);
         }
     }
 
@@ -595,6 +616,44 @@ fn main() {
         );
         let _ = land_count;
     }
+    // **The margin of the clamp, by band.** The clamp holds a cell at the
+    // melting point while its bank pays. So the low mark of the bank over a
+    // year says whether a larger melt cost would release that band: a band
+    // whose bank runs down to nothing is at the edge, and a band that never
+    // spends its bank down is far from it.[^2]
+    //
+    // [^2]: Findings register, FND-632. `docs/FINDINGS.md`
+    {
+        let bands = 12u32;
+        println!();
+        println!("=== the freeze bank of each band, and the margin of the clamp ===");
+        println!();
+        println!("  band  latitude  cells   bank low  bank high   spent   low over spent");
+        for band in 0..bands {
+            let members: Vec<&Record> = records
+                .iter()
+                .filter(|record| record.land && record.row * bands / high.max(1) == band)
+                .collect();
+            if members.is_empty() {
+                continue;
+            }
+            let count = members.len() as i64;
+            let low: i64 = members.iter().map(|record| record.bank_low).sum::<i64>() / count;
+            let top: i64 = members.iter().map(|record| record.bank_high).sum::<i64>() / count;
+            let spent = top - low;
+            // How many times over the surviving bank covers what one summer
+            // spent, in hundredths. A band near one hundred is at the edge of
+            // the clamp. A large figure means a much larger melt cost is
+            // needed before that band warms.
+            let margin = if spent > 0 { low * 100 / spent } else { -1 };
+            let middle = (band * high / bands + (band + 1) * high / bands) / 2;
+            let latitude = i64::from(latitudes.of_row(middle, high)) / i64::from(LATITUDE_FINE);
+            println!(
+                "  {band:>4}  {latitude:>8}  {count:>5}  {low:>9}  {top:>9}  {spent:>6}                   {margin:>14}"
+            );
+        }
+    }
+
     // The two headline questions, in one line each.
     let band_of = |degrees: i32| -> Vec<&Record> {
         let low = degrees - 8;

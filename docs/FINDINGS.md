@@ -16180,16 +16180,25 @@ a few degrees of each other. The freeze bank is a function of how far below the
 melting point a cell stands and for how long, so two bands that are cold in the
 same way bank in the same way.
 
-**Whether a melt cost exists that separates them is not settled here, and the
-first draft of this finding asserted that none does.** That assertion went
-beyond the measurement. The clamp holds both bands at the melting point, which
-says that each bank covers its own summer, and it does not say by how much
-either one covers it. If one bank covers its summer several times over and the
-other only just, then a larger melt cost releases the second and holds the
-first. **The measurement that settles it is the freeze bank of each band against
-the warming its summer asks for**, and this register carries the answer when
-somebody takes it. Read the paragraph below as the reason to expect a small
-margin, not as the margin.
+**No melt cost separates the two bands, and the measurement says the direction
+is wrong as well.** The probe reads the freeze bank of each band at its lowest
+and its highest over a year. The bank that survives the summer, against what
+that summer spent, is the margin of the clamp: a band near nothing is at the
+edge, and a larger melt cost releases it first. In one hemisphere the two bands
+sit within a small factor of each other. **In the other the band below the pole
+holds the larger margin**, so a larger melt cost releases the polar band before
+it releases the band below. That is the opposite of what a correction needs, and
+it rules the melt cost out as a lever on this defect.
+
+**The same measurement does name a lever on a smaller part of it.** The bands at
+the middle of the high latitudes sit close to the edge, an order of magnitude
+below the two polar bands. A larger melt cost releases those and leaves the
+polar bands clamped. That is worth taking on its own terms and it does not touch
+the defect above.
+
+**The first draft of this finding asserted that no melt cost separates the two
+bands, before this measurement existed.** The assertion turned out to be right
+and it was not evidence when it was written. The margin table is the evidence.
 
 **The cause is the record that this term extends, and that record names it.**
 The belt of the published energy balance that this project imposes is flatter
@@ -16210,6 +16219,21 @@ this change settled for less than one period, and it clamped one hemisphere and
 not the other. **A field that gains carried state gains a spin-up**, and a probe
 that settled long enough for the old field may not settle long enough for the
 new one.
+
+**The class error over the land of this world moved, and the belt breakdown
+says where.** The error over the land equatorward of 60 degrees did not move.
+The whole of the movement is inside the belt poleward of it, which is the belt
+this term acts on. **So this term did not expose an error somewhere else, and a
+reader must not tell that story about it.**
+
+**Read the polar figure of that breakdown with care, and do not read it as a
+score.** It grades polar land against the published shares of the whole Earth,
+and the whole Earth holds tropical and temperate land that no polar belt can
+hold. Two of the five classes therefore carry their whole published share as
+error whatever the model does. The figure compares one run against another run
+on the same set of cells. **It does not say whether the polar belt is right**,
+and the warmest month of each band against its published value is the reading
+that does.
 
 **What follows.** The next work on this model is the shape of the belt at high
 latitude, and it is not the size of this clamp. A worker who tunes the melt cost
