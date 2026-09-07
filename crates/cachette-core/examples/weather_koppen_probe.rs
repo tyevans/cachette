@@ -51,6 +51,19 @@ const THREADS: usize = 4;
 /// of the Earth.
 const MEAN_ANNUAL_RAIN: i64 = 800;
 
+/// The published share of the land of the Earth that each first-letter
+/// Köppen class holds, in tenths of a percent, in the order A, B, C, D, E.
+///
+/// **Published.** The five shares come from the updated world map of the
+/// Köppen-Geiger classification, and the register holds three of them
+/// already.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Peel, Finlayson and McMahon, updated world map of the Koppen-Geiger climate classification, 2007. Hydrology and Earth System Sciences 11, 1633 to 1644.
+/// [^2]: Findings register, FND-616. `docs/FINDINGS.md`
+const PUBLISHED_SHARE_FINE: [i64; 5] = [190, 302, 134, 246, 128];
+
 fn argument(position: usize, fallback: u64) -> u64 {
     std::env::args()
         .nth(position)
@@ -70,6 +83,20 @@ struct Record {
     water: [i64; MONTHS],
     /// The samples taken in each month.
     counted: [i64; MONTHS],
+    /// The least freeze bank the cell held over the sampled year.
+    ///
+    /// **This is the margin of the clamp, and it is what says whether a
+    /// different melt cost would release this cell.** A cell whose bank runs
+    /// down to nothing only just covers its own summer, so a larger melt cost
+    /// lets it warm. A cell that never spends its bank down covers its summer
+    /// many times over, and only a much larger cost reaches it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-632. `docs/FINDINGS.md`
+    bank_low: i64,
+    /// The greatest freeze bank the cell held over the sampled year.
+    bank_high: i64,
     /// The row of the world that the cell stands on.
     row: u32,
     /// Whether the cell holds more land than water.
@@ -82,6 +109,8 @@ impl Record {
             warmth: [0; MONTHS],
             water: [0; MONTHS],
             counted: [0; MONTHS],
+            bank_low: i64::MAX,
+            bank_high: 0,
             row,
             land,
         }
@@ -211,6 +240,76 @@ fn grade(record: &Record, rain_for_each_drop: i64, whole: i64, boundary: i64) ->
     }
 }
 
+/// Prints the first-letter class table of one set of land cells, and returns
+/// the total absolute error against the published shares, in tenths of a
+/// point.
+///
+/// **The five first-letter classes gather the seven groups.** The arid class
+/// takes the desert and the steppe, and the polar class takes the tundra and
+/// the ice cap.
+///
+/// **The set normalises within itself.** So the error of a subset says what
+/// that land grades against the published shares of the whole Earth, and it is
+/// not a part of the error of a larger set. Two subsets do not add up to the
+/// whole.
+///
+/// A reader who wants the figure that the register quotes must weight each
+/// latitude band by the land Earth holds in it, and that weighting is not in
+/// this tree.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-631. `docs/FINDINGS.md`
+fn error_over(
+    name: &str,
+    members: &[&Record],
+    rain_for_each_drop: i64,
+    whole: i64,
+    boundary: i64,
+) -> i64 {
+    let count = members.len().max(1);
+    let mut totals = [0usize; 7];
+    for record in members {
+        let group = grade(record, rain_for_each_drop, whole, boundary);
+        let at = Group::ALL
+            .iter()
+            .position(|other| *other == group)
+            .unwrap_or(0);
+        totals[at] += 1;
+    }
+    let held = [
+        totals[0],
+        totals[1] + totals[2],
+        totals[3],
+        totals[4],
+        totals[5] + totals[6],
+    ];
+    let mut error = 0i64;
+    println!();
+    println!("over {name}, {} cells:", members.len());
+    println!("  class     held    published    apart");
+    for (at, published) in PUBLISHED_SHARE_FINE.iter().enumerate() {
+        let share = (held[at] * 1000 / count) as i64;
+        error += (share - published).abs();
+        println!(
+            "  {:<8} {:>4}.{:<3} {:>6}.{:<4} {:>4}.{}",
+            ["A", "B", "C", "D", "E"][at],
+            share / 10,
+            share % 10,
+            published / 10,
+            published % 10,
+            (share - published).abs() / 10,
+            (share - published).abs() % 10
+        );
+    }
+    println!(
+        "  the class error here is {}.{} points",
+        error / 10,
+        error % 10
+    );
+    error
+}
+
 fn main() {
     let extent = argument(1, 128) as u32;
     let seed = argument(2, 0x2f);
@@ -294,6 +393,11 @@ fn main() {
             record.warmth[month] += i64::from(field.warmth_at(cell));
             record.water[month] += field.ground_at(cell).0;
             record.counted[month] += 1;
+            // **The freeze bank of the cell, at its lowest and its highest over
+            // the year.** The low mark is the margin of the clamp.
+            let bank = i64::from(field.frozen_at(cell));
+            record.bank_low = record.bank_low.min(bank);
+            record.bank_high = record.bank_high.max(bank);
         }
     }
 
@@ -446,7 +550,110 @@ fn main() {
                 totals[at] * 100 / land_count
             );
         }
+
+        // **The class error, over the land of this world and not over the
+        // land of Earth.** The five first-letter classes gather the seven
+        // groups above: B takes the desert and the steppe, and E takes the
+        // tundra and the ice cap. The error is the total absolute difference
+        // against the published shares, in tenths of a point.
+        //
+        // A reader who wants the figure the register quotes must weight each
+        // latitude band by the land Earth holds in it, and that weighting is
+        // not in this tree. **This figure grades the land this world has**,
+        // so it compares one run of this probe against another run of it and
+        // it does not compare this world with Earth.[^4]
+        //
+        // [^4]: Findings register, FND-616 and FND-618. `docs/FINDINGS.md`
+        let over_all = error_over(
+            "the whole land of this world",
+            &land,
+            rain_for_each_drop,
+            whole,
+            boundary,
+        );
+
+        // **The error is reported over three sets of land, because a change to
+        // one belt must not be read as a change to the model.** A term that
+        // acts only where a cell freezes changes the polar set and leaves the
+        // other one alone. A term that changes the model changes both.
+        //
+        // The three do not add up. Each set normalises within itself, so each
+        // says what the land of that set grades against the published shares
+        // and none of them is a part of another.
+        let polar: Vec<&Record> = land
+            .iter()
+            .copied()
+            .filter(|record| (latitudes.of_row(record.row, high) / LATITUDE_FINE).abs() >= 60)
+            .collect();
+        let rest: Vec<&Record> = land
+            .iter()
+            .copied()
+            .filter(|record| (latitudes.of_row(record.row, high) / LATITUDE_FINE).abs() < 60)
+            .collect();
+        let cold = error_over(
+            "the land poleward of 60 degrees",
+            &polar,
+            rain_for_each_drop,
+            whole,
+            boundary,
+        );
+        let warm = error_over(
+            "the land equatorward of 60 degrees",
+            &rest,
+            rain_for_each_drop,
+            whole,
+            boundary,
+        );
+        println!();
+        println!(
+            "class error: whole {}.{}, poleward of 60 {}.{}, equatorward of 60 {}.{}",
+            over_all / 10,
+            over_all % 10,
+            cold / 10,
+            cold % 10,
+            warm / 10,
+            warm % 10
+        );
+        let _ = land_count;
     }
+    // **The margin of the clamp, by band.** The clamp holds a cell at the
+    // melting point while its bank pays. So the low mark of the bank over a
+    // year says whether a larger melt cost would release that band: a band
+    // whose bank runs down to nothing is at the edge, and a band that never
+    // spends its bank down is far from it.[^2]
+    //
+    // [^2]: Findings register, FND-632. `docs/FINDINGS.md`
+    {
+        let bands = 12u32;
+        println!();
+        println!("=== the freeze bank of each band, and the margin of the clamp ===");
+        println!();
+        println!("  band  latitude  cells   bank low  bank high   spent   low over spent");
+        for band in 0..bands {
+            let members: Vec<&Record> = records
+                .iter()
+                .filter(|record| record.land && record.row * bands / high.max(1) == band)
+                .collect();
+            if members.is_empty() {
+                continue;
+            }
+            let count = members.len() as i64;
+            let low: i64 = members.iter().map(|record| record.bank_low).sum::<i64>() / count;
+            let top: i64 = members.iter().map(|record| record.bank_high).sum::<i64>() / count;
+            let spent = top - low;
+            // How many times over the surviving bank covers what one summer
+            // spent, in hundredths. A band near one hundred is at the edge of
+            // the clamp. A large figure means a much larger melt cost is
+            // needed before that band warms.
+            let margin = if spent > 0 { low * 100 / spent } else { -1 };
+            let middle = (band * high / bands + (band + 1) * high / bands) / 2;
+            let latitude = i64::from(latitudes.of_row(middle, high)) / i64::from(LATITUDE_FINE);
+            println!(
+                "  {band:>4}  {latitude:>8}  {count:>5}  {low:>9}  {top:>9}  {spent:>6}                   {margin:>14}"
+            );
+        }
+    }
+
     // The two headline questions, in one line each.
     let band_of = |degrees: i32| -> Vec<&Record> {
         let low = degrees - 8;

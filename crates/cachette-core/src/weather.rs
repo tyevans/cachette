@@ -2519,6 +2519,105 @@ pub fn ice_forcing_of(warmth: i32) -> i64 {
 /// The hundredths of a degree in one whole degree.
 const DEGREE_FINE: i64 = 100;
 
+/// The warmth that water melts at.
+///
+/// **This is the zero of the freeze bank and it is a physical constant.** It
+/// is not a mean that a measurement fitted, so a cell that never reaches it
+/// never touches the clamp.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0190, ground that carries ice stays at the melting point until the ice is gone, decision D6. `docs/adrs/draft/adr-0190-ground-that-carries-ice-stays-at-the-melting-point-until-the-ice-is-gone.md`
+pub const MELTING_WARMTH: i32 = warmth_of_hundredths(0);
+
+/// The freezing that grew the ice which one warmth unit of rise melts.
+///
+/// **This is a balance value and a blocker governs it. It is not
+/// published.** The deposit of the bank counts freezing over time and the
+/// withdrawal spends warmth, so one constant converts between the two. That
+/// constant is the latent heat of fusion divided by the heat capacity of the
+/// surface, in the units of this field, and this project can verify neither
+/// quantity. The balance register holds the row and how the value was
+/// reached.[^1] [^2] [^3]
+///
+/// # References
+///
+/// [^1]: ADR-0190, ground that carries ice stays at the melting point until the ice is gone, decision D4. `docs/adrs/draft/adr-0190-ground-that-carries-ice-stays-at-the-melting-point-until-the-ice-is-gone.md`
+/// [^2]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+/// [^3]: Balance register, the weather values. `docs/reference/balance.md`
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+pub const MELT_COST: i64 = 16;
+
+/// The most freezing that one cell banks.
+///
+/// **The bound is arithmetic over two constants this module already
+/// declares**, and it states no new figure. It is what one whole season
+/// period deposits when a cell stands the whole of the heat scale below the
+/// melting point for the whole of that period.
+///
+/// **The bound is what makes an ice cap possible and it is not a lever.** A
+/// cell whose winter deposits more than its summer withdraws carries a
+/// residue into the next year, the residue grows, and the summer of that cell
+/// is then held for ever. This stops the count from running away.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0190, ground that carries ice stays at the melting point until the ice is gone, decision D5. `docs/adrs/draft/adr-0190-ground-that-carries-ice-stays-at-the-melting-point-until-the-ice-is-gone.md`
+const FREEZE_BANK_CEILING: i64 = SEASON_PERIOD_TICKS * HEAT_CEILING as i64;
+
+/// Returns the temperature that a cell may stand at, and the freeze bank that
+/// it carries out of the solve.
+///
+/// **Ground that carries ice stays at the melting point until the ice is
+/// gone.** The energy that arrives melts the ice rather than warming the
+/// ground under it, and the latent heat of fusion of water is large. The polar
+/// summer of a real planet stays at the melting point for this reason, and a
+/// model without the term lets the polar summer run.[^1] [^2]
+///
+/// The deposit is the depth of the cell below the melting point, and it costs
+/// the cell nothing. **The freezing of a real surface does stall it, and this
+/// leaves that out**: a water surface stays near its freezing point while it
+/// freezes over, and the ice then radiates from its own top and cools freely.
+/// This field carries one temperature for a cell, and that temperature is the
+/// surface. So a reader who expects a plateau at each end finds only one.[^3]
+///
+/// The withdrawal is one subtraction. **There is no melt loop and no trip
+/// count that depends on the values.**[^4]
+///
+/// **The reader takes the settled temperature and not one step of it.** The
+/// driver moves a cell and the wind then carries heat onto it, so a clamp
+/// inside one of the two passes lets the other one lift a cell over the
+/// melting point with ice still standing. A test found that hole.[^5]
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+///
+/// # References
+///
+/// [^1]: ADR-0190, ground that carries ice stays at the melting point until the ice is gone, decisions D2 and D3. `docs/adrs/draft/adr-0190-ground-that-carries-ice-stays-at-the-melting-point-until-the-ice-is-gone.md`
+/// [^2]: Findings register, FND-619. `docs/FINDINGS.md`
+/// [^3]: ADR-0190, ground that carries ice stays at the melting point until the ice is gone, decision D2. `docs/adrs/draft/adr-0190-ground-that-carries-ice-stays-at-the-melting-point-until-the-ice-is-gone.md`
+/// [^4]: ADR-0005, a solver runs a fixed iteration count, never a convergence test, decisions D1 and D2. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+/// [^5]: Findings register, FND-630. `docs/FINDINGS.md`
+#[must_use]
+pub fn frozen_hold(held: i32, bank: i64) -> (i32, i64) {
+    // The deposit. A cell below the melting point grows ice for as long as it
+    // stands there, and one solve adds the depth it stands below.
+    let below = i64::from((MELTING_WARMTH - held).max(0));
+    let bank = (bank + below).clamp(0, FREEZE_BANK_CEILING);
+    let over = i64::from(held - MELTING_WARMTH);
+    if over <= 0 || bank <= 0 {
+        return (held, bank);
+    }
+    // The withdrawal. The cell gives up as much of its rise above the melting
+    // point as the bank pays for, and each unit given up spends what that unit
+    // of ice cost to grow.
+    let paid = (bank / MELT_COST).min(over);
+    (held - paid as i32, bank - paid * MELT_COST)
+}
+
 /// Returns the warmth that one temperature in hundredths of a degree stands
 /// at on the heat scale.
 ///
@@ -3609,6 +3708,24 @@ pub struct WeatherField {
     ///
     /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D3. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
     warmth_scratch: Vec<i32>,
+    /// The freezing that each cell has taken and that its ice has not yet
+    /// paid back.
+    ///
+    /// **This is simulated state and it enters the state hash.** A world that
+    /// loads a saved bank and a world that recomputes one are different
+    /// worlds, in the same way that the temperature makes them different.[^1]
+    ///
+    /// **The bank could not be derived.** The albedo term reads an ice share
+    /// from the temperature a cell carries, and that reader holds no history:
+    /// a cell that spent a winter frozen and a cell that reached the same
+    /// temperature on this pass read alike. The clamp is a memory of the
+    /// winter, so it needs a memory.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0190, ground that carries ice stays at the melting point until the ice is gone, decision D1. `docs/adrs/draft/adr-0190-ground-that-carries-ice-stays-at-the-melting-point-until-the-ice-is-gone.md`
+    /// [^2]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    frozen: Vec<i32>,
     /// The temperature passes that have run since the field was built.
     warmth_passes: u64,
     /// The wind passes that have run since the field was built.
@@ -3752,6 +3869,9 @@ impl WeatherField {
             // weather.
             warmth: vec![HEAT_CEILING / 2; count],
             warmth_scratch: vec![HEAT_CEILING / 2; count],
+            // **A world starts with no ice.** A field that began with a bank
+            // would hold a winter that never happened.
+            frozen: vec![0; count],
             warmth_passes: 0,
             wind_passes: 0,
             raised: 0,
@@ -3891,6 +4011,26 @@ impl WeatherField {
     #[must_use]
     pub fn warmth_plane(&self) -> &[i32] {
         &self.warmth
+    }
+
+    /// Returns the freezing that each cell of the whole lattice has taken and
+    /// that its ice has not yet paid back.
+    ///
+    /// A cell that has never stood below the melting point reads zero, and
+    /// the clamp does nothing to such a cell.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0190, ground that carries ice stays at the melting point until the ice is gone, decision D6. `docs/adrs/draft/adr-0190-ground-that-carries-ice-stays-at-the-melting-point-until-the-ice-is-gone.md`
+    #[must_use]
+    pub fn frozen_plane(&self) -> &[i32] {
+        &self.frozen
+    }
+
+    /// Returns the freeze bank of one cell of the whole lattice.
+    #[must_use]
+    pub fn frozen_at(&self, cell: u32) -> i32 {
+        self.frozen.get(cell as usize).copied().unwrap_or(0)
     }
 
     /// Returns the temperature passes that have run since the field was built.
@@ -4310,6 +4450,12 @@ impl WeatherField {
         for _ in 0..WARMTH_PASSES_FOR_EACH_SOLVE {
             self.warm(tick, ground);
             self.carry(threads);
+            // **Ground that carries ice cannot rise above the melting point
+            // until the ice is gone.** The pass runs after the driver and the
+            // carry, because both of them move the temperature.[^4]
+            //
+            // [^4]: ADR-0190, ground that carries ice stays at the melting point until the ice is gone, decisions D2 and D3. `docs/adrs/draft/adr-0190-ground-that-carries-ice-stays-at-the-melting-point-until-the-ice-is-gone.md`
+            self.melt();
             self.warmth_passes = self.warmth_passes.saturating_add(1);
         }
         // **The wind blows over dry ground too.** The wind passes run before
@@ -4699,6 +4845,32 @@ impl WeatherField {
             // never overshoots, because it is bounded by what is left.
             let step = (i64::from(step) + apart.signum()).clamp(-apart.abs(), apart.abs());
             *held = narrow(Some(Accum(i64::from(*held) + step))).clamp(0, HEAT_CEILING);
+        }
+    }
+
+    /// Holds every cell that carries ice at the melting point.
+    ///
+    /// **The pass runs after the driver and after the carry**, so it reads the
+    /// temperature that the whole solve settled on. A clamp inside one of the
+    /// two passes lets the other one lift a cell over the melting point with
+    /// ice still standing.[^1] [^2]
+    ///
+    /// The pass walks the cells in ascending index order and reads nothing it
+    /// is writing.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0190, ground that carries ice stays at the melting point until the ice is gone, decisions D2 and D3. `docs/adrs/draft/adr-0190-ground-that-carries-ice-stays-at-the-melting-point-until-the-ice-is-gone.md`
+    /// [^2]: Findings register, FND-630. `docs/FINDINGS.md`
+    /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn melt(&mut self) {
+        for (cell, bank) in self.frozen.iter_mut().enumerate() {
+            let Some(held) = self.warmth.get_mut(cell) else {
+                continue;
+            };
+            let (settled, banked) = frozen_hold(*held, i64::from(*bank));
+            *held = settled;
+            *bank = banked as i32;
         }
     }
 
@@ -5124,6 +5296,12 @@ impl WeatherField {
             .write(bytemuck::cast_slice(&self.ground))
             .write(bytemuck::cast_slice(&self.wind))
             .write(bytemuck::cast_slice(&self.warmth))
+            // **The freeze bank is state that the next step reads, so it
+            // enters the hash.** Two cells at one temperature and a different
+            // bank move differently on the next pass.[^5]
+            //
+            // [^5]: ADR-0190, ground that carries ice stays at the melting point until the ice is gone, decision D1. `docs/adrs/draft/adr-0190-ground-that-carries-ice-stays-at-the-melting-point-until-the-ice-is-gone.md`
+            .write(bytemuck::cast_slice(&self.frozen))
     }
 }
 
