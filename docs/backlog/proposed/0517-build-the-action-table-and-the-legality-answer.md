@@ -28,8 +28,8 @@ factorises the table into a verb, a target and a magnitude. The built-in
 controller's choice enumeration does not have that shape: one choice names two
 things, several name nothing, and none carries a quantity. A later record
 replaces the factorisation with a per-verb list of argument positions and keeps
-the rest.[^5] **That record is a draft, and a draft binds nothing.** This item
-cannot be refined until a reviewer accepts it or rejects it.
+the rest.[^5] **A reviewer accepted that record on 6 September 2026, so it
+binds.** The encoding this item builds is the one that record states.
 
 **It depends on item 0495.** A legality answer must not name a target the
 faction cannot see, so the readers that answer for one faction come first.[^6]
@@ -98,7 +98,7 @@ Filled in when the item moves to `complete/`.
 [^2]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^3]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^4]: Research report 31, the state of the learner surface. `docs/research/reports/31-the-state-of-the-learner-surface.md`
-[^5]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares. `docs/adrs/draft/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+[^5]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^6]: Backlog item 0495, build the observation plane and let every reader answer for one faction. `docs/backlog/proposed/0495-build-the-observation-plane-and-let-every-reader-answer-for-one-faction.md`
 [^7]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^8]: Blockers register, BLK-007. `docs/BLOCKERS.md`

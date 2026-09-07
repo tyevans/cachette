@@ -13901,7 +13901,7 @@ belongs in the sizing of the batch step.
 
 [^F565A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D4. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F565C]: Research report 31, the state of the learner surface. `docs/research/reports/31-the-state-of-the-learner-surface.md`
-[^F565E]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares. `docs/adrs/draft/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+[^F565E]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^F552A]: The unit-to-tile bridge, the block key. `crates/cachette-core/src/bridge.rs`
 [^F494C]: Findings register, FND-486. `docs/FINDINGS.md`
 [^F542C]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
