@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-610**
+**Next number: FND-612**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -15494,3 +15494,144 @@ the field is.
 ## References
 
 [^F606A]: The contrast probe. `crates/cachette-core/examples/weather_contrast_probe.rs`
+
+
+### FND-607 — The height ceiling was the whole of the cooling error, and none of the rest
+
+**Believed.** The land of this world stands two to three times higher in its own
+range than the land of the Earth stands in its, so the published lapse rate took
+11 to 18 degrees off every land cell. Either the ceiling or the height
+distribution had to move.[^F603A]
+
+**True, and the ceiling alone was enough.** Moving the ceiling from 4000 metres
+to 1500 puts the mean land near 800 metres, which is the published mean for the
+Earth, and the cooling falls to between 4.0 and 6.7 degrees. **The distribution
+did not need to move.** A reshape of the terrain was specified and then
+withdrawn before any of it was written.
+
+**Evidence.** A water probe and the Köppen probe over the demonstration world,
+at an extent of 128, at seed `0x2f`, at the tile pitch, settled 400 ticks, on 7
+September 2026 on one development machine (x86-64). Every figure is derived.
+
+The land stands at 41 to 69 percent of its range, which is unchanged because the
+terrain is unchanged. At 1500 metres that is 620 to 1029 metres, and at the
+published lapse rate it is 4.0 to 6.7 degrees of cooling, against 11 to 18 at
+the old ceiling.
+
+**What follows.** **The class table did not come right, and the height was not
+why.** With the cooling corrected the polar band still grades desert and the
+equatorial band still misses tropical by about two degrees. Both are the cloud
+term, and the next finding holds the measurement.
+
+**Two figures were proposed for this and both were arithmetic from the same
+table.** The first was wrong by a factor of two and a half. The second was
+checked against a probe before anything was built on it, and it held.
+
+### FND-608 — The cloud term is load-bearing in both directions, and it reads the wrong quantity
+
+**Believed.** With the height corrected, the published energy balance would give
+the classes their published latitudes.
+
+**True for the middle latitudes and false at both ends.** The band at 37 degrees
+moved from 1 percent temperate to 23. The polar bands grade 80 to 84 percent
+desert, and the equatorial band misses tropical by two degrees.
+
+**An ablation proves the cause and refuses the fix.** Removing the cloud term
+entirely repairs the poles, which grade 84 to 90 percent tundra. In the same run
+the rain of the middle latitudes collapses, the band at 37 degrees falls from
+364 to 48 on the probe's rain scale and grades 94 percent desert. **The term is
+load-bearing in both directions, so its presence is not the defect and its
+absence is not the repair.**
+
+**The defect is the quantity it reads.** The term takes the water the air holds
+against what that air could hold, which is a relative humidity, and treats it as
+a cloud cover. In this field that quantity runs from 14 percent to 94 percent
+between bands. **Real cloud cover does not swing that far**, so the anomaly
+swings about twice as wide as it should: it warms a dry polar cell by about 7
+degrees and cools the wet equator by about 4.
+
+**Evidence.** Runs of the Köppen probe over the demonstration world at a 1500
+metre ceiling, with the cloud term at its published value and at zero, on 7
+September 2026 on one development machine (x86-64). Every figure is derived.
+
+**What follows.** **The two records are coupled and neither lands alone.** The
+right source for a cloud term is the condensed water that a second record adds
+as a plane, and that record already states that the two readers deriving cloud
+from humidity must move onto it.[^F608A] **Until they do, the energy balance has
+no correct cloud to read.**
+
+**A fourth reason not to land the driver was found by the tests.** The peak of
+the air plane visits three cells in about a thousand ticks, where the test
+requires four. The weather is pinned. A better class table bought by losing the
+motion of the field is not a trade this work will make quietly.
+
+## References
+
+[^F608A]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D1. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
+
+
+### FND-610 — The cloud plane does not hold up beside the energy balance, and the run that said it did was reading a broken scale
+
+**Believed.** The energy balance reads a relative humidity where it wants a
+cloud cover, so moving that reader onto the condensed water plane would repair
+it.[^F608A]
+
+**True in the reasoning and false in the result.** Moving both readers onto the
+plane did raise the temperate band, from 23 percent of the band at 37 degrees to
+33. **That gain is an artefact and not a repair.**
+
+**Condensed water is not a cover fraction.** The plane holds what has condensed
+and not yet fallen, and it falls at a share of one seventh in each solve, so it
+is a small transient quantity against the capacity of the air. Read as a cover
+it gives about 5 percent everywhere. The cloud term is an anomaly about a mean
+cover of 68 percent, so a uniform 5 percent is a uniform warming of the whole
+world, and that warming is what moved the band.
+
+**A test caught it that the class table could not.** The painted sky over polar
+land reads 13 of a whole sky of 255, where the field requires the high latitudes
+to hold cloud. **The class table cannot see a uniform offset, and a readability
+test can.**
+
+**Evidence.** Runs of the Köppen probe and the weather test binary over the
+demonstration world at a 1500 metre ceiling, on 7 September 2026 on one
+development machine (x86-64). Three arrangements were measured: the driver
+alone, the driver with the plane and the old readers, and the driver with both
+readers moved. The first two differ by about three points of desert and one of
+temperate, which is a wash. Every figure is derived.
+
+**What follows.** **A quantity that is conserved and a quantity that is a
+fraction are not the same shape, and one cannot be substituted for the other by
+changing what a reader points at.** A cloud cover needs its own scale: how much
+condensed water makes an overcast sky. That is a constant nobody has chosen, and
+choosing it against the picture would be fitting.
+
+So the cloud plane is left out of this landing. **It is not wrong. It has no
+correct reader yet**, and the record that adds it already says the two readers
+must move onto it.[^F608A]
+
+### FND-611 — One account, two readers, and only the test knew about the second
+
+**Believed.** Adding a plane to the water account meant updating the account
+check. Three sites in the test file were found and repaired.
+
+**True, and there was a fourth.** The engine carries its own account check, and
+the world invariant calls it every frame. It read the air and the ground and not
+the cloud, so it failed at frame zero with the whole world still empty.
+
+**The failure was correct and the repair was one line each side.** What made it
+cheap was that the invariant runs inside the world rather than only inside a
+test, so it fired on the first frame of an unrelated test rather than waiting
+for a reviewer.
+
+**Evidence.** The weather test binary over the demonstration world on 7
+September 2026 on one development machine (x86-64). Eight tests failed with the
+account short by the cloud; five failed after the engine check was repaired, and
+the three that recovered were the account tests.
+
+**What follows.** **A rule that lives in a test protects one test. A rule that
+lives in the engine protects every caller.** The account is one fact with two
+readers, and only the one inside the engine caught the omission. The finding is
+recorded because the next plane added to any account will meet the same pair.
+
+## References
+

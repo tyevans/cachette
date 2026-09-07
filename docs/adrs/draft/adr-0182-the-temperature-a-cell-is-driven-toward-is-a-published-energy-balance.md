@@ -175,6 +175,13 @@ states, which is already a parameter.[^2]
 **The seasonal range at a high latitude is larger than at a middle latitude.**
 Any content that assumed one season everywhere is wrong under this record.
 
+**This record is implemented and it does not yet give the published classes.**
+The band at 37 degrees holds the temperate climates the published scheme puts
+there, where before it held almost none. The equatorial band loses its tropical
+cells, the polar bands grade arid, and the peak of the air plane stops moving.
+**Those three point one way: the belt this record settles at is flatter than the
+one the world needs.** The next clause names why.
+
 **The albedo is fixed.** The published model this record takes its constants from
 holds the albedo constant, so it carries no ice feedback. It is therefore known
 to settle warmer at the poles than a planet with ice does. **The engine inherits
@@ -191,6 +198,12 @@ do.** The lapse rate takes its metres from the relief and its fraction from the
 terrain. A terrain whose land sits high in its own range, under a large relief,
 puts every land cell far below the balance. The two are declared apart and no
 check fails when they disagree.[^9]
+
+**The missing term has a name and a published form.** The albedo above is held
+constant, so nothing cools a pole as it freezes. **An ice albedo that reads the
+temperature steepens the profile at both ends**, which is the direction all
+three failures above ask for. It is the classic addition to this model and it is
+the work that should follow this record.
 
 **One published quantity is still absent.** The model this record takes carries
 no term for the land and the sea holding heat differently in the mean. The field
