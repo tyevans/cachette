@@ -148,9 +148,16 @@ def parse_analysis(text: str, liked: Sequence[str]) -> dict:
 
 def _rasters(
     store: session.Session, index: int, letters: Sequence[str], verdict: str, sizes
-) -> list[Image]:
-    """Rasterise each named variant at the display size, with a label."""
+) -> tuple[list[Image], list[str]]:
+    """Rasterise each named variant at the display size, with a label.
+
+    Give the images, and the letters that a picture actually went out for.
+    A letter drops out of the second list when its SVG is missing, or when
+    it will not rasterise. The caller must not ask the model about a letter
+    that dropped out.
+    """
     images: list[Image] = []
+    sent: list[str] = []
     for letter in letters:
         source = store.svg(index, letter)
         if not source:
@@ -168,7 +175,8 @@ def _rasters(
                 data=data,
             )
         )
-    return images
+        sent.append(letter)
+    return images, sent
 
 
 def run(
@@ -176,7 +184,6 @@ def run(
     session_id: str,
     index: int,
     root: Path = session.SESSION_ROOT,
-    exemplar_limit: int = guide_module.DEFAULT_EXEMPLAR_LIMIT,
     ask=ask_with_images,
     log=print,
 ) -> dict:
@@ -197,18 +204,26 @@ def run(
             "ask again."
         )
 
-    the_guide = guide_module.load(asset, limit=exemplar_limit)
+    the_guide = guide_module.load(asset, limit=0)
     sizes = render.sizes_for(asset)
-    images = _rasters(store, index, found.order, "ACCEPTED", sizes)
+    images, liked_sent = _rasters(store, index, found.order, "ACCEPTED", sizes)
+    missing = [letter for letter in found.order if letter not in liked_sent]
+    if missing:
+        raise AnalysisError(
+            f"the picture for variant {missing[0]} is missing, and it was "
+            "liked. Draw it again, or refuse it, before you ask for an "
+            "analysis."
+        )
     if not images:
         raise AnalysisError("no liked drawing has a picture on disk")
-    images.extend(_rasters(store, index, found.denies, "REFUSED", sizes))
+    refused_images, _ = _rasters(store, index, found.denies, "REFUSED", sizes)
+    images.extend(refused_images)
 
     meta = session.read_json(directory / "meta.json") or {}
     summary = meta.get("prompt_summary")
     subject = summary.split(";")[0].strip() if isinstance(summary, str) else asset
 
-    prompt = build_analysis_prompt(the_guide, subject, found.order)
+    prompt = build_analysis_prompt(the_guide, subject, liked_sent)
     log(f"analysing {asset}/{session_id}/round-{index:02d}: {len(images)} pictures")
 
     last_error = "no answer"
@@ -227,7 +242,7 @@ def run(
         except ClientError as error:
             raise AnalysisError(f"the endpoint failed: {error}") from error
         try:
-            parsed = parse_analysis(reply.text, found.order)
+            parsed = parse_analysis(reply.text, liked_sent)
         except ValueError as error:
             last_error = str(error)
             continue

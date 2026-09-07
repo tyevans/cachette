@@ -80,7 +80,6 @@ def _analyse(arguments: argparse.Namespace) -> int:
             arguments.asset,
             arguments.session,
             arguments.round,
-            exemplar_limit=arguments.exemplars,
         )
     except guide_module.GuideError as error:
         print(f"guide error: {error}", file=sys.stderr)
@@ -219,12 +218,6 @@ def main(argv: list[str] | None = None) -> int:
     analysis.add_argument("--asset", default="hex-tile", help="the asset type")
     analysis.add_argument("--session", required=True, help="the session identifier")
     analysis.add_argument("--round", type=int, required=True, help="the round index")
-    analysis.add_argument(
-        "--exemplars",
-        type=int,
-        default=guide_module.DEFAULT_EXEMPLAR_LIMIT,
-        help="how many exemplar images to attach",
-    )
     analysis.set_defaults(handler=_analyse)
 
     commands.add_parser("guide", help="report what the guide holds").set_defaults(

@@ -407,6 +407,7 @@ class SessionStore:
         number = int(match.group(1)) if match else -1
         meta = read_json(directory / "meta.json")
         feedback = read_json(directory / "feedback.json")
+        feedback = self._checked_feedback(feedback, number)
         analysis = read_json(directory / "analysis.json")
         variants = [self._load_variant(directory, letter) for letter in VARIANT_LETTERS]
         return Round(
@@ -417,6 +418,26 @@ class SessionStore:
             feedback=feedback,
             analysis=analysis,
         )
+
+    @staticmethod
+    def _checked_feedback(feedback: dict | None, number: int) -> dict | None:
+        """Drop a feedback that names a round other than the one it sits in.
+
+        A feedback file with no `round` field still loads. `number` is `-1`
+        when the round directory name does not match the pattern, so this
+        does not reject on that. `Session.feedback` applies the same rule,
+        and one test checks that the two agree.[^1]
+
+        ## References
+
+        [^1]: The rule against a misfiled feedback. `tools/direct-die/review/test_readers_agree.py`
+        """
+        if not isinstance(feedback, dict):
+            return feedback
+        named = feedback.get("round")
+        if named is not None and named != number:
+            return None
+        return feedback
 
     @staticmethod
     def _load_variant(directory: Path, letter: str) -> Variant:

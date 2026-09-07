@@ -112,7 +112,6 @@ class RoundResult:
     """What one round produced."""
 
     index: int
-    parent: str | None
     variants: list[VariantResult] = field(default_factory=list)
     seconds: float = 0.0
 
@@ -170,6 +169,16 @@ def parse_critique(text: str) -> dict:
     }
 
 
+def _taken_refusals(denied_sources: Sequence[str]) -> list[str]:
+    """Give the refusals that a prompt actually holds.
+
+    This is the one place that drops an empty source and caps the count at
+    `MAX_REFUSALS`. The prompt builder and the round summary both call this,
+    so they cannot disagree on how many refusals went in.
+    """
+    return [item for item in denied_sources if item and item.strip()][-MAX_REFUSALS:]
+
+
 def _refusal_block(denied_sources: Sequence[str]) -> str:
     """Give the prompt section that shows the drawings a person refused.
 
@@ -177,7 +186,7 @@ def _refusal_block(denied_sources: Sequence[str]) -> str:
     source, because the generation step sends no picture, and that is what
     keeps the prompt inside the model window.
     """
-    taken = [item for item in denied_sources if item and item.strip()][-MAX_REFUSALS:]
+    taken = _taken_refusals(denied_sources)
     if not taken:
         return ""
     bodies = "\n-----\n".join(item.strip() for item in taken)
@@ -454,7 +463,7 @@ def run_round(
     sizes = render.sizes_for(the_guide.asset)
     letters = session.VARIANT_LETTERS[:variants]
     plan = plan_round(store, index, letters)
-    result = RoundResult(index=index, parent=plan.parents.get(letters[0]))
+    result = RoundResult(index=index)
     round_path = store.round_path(index)
 
     for letter in letters:
@@ -533,8 +542,9 @@ def run_round(
     summary = "first drawing" if not plan.parents else "revision"
     if plan.note or plan.text:
         summary += "; the human gave direction"
-    if plan.denied_sources:
-        summary += f"; {len(plan.denied_sources)} refused drawings in the prompt"
+    held_refusals = _taken_refusals(plan.denied_sources)
+    if held_refusals:
+        summary += f"; {len(held_refusals)} refused drawings in the prompt"
     session.write_json(
         round_path / "meta.json",
         {

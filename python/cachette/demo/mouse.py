@@ -105,7 +105,12 @@ class Controls:
     the view on the next frame, so a change to what draws leaves this alone.
     """
 
-    __slots__ = ("_demo", "_dragged", "_say")
+    # The window library holds a handler by weak reference, so a class with
+    # no dictionary must name the weak reference slot. Without it the push
+    # raises, and the failure is invisible to a test that has no window.[^1]
+    #
+    # [^1]: Findings register, FND-595. `docs/FINDINGS.md`
+    __slots__ = ("__weakref__", "_demo", "_dragged", "_say")
 
     def __init__(self, demo: Watched, say: Callable[[str], None] | None = None) -> None:
         """Hold the state the gestures move.

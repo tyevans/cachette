@@ -22,7 +22,9 @@ import os
 import tempfile
 from pathlib import Path
 
-# The heading that holds every rule a person accepted from an analysis.
+# The heading that this module writes once, before the first rule it adds.
+# A later rule always lands at the end of the file, not under this heading.
+# The two stay together only while nobody adds a section below the heading.
 ADDED_HEADING = "## Rules the art director added"
 
 
@@ -45,7 +47,12 @@ def rules_file(styleguide_root: Path, style: str) -> Path:
 
 
 def append_rule(styleguide_root: Path, style: str, rule: str) -> Path:
-    """Append one rule to a style rules file, and give the path.
+    """Append one rule to the end of a style rules file, and give the path.
+
+    The function writes the heading once, the first time it adds a rule, and
+    every rule after that goes at the end of the file. It does not search for
+    the heading's section, so a rule can land below a section that a person
+    added later.
 
     The write is atomic. It writes a temporary file in the same directory and
     then renames it, so a reader never sees half a file.

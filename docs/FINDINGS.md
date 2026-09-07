@@ -3698,6 +3698,28 @@ belongs to the processor path and not to the design.
 
 ## F. Sourcing
 
+### FND-595 — A test that names a handler cannot see that the window refuses to hold it
+
+**Believed.** The mouse controls were checked against the window library
+without a display. The check read the handler method names and compared them
+against the event names the library declares. That was called the strongest
+check a machine with no display can make.
+
+**True.** The library does not only call those methods. It holds the handler
+object by weak reference. A class that declares its attribute slots and names
+no weak reference slot cannot be referred to weakly, so the push raises
+`TypeError` before any name is read. The names were right and the push failed.
+
+**Evidence.** The demonstration raised `cannot create weak reference to
+'Controls' object` at the first window it opened. Adding the weak reference
+slot to the declared slots fixes it. Removing the slot again makes the new
+test fail with the same message the owner saw.
+
+**What follows.** A test that reads names is a test about names. When a
+library takes an object rather than calling a function, drive the real call:
+build the library's own dispatcher, push the handler onto it, and send one
+event. That needs no display and it catches what the name check cannot.
+
 ### FND-026 — Games do not document their implementations
 
 Eight subsystems across seven games are community-wiki only, with no developer

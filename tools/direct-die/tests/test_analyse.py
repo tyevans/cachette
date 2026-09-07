@@ -174,6 +174,20 @@ def test_the_runner_asks_once_more_when_the_answer_is_malformed(tmp_path):
     assert len(calls) == 2
 
 
+def test_the_runner_raises_before_asking_when_a_liked_picture_is_missing(tmp_path):
+    # "c" holds no SVG file, so it never rasterises. The person liked it.
+    _session_with(tmp_path, likes=["b", "c"], denies=["a"])
+    calls = []
+
+    def ask(prompt, images, **rest):
+        calls.append(prompt)
+        return client.Reply(text=GOOD)
+
+    with pytest.raises(analyse.AnalysisError, match="variant c"):
+        analyse.run("hex-tile", "s1", 0, root=tmp_path, ask=ask, log=lambda *_: None)
+    assert calls == []
+
+
 def test_the_runner_raises_when_the_answer_stays_malformed(tmp_path):
     _session_with(tmp_path, likes=["b", "d"])
 

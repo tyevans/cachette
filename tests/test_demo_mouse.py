@@ -382,3 +382,36 @@ def test_the_button_numbers_match_the_ones_the_window_library_uses() -> None:
     assert LEFT_BUTTON == pyglet.window.mouse.LEFT
     assert MIDDLE_BUTTON == pyglet.window.mouse.MIDDLE
     assert RIGHT_BUTTON == pyglet.window.mouse.RIGHT
+
+
+def test_a_window_can_hold_the_controls_by_weak_reference() -> None:
+    """The library takes the handler weakly, so the push must succeed.
+
+    The earlier test named the handler methods against the library's event
+    list, which is the strongest check a machine with no display can make
+    from names alone. It passed while the push itself raised, because a
+    class with no dictionary cannot be referred to weakly unless it names
+    the slot. This drives the real call instead of the names.[^1]
+
+    [^1]: Findings register, FND-595. `docs/FINDINGS.md`
+    """
+    from pyglet.event import EventDispatcher
+
+    class Surface(EventDispatcher):
+        pass
+
+    for name in (
+        "on_mouse_press",
+        "on_mouse_drag",
+        "on_mouse_release",
+        "on_mouse_scroll",
+    ):
+        Surface.register_event_type(name)
+
+    demo = build()
+    controls = Controls(demo)
+    surface = Surface()
+
+    surface.push_handlers(controls)
+
+    surface.dispatch_event("on_mouse_scroll", 10, 10, 0, 1)

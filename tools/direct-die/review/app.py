@@ -117,9 +117,9 @@ def no_store(response: Response) -> Response:
     return response
 
 
-# How long the analysis may take. It is one model call with up to eight
-# pictures. A run of a whole subject takes about seventy seconds, and this is
-# smaller than that.
+# How long the analysis may take. It is one model call with up to four
+# pictures, one for each variant of a round. A run of a whole subject takes
+# about seventy seconds, and this is smaller than that.
 ANALYSIS_TIMEOUT_SECONDS = 180.0
 
 
@@ -493,7 +493,8 @@ def create_app(
             rule_module.append_rule(styleguide_root, style, rule)
         except rule_module.RuleError as error:
             return page("error.html", request, message=str(error))
-        target = back if back.startswith("/") else "/"
+        is_local_path = back.startswith("/") and not back.startswith("//")
+        target = back if is_local_path else "/"
         joiner = "&" if "?" in target else "?"
         return no_store(RedirectResponse(f"{target}{joiner}ruled=1", status_code=303))
 
