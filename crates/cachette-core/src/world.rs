@@ -3007,7 +3007,8 @@ impl World {
         true
     }
 
-    /// Gives every site that a rival occupies undefended to the occupier.
+    /// Gives every site that a rival occupies undefended to the occupier, and
+    /// burns the ones the occupier cannot supply.
     ///
     /// **The trigger is the ground.** A site changes hands when a faction
     /// that is not its own stands on its tile and no unit of its own faction
@@ -3022,11 +3023,20 @@ impl World {
     /// that could take one site on one tick therefore resolve by a rule and
     /// never by an iteration order.[^2] [^3]
     ///
-    /// **What stands at the site passes to the taker whole.** The store, the
-    /// housing, the rates, the staff and the upgrades on the ground are
+    /// **What stands at a kept site passes to the taker whole.** The store,
+    /// the housing, the rates, the staff and the upgrades on the ground are
     /// untouched, and every unit that draws from the site changes faction
     /// with it. Only the queue is cleared, because a queue holds orders that
     /// the taker never gave.[^4]
+    ///
+    /// **The taker keeps a city it can supply and burns one it cannot.** A
+    /// city of the taker supplies the captured site when the site stands
+    /// inside the reach of that city. The reach is the quantity the ground
+    /// rule already computes for every city on every tick, and the upgrades a
+    /// faction finishes inside its own ground extend it to a bound.[^5] A
+    /// near conquest therefore grows the taker and a far one pays it in
+    /// plunder, and a road between two cities changes which is which. Nothing
+    /// here states a distance of its own.
     ///
     /// The pass walks the settlements in slot order, and the occupancy list
     /// is in ascending tile order. Both are stable keys.[^3]
@@ -3037,6 +3047,7 @@ impl World {
     /// [^2]: ADR-0153, a tile's lease follows the units that stand on it, decision D3. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
     /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     /// [^4]: ADR-0180, a site changes hands or the taker destroys it, decisions D1 and D2. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^5]: ADR-0180, a site changes hands or the taker destroys it, decision D7. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
     fn capture_sites(&mut self, occupancy: &[(TileIdx, FactionId)]) {
         // The list is in ascending tile order, so a lookup searches it and
         // never scans the world.
@@ -3073,10 +3084,55 @@ impl World {
             }
             takings.push((site, taker));
         }
-        let mut took = false;
-        for (site, taker) in takings {
-            took |= self.take_site(site, taker);
+        if takings.is_empty() {
+            return;
         }
+        // **The taker keeps a city it can supply and burns one it cannot.**
+        // The reach of a city is the quantity the ground rule already
+        // computes for every city on every tick, and the upgrades a faction
+        // finishes inside its own ground are what extend it.[^5] A road
+        // between two cities therefore decides which conquests a faction can
+        // keep, and nothing here states a distance of its own.
+        //
+        // The list is built once for the tick, and only on a tick that takes
+        // something. A tick that takes nothing pays nothing for this rule.
+        //
+        // [^5]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+        let cities = self.holding.cities(&self.settlements, &self.upgrades);
+        let mut moved = false;
+        for (site, taker) in takings {
+            let Some(address) = self.settlements.address(site) else {
+                continue;
+            };
+            // The site being taken still belongs to the faction that is
+            // losing it, so the taker's own cities are the only ones this
+            // walk sees.
+            let mut holds_one = false;
+            let mut supplied = false;
+            for city in &cities {
+                if city.faction != taker {
+                    continue;
+                }
+                holds_one = true;
+                if address.distance(city.address) <= city.reach {
+                    supplied = true;
+                    break;
+                }
+            }
+            // **A taker that holds no city keeps what it takes.** The rule
+            // asks which of the taker's cities supplies this one, and a
+            // faction with none is not a faction that failed to reach it. A
+            // captured city is then the only city that faction has, and it
+            // supplies itself. Without this the last army of a beaten faction
+            // could never take a capital, and a faction that lost every city
+            // could never return.
+            moved |= if supplied || !holds_one {
+                self.take_site(site, taker)
+            } else {
+                self.burn_site(site, taker)
+            };
+        }
+        let took = moved;
         // **A capture writes the faction of a unit, and that moves the arena
         // past the derived structure.** The unit stands where it stood, so
         // the rebuild gives the same structure back and only restamps the
@@ -3165,10 +3221,9 @@ impl World {
     /// Destroys a site that a faction holds undefended, and pays it the
     /// store.
     ///
-    /// **A raze is an order and a capture is not.** The step captures a site
-    /// that stands undefended under a rival, because the ground decides it.
-    /// Nothing in the engine razes: a raze destroys what a capture keeps, so
-    /// somebody must choose it.[^1]
+    /// **This is the caller's raze, and the step has one of its own.** The
+    /// capture pass burns a site that no city of the taker reaches, and this
+    /// verb lets a caller burn one whatever the reach says.[^1]
     ///
     /// The trigger is the trigger of a capture. The razer stands on the tile,
     /// and no unit of the owning faction stands there. The call refuses when
@@ -3196,10 +3251,6 @@ impl World {
     /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D3. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     pub fn raze_site(&mut self, site: Entity, razer: FactionId) -> Result<(), RazeError> {
-        let slot = self
-            .settlements
-            .slot_of(site)
-            .ok_or(RazeError::NoSuchSite)?;
         let owner = self
             .settlements
             .faction(site)
@@ -3225,6 +3276,32 @@ impl World {
                 return Err(RazeError::Defended);
             }
         }
+        if !self.burn_site(site, razer) {
+            return Err(RazeError::NoSuchSite);
+        }
+        self.refresh_bridge().map_err(RazeError::Bridge)?;
+        Ok(())
+    }
+
+    /// Destroys a site and pays its store to the faction that took it.
+    ///
+    /// **This is the one place a raze happens.** The caller's verb and the
+    /// capture pass both go through it, and neither repeats the work. The
+    /// caller checks the trigger and refreshes the derived unit structure
+    /// afterwards, because the two callers reach this from different points
+    /// of a step.
+    ///
+    /// Returns `false` when the identity names no live site.
+    fn burn_site(&mut self, site: Entity, razer: FactionId) -> bool {
+        let Some(slot) = self.settlements.slot_of(site) else {
+            return false;
+        };
+        let Some(owner) = self.settlements.faction(site) else {
+            return false;
+        };
+        let Some(tile) = self.settlements.tile(site) else {
+            return false;
+        };
         let store = self
             .settlements
             .store(site)
@@ -3268,7 +3345,7 @@ impl World {
             self.despawn_soldier(unit);
         }
         if !self.destroy_settlement(site) {
-            return Err(RazeError::NoSuchSite);
+            return false;
         }
         self.cohorts.rebuild(
             self.soldiers.home_column(),
@@ -3284,8 +3361,7 @@ impl World {
             razer,
             TAKE_KIND_RAZED,
         ));
-        self.refresh_bridge().map_err(RazeError::Bridge)?;
-        Ok(())
+        true
     }
 
     /// Returns the live site of a faction that stands nearest a tile.

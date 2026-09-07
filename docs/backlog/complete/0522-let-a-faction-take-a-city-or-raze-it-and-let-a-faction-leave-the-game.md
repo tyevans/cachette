@@ -40,9 +40,10 @@ elimination that a raze makes reachable.
    its staff. Every upgrade on the ground goes with the ground.
 3. Every resident of a captured site changes faction with the site, and so does
    the character each resident carries. The production queue is cleared.
-4. A caller may order a raze instead. A raze destroys the site, its upgrades
-   and its residents, and moves the store to the nearest live site of the
-   razing faction.
+4. The taker keeps a site that a city it already holds reaches, and burns one
+   that no city of its own reaches. A burn destroys the site, its upgrades and
+   its residents, and moves the store to the nearest live site of the burning
+   faction. A caller may order a raze as well.
 5. A faction that holds no site and no unit leaves the game. The pass releases
    the holder and the lease of every tile it held, and it removes its
    characters.
@@ -93,6 +94,8 @@ index placed it second.[^12]
 - A faction takes a city by standing on its tile, and the city answers with the
   new faction, its upgrades intact and its residents alive. A test drives the
   step.
+- A taker whose own cities do not reach the captured one burns it instead, and
+  a taker that holds no city keeps what it takes.
 - A garrison of one unit refuses the capture, whatever stands against it.
 - A razed city is gone, its upgrades are gone, and its store has moved to the
   razer.
@@ -118,10 +121,16 @@ touched a fact stored in two columns with nothing that failed on
 disagreement.[^14] One records two guards this work added that no fixture can
 reach, and says so rather than letting a green test imply coverage.[^15]
 
-**Two things are left undone, and neither belongs to this item.** Nothing
-inside the engine orders a raze, so a seeded run captures and never razes. A
-faction still cannot found a second city during a run, and a separate item
-holds that half.[^16]
+The engine chooses between the two acts from the reach of the cities the taker
+already holds, and a decision entry records that choice and its
+reasoning.[^17] At the reach the register holds today a seeded run burns far
+more cities than it keeps, and a run ends with fewer cities than it began with.
+That follows from the reach and from how far apart the seeder places cities,
+and both are balance values that this work does not touch.[^18]
+
+**One thing is left undone, and it does not belong to this item.** A faction
+still cannot found a second city during a run, and a separate item holds that
+half.[^16]
 
 ## References
 
@@ -141,3 +150,5 @@ holds that half.[^16]
 [^14]: Findings register, FND-580. `docs/FINDINGS.md`
 [^15]: Findings register, FND-581. `docs/FINDINGS.md`
 [^16]: Backlog item 0514. `docs/backlog/proposed/0514-let-a-faction-found-a-city-during-a-run.md`
+[^17]: Decisions register, DEC-278. `docs/DECISIONS.md`
+[^18]: Findings register, FND-590. `docs/FINDINGS.md`

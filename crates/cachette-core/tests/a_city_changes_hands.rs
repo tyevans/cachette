@@ -37,7 +37,7 @@ const EXTENT: u32 = 192;
 /// The commodity every fixture writes and reads.
 const GRAIN: CommodityId = CommodityId(0);
 
-fn world(seed: u64, factions: u16) -> World {
+fn world(seed: u64, factions: u16, reach: u32) -> World {
     let mut field = World::new(WorldConfig {
         width: EXTENT,
         height: EXTENT,
@@ -46,11 +46,24 @@ fn world(seed: u64, factions: u16) -> World {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     })
     .expect("the extent must describe a world");
-    // A small reach keeps the fixture local. The test never reads a reach
+    // The reach decides whether a taker keeps a captured city or burns it, so
+    // each fixture states the reach it needs. The test never reads a reach
     // value, so this is a fixture choice and not a balance figure.
-    field.set_reach_rules(ReachRules::new(2, 1, 3));
+    field.set_reach_rules(ReachRules::new(reach, 1, reach));
     field
 }
+
+/// The reach that puts the rival city far outside the island.
+///
+/// The fixture places the two cities more than eight steps apart, so a reach
+/// of two supplies neither from the other.
+const REACH_APART: u32 = 2;
+
+/// The reach that covers the whole fixture world.
+///
+/// The extent bounds every distance in the world, so a reach of the extent
+/// puts every city of a faction within reach of every tile.
+const REACH_TOGETHER: u32 = EXTENT;
 
 /// Returns every address of a world, in tile index order.
 fn addresses(field: &World) -> Vec<Axial> {
@@ -103,7 +116,12 @@ struct Fixture {
 ///
 /// [^1]: Testing rules, section 5. `.agents/rules/testing.md`
 fn fixture(seed: u64) -> Option<Fixture> {
-    let mut field = world(seed, 2);
+    fixture_with_reach(seed, REACH_APART)
+}
+
+/// Builds the fixture at a stated reach.
+fn fixture_with_reach(seed: u64, reach: u32) -> Option<Fixture> {
+    let mut field = world(seed, 2, reach);
     // The readers are off while the fixture builds. A world of two factions
     // in which only one has founded ends on domination at once, and the
     // fixture would then measure the reader rather than the capture.
@@ -174,6 +192,8 @@ fn any_fixture() -> Fixture {
 
 #[test]
 fn a_faction_that_stands_on_an_undefended_city_takes_it_whole() {
+    // The taker holds a city that reaches the island, so the rule keeps the
+    // city rather than burning it.
     let seed = any_seed();
     let Fixture {
         mut field,
@@ -181,7 +201,7 @@ fn a_faction_that_stands_on_an_undefended_city_takes_it_whole() {
         site,
         resident,
         ..
-    } = fixture(seed).expect("the seed builds the fixture");
+    } = fixture_with_reach(seed, REACH_TOGETHER).expect("the seed builds the fixture");
     assert_eq!(field.settlement_faction(site), Some(FactionId(0)));
 
     let invader = field
@@ -193,7 +213,8 @@ fn a_faction_that_stands_on_an_undefended_city_takes_it_whole() {
     // The control is the same fixture on the same seed with no invader. It
     // says what the store, the road and the resident do without a capture,
     // so the assertions below read the capture and not the tick.
-    let mut control = fixture(seed).expect("the seed builds the fixture");
+    let mut control =
+        fixture_with_reach(seed, REACH_TOGETHER).expect("the seed builds the fixture");
     control.field.step(2).expect("the step must run");
 
     assert_eq!(
@@ -264,7 +285,7 @@ fn a_garrison_of_one_refuses_the_capture() {
         seat,
         site,
         ..
-    } = any_fixture();
+    } = fixture_with_reach(any_seed(), REACH_TOGETHER).expect("the seed builds the fixture");
     field
         .spawn_soldier(seat, FactionId(0))
         .expect("the island admits a unit");
@@ -284,6 +305,105 @@ fn a_garrison_of_one_refuses_the_capture() {
         field.taken_log().is_empty(),
         "a defended city wrote an event"
     );
+}
+
+#[test]
+fn a_captured_city_beyond_the_takers_reach_is_burned() {
+    // **This is the half of the rule that the keeping test cannot show.** The
+    // fixture puts the two cities more than eight steps apart and gives every
+    // city a reach of two, so no city of the taker supplies the island. The
+    // step must burn it rather than keep it.
+    let Fixture {
+        mut field,
+        seat,
+        site,
+        resident,
+        rival,
+        ..
+    } = fixture_with_reach(any_seed(), REACH_APART).expect("the seed builds the fixture");
+    let home = field
+        .settlement_on(rival)
+        .expect("the rival founded a city");
+    let held = field
+        .settlement_store(home, GRAIN)
+        .expect("the site is live");
+    assert!(
+        rival.distance(seat) > REACH_APART,
+        "the fixture put the two cities within reach of each other"
+    );
+
+    field
+        .spawn_soldier(seat, FactionId(1))
+        .expect("the island admits a unit");
+    field.step(2).expect("the step must run");
+
+    assert!(field.check_invariants());
+    assert_eq!(
+        field.settlement_on(seat),
+        None,
+        "the step kept a city the taker cannot supply"
+    );
+    assert_eq!(
+        field.finished_upgrade(seat),
+        None,
+        "the burn left the road standing"
+    );
+    assert!(
+        !field.soldiers().contains(resident),
+        "the burn left a resident alive"
+    );
+    assert!(
+        field
+            .settlement_store(home, GRAIN)
+            .is_some_and(|now| now.0 >= held.0),
+        "the burn paid the taker nothing"
+    );
+    let taken = field.taken_log();
+    assert_eq!(taken.len(), 1, "the burn wrote no event, or wrote two");
+    assert_eq!(taken[0].kind, TAKE_KIND_RAZED);
+    assert_eq!(taken[0].site, site.to_bits());
+    assert_eq!(taken[0].to, FactionId(1));
+}
+
+#[test]
+fn a_taker_that_holds_no_city_keeps_what_it_takes() {
+    // **The boundary of the rule, and it is reachable.** A faction that lost
+    // every city keeps a field army, and that army can take a capital. The
+    // rule asks which city of the taker supplies the captured one, and a
+    // taker with none has not failed to reach it. Without this the last army
+    // of a beaten faction could never take a city, and a faction that lost
+    // every city could never return.
+    let Fixture {
+        mut field,
+        seat,
+        site,
+        rival,
+        ..
+    } = fixture_with_reach(any_seed(), REACH_APART).expect("the seed builds the fixture");
+    let home = field
+        .settlement_on(rival)
+        .expect("the rival founded a city");
+    // The taker loses its only city, and keeps its army.
+    assert!(field.destroy_settlement(home));
+    field
+        .spawn_soldier(seat, FactionId(1))
+        .expect("the island admits a unit");
+    field.step(2).expect("the step must run");
+
+    assert!(field.check_invariants());
+    assert_eq!(
+        field.settlement_faction(site),
+        Some(FactionId(1)),
+        "a taker with no city of its own burned the city it took"
+    );
+    assert_eq!(
+        field.finished_upgrade(seat),
+        Some(UpgradeCategory::ROAD),
+        "the capture destroyed the road"
+    );
+    let taken = field.taken_log();
+    assert_eq!(taken.len(), 1, "the capture wrote no event, or wrote two");
+    assert_eq!(taken[0].kind, TAKE_KIND_CAPTURED);
 }
 
 #[test]

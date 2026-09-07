@@ -84,19 +84,20 @@ A reviewer finds a violation when an upgrade carries a faction of its own, when
 a capture destroys an upgrade, or when a change of holder pays anything back to
 the previous holder.
 
-### D3. The trigger is occupation of the site tile with no defending unit standing, and a raze is an order while a capture is not
+### D3. The trigger is occupation of the site tile with no defending unit standing, and the same trigger serves both acts
 
 The trigger for both acts is the same. One faction has units on the site tile,
 and the faction of the site has no unit on that tile.
 
-**A capture needs no order.** The ground decided it, so the step performs the
-capture wherever the trigger holds. A caller cannot refuse a capture and cannot
-ask for one.
+**Neither act needs an order.** The ground decided that the site is taken, so
+the step performs the taking wherever the trigger holds. A separate decision
+says which of the two acts follows.[^12] A caller cannot refuse a taking and
+cannot ask for one.
 
-**A raze needs an order.** A raze destroys what a capture keeps, so a caller
-must ask for it. The raze verb reads the same trigger, and it refuses when the
-trigger does not hold. **Nothing inside the engine orders a raze.** The engine
-razes no site on its own, and a caller is the only source of a raze order.
+**A caller may still order a raze.** The verb reads the same trigger, and it
+refuses when the trigger does not hold. It lets a caller burn a site that the
+step would have kept, so a control plane keeps the choice that the step makes
+for a faction that has none.
 
 The capture runs after the pass that moves the lease of each tile, and before
 the pass that spreads the ground out from the cities.[^2] The ground of a
@@ -104,9 +105,9 @@ captured city therefore follows the city on the tick the city changes hands.
 This is a constraint on the order of the passes within one tick. It is not a
 statement about where the code lives.
 
-A reviewer finds a violation when a capture waits for an order, when a raze
-fires with no order, when the raze verb accepts an order on a defended site, or
-when the ground of a captured city follows on a later tick.
+A reviewer finds a violation when a taking waits for an order, when the raze
+verb accepts an order on a defended site, or when the ground of a captured city
+follows on a later tick.
 
 ### D4. The occupier of a tile is stated once, and the capture reads the same statement the lease reads
 
@@ -176,6 +177,35 @@ the absence, so that a later reader sees a decision rather than an oversight.
 A reviewer finds a violation when any stored value marks a city as captured, or
 when a rule reads the previous faction of a site.
 
+### D7. The taker keeps a site its own reach supplies, and burns one it does not
+
+**A faction keeps a city it can hold and destroys one it cannot.** The engine
+decides between the two acts, and it decides from a quantity it already
+computes.
+
+Every city reaches a distance out from its seat. That reach is what decides
+which ground a faction holds, it grows with the upgrades the faction finishes
+inside its own ground, and it stops at a bound.[^1] A captured site is supplied
+when it stands inside the reach of a city the taker already holds. A supplied
+site is kept. A site no city of the taker reaches is burned.
+
+**The reach is derived and this decision states no distance of its own.** A
+rule with a distance chosen here would be a balance value, and one blocker
+holds every value of the downstream game.[^6] A rule that reads the reach binds
+the choice to the ground the faction has actually built. A road between two
+cities extends the reach, so the same conquest that burns today is kept once a
+faction has built the ground between.
+
+**A taker that holds no city keeps what it takes.** The rule asks which city of
+the taker supplies the captured one. A faction with no city has not failed to
+reach it, and the captured site is then the only city that faction has, so it
+supplies itself. Without this clause the last army of a beaten faction could
+never take a city, and a faction that lost every city could never return.
+
+A reviewer finds a violation when the choice reads a distance that no pass
+derives, when a site inside the reach of a city of the taker is burned, or when
+a faction holding no city burns what it takes.
+
 ## The alternatives this rejects
 
 **The upgrade stays with the faction that built it.** A faction would keep a
@@ -214,9 +244,11 @@ that holds no site and no unit.[^12]
 **A captured site keeps its rates, so production does not pause.** A watcher
 sees the colour of a city change, and sees its output continue.
 
-**The engine razes nothing on its own.** A seeded run with no caller therefore
-captures cities and never razes one. A test of the raze path must issue the
-order, because no engine pass issues it.
+**The engine now chooses between the two acts.** A seeded run with no caller
+both captures cities and burns them. Which of the two is common follows from
+how far apart the cities of a world stand against the reach each one has, so a
+change to either value changes how many cities a run ends with. A register
+holds those values, and one blocker governs them.[^6] [^14]
 
 **The store account stays exact.** Plunder moves between two stores, so the sum
 of a good over the world does not change when a faction razes a site.

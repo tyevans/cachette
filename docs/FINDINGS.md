@@ -14610,7 +14610,46 @@ reader may not depend on held ground.
 **A put-back experiment answers a question a passing test cannot.** Both guards
 read as tested until the experiment ran.[^F492B]
 
+### FND-590 — Giving the engine a raze rule made a seeded run burn far more cities than it keeps
+
+**Believed.** A rule that keeps a city the taker can supply and burns one it
+cannot gives conquest two shapes. A near conquest grows the taker and a far one
+pays it in plunder, and a run holds a mixture of the two.
+
+**True.** At the reach the balance register holds today, and at the distance
+the seeder places cities apart, almost no conquest is a near one. A seeded run
+burns far more cities than it keeps, and it ends with fewer cities standing
+than it began with. The rule is doing what it says. The world it produces is
+one-sided, because one of its two branches almost never fires.
+
+**Evidence.** A sweep of the demonstration world over eight seeds, at three
+factions, at an extent of 48, to a tick limit of 4000, on 6 September 2026 on
+one development machine (x86-64). With a capture and no raze rule, the eight
+runs ended holding between one and six sites, and five of them held three or
+more. With the raze rule, the same eight ended holding one or two. Domination
+still ended all eight, and the end ticks moved from a range of 1 to 1139 to a
+range of 1 to 2962. The commit body holds both tables and the command. The
+figures stay derived until the target platform measures them.[^28]
+
+**What follows.** **A rule that reads a balance value inherits that value's
+distribution.** The rule states no distance and reads the reach of a city,
+which is what the project wanted. What the project did not see is that the
+reach and the founding distance together decide which branch fires, and neither
+was chosen with this rule in mind.
+
+**Do not repair this by changing the rule.** The lever is the reach, or how far
+apart the seeder places cities. Both are balance values that one blocker
+governs, and the project owner has said he intends to tune from reinforcement
+learning runs rather than ahead of them.[^F494F] [^DEC278]
+
+**Measure the branch that a rule does not take.** A test proved each branch
+works, and a run showed that one of them almost never happens. Neither answer
+is available from the other.
+
 ## References
+
+[^F494F]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+[^DEC278]: Decisions register, DEC-278. `docs/DECISIONS.md`
 
 [^F579B]: ADR-0150, held ground is the ground within reach of a city its faction owns. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^F580A]: ADR-0153, a tile's lease follows the units that stand on it, decision D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
@@ -14665,7 +14704,6 @@ read as tested until the experiment ran.[^F492B]
 [^F496I]: Backlog item 0502. `docs/backlog/proposed/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
 [^F494A]: Balance register, the stock target, the wonder work, the tick limit, the founding group and the campaign cohort size. `docs/reference/balance.md`
 [^F494B]: The census row that counts a filled seat. `crates/cachette-core/src/world.rs`
-[^F494F]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^F492A]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^F492B]: Testing rules, section 2a. `.agents/rules/testing.md`
 [^F488A]: The send verb, which names a seed set and a plane. `crates/cachette-core/src/world.rs`

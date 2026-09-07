@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-278**
+**Next number: DEC-279**
 
 ## Open
 
@@ -1946,6 +1946,61 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-278 — When does the engine keep a city it takes, and when does it burn it?
+
+**Closed. Option C. The taker keeps a city its own reach supplies, and burns
+one it does not.**
+
+A faction that occupies a site tile undefended takes the site.[^DEC278A] Two
+acts are open to it. It keeps the city, with the store, the housing, the rates,
+the staff and every upgrade on the ground. Or it destroys the city and carries
+the store away as plunder. Nothing chose between the two, so the engine kept
+every city it took and only a caller could order a burn. A verb that nothing
+inside the engine calls is a verb no run exercises.
+
+**Option A. The engine always keeps.** Costs nothing and needs no rule. It
+makes the raze verb inert in every run, and it gives conquest one shape: every
+war grows the winner and nothing is ever lost.
+
+**Option B. A faction carries a policy that says which act it prefers.** One
+byte on the faction row and one verb that writes it. It states no rule at all.
+Nothing in the engine would set the byte, so the choice would move to a caller
+and the engine would still never burn.
+
+**Option C. The taker keeps a city its own reach supplies.** A city reaches a
+distance out from its seat, that reach decides which ground a faction holds,
+and the upgrades a faction finishes inside its own ground extend it to a
+bound.[^DEC278B] A captured site inside the reach of a city the taker already
+holds is kept. A site no city of the taker reaches is burned.
+
+**Why C.** The project owner delegated this class of choice with an
+instruction to follow the rule of cool, and the coordinator ruled on 6
+September 2026. Option C gives conquest two shapes rather than one. A near
+conquest grows the taker, and a far one pays it in plunder and leaves a ruin. A
+player who wants to keep what it takes must first build the ground between, and
+that makes the road the strategic act it is meant to be.
+
+**The rule states no distance of its own, and that is the point.** A distance
+chosen here would be a balance value, and one blocker holds every value of the
+downstream game.[^DEC278C] The reach is a quantity the ground rule already
+computes for every city on every tick, so the choice reads the world the faction
+has built rather than a number somebody picked.
+
+**A taker that holds no city keeps what it takes.** The rule asks which city of
+the taker supplies the captured one, and a faction with none has not failed to
+reach it. The captured site is then the only city that faction has, so it
+supplies itself. Without this clause the last army of a beaten faction could
+never take a city, and a faction that lost every city could never return. A
+test drives that case.
+
+**What it costs, and what a reviewer should watch.** At the reach the balance
+register holds today, a seeded run burns far more cities than it keeps, and a
+run ends with fewer cities standing than it began with. The commit body holds
+the measurement. That is a consequence of the reach and of how far apart the
+seeder places cities, and both are balance values that this decision does not
+touch. **If the project wants keeping to be the common outcome, it raises the
+reach or moves the cities closer. It does not change this rule.**
 
 ### DEC-277 — Is the map a region of a planet, or a planet?
 
@@ -4338,6 +4393,10 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 
 
 ## References
+
+[^DEC278A]: ADR-0180, a site changes hands or the taker destroys it, decision D3. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+[^DEC278B]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+[^DEC278C]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 
 [^DEC224A]: Review of backlog item 0345, section 10. `docs/reviews/0345-resolve-a-meeting.md`
 [^DEC224B]: Backlog item 0432, decide the lifetime of every log the bindings expose. `docs/backlog/proposed/0432-decide-the-lifetime-of-every-log-the-bindings-expose.md`

@@ -465,12 +465,21 @@ fn traded_land_outside_every_creditor_city_is_unheld_after_the_next_step() {
 
     // The traded tile is ground the debtor holds and no city of the creditor
     // reaches. That is the case the record calls out.
+    //
+    // **The tile must not be a seat.** The trade puts a unit of the creditor
+    // on it, and a faction that stands on an undefended city tile takes that
+    // city.[^2] A fixture that traded the seat would hand the debtor's
+    // capital to the creditor and measure the conquest rather than the
+    // ground rule.
+    //
+    // [^2]: ADR-0180, a site changes hands or the taker destroys it, decision D3. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
     let traded = *open
         .iter()
         .find(|address| {
             field.tile_holder(**address).and_then(Holder::faction) == Some(FactionId(0))
                 && address.distance(creditor_seat) > rules.cap()
                 && field.upgrade_at(**address).is_none()
+                && field.settlement_on(**address).is_none()
         })
         .expect("the debtor holds ground outside the reach of the creditor");
     let tile = field
