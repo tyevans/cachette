@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-603**
+**Next number: FND-604**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -15059,3 +15059,64 @@ accessible source. The next attempt needs that data before it starts.
 ## References
 
 [^F602C]: Research report 30, the published atmospheric math, section 5.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+
+
+### FND-603 — The published energy balance produces the classes, and the ground term has no unit to meet it in
+
+**Believed.** The belt of a latitude and the season are locked together, so
+neither can be corrected alone, and correcting both against a published energy
+balance would put each climate class where the published classification puts
+it.[^F603A]
+
+**True, for the two terms it names.** A driver built from the published
+diffusive energy balance moved every class in the right direction at once, in
+one run, with no constant fitted to the result. The temperate band appeared
+where the published classification puts it, the equatorial band became wholly
+tropical, and the ice cap went to nothing.
+
+**False for the run as a whole, and one term is the reason.** The heat a cell
+takes from its ground is a count on an abstract scale with no unit and no zero.
+The old driver hid that, because its base was derived from the heat scale and
+absorbed whatever the ground term averaged. **A driver stated in degrees has no
+such slack.** A blocker now holds the missing unit.[^F603B]
+
+**Evidence.** Runs of the Köppen probe over one demonstration world, at an
+extent of 128, at seed `0x2f`, at the tile pitch, settled for 400 ticks and
+sampled every 8 ticks over one season period, on 6 September 2026 on one
+development machine (x86-64). Every figure is derived.[^F601A]
+
+The band at 37 degrees north, which is where the published classification puts
+the temperate climates, moved from 1 percent temperate and 36 percent
+continental to 56 percent temperate and no continental. Its coldest month moved
+from −7 °C to +10 °C and its annual range from 40 °C to 16 °C. The equatorial
+band moved from 81 percent tropical to 100 percent. The ice cap moved from 1
+percent of the land to none.
+
+In the same run the polar band moved from 95 percent tundra to 76 percent
+desert, its annual mean from −24 °C to 0 °C. **Two causes, and they are
+separable.** The published model holds the albedo constant, so it carries no ice
+feedback and is known to settle warmer at a pole than a planet with ice
+does.[^F603D] The larger cause is the ground term, which the driver adds whole
+rather than as a perturbation, and which lifts the poles about 8 degrees.
+
+Centring that term on the middle of its own range cooled the whole world by
+about 16 degrees and put 97 percent of the equatorial band under tundra. **The
+midpoint of a range is not where the ground of a world sits**, so the correction
+is not a centring.
+
+**What follows.** **A term with no unit cannot join a model that has one.** The
+belt and the season are now stated in degrees against published constants. The
+ground term is not, and no offset for it can be chosen without either a
+measurement of this world or a physical scale for the terrain. The first is
+fitting and the second is the blocker.
+
+**Do not close the gap with an offset.** Both attempts above are offsets, both
+are defensible in a sentence, and both are wrong by more than ten degrees over
+most of the world. The scale of the error is the evidence that the quantity is
+missing rather than mis-set.
+
+## References
+
+[^F603A]: Findings register, FND-601. `docs/FINDINGS.md`
+[^F603B]: Blockers register, BLK-156. `docs/BLOCKERS.md`
+[^F603D]: ADR-0182, the temperature a cell is driven toward is a published energy balance, the consequences. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`

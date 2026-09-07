@@ -25,39 +25,96 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-156**
+**Next number: BLK-157**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
 ## Open
+
+### BLK-156 — The terrain has no height in metres, so no term can read a lapse rate
+
+**Owner:** the project owner. **Blocks:** ADR-0182, and every weather term that
+wants to read an elevation.
+
+**The height of a tile is a fraction and not a distance.** The terrain declares
+the height of a tile as a unit fraction, and it declares the mark below which a
+tile holds water as another fraction. Nothing anywhere states what the range
+between the two ends is worth in metres. The scale register fixes the tile edge
+at 80 metres and states no vertical scale at all.[^SCALE]
+
+**This blocks a published term.** Air cools as it rises, at a rate the research
+report states in degrees for each kilometre.[^BLK156B] A term that reads an
+elevation therefore needs metres, and there are none. The heat that a cell takes
+from its ground is instead a count on an abstract scale, chosen so that the sum
+of the driver fits the heat scale.
+
+**That was harmless while the driver was relative, and it is not harmless now.**
+A record states that the temperature a cell is driven toward is a published
+energy balance in degrees.[^BLK156C] Under that record the sun term carries the
+level, so the ground term must be a signed perturbation about it. **A term with
+no unit has no zero**, so nothing says which ground receives the balance
+temperature and which stands above or below it.
+
+Two attempts measured the cost. A ground term added whole to the balance lifts
+the poles about 8 degrees above it, and the polar band then grades desert rather
+than ice. A ground term centred on the middle of its own range cools the whole
+world by about 16 degrees, because the range midpoint is not where the ground of
+a world actually sits. **Neither is a defect in the energy balance. Both are the
+same missing unit.**
+
+**What would close this.** One statement of what the terrain height range is
+worth in metres. The lapse rate then converts it, the ground term becomes a
+signed number of degrees, and the zero of that term is sea level rather than a
+choice.
+
+**What the project does meanwhile.** The energy balance record stays a draft
+that nothing implements. The driver keeps the base that is derived from the heat
+scale rather than from the balance, and the belt keeps the profile of the
+radiation with no transport in it.
 
 ### BLK-155 — The subtropics receive one percent of the rain the equator receives
 
 **Owner:** the project owner. **Blocks:** every climate class that a dry test
 decides, and the temperate band in particular.
 
-**The rain field is collapsed onto the equator.** Measured over the
-demonstration world, at an extent of 128, at seed `0x2f`, at the tile pitch,
-settled for 400 ticks and sampled over one season period, on 6 September 2026
-on one development machine (x86-64): the land within eight degrees of the
-equator holds 17,432 units of the probe's rain scale, and the land near thirty
-degrees north holds 344. **The subtropics receive 1 percent of what the
-equator receives.** The probe carries its own test of this, and the test says
-the figure must be well under a hundred percent. One percent is not the right
-side of that test. It is off the scale the test was written for.
+**The subtropics are too dry, and the first measurement of how much was
+wrong.** The figure this row first carried was one percent, and it came from
+the Köppen probe, which grades only the cells that hold more land than water.
+**The equatorial band of this world is 93 percent open water**, so its handful
+of land cells sit inside an ocean and read as saturated, while the subtropical
+land sits in larger blocks. The comparison was between two unlike samples.
 
-**The published belt of deserts is a fall, not a collapse.** The subtropical
-high descends and dries, and that is why the deserts of the Earth sit near
-thirty degrees.[^BLK155A] The fall is real. A fall to one hundredth is not
-what the published circulation gives.
+**The corrected measurement.** Over the demonstration world, at an extent of
+128, at seed `0x2f`, at the tile pitch, settled 400 ticks, read at one tick on
+6 September 2026 on one development machine (x86-64). Over the cells that hold
+more land than water: the band at 7 degrees north holds 73,323 drops on the
+ground and the band at 37 degrees north holds 3,208. **The ratio is about 23
+to 1, and not 100 to 1.** The vapour those two bands carry differs by only 2.2
+to 1, so the amplification happens after the transport and not in it.
+
+**Where the amplification happens.** The fall share rises with how full the
+air is. The equatorial band stands at 94 percent of its capacity and the
+subtropical band at 47 percent, so the wetter band both holds more water and
+sheds a larger share of it. The imposed pressure high at thirty degrees then
+drives the wind outward from the subtropics, which carries water away from a
+band that is already shedding less.
+
+**Both of those are the right physics with the wrong size.** The subtropical
+high is why the deserts of the Earth sit near thirty degrees, and a full sky
+does rain more than a clear one.[^BLK155A] The published ratio between
+equatorial and subtropical rain over land is nearer 4 to 10 than 23. **So this
+row records an exaggeration of about two to five times, and not a collapse.**
 
 **This caps a climate that no other change can reach.** The Köppen aridity
 test runs before every temperature test, so an arid cell never reaches the
 temperate test whatever its temperature does. At thirty-seven degrees, which
 is where the published classification puts the temperate climates, 61 percent
 of the land grades arid. **So the temperate band cannot pass about 39 percent
-of that latitude while this stands**, and the published share of the land of
-the Earth is 13.4 percent temperate against 30.2 percent arid.[^BLK155B]
+of that latitude while this stands.** A separate measurement found that
+correcting the season alone reaches 36 percent of that band, which is most of
+the headroom the aridity test leaves. **The two defects are therefore less
+coupled than they look**: the temperature reaches the ceiling that the
+moisture sets, and raising that ceiling is a second and independent gain.[^BLK155B]
 
 **What would close this.** A measurement of what the transport carries out of
 the equatorial band, and a statement of how much of the rain of a world the
@@ -865,6 +922,8 @@ normally.
 [^BLK153B]: Findings register, FND-589. `docs/FINDINGS.md`
 [^BLK155A]: Research report 30, the published atmospheric math, section 5.1. `docs/research/reports/30-the-published-atmospheric-math.md`
 [^BLK155B]: Research report 30, the published atmospheric math, section 8.1. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^BLK156B]: Research report 30, the published atmospheric math, section 2. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^BLK156C]: ADR-0182, the temperature a cell is driven toward is a published energy balance. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
 [^BLK122A]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decisions D1 and D4. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
 [^BLK123A]: ADR-0132, conversion changes the faction of a unit and adds no second allegiance, decision D2. `docs/adrs/draft/adr-0132-conversion-changes-the-faction-of-a-unit.md`
 [^BLK130A]: ADR-0142, a god inflicts weather only on ground its own faction holds, decisions D2 and D4. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
