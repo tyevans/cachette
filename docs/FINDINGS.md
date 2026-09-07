@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-570**
+**Next number: FND-572**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13895,6 +13895,90 @@ The same measurement at an extent of 256 read about 120 milliseconds at tick
 nothing without its extent and its depth**, and the first reading of this row
 carried neither. That figure bounds the throughput of any training run and
 belongs in the sizing of the batch step.
+
+### FND-570 — The demonstration world stopped producing a laden unit when a sent unit began to arrive
+
+**Believed.** The carrier tests of the demonstration world went red in a
+session that raised the work costs, the founding housing and the birth rate.
+The reading was that the balance change starved the carriers, because the same
+session turned two other targets red for balance reasons.
+
+**True.** The balance change moved neither figure the carrier tests read. The
+target went red at the commit that gave a sent unit a fine field, so that it
+reaches the tile it was sent to instead of the cell. The controller sends every
+unit of the demonstration world and nothing releases a unit that arrives. A
+sent unit reads its destination plane and never its option row, so it neither
+gathers nor delivers. Before the fine field, a sent unit could not arrive: the
+field ran out inside the destination cell and the unit fell to a keyed draw and
+wandered. That wandering crossed new ground and filled the loads, and the
+carrier behaviour was reachable only through it.
+
+**Evidence.** Measured on 6 September 2026 on one development machine
+(ty001-ubuntu, x86-64), in the demonstration world at 300 ticks. At the parent
+of the fine field commit the heaviest load reached 80 of a carry mark of 32,
+nine units were laden, three held the delivery option, and the engine delivered
+324 loads. At the fine field commit the heaviest load reached 20, no unit was
+laden, no unit held the delivery option, and the engine delivered 82 loads. The
+whole target passed at the parent and two of its tests failed at the commit. A
+run of the same probe at the balance commit read 49 laden units and 29 holding
+the delivery option, so the balance change is not the cause. The commit body
+holds the probe and the bisect log.
+
+**What follows.** Three things.
+
+**A capability that only a random walk reaches is still inert.** The register
+already holds one finding about this delivery: it worked and nothing ran it.
+The repair made the engine run it, and the run depended on a walk that nobody
+intended. A test that drives the engine proves reachability, and it does not
+prove that the path the engine took was the path the design names.
+
+**A verb that sends a unit must state what releases it.** Nothing in the engine
+clears the destination of a unit that reaches it. The defect was invisible for
+as long as arrival was impossible.
+
+**Do not read a red test as evidence for the change you just made.** Two other
+targets of the same session were red for the balance change, and this one was
+not. The bisect took seven builds and it named a different commit.
+
+### FND-571 — Two fixtures pinned a balance constant, and each measured a different one
+
+**Believed.** A test that steps a fixed number of ticks and reads a finished
+upgrade encodes the cost of that upgrade. Raising the cost six times therefore
+breaks it by running out of ticks.
+
+**True.** That is half of one of the two. The builder fixture ran 32 frames and
+read a road level, and the first level of a road now costs 48 work, so the read
+was too early. The same fixture also lost its builder: a unit that stands on
+one tile draws no ration, and the need rule ended it at tick 90, while the road
+now takes 193 ticks. The tick count and the hunger are two pins, and raising
+the tick count alone would have replaced a red test with a fixture that starves
+its own subject.
+
+The cohort fixture pinned no tick count at all. It asserted that the pipeline
+of its site stood at one, and the pipeline takes a share of a rate away for the
+places a site holds empty. The founding housing rose from 16 to 1024 against a
+group of 32, so the site went from full to almost empty and the scale fell to
+about three quarters.
+
+**Evidence.** Measured on 6 September 2026 on one development machine
+(ty001-ubuntu, x86-64). The builder probe read the work of the site on every
+tick: level one at tick 48, one tick lost to a repair between ticks 80 and 100,
+and the unit ended by the need rule at tick 90 with the site at level one. With
+the need rule set to no decay the road reached its top level at tick 193 and
+the builder stepped away at tick 194. The cohort assertion read a scale of
+49664 against 65536, and the people term of an empty site is a quarter times
+the empty share, which is 0.25 times 992 over 1024.
+
+**What follows.** **A fixture that names a tick count measures the constants.**
+The builder tests now step until the site reaches its top level and assert the
+hold on every frame that leaves work, so the frame the build ends on is free to
+move. The cohort fixture now states the housing of its own site, so the
+founding housing of the world governs nothing in it.
+
+**A test that removes a confound must say which one.** The builder fixture sets
+a need rule of no decay, and it says so, because a reader who found the rule
+there without the reason would take it for balance.
+
 
 
 ## References

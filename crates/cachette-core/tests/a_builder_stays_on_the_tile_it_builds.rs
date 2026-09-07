@@ -27,6 +27,8 @@
 //! [^3]: Testing rules, section 5. `.agents/rules/testing.md`
 //! [^4]: Testing rules, section 2a. `.agents/rules/testing.md`
 
+use cachette_core::cohort::NeedRule;
+use cachette_core::types::Fix32;
 use cachette_core::unit_type;
 use cachette_core::upgrade::{UpgradeCategory, ROAD_LEVEL_1_WORK, ROAD_LEVEL_2_WORK};
 use cachette_core::{Axial, Entity, FactionId, TileIdx, World, WorldConfig};
@@ -56,22 +58,53 @@ const FRAMES: u64 = 32;
 
 /// The work that finishes both levels of a road.
 ///
-/// A worker adds one work in one tick, so this is also the number of ticks a
-/// worker takes to reach the top level of a road on its own.[^1]
+/// The number is read from the balance the engine holds, so a change to what
+/// a road costs flows into this file and no test below states a cost of its
+/// own.[^1]
 ///
 /// # References
 ///
 /// [^1]: Balance register, the road work by level. `docs/reference/balance.md`
 const ROAD_WORK: u64 = ROAD_LEVEL_1_WORK as u64 + ROAD_LEVEL_2_WORK as u64;
 
+/// The level a road stands at when it is finished.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+const TOP_LEVEL: u8 = 2;
+
+/// The number of frames a build gets to reach the top level of a road.
+///
+/// A worker adds its rate of work in one tick, and the wear pass can take a
+/// tick back by asking the same worker to repair what stands. The number of
+/// ticks a road takes is therefore not a function of what a road costs, and
+/// this is a bound on a loop rather than a budget.[^1] The multiple is large
+/// enough that a run reaches the finish and small enough that a build which
+/// never finishes stops.
+///
+/// # References
+///
+/// [^1]: Decision Record Scope, section 4.1. `.agents/rules/adr-scope.md`
+const BUILD_BOUND: u64 = ROAD_WORK * 4;
+
 /// Builds a fixture world with the choice on every tick.
 ///
 /// A unit that holds no intent does not move, so a world whose choice pass
 /// never ran would freeze every unit and every test below would pass.[^1]
 ///
+/// **The fixture takes hunger out of the world.** A unit that stands on one
+/// tile for the whole of a build draws no ration, and the need rule the
+/// engine starts with ends it before the road reaches its top level. The
+/// tests below say what a build order does to movement, and a builder that
+/// starves half way through measures the need rule instead.[^2] The rule
+/// here holds the ration equal to the decay, which is the equality the
+/// default states, and it sets both to nothing.
+///
 /// # References
 ///
 /// [^1]: ADR-0064, a unit chooses by scoring a small fixed option set, decision D4. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`
+/// [^2]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D3. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
 fn fixture() -> World {
     let mut world = World::new(WorldConfig {
         width: EXTENT,
@@ -84,8 +117,83 @@ fn fixture() -> World {
     world
         .set_choice_schedule(0)
         .expect("the exponent is inside the range");
+    let default = NeedRule::DEFAULT;
+    world.set_need_rule(
+        NeedRule::new(
+            Fix32::ZERO,
+            Fix32::ZERO,
+            default.threshold(),
+            default.recovery(),
+            default.bound(),
+        )
+        .expect("no rate of the rule is below zero"),
+    );
     world.rebuild_pyramid(1).expect("the rebuild must run");
     world
+}
+
+/// Returns the whole work that has gone into the site on one tile.
+///
+/// The progress of a site returns to zero when a level rises, so a reader
+/// that watched the progress alone would see the work fall.[^1] The total
+/// here adds the work of the levels that stand, so it only rises.
+///
+/// A zoned tile that nobody has worked on yet carries no site, and that
+/// reads as no work.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-011. `docs/FINDINGS.md`
+fn work_in(world: &World, tile: Axial) -> i64 {
+    let Some(site) = world.upgrade_at(tile) else {
+        return 0;
+    };
+    let finished = match site.level {
+        0 => 0,
+        1 => i64::from(ROAD_LEVEL_1_WORK),
+        _ => i64::from(ROAD_LEVEL_1_WORK) + i64::from(ROAD_LEVEL_2_WORK),
+    };
+    finished + site.progress.0
+}
+
+/// Steps until the road on the tile reaches its top level.
+///
+/// **The loop asserts the hold on every frame that leaves work.** It reads
+/// the level of the site rather than a count of ticks, so it states what the
+/// build pass does and not what a level costs.
+///
+/// The loop also asserts that at least one frame added work. A builder that
+/// stood still and built nothing would satisfy the hold on every frame and
+/// would be a different defect.
+///
+/// Returns the number of frames the build took.
+fn build_the_road(world: &mut World, unit: Entity, tile: Axial) -> u64 {
+    let mut before = work_in(world, tile);
+    let mut worked = false;
+    for frame in 1..=BUILD_BOUND {
+        world.step(1).expect("the step must run");
+        let now = work_in(world, tile);
+        if now > before {
+            worked = true;
+        }
+        before = now;
+        if world.upgrade_level(tile) == TOP_LEVEL {
+            assert!(
+                worked,
+                "the road on tile {tile:?} reached its top level and no frame added work"
+            );
+            return frame;
+        }
+        assert_eq!(
+            world.soldiers().address(unit),
+            Some(tile),
+            "the builder left tile {tile:?} on frame {frame}, while the road was unfinished"
+        );
+    }
+    panic!(
+        "the road on tile {tile:?} did not reach its top level inside {BUILD_BOUND} frames, \
+         so this fixture measures nothing"
+    );
 }
 
 /// Returns the tile that every test below builds on.
@@ -188,17 +296,11 @@ fn a_unit_under_a_build_order_does_not_move_while_work_remains() {
     let tile = a_tile_a_free_unit_leaves();
     let (mut world, unit) = a_worker_on_a_zoned_road(tile);
 
-    assert!(
-        !leaves(&mut world, unit, tile),
-        "the builder left tile {tile:?} while the road was unfinished"
-    );
-    // The unit stood still and it also worked. A unit that stood still and
-    // built nothing would pass the line above and would be a different
-    // defect.
-    assert!(
-        world.upgrade_level(tile) > 0,
-        "the builder held the tile and finished no level of the road"
-    );
+    // The drive asserts the hold on every frame that leaves work, and it
+    // ends at the level the site reaches and not at a tick count. It also
+    // asserts that the builder added work, so a unit that stood still and
+    // built nothing cannot pass.
+    build_the_road(&mut world, unit, tile);
 }
 
 #[test]
@@ -206,15 +308,13 @@ fn the_hold_clears_when_the_work_finishes() {
     let tile = a_tile_a_free_unit_leaves();
     let (mut world, unit) = a_worker_on_a_zoned_road(tile);
 
-    // A worker adds one work in one tick, so the road reaches its top level
-    // after the work of both levels. The extra frames give the unit room to
-    // step once the road holds no row above it.
-    for _ in 0..ROAD_WORK {
-        world.step(1).expect("the step must run");
-    }
+    // The drive runs the build to its end rather than for a number of ticks,
+    // so a change to what a road costs moves the frame it ends on and
+    // changes nothing this test states.
+    build_the_road(&mut world, unit, tile);
     assert_eq!(
         world.upgrade_level(tile),
-        2,
+        TOP_LEVEL,
         "the road did not reach its top level, so this test cannot say \
          whether a finished build releases the unit"
     );
