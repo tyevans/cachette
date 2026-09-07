@@ -126,6 +126,38 @@ geometry makes it grow, and no latitude receives another latitude's season.
 normaliser at the middle latitude makes every latitude beyond it clamp, which
 replaces the geometry with one number over the whole of the high latitudes.
 
+### D4. The ground term is a lapse rate on elevation, and sea level is its zero
+
+The ground of a cell takes a temperature off the balance, and that temperature
+is the published lapse rate multiplied by the mean height of the land of the
+cell. **The term is never positive.** Air cools as it rises, so high ground
+stands below the balance and no ground stands above it.
+
+**Sea level is the zero, and that is what gives the term a unit.** The balance
+of D2 is a sea-level temperature, so a cell at sea level receives it unchanged.
+Open water sits at the sea mark, so it cools nothing.
+
+**A world states its own relief, in the way it states its latitude span.** The
+terrain declares a height as a unit fraction, and the relief is what the whole
+fraction is worth in metres. The reference table holds the value.[^7]
+
+**The water of a cell does not appear here.** The sea moderates a coast by
+holding its heat rather than by sitting at a different mean, and the field
+already carries that as a lag on how fast a cell follows its driver. A second
+term for it would be one fact in two places.[^1]
+
+### D5. A radiative term that the albedo already carries is an anomaly about its own mean
+
+The albedo of D2 is the albedo of a planet that already carries its mean cloud.
+**So a cloud term that took the whole effect off every cell would count the same
+cloud twice.** The term is therefore an anomaly: a cell under the mean cover
+warms, a cell above it cools, and a cell at the mean cover moves nothing.
+
+The rule generalises. **Any term this project adds for a quantity that the
+published constants already average over must be an anomaly about that
+average**, and a reviewer should ask, of every new radiative term, what its zero
+is and why.
+
 ## Consequences
 
 **The project cannot tune the mean temperature profile by changing an amplitude,
@@ -154,6 +186,12 @@ transport are all functions of the latitude and the tick. The asked value stays
 a pure function of the cell, which is what lets the driver pass run without a
 stencil.
 
+**The relief of a world and its terrain must agree, and nothing checks that they
+do.** The lapse rate takes its metres from the relief and its fraction from the
+terrain. A terrain whose land sits high in its own range, under a large relief,
+puts every land cell far below the balance. The two are declared apart and no
+check fails when they disagree.[^9]
+
 **One published quantity is still absent.** The model this record takes carries
 no term for the land and the sea holding heat differently in the mean. The field
 carries that separately, as a lag on how fast a cell follows its driver, and
@@ -169,3 +207,4 @@ that lag is untouched here.[^1]
 [^6]: Research report 30, the published atmospheric math, section 5.3, on the eddy-driven cell. `docs/research/reports/30-the-published-atmospheric-math.md`
 [^7]: Balance register, the energy balance constants. `docs/reference/balance.md`
 [^8]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+[^9]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`

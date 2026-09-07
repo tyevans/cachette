@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-604**
+**Next number: FND-606**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -15120,3 +15120,83 @@ missing rather than mis-set.
 [^F603A]: Findings register, FND-601. `docs/FINDINGS.md`
 [^F603B]: Blockers register, BLK-156. `docs/BLOCKERS.md`
 [^F603D]: ADR-0182, the temperature a cell is driven toward is a published energy balance, the consequences. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+
+
+### FND-604 — The lapse rate is right and the terrain stands too high for it
+
+**Believed.** Giving the terrain a height in metres would let the ground term
+read the published lapse rate, which would give it a unit and a zero, and the
+energy balance driver would then land.[^F603B]
+
+**True in the mechanism and false in the result.** The lapse rate reads
+correctly, sea level is its zero, and it repairs the polar band. It also cools
+the whole world by between eleven and eighteen degrees, because **the land of
+this world stands two to three times higher in its own range than the land of
+the Earth stands in its**.
+
+**Evidence.** The Köppen probe and a water probe over the demonstration world,
+at an extent of 128, at seed `0x2f`, at the tile pitch, settled 400 ticks, on
+6 September 2026 on one development machine (x86-64). Every figure is
+derived.[^F604B]
+
+The mean height of the land runs from 41 percent of the range at the equator to
+69 percent at the southern pole. At the chosen relief that is 1650 to 2750
+metres, and at the published lapse rate it is 10.7 to 17.8 degrees of cooling.
+**The mean land elevation of the Earth is near 800 metres**, which is about
+5 degrees.
+
+The polar band moved from 85 percent desert to 3 percent, which is the repair
+the lapse rate was wanted for. In the same run the equatorial band lost every
+tropical cell, and the bands at 52 and 66 degrees went to ice cap and tundra.
+
+**What follows.** **The relief of a world and the height distribution of its
+terrain are one quantity declared in two places, and nothing fails when they
+disagree.**[^F590A] The relief says what the whole fraction is worth. The
+terrain decides where in that fraction the land sits. Only their product
+reaches the lapse rate, and only their product is wrong.
+
+**Do not repair this by changing the lapse rate.** The rate is published and it
+is not the free variable. The free variables are the relief and the terrain,
+and both are choices that belong to the project owner.
+
+### FND-605 — Two terms had no zero, and both were found by the same question
+
+**Believed.** Restating the temperature driver in degrees was a change of unit.
+The terms that fed it would carry over unchanged.
+
+**True.** Two of them could not, and neither was visible until the driver
+carried a level of its own. **A relative driver hides a term that has no zero**,
+because a base tuned to the scale silently absorbs whatever that term averages.
+
+**The ground term had no zero.** It was a count on an abstract scale that only
+ever added. Added whole to an absolute balance it lifted the poles about 8
+degrees; centred on the middle of its own range it cooled the world about 16
+degrees. Both are choices and both are wrong by more than ten degrees. The
+answer was a physical zero, which is sea level, and that needed a unit.[^F603B]
+
+**The cloud term double-counted the albedo.** The balance takes the albedo of a
+planet that already carries its mean cloud, so subtracting a whole cloud effect
+on top counted the same cloud twice. It cooled the equator by about 16 degrees
+and took every tropical cell off the map. The answer was an anomaly about the
+mean cover.
+
+**Evidence.** Runs of the Köppen probe over the demonstration world on 6
+September 2026 on one development machine (x86-64), each isolating one term.
+Every figure is derived.[^F604B]
+
+**What follows.** **Ask of every term what its zero is and why.** Both defects
+answer that question the same way and neither answers it in the old code,
+because a relative driver never asks. A record now states the rule for any
+radiative term the project adds.[^F605A]
+
+**A third defect of the same shape was in this work and not in the code.** The
+land share of a cell was read as the water share, so the relief term was
+multiplied by the water fraction and vanished over land. Three measurements
+were taken and reported before an ablation at forty thousand metres returned a
+result identical to the cell. **A term that does nothing looks exactly like a
+term that is not needed**, and only an absurd input separated them.
+
+## References
+
+[^F604B]: The Köppen probe and the water probe. `crates/cachette-core/examples/`
+[^F605A]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`

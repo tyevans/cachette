@@ -31,7 +31,20 @@ precedent.[^ALLOC]
 
 ## Open
 
-### BLK-156 — The terrain has no height in metres, so no term can read a lapse rate
+### BLK-156 — How much is the terrain height range worth in metres?
+
+**Resolved on 6 September 2026. The range is 0 to 4000 metres.**
+
+The project owner chose the figure directly, and the scale constants table holds
+it beside the tile edge.[^SCALE] **A world states the range, in the way a world
+states its latitude span**, so a world that wants a different vertical scale
+changes a value rather than the physics.
+
+At the published environmental lapse rate the range gives a spread of 26 degrees
+from the lowest ground to the highest.[^BLK156B] That puts the snow line inside
+the world at most latitudes, which is what the owner asked the figure to buy.
+
+**What the row held.** The question below is the one the answer settles.
 
 **Owner:** the project owner. **Blocks:** ADR-0182, and every weather term that
 wants to read an elevation.

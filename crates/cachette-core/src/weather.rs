@@ -23,7 +23,7 @@
 //! every moment, and a check reports it:
 //!
 //! ```text
-//! raised == air total + cloud total + ground total + evaporated
+//! raised == air total + ground total + evaporated
 //! ```
 //!
 //! # What carries the water
@@ -142,6 +142,8 @@ pub enum WeatherError {
     ScaleAboveCeiling(u32),
     /// The caller asked for a latitude span that does not fit on the globe.
     LatitudeSpanOutsideTheGlobe(i32),
+    /// The caller asked for a relief that is not a positive height.
+    ReliefNotPositive(i32),
     /// The caller named a faction that this world does not hold.
     NoSuchFaction(u16),
     /// The caller named a place outside the world.
@@ -177,6 +179,10 @@ impl core::fmt::Display for WeatherError {
             Self::LatitudeSpanOutsideTheGlobe(span) => write!(
                 formatter,
                 "the latitude span {span} does not fit between the two poles"
+            ),
+            Self::ReliefNotPositive(metres) => write!(
+                formatter,
+                "the relief {metres} is not a positive height in metres"
             ),
             Self::NoSuchFaction(faction) => {
                 write!(formatter, "this world holds no faction {faction}")
@@ -1502,24 +1508,6 @@ const _: () = assert!(
 );
 const _: () = assert!(FALL_NUMERATOR_FLOOR + FALL_FOR_FULL_AIR < FALL_DENOMINATOR);
 
-/// The share of the cloud of a cell that reaches the ground in one solve.
-///
-/// **This is a published timescale and not a chosen share.** A cloud converts
-/// from vapour over about a thousand seconds and falls over about another
-/// thousand, and one tick of this engine carries about a hundred and forty
-/// seconds of simulated time. So one seventh of the cloud reaches the ground
-/// in one solve, and water travels the wind for the ticks it takes to
-/// fall.[^1] [^2]
-///
-/// # References
-///
-/// [^1]: Research report 30, the published atmospheric math, section 3.1. `docs/research/reports/30-the-published-atmospheric-math.md`
-/// [^2]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D3. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
-const CLOUD_FALL_NUMERATOR: i64 = 1;
-
-/// The whole of the share that the cloud of a cell gives up in one solve.
-const CLOUD_FALL_DENOMINATOR: i64 = 7;
-
 /// The share of the water on the ground that leaves the world in one solve.
 const DRY_DIVISOR: i64 = 32;
 
@@ -2053,12 +2041,22 @@ fn part_of(whole: i32, fraction: Fix32) -> i32 {
     ))
 }
 
-/// Returns the heat of one cell, from zero to the heat ceiling.
+/// Returns what the relief of a cell takes off the balance temperature, in
+/// hundredths of a degree.
 ///
-/// **A low coast is hot and a high ridge is cold.** The heat rises with the
-/// share of the cell that holds open water and falls with the mean height of
-/// the cell. Both come from the ground array over the weather lattice, which
-/// the world folds from the terrain once. **They do not come from the level 1
+/// **The answer is never positive.** Air cools as it rises, so high ground
+/// stands below the temperature that the energy balance settles at and no
+/// ground stands above it. Open water sits at the sea mark, which is the
+/// bottom of the range, so it cools nothing.[^4]
+///
+/// **The water of a cell does not appear here, and that is deliberate.** The
+/// sea moderates a coast by holding its heat, not by sitting at a different
+/// mean, and the field already carries that as a lag on how fast a cell
+/// follows its driver. A second term for it would be one fact in two
+/// places.[^5]
+///
+/// The ground comes from the ground array over the weather lattice, which the
+/// world folds from the terrain once. **It does not come from the level 1
 /// summary**, because that summary describes a block thirty-two tiles a side
 /// and is the wrong source at any other weather pitch.[^1]
 ///
@@ -2076,41 +2074,42 @@ fn part_of(whole: i32, fraction: Fix32) -> i32 {
 /// # References
 ///
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+/// [^4]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+/// [^5]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 /// [^2]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 /// [^3]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 #[must_use]
-pub fn heat_of(ground: CellGround) -> i32 {
+pub fn relief_cooling_of(ground: CellGround, relief: HeightRange) -> i32 {
     if ground.tiles() <= 0 {
         return 0;
     }
-    // Water is the only ground that admits no unit, so the share of the cell
-    // that admits none is its water share exactly.
-    let open = ground.open_share().map_or(Fix32::ZERO, to_unit);
-    let water = Fix32(Fix32::ONE.0 - open.0);
+    // **The share of the cell that holds land.** A tile is open when a unit
+    // may stand on it, so the open share is the land share and not the water
+    // share. Open water stands at the sea mark, which is the bottom of the
+    // range, so it cools nothing.
+    let land = ground.open_share().map_or(Fix32::ZERO, to_unit);
 
-    // **The land term reads the height of the land, and not of the cell.**
-    // Low land is warm. A cell that averaged its water in with its land
-    // reported a height that no tile of it held, and a deep sea then read as
-    // the lowest ground in the world and therefore as the hottest. That is
-    // backwards, and it was the whole of the difference between a sea and the
-    // coast beside it: the sea ran warmer than every land cell, the air
-    // leaving it met that step as cooling at the first land it reached, and
-    // it rained out there. No air survived one cell inland.[^2]
+    // **The land term reads the height of the land, and not of the cell.** A
+    // mean over both reported a height that no tile of it held, and a deep
+    // sea then read as the lowest ground in the world.
     let land_height = ground.mean_land_height().map_or(Fix32::ZERO, to_unit);
-    let low = Fix32(Fix32::ONE.0 - land_height.0);
-    let land_term = part_of(part_of(HEAT_FROM_LOW_GROUND, low), open);
 
-    // **The water term is graded by depth, and shallow water is the warmer.**
-    // Shallow water takes up heat and gives it up over a small column, so a
-    // shelf or a lake is a strong source. Deep water spreads the same heat
-    // through a large one, so it is a weak one. A cell that counted its water
-    // tiles alone could not tell the two apart, because a tile counts as
-    // water when its height falls below one mark and the count carries no
-    // depth past it.[^2]
-    let shallow = ground.shallowness().map_or(Fix32::ZERO, to_unit);
-    let water_term = part_of(part_of(HEAT_FROM_WATER, shallow), water);
-
-    land_term + water_term
+    // **Air cools as it rises, at the published rate.** The height is a unit
+    // fraction and the relief of the world is what the whole fraction is
+    // worth, so the metres are the one multiplied by the other. The answer is
+    // negative, because high ground is colder than the balance and never
+    // warmer than it.[^3]
+    //
+    // [^3]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    let metres = i64::from(part_of(relief.metres(), land_height));
+    let cooling = narrow(sim_math::share(
+        Accum(LAPSE_RATE_FINE * metres),
+        Accum(1),
+        Accum(METRES_IN_KILOMETRE),
+    ));
+    // A cell that is half sea and half mountain cools by half of what the
+    // mountain alone would.
+    -part_of(cooling, land)
 }
 
 /// Returns what the temperature divisor of a cell is multiplied by.
@@ -2212,7 +2211,7 @@ pub fn declination_at(tick: Tick) -> i32 {
 #[must_use]
 pub fn season_at(tick: Tick, latitude: i32) -> i32 {
     let table = insolation();
-    table.normalise(table.shape_at(latitude, declination_at(tick)))
+    table.shape_at(latitude, declination_at(tick))
 }
 
 /// Returns the pressure that the banded circulation adds at one latitude.
@@ -2337,6 +2336,153 @@ const SOLAR_CONSTANT: i64 = 1361;
 /// not a measurement, so it belongs beside the arithmetic that reads it.
 const PI_FIXED: i64 = 205_887;
 
+/// The share of the incoming radiation that the planet keeps, in hundredths.
+///
+/// **Published, and held constant.** The published model this module takes its
+/// belt from holds the albedo constant, so it carries no ice feedback and it
+/// settles warmer at a pole than a planet with ice does. The engine inherits
+/// that bias knowingly.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the energy balance constants. `docs/reference/balance.md`
+const ALBEDO_KEPT: i64 = 70;
+
+/// The constant term of the outgoing radiation, in watts for each square
+/// metre.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the energy balance constants. `docs/reference/balance.md`
+const OLR_INTERCEPT: i64 = 210;
+
+/// The slope of the outgoing radiation, in hundredths of a watt for each
+/// square metre for each degree.
+///
+/// **This is what turns a radiation anomaly into degrees**, so every term of
+/// the driver that starts in watts reads it.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the energy balance constants. `docs/reference/balance.md`
+const OLR_SLOPE_FINE: i64 = 200;
+
+/// The poleward diffusion of the published model, in hundredths of a watt for
+/// each square metre for each degree.
+///
+/// **The engine never runs this diffusion.** It takes the profile the model
+/// settles at, which is a closed form. A diffusion on the carried temperature
+/// changed nothing at any affordable pass count, because the driver relaxes
+/// each cell to a local value far faster than any affordable diffusion moves
+/// heat between cells.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-602. `docs/FINDINGS.md`
+const POLEWARD_DIFFUSION_FINE: i64 = 55;
+
+/// What a radiation anomaly that varies with the latitude is divided by,
+/// after the diffusion damps it.
+///
+/// **The diffusion damps each Legendre mode by its own order**, and the annual
+/// mean insolation of a globe is a constant plus one second Legendre
+/// polynomial to within a few percent. The second mode carries a factor of
+/// six, so the belt divides by the slope plus six times the diffusion while a
+/// term that does not vary with the latitude divides by the slope alone.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D2. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+const DAMPED_SLOPE_FINE: i64 = OLR_SLOPE_FINE + 6 * POLEWARD_DIFFUSION_FINE;
+
+/// The hundredths of a degree in one whole degree.
+const DEGREE_FINE: i64 = 100;
+
+/// Returns the warmth that one temperature in hundredths of a degree stands
+/// at on the heat scale.
+///
+/// **The scale is an affine map to a temperature and the module declares it
+/// once.** This is the inverse of that map, so every term of the driver can be
+/// stated in degrees and converted here.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D1. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+const fn warmth_of_hundredths(hundredths: i64) -> i32 {
+    let steps = (hundredths - WARMTH_FLOOR as i64) / WARMTH_FINE as i64;
+    if steps < 0 {
+        0
+    } else if steps > HEAT_CEILING as i64 {
+        HEAT_CEILING
+    } else {
+        steps as i32
+    }
+}
+
+/// The relief of a world, as the metres between its lowest ground and its
+/// highest.
+///
+/// **A world states its own vertical range, in the way it states its latitude
+/// span.** The terrain declares a height as a unit fraction, and this is what
+/// the whole fraction is worth. A world that wants taller mountains changes
+/// this value and not the physics.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+/// [^2]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct HeightRange {
+    metres: i32,
+}
+
+impl HeightRange {
+    /// The relief a world takes when the caller states none.
+    ///
+    /// The project owner chose the figure, and the scale constants table
+    /// holds it beside the tile edge.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+    pub const DEFAULT: Self = Self { metres: 4000 };
+
+    /// Builds a relief from a height in metres.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the relief is not positive.
+    pub const fn new(metres: i32) -> Result<Self, WeatherError> {
+        if metres <= 0 {
+            return Err(WeatherError::ReliefNotPositive(metres));
+        }
+        Ok(Self { metres })
+    }
+
+    /// Returns the relief in metres.
+    #[must_use]
+    pub const fn metres(self) -> i32 {
+        self.metres
+    }
+}
+
+/// The environmental lapse rate, in hundredths of a degree for each kilometre
+/// of height.
+///
+/// **This is the published mean and not a chosen figure.** Air cools as it
+/// rises, and the standard atmosphere uses this rate. The saturated rate is
+/// lower and the dry rate is higher, and the research report recommends one
+/// rate for a field at this scale because the difference across one ridge is
+/// about two degrees and no watcher sees it.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, sections 2.1 and 2.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+const LAPSE_RATE_FINE: i64 = 650;
+
+/// The metres in one kilometre.
+const METRES_IN_KILOMETRE: i64 = 1000;
+
 /// The middle latitude, in hundredths of a degree.
 ///
 /// The season normaliser is read here. A season that reached its whole swing
@@ -2393,11 +2539,23 @@ impl Insolation {
         }
         let top = mean[INSOLATION_BANDS / 2];
         let floor = mean[0];
-        let middle = (Self::band_of_latitude(MIDDLE_LATITUDE) / i64::from(Fix32::ONE.0)) as usize;
-        let reference = (i64::from(daily[middle * (DECLINATION_STEPS + 1) + DECLINATION_STEPS])
-            - i64::from(mean[middle]))
-        .abs()
-        .max(1);
+        // **The normaliser is the largest anomaly the geometry holds
+        // anywhere, and it stands at a pole.** A normaliser read at a chosen
+        // latitude makes every latitude beyond it clamp, which replaces the
+        // geometry with one number over the whole of the high latitudes.[^1]
+        //
+        // [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D3. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+        let mut reference = 1i64;
+        for band in 0..INSOLATION_BANDS {
+            for step in 0..=DECLINATION_STEPS {
+                let apart = (i64::from(daily[band * (DECLINATION_STEPS + 1) + step])
+                    - i64::from(mean[band]))
+                .abs();
+                if apart > reference {
+                    reference = apart;
+                }
+            }
+        }
         let mut table = Self {
             daily,
             mean,
@@ -2439,20 +2597,17 @@ impl Insolation {
         // scale. A cloud that shades the ground is worth what the sun it
         // shades is worth, and nothing else.
         let full_sky = CLOUD_EFFECT_WATTS * 100 / CLOUD_COVER_FINE.max(1);
-        let numerator = 2 * i64::from(LATITUDE_SWING) * 2 * i64::from(SEASON_SWING);
-        let denominator = ((i64::from(top) - i64::from(floor))
-            * (i64::from(reach_top) - i64::from(reach_floor)))
-        .max(1);
-        table.cloud_swing = ((full_sky * numerator + denominator / 2) / denominator)
-            .clamp(0, i64::from(HEAT_BASE)) as i32;
+        let hundredths = full_sky * DEGREE_FINE * 100 / OLR_SLOPE_FINE;
+        table.cloud_swing = (hundredths / i64::from(WARMTH_FINE)).clamp(0, i64::from(HEAT_CEILING))
+            as i32;
 
         // **The coldest cell must not clamp at the bottom of the scale.** The
         // top of the scale needs no check, because the base is derived from
         // it. The check is here and not at a declaration, because the cloud
         // reads the table and a constant cannot read a table.
         assert!(
-            HEAT_BASE - SEASON_SWING - table.cloud_swing >= 0,
-            "the coldest cell must not clamp at the bottom of the heat scale"
+            table.cloud_swing < HEAT_CEILING,
+            "a whole sky must not take the scale away"
         );
         table
     }
@@ -2466,34 +2621,38 @@ impl Insolation {
     /// Returns the sum of the belt and the season from one daily value and
     /// one annual mean.
     ///
-    /// **Each part carries its own amplitude and its own clamp.** The
-    /// amplitudes are the ratio between the two, and the normaliser gives the
-    /// sum its size. The clamp on the season is what keeps a summer pole
-    /// below the equator: the top of the atmosphere over a summer pole
-    /// receives about a third more daily energy than the equator, and a
-    /// surface does not hold it.[^1]
+    /// **The belt is absolute and the season is a swing about it.** The belt
+    /// carries the level, so the driver needs no separate base. Nothing
+    /// clamps: the season is normalised against the largest anomaly the
+    /// geometry holds anywhere, and no latitude can exceed it.[^1] [^2]
     ///
     /// # References
     ///
-    /// [^1]: Research report 30, the published atmospheric math, section 4.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+    /// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D2 and D3. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    /// [^2]: Research report 30, the published atmospheric math, section 4.3. `docs/research/reports/30-the-published-atmospheric-math.md`
     fn shape_of(&self, daily: i64, mean: i64) -> i32 {
-        // The belt of the latitude. It runs from the whole belt amplitude at
-        // the equator to the whole of it the other way at a pole.
-        let belt = narrow(sim_math::share(
-            Accum(i64::from(LATITUDE_SWING)),
-            Accum(2 * mean - i64::from(self.top) - i64::from(self.floor)),
-            Accum((i64::from(self.top) - i64::from(self.floor)).max(1)),
-        ))
-        .clamp(-LATITUDE_SWING, LATITUDE_SWING);
-        // The season. It is the daily value against the annual mean of the
-        // same latitude, so it is zero at the equinox everywhere.
+        // **The belt is the settled profile of the published energy balance,
+        // and it is stated in degrees.** The globe keeps a share of what
+        // reaches it, radiates a linear function of its temperature, and
+        // diffuses heat along the latitude. The diffusion damps the second
+        // Legendre mode by six times its own strength, and the annual mean
+        // insolation is a constant plus that mode to within a few percent, so
+        // the settled profile is arithmetic and not a solver.[^1]
+        let global = SOLAR_CONSTANT * ALBEDO_KEPT / (4 * 100);
+        let base = (global - OLR_INTERCEPT) * DEGREE_FINE * 100 / OLR_SLOPE_FINE;
+        let absorbed = mean * ALBEDO_KEPT / 100;
+        let belt = (absorbed - global) * DEGREE_FINE * 100 / DAMPED_SLOPE_FINE;
+        // **The season is the daily value against the annual mean of the same
+        // latitude**, so it is zero at the equinox everywhere. Its shape comes
+        // from the geometry and its size is a balance value that a blocker
+        // governs, because no published heat capacity this project could
+        // verify fixes it.[^2]
         let season = narrow(sim_math::share(
             Accum(i64::from(SEASON_ANOMALY_SWING)),
             Accum(daily - mean),
             Accum(i64::from(self.reference).max(1)),
-        ))
-        .clamp(-SEASON_ANOMALY_SWING, SEASON_ANOMALY_SWING);
-        belt + season
+        ));
+        warmth_of_hundredths(base + belt) + season
     }
 
     /// Returns the degrees the sun adds, from one sum of the two parts.
@@ -2677,14 +2836,23 @@ pub fn daily_insolation(latitude: i32, declination: i32) -> i64 {
 #[must_use]
 pub fn cloud_at(air: Drops, capacity: Drops) -> i32 {
     let swing = insolation().cloud_swing;
-    if capacity.0 <= 0 {
-        return swing;
-    }
-    let held = air.0.clamp(0, capacity.0);
+    // **The term is an anomaly about the mean cover, and never an absolute
+    // subtraction.** The albedo the balance uses is the albedo of a planet
+    // that already carries its mean cloud, so a term that took the whole
+    // effect off every cell would count the same cloud twice. A cell under
+    // the mean cover therefore warms and a cell above it cools.[^4]
+    //
+    // [^4]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    let cover = if capacity.0 <= 0 {
+        CLOUD_SHARE_WHOLE
+    } else {
+        air.0.clamp(0, capacity.0) * CLOUD_SHARE_WHOLE / capacity.0
+    };
+    let mean = CLOUD_SHARE_WHOLE * CLOUD_COVER_FINE / 100;
     narrow(sim_math::share(
         Accum(i64::from(swing)),
-        Accum(held),
-        Accum(capacity.0),
+        Accum(cover - mean),
+        Accum(CLOUD_SHARE_WHOLE),
     ))
 }
 
@@ -2708,13 +2876,14 @@ pub fn cloud_at(air: Drops, capacity: Drops) -> i32 {
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 #[must_use]
-pub fn asked_warmth(ground: i32, season: i32, cloud: i32) -> i32 {
-    let ground = narrow(sim_math::share(
-        Accum(i64::from(ground)),
-        Accum(1),
-        Accum(GROUND_DIVISOR),
-    ));
-    (HEAT_BASE + ground + season - cloud).clamp(0, HEAT_CEILING)
+pub fn asked_warmth(relief: i32, season: i32, cloud: i32) -> i32 {
+    // **The relief arrives in hundredths of a degree and the scale steps by
+    // half a degree.** The sun term already carries the level, so the relief
+    // is a signed perturbation about it and never an addition to it.[^2]
+    //
+    // [^2]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D1 and D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    let relief = (i64::from(relief) / i64::from(WARMTH_FINE)) as i32;
+    (season + relief - cloud).clamp(0, HEAT_CEILING)
 }
 
 /// The degrees a cell holds before any of the three terms moves it.
@@ -2859,21 +3028,17 @@ pub struct WeatherField {
     /// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D2. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
     band: Vec<i32>,
     faction_count: u16,
-    /// The water in the air above each cell, in cell index order. It is empty
-    /// until the first drop enters the world.
-    air: Vec<Drops>,
-    /// The condensed water the air of each cell carries, in the same order.
+    /// The relief of the world, which the lapse rate reads.
     ///
-    /// **Cloud is not vapour and it is not rain.** Vapour is what the air
-    /// holds invisibly and it does not fall. Cloud is what condensed out of
-    /// it, and it falls on a timescale while the wind carries it. Keeping the
-    /// two apart is what lets a storm form in one cell and rain in
-    /// another.[^2]
+    /// **A world states it, in the way it states its latitude span.**[^1]
     ///
     /// # References
     ///
-    /// [^2]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D1. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
-    cloud: Vec<Drops>,
+    /// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    relief: HeightRange,
+    /// The water in the air above each cell, in cell index order. It is empty
+    /// until the first drop enters the world.
+    air: Vec<Drops>,
     /// The water on the ground of each cell, in the same order.
     ground: Vec<Drops>,
     /// The write half of one transport pass.
@@ -3018,8 +3183,8 @@ impl WeatherField {
             latitudes,
             band,
             faction_count,
+            relief: HeightRange::DEFAULT,
             air: Vec::new(),
-            cloud: Vec::new(),
             ground: Vec::new(),
             scratch: Vec::new(),
             wind: vec![Wind::STILL; count],
@@ -3328,29 +3493,6 @@ impl WeatherField {
     #[must_use]
     pub fn air_total(&self) -> Accum {
         total_of(&self.air)
-    }
-
-    /// Returns the condensed water the air carries over the whole lattice.
-    ///
-    /// **The total holds the margin as well as the world**, for the reason
-    /// the air total states. **It is a third term of the water account**, so
-    /// a reader that checks the account against the raised total must add it
-    /// to the air and the ground.[^1]
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D1. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
-    #[must_use]
-    pub fn cloud_total(&self) -> Accum {
-        total_of(&self.cloud)
-    }
-
-    /// Returns the condensed water the air of one cell carries.
-    ///
-    /// Returns nothing when the cell lies outside the lattice.
-    #[must_use]
-    pub fn cloud_drops_at(&self, cell: u32) -> Drops {
-        self.cloud.get(cell as usize).copied().unwrap_or(Drops::ZERO)
     }
 
     /// Returns the water on the ground over the whole lattice.
@@ -3663,7 +3805,7 @@ impl WeatherField {
             // overcast, and a warm cell holding the same water is clear.
             let capacity = capacity_at(self.warmth.get(cell).copied().unwrap_or(0));
             let asked = asked_warmth(
-                heat_of(*under),
+                relief_cooling_of(*under, self.relief),
                 season_at(tick, latitudes.of_row(row, height)),
                 cloud_at(air, capacity),
             );
@@ -3842,7 +3984,6 @@ impl WeatherField {
         }
         let count = self.cells().tile_count() as usize;
         self.air = vec![Drops::ZERO; count];
-        self.cloud = vec![Drops::ZERO; count];
         self.ground = vec![Drops::ZERO; count];
         self.scratch = vec![Drops::ZERO; count];
     }
@@ -3878,28 +4019,13 @@ impl WeatherField {
         }
         let pass = Pass {
             cells: self.cells(),
-            plane: &self.air,
+            air: &self.air,
             wind: &self.wind,
         };
         run_in_chunks(count, threads, &mut self.scratch, |low, out| {
             pass.fill(low, out);
         });
         self.air.copy_from_slice(&self.scratch);
-        // **The cloud rides the wind too, and that is why it is a plane.**
-        // Condensed water that fell in the cell it formed in could not
-        // travel, so no storm crossed a coast and rain stood where the air
-        // first met colder ground.[^2]
-        //
-        // [^2]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D2. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
-        let pass = Pass {
-            cells: self.cells(),
-            plane: &self.cloud,
-            wind: &self.wind,
-        };
-        run_in_chunks(count, threads, &mut self.scratch, |low, out| {
-            pass.fill(low, out);
-        });
-        self.cloud.copy_from_slice(&self.scratch);
     }
 
     /// Drops part of the air onto the ground, and dries part of the ground.
@@ -3957,15 +4083,7 @@ impl WeatherField {
             let held = self.air[cell];
             let poured = Drops((held.0 - capacity.0).max(0));
             self.air[cell] = Drops(held.0 - poured.0);
-            // **Condensation makes cloud, and cloud is not rain.** What the
-            // air cannot hold becomes condensed water in the cloud plane,
-            // which the transport then carries. The old rule put it on the
-            // ground of the same cell in the same solve, so no condensed drop
-            // ever moved and the rain of a cell was decided by its own
-            // ground.[^7]
-            //
-            // [^7]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D1. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
-            self.cloud[cell] = self.cloud[cell].combine(poured);
+            self.ground[cell] = self.ground[cell].combine(poured);
 
             // **What is left drizzles in proportion to how full it is.** A
             // full sky gives up a share each solve and a clear one gives up
@@ -3974,20 +4092,7 @@ impl WeatherField {
             let numerator = fall_numerator(air, capacity);
             let fallen = share_of(air, numerator, FALL_DENOMINATOR);
             self.air[cell] = Drops(air.0 - fallen.0);
-            self.cloud[cell] = self.cloud[cell].combine(fallen);
-
-            // **The cloud gives up a fixed share to the ground each solve,
-            // and that share is a published timescale.** A cloud converts and
-            // falls over about a thousand seconds each, so at the simulated
-            // time one tick carries the share is about one seventh. The share
-            // is what gives a storm a distance: the water travels the wind
-            // for as long as it takes to fall.[^8]
-            //
-            // [^8]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D3. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
-            let carried = self.cloud[cell];
-            let rain = share_of(carried, CLOUD_FALL_NUMERATOR, CLOUD_FALL_DENOMINATOR);
-            self.cloud[cell] = Drops(carried.0 - rain.0);
-            self.ground[cell] = self.ground[cell].combine(rain);
+            self.ground[cell] = self.ground[cell].combine(fallen);
 
             // **Water leaves the ground of a cell at one site, and the room
             // above it decides where that water goes.** Two terms take it off
@@ -4228,9 +4333,7 @@ fn sent(air: Drops, wind: Wind, direction: usize) -> Drops {
 #[derive(Clone, Copy)]
 struct Pass<'a> {
     cells: Grid,
-    /// The plane the pass carries. The air and the cloud both ride it, one
-    /// after the other, because a transfer reads only the plane and the wind.
-    plane: &'a [Drops],
+    air: &'a [Drops],
     wind: &'a [Wind],
 }
 
@@ -4249,7 +4352,7 @@ impl Pass<'_> {
             let Some(address) = self.cells.address_of(TileIdx(index as u32)) else {
                 continue;
             };
-            let here = self.plane[index];
+            let here = self.air[index];
             let blowing = self.wind[index];
 
             let mut kept = here.0;
@@ -4268,7 +4371,7 @@ impl Pass<'_> {
                 // The neighbour faces this cell the other way round, so the
                 // direction is the opposite one. Both ends compute this from
                 // the same settled planes, so they reach one integer.
-                taken = taken.combine(sent(self.plane[at], self.wind[at], opposite(direction)));
+                taken = taken.combine(sent(self.air[at], self.wind[at], opposite(direction)));
             }
             *cell = Drops(kept).combine(taken);
         }

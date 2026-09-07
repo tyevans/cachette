@@ -80,6 +80,11 @@ fn main() {
     let mut land_ground = vec![0i64; BANDS as usize];
     let mut land_air = vec![0i64; BANDS as usize];
     let mut land_counted = vec![0i64; BANDS as usize];
+    // The mean height of the land of each band, as a share of the height
+    // range in thousandths. The lapse rate reads it, so it decides how far
+    // below the sea-level balance the land of a band stands.
+    let mut land_height = vec![0i64; BANDS as usize];
+    let mut land_height_counted = vec![0i64; BANDS as usize];
 
     let field = world.weather();
     for index in 0..inner.tile_count() {
@@ -110,6 +115,12 @@ fn main() {
                 here_tiles += 1;
                 if tile.kind.is_passable() {
                     here_land += 1;
+                    // The height of a land tile, as thousandths of the whole
+                    // height range. The lapse rate reads this, so it decides
+                    // how far below the sea-level balance the land stands.
+                    land_height[band] += i64::from(tile.height.0) * 1000
+                        / i64::from(cachette_core::Fix32::ONE.0);
+                    land_height_counted[band] += 1;
                 } else {
                     open[band] += 1;
                 }
@@ -133,7 +144,7 @@ fn main() {
     println!();
     println!(
         "  band  latitude   cells  open%   mean C  capacity     air   air/cap%    ground  \
-         ground/air%    land   land air  land ground"
+         ground/air%    land   land air  land ground   land height/1000"
     );
     for band in 0..BANDS as usize {
         if counted[band] == 0 {
@@ -163,6 +174,9 @@ fn main() {
             land_air[band] / ln,
             land_ground[band] / ln
         );
-        println!();
+        println!(
+            "  {:>15}",
+            land_height[band] / land_height_counted[band].max(1)
+        );
     }
 }
