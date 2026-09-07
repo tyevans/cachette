@@ -204,14 +204,14 @@ class Page:
 
     stood: Projection
     shape: tuple[int, int]
-    stand: tuple[float, float]
+    stand: tuple[float, float, float]
     box: tuple[int, int, int, int]
 
     def __init__(
         self,
         stood: Projection,
         shape: tuple[int, int],
-        stand: tuple[float, float],
+        stand: tuple[float, float, float],
         box: tuple[int, int, int, int],
     ) -> None:
         """Record the projection, the frame, the angles and the part in use."""
@@ -316,7 +316,8 @@ class GlSketch(Sketch):
         pass draws it against these numbers.
         """
         window = self._window(camera, width, height)
-        stand = (self.view.turn, self.view.lean)
+        detail = self.detail_of(camera, width, height)
+        stand = (self.view.turn, self.view.lean, float(detail))
         held = self._held
         if (
             held is not None
@@ -325,7 +326,7 @@ class GlSketch(Sketch):
             and held.stand == stand
         ):
             return held
-        stood = self.projection(window, width, height)
+        stood = self.projection(window, width, height, detail)
         built = Page(stood, (height, width), stand, self.box_of(stood))
         self._held = built
         return built
@@ -614,7 +615,7 @@ class GlSketch(Sketch):
         device.ensure("wash_settled", "r32f")
         device.ensure("wash_blurred", "rg32f", bands=2)
 
-        fit_w, fit_h = self._send_fit(page, width, height)
+        self._send_fit(page, camera, width, height)
         program = self._program(
             "composite", source.TONE + source.HATCH + source.COMPOSITE
         )
@@ -654,8 +655,7 @@ class GlSketch(Sketch):
         program["draws_wash"] = 1 if washes else 0
         program["cloud_step"] = max(int(page_cols * ink.CLOUD_SHADOW_STEP), 1)
         program["cloud_lift"] = int(stood.rise * ink.CLOUD_HEIGHT)
-        program["fit_size"] = (fit_w, fit_h)
-        program["fit_at"] = ((width - fit_w) // 2, (height - fit_h) // 2)
+        program["fit_size"] = (width, height)
         program.stop()
 
         device.run(program, width, height, "rgba8")
@@ -670,31 +670,21 @@ class GlSketch(Sketch):
         ).astype(np.uint32)
         return result
 
-    def _send_fit(self, page: Page, width: int, height: int) -> tuple[int, int]:
+    def _send_fit(self, page: Page, camera: Camera, width: int, height: int) -> None:
         """Say which point of the paper each pixel of the frame shows.
 
-        The paper is wider and shorter than the frame, because the turn
-        spreads the world across it. It is scaled to fit rather than cut, so a
-        watcher sees the whole world the camera covers.
+        The paper holds the whole world. The camera says which point of it the
+        middle of the frame shows and how far it is magnified, so a drag moves
+        the drawing and a zoom makes it larger.
 
         **Both renderers take this mapping from one rule.** The mapping is two
         short lists, so it crosses to the device whole rather than being
         worked out again for each pixel.
-
-        Gives back the size of the fitted paper in pixels.
         """
-        first_row, last_row, first_col, last_col = page.box
-        rows = last_row - first_row
-        cols = last_col - first_col
-        scale = min(width / cols, height / rows)
-        fit_w = max(int(cols * scale), 1)
-        fit_h = max(int(rows * scale), 1)
-        take_x = np.clip((np.arange(fit_w) / scale).astype(np.int32), 0, cols - 1)
-        take_y = np.clip((np.arange(fit_h) / scale).astype(np.int32), 0, rows - 1)
+        take_x, take_y = self.fit_lists(page.stood, page.box, camera, width, height)
         device = self.device
-        device.upload("fit_x", (take_x + first_col)[None, :], "r32i")
-        device.upload("fit_y", (take_y + first_row)[None, :], "r32i")
-        return fit_w, fit_h
+        device.upload("fit_x", take_x[None, :], "r32i")
+        device.upload("fit_y", take_y[None, :], "r32i")
 
     def _blur_wash(self, page_cols: int, page_rows: int) -> None:
         """Blur the settled pigment at both reaches, down the paper and across.

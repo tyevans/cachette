@@ -12,7 +12,7 @@ import pytest
 from cachette import Camera, World
 from cachette.demo import sketch as ink
 from cachette.demo.app import Demo, main
-from cachette.demo.mouse import RIGHT_BUTTON, Controls
+from cachette.demo.mouse import LEFT_BUTTON, RIGHT_BUTTON, Controls
 from cachette.demo.sketch import BoundaryGap, Sketch
 from cachette.demo.surface import Surface
 from cachette.demo.view import View
@@ -422,4 +422,130 @@ def test_a_zoom_does_not_walk_the_wash_across_the_ground() -> None:
         assert apart == 0.0, (
             f"at zoom {factor} the frame drawn after a zoom differs from the "
             f"frame drawn at that camera alone on {apart:.4%} of its pixels"
+        )
+
+
+# ----------------------------------------------------------------------
+# The camera against the page.
+#
+# **The page holds the whole world, and the camera moves the view of it.** A
+# page cut to the tiles the camera covered made the camera choose an extent
+# rather than a view. Panning towards the edge of the world then widened the
+# extent, and the page drew the world smaller instead of moving it, so a drag
+# with the left button did the opposite of what a hand expects.
+
+# How far the test drags, in pixels.
+#
+# **A drag across the screen moves the drawing across it and down it.** The
+# page turns the ground, so the ground moves along its own axes and those
+# stand at an angle on the paper. The drawing therefore travels diagonally,
+# and the test states that rather than hiding it.
+DRAG_ACROSS = 40
+
+# How much of the change a drag makes must be a move of the drawing.
+#
+# The correct page scores about 0.47 on the fixture below. The page that was
+# cut to the camera scores nothing at all, because its best shift is no shift:
+# a drag resized the drawing rather than moving it.
+#
+# **A drag that resized the drawing leaves no shift that explains it.** The
+# page used to be cut to the tiles the camera covered and then fitted to the
+# frame, so a drag towards the edge of the world widened the cut and drew the
+# world smaller. Under that page the best shift explains almost nothing.
+MOVE_EXPLAINS = 0.30
+
+
+def travel_between(before: np.ndarray, after: np.ndarray, reach: int) -> tuple:
+    """Say how far the drawing moved, and how much of the change that explains.
+
+    The answer is the shift across, the shift down, and the share of the
+    difference between the two frames that the shift takes away. A positive
+    shift across means the drawing moved to the right.
+    """
+    first = ((before >> 8) & 0xFF).astype(np.int32)
+    second = ((after >> 8) & 0xFF).astype(np.int32)
+    rows, cols = first.shape
+    edge = reach + 1
+    still = float(
+        np.abs(
+            second[edge : rows - edge, edge : cols - edge]
+            - first[edge : rows - edge, edge : cols - edge]
+        ).mean()
+    )
+    best, at = None, (0, 0)
+    for down in range(-reach, reach + 1):
+        for across in range(-reach, reach + 1):
+            cut = second[
+                edge + down : rows - edge + down, edge + across : cols - edge + across
+            ]
+            gap = np.abs(cut - first[edge : rows - edge, edge : cols - edge])
+            cost = float(gap.mean())
+            if best is None or cost < best:
+                best, at = cost, (across, down)
+    explains = 0.0 if still <= 0.0 else 1.0 - (best or 0.0) / still
+    return at[0], at[1], explains
+
+
+def test_a_left_drag_moves_the_drawing_and_does_not_resize_it() -> None:
+    """The sketch follows the hand, and the drawing keeps its size.
+
+    **This asserts on the frame the renderer drew, not on the view.** A test
+    that read the camera back after a drag passes while the renderer ignores
+    the camera, and that is how a page that resized under every drag reached a
+    watcher. The page now holds the whole world, so nothing but the placing of
+    the page in the frame can change the drawing.
+    """
+    world, _ = build()
+    demo = Demo(world, Names(SEED), width=WIDTH, height=HEIGHT, threads=1)
+    demo.camera = Camera.fitting(world, WIDTH, HEIGHT)
+    demo.clock.pause()
+    demo.renderer = Sketch(world, view=demo.view)
+    # Zoom in first, so that the drag has room before the world meets the edge
+    # of the frame.
+    demo.view.zoom_at(2.0, WIDTH / 2.0, HEIGHT / 2.0)
+    demo.advance()
+    before = demo.surface.pixels.reshape(HEIGHT, WIDTH).copy()
+
+    controls = Controls(demo)
+    controls.on_mouse_press(WIDTH // 2, HEIGHT // 2, LEFT_BUTTON, 0)
+    for step in range(4):
+        controls.on_mouse_drag(
+            WIDTH // 2 + (step + 1) * (DRAG_ACROSS // 4),
+            HEIGHT // 2,
+            DRAG_ACROSS // 4,
+            0,
+            LEFT_BUTTON,
+            0,
+        )
+    controls.on_mouse_release(WIDTH // 2 + DRAG_ACROSS, HEIGHT // 2, LEFT_BUTTON, 0)
+    demo.advance()
+    after = demo.surface.pixels.reshape(HEIGHT, WIDTH).copy()
+
+    assert not np.array_equal(before, after), "a drag drew the same frame"
+    across, down, explains = travel_between(before, after, DRAG_ACROSS)
+    assert across > 0, (
+        f"a drag of {DRAG_ACROSS} pixels to the right moved the drawing "
+        f"{across} across and {down} down; the map must follow the hand"
+    )
+    assert explains >= MOVE_EXPLAINS, (
+        f"a shift of ({across}, {down}) takes away only {explains:.2%} of the "
+        f"change the drag made, so the drag resized the drawing rather than "
+        f"moving it"
+    )
+
+
+def test_the_page_holds_every_tile_of_the_world_at_every_camera() -> None:
+    """The sketch draws the whole map, and the camera does not cut it.
+
+    A page cut to the camera made a pan widen the extent. The extent is now
+    the world at every camera, so nothing a mouse does can drop a tile.
+    """
+    world, _ = build()
+    sketch = Sketch(world, view=View())
+    whole = (0, 0, world.width, world.height)
+    for factor in (1.0, 1.7, 3.0):
+        camera = zoomed(world, factor)
+        frame_of(sketch, world, camera)
+        assert sketch.window() == whole, (
+            f"at zoom {factor} the page held {sketch.window()} and not {whole}"
         )

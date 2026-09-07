@@ -222,29 +222,30 @@ def grown(mask: np.ndarray, reach: int) -> np.ndarray:
     return wide
 
 
-def edges_in_the_frame(ground: object) -> np.ndarray:
+def edges_in_the_frame(
+    drawing: Sketch, camera: Camera, width: int, height: int
+) -> np.ndarray:
     """Say which pixel of the frame shows an edge that the relief makes.
 
-    An edge is a face the lift exposed, or the silhouette of the ground. The
-    paper is scaled into the middle of the frame, so the mask is scaled the
-    same way.
+    An edge is a face the lift exposed, or the silhouette of the ground.
+
+    **The renderer says where each pixel of the frame reads the page.** A
+    mapping worked out again here would be a second copy of one the renderer
+    owns, and the mask would then sit where the page used to be drawn rather
+    than where it is drawn now.
     """
+    ground = drawing._ground
+    assert ground is not None
     drawn = ground.drawn
     edge = ground.cliff & drawn
     edge |= drawn ^ np.roll(drawn, 1, axis=0)
     edge |= drawn ^ np.roll(drawn, 1, axis=1)
-    first_row, last_row, first_col, last_col = ground.box
-    cut = grown(edge, EDGE_REACH)[first_row:last_row, first_col:last_col]
-    rows, cols = cut.shape
-    scale = min(WIDTH / cols, HEIGHT / rows)
-    fit_w = max(int(cols * scale), 1)
-    fit_h = max(int(rows * scale), 1)
-    take_x = np.clip((np.arange(fit_w) / scale).astype(np.int32), 0, cols - 1)
-    take_y = np.clip((np.arange(fit_h) / scale).astype(np.int32), 0, rows - 1)
-    inside = np.zeros((HEIGHT, WIDTH), dtype=bool)
-    left, top = (WIDTH - fit_w) // 2, (HEIGHT - fit_h) // 2
-    inside[top : top + fit_h, left : left + fit_w] = cut[take_y][:, take_x]
-    return inside
+    wide = grown(edge, EDGE_REACH)
+    stood = drawing.projection(ground.window, width, height, int(ground.stand[2]))
+    take_x, take_y = drawing.fit_lists(stood, ground.box, camera, width, height)
+    inside = (take_y >= 0)[:, None] & (take_x >= 0)[None, :]
+    read = wide[np.clip(take_y, 0, None)][:, np.clip(take_x, 0, None)]
+    return np.asarray(read & inside)
 
 
 @pytest.mark.parametrize(("turn", "lean"), EDGE_ANGLES)
@@ -317,7 +318,7 @@ def test_the_relief_is_the_only_thing_the_two_renderers_draw_apart(
         f"{share:.4%} of the frame differs by more than {TOLERANCE} band "
         f"values, and {RELIEF_LOUD_SHARE:.2%} is the share the relief explains"
     )
-    at_edge = float(loud[edges_in_the_frame(slow._ground)].sum()) / max(
+    at_edge = float(loud[edges_in_the_frame(slow, camera, WIDTH, HEIGHT)].sum()) / max(
         int(loud.sum()), 1
     )
     assert at_edge >= RELIEF_EDGE_SHARE, (
