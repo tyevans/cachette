@@ -15,7 +15,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from cachette import World
+from cachette import VerbError, World
 from cachette.demo.clock import SPEEDS, says
 from cachette.demo.player import TURN_CHOICES
 from cachette.demo.ui.menu import Item, Menu
@@ -74,10 +74,67 @@ def world_menu(host: Host) -> Menu:
                 over_rule=True,
                 live=lambda: bool(_seated(host)),
             ),
+            Item("STORMS", opens=lambda: storm_menu(host)),
         ]
         return items
 
     return Menu("THE WORLD", rows)
+
+
+def storm_menu(host: Host) -> Menu:
+    """Give back the menu that raises a storm where the person is pointing.
+
+    **A storm is placed and it does not form.** The field of the engine holds
+    one layer of air, and one layer grows no low of its own, so a person
+    places one and the engine carries it until it dies.
+
+    The two rows are one storm at two settings. The large one covers several
+    cells and lasts. The small one is deeper over one cell and is over
+    quickly. **The small one is not a tornado.** One weather cell spans tens
+    of kilometres at least, and a tornado is under one, so the small setting
+    is an intensity on a cell rather than a funnel.
+    """
+
+    def rows() -> list[Item]:
+        return [
+            Item(
+                "STORMS STANDING",
+                reads=lambda: str(len(host.world.cyclones())),
+                over_rule=True,
+            ),
+            Item(
+                "RAISE A LARGE STORM",
+                act=_raise_storm(host, "tropical"),
+                live=lambda: host.pointer is not None,
+            ),
+            Item(
+                "RAISE A SMALL VIOLENT STORM",
+                act=_raise_storm(host, "severe"),
+                live=lambda: host.pointer is not None,
+            ),
+        ]
+
+    return Menu("STORMS", rows)
+
+
+def _raise_storm(host: Host, kind: str) -> Callable[[], None]:
+    """Give back an action that raises one storm under the pointer.
+
+    The engine refuses a place outside the world, and it refuses a storm when
+    it already carries as many as it holds. The action takes the refusal and
+    leaves the world alone, because a menu row is not the place to report one.
+    """
+
+    def act() -> None:
+        place = host.pointer
+        if place is None:
+            return
+        try:
+            host.world.raise_cyclone(place, kind)
+        except VerbError:
+            return
+
+    return act
 
 
 def seats_menu(host: Host) -> Menu:

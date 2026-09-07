@@ -165,6 +165,25 @@ class Storm(TypedDict):
     drops: int
     ready_at: int
 
+class CycloneReport(TypedDict):
+    """One travelling storm that the weather field carries.
+
+    The eye is the cell of the whole weather lattice that the storm stands
+    over, as the pair ``(q, r)``. The lattice carries a margin around the
+    world, so an eye may stand over a cell that covers no tile.
+
+    The depth is the pressure deficit at the eye, in the units that the
+    temperature plane carries. The radius is the cells that the deficit
+    reaches. The age and the life are in ticks.
+    """
+
+    id: int
+    eye: tuple[int, int]
+    depth: int
+    radius: int
+    age: int
+    life: int
+
 class WeatherTotals(TypedDict):
     """What the weather of the whole world holds.
 
@@ -1379,6 +1398,17 @@ class World:
         places: Sequence[tuple[int, int]],
         strength: int = ...,
     ) -> Storm: ...
+    def raise_cyclone(
+        self,
+        place: tuple[int, int],
+        kind: str = ...,
+        depth: int | None = ...,
+        radius: int | None = ...,
+        life: int | None = ...,
+    ) -> CycloneReport: ...
+    def cyclones(self) -> list[CycloneReport]: ...
+    @property
+    def cyclone_ceiling(self) -> int: ...
     def air_at(self, q: int, r: int) -> int: ...
     def ground_water_at(self, q: int, r: int) -> int: ...
     def ground_is_wet(self, q: int, r: int) -> bool: ...

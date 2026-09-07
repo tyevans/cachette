@@ -38,8 +38,9 @@ use cachette_core::weather::CLOUD_SHARE_WHOLE;
 use cachette_core::TileIdx;
 use cachette_core::{Advert, Consideration, KIND_LAND, KIND_RELATION, KIND_RESOURCE};
 use cachette_core::{
-    Axial, CommodityId, Entity, FactionId, FactionWeights, Fix32, Holder, Influence, ResourceKind,
-    TileKind, WeatherScale, Wind, World as CoreWorld, WorldConfig, WEIGHT_HIGH, WEIGHT_LOW,
+    Axial, CommodityId, Cyclone, CycloneSetting, Entity, FactionId, FactionWeights, Fix32, Holder,
+    Influence, ResourceKind, TileKind, WeatherScale, Wind, World as CoreWorld, WorldConfig,
+    WEIGHT_HIGH, WEIGHT_LOW,
 };
 use cachette_view::panel::Set as PanelSet;
 use cachette_view::{
@@ -6272,6 +6273,86 @@ impl PyWorld {
         self.lock().pyramid().layout().blocks_wide()
     }
 
+    /// Raises a travelling storm over one place.
+    ///
+    /// The place is a tile, as the pair `(q, r)` of integers. The storm
+    /// stands over the weather cell that covers it, and it moves, rains and
+    /// dies on its own from there.
+    ///
+    /// **The storm is imposed and it did not form.** The field holds one
+    /// layer of air, and a layer grows no low of its own, so a caller places
+    /// one and the engine carries it.
+    ///
+    /// The kind is `"tropical"` or `"severe"`. The two are one object at two
+    /// points of one parameter set, and a caller may state the three
+    /// parameters instead. **The severe kind is not a resolved tornado.** One
+    /// weather cell spans tens to hundreds of kilometres, and a tornado is
+    /// under one, so the severe kind is an intensity carried on a cell.
+    ///
+    /// The answer is a dictionary of the storm that was raised.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the place lies outside the world, when the
+    /// kind is not one this world holds, when a stated parameter lies outside
+    /// its range, and when the field already carries as many storms as it
+    /// holds.
+    #[pyo3(signature = (place, kind = "tropical", depth = None, radius = None, life = None))]
+    fn raise_cyclone<'py>(
+        &self,
+        python: Python<'py>,
+        place: (i32, i32),
+        kind: &str,
+        depth: Option<i32>,
+        radius: Option<i32>,
+        life: Option<u32>,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let mut setting = match kind {
+            "tropical" => CycloneSetting::TROPICAL,
+            "severe" => CycloneSetting::SEVERE,
+            other => {
+                return Err(VerbError::new_err(format!(
+                    "the kind {other} is not tropical and not severe"
+                )))
+            }
+        };
+        if let Some(depth) = depth {
+            setting.depth = depth;
+        }
+        if let Some(radius) = radius {
+            setting.radius = radius;
+        }
+        if let Some(life) = life {
+            setting.life = life;
+        }
+        let storm = self
+            .lock()
+            .raise_cyclone(Axial::new(place.0, place.1), setting)
+            .map_err(|error| VerbError::new_err(error.to_string()))?;
+        cyclone_report(python, storm)
+    }
+
+    /// The storms that the world is carrying, as a list of dictionaries.
+    ///
+    /// Each entry holds the identity, the cell the eye stands over, the
+    /// depth, the radius, the age and the life of one storm. The list is in
+    /// the order the storms were raised in.
+    fn cyclones<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyList>> {
+        let world = self.lock();
+        let reports: Vec<Bound<'py, PyDict>> = world
+            .cyclones()
+            .iter()
+            .map(|storm| cyclone_report(python, *storm))
+            .collect::<PyResult<_>>()?;
+        PyList::new(python, reports)
+    }
+
+    /// The storms that the field carries at once, as an integer.
+    #[getter]
+    fn cyclone_ceiling(&self) -> usize {
+        cachette_core::CYCLONE_CEILING
+    }
+
     /// The largest strength that one storm may carry, as an integer.
     #[getter]
     fn weather_strength_ceiling(&self) -> u8 {
@@ -8978,6 +9059,27 @@ fn trade_refusal(error: cachette_core::TradeError) -> PyErr {
         ),
     };
     VerbError::new_err(said)
+}
+
+/// Returns one storm as a dictionary.
+///
+/// The eye is the cell of the whole weather lattice that the storm stands
+/// over, as the pair `(q, r)`. **The margin is part of that lattice**, so a
+/// storm may stand at a cell that covers no tile of the world.
+///
+/// # Errors
+///
+/// Returns an error when the interpreter refuses to hold the dictionary.
+fn cyclone_report(python: Python<'_>, storm: Cyclone) -> PyResult<Bound<'_, PyDict>> {
+    let report = PyDict::new(python);
+    let eye = storm.eye();
+    report.set_item("id", storm.id)?;
+    report.set_item("eye", (eye.q, eye.r))?;
+    report.set_item("depth", storm.depth)?;
+    report.set_item("radius", storm.radius)?;
+    report.set_item("age", storm.age)?;
+    report.set_item("life", storm.life)?;
+    Ok(report)
 }
 
 /// Returns the columns that every event log gives, as a `dict`.

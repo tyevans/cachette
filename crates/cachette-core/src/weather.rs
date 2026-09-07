@@ -154,6 +154,12 @@ pub enum WeatherError {
     TooManyPlaces(usize),
     /// The strength is zero, or above the ceiling.
     StrengthOutOfRange(u8),
+    /// The caller named a cell that the lattice does not hold.
+    NoSuchCell(u32),
+    /// The caller asked for a storm outside the range the field carries.
+    CycloneSettingOutOfRange,
+    /// The field already carries as many storms as it holds.
+    TooManyCyclones,
     /// The faction inflicted weather too recently.
     StillCooling {
         /// The first tick at which the faction may inflict weather again.
@@ -204,6 +210,17 @@ impl core::fmt::Display for WeatherError {
             Self::StrengthOutOfRange(strength) => write!(
                 formatter,
                 "the strength {strength} is outside the range 1 to {STRENGTH_CEILING}"
+            ),
+            Self::NoSuchCell(cell) => {
+                write!(formatter, "the lattice holds no cell {cell}")
+            }
+            Self::CycloneSettingOutOfRange => write!(
+                formatter,
+                "a storm carries a depth of {CYCLONE_DEPTH_FLOOR} to {CYCLONE_DEPTH_CEILING}, a radius of 0 to {CYCLONE_RADIUS_CEILING}, and a life of 1 to {CYCLONE_LIFE_CEILING}"
+            ),
+            Self::TooManyCyclones => write!(
+                formatter,
+                "the field carries {CYCLONE_CEILING} storms at once"
             ),
             Self::StillCooling { ready_at } => write!(
                 formatter,
@@ -2753,8 +2770,8 @@ impl Insolation {
         // shades is worth, and nothing else.
         let full_sky = CLOUD_EFFECT_WATTS * 100 / CLOUD_COVER_FINE.max(1);
         let hundredths = full_sky * DEGREE_FINE * 100 / OLR_SLOPE_FINE;
-        table.cloud_swing = (hundredths / i64::from(WARMTH_FINE)).clamp(0, i64::from(HEAT_CEILING))
-            as i32;
+        table.cloud_swing =
+            (hundredths / i64::from(WARMTH_FINE)).clamp(0, i64::from(HEAT_CEILING)) as i32;
 
         // **The coldest cell must not clamp at the bottom of the scale.** The
         // top of the scale needs no check, because the base is derived from
@@ -3129,6 +3146,462 @@ pub fn fall_numerator(air: Drops, capacity: Drops) -> i64 {
     FALL_NUMERATOR_FLOOR + by_fullness
 }
 
+/// A cyclone: a travelling low that the field carries as state.
+///
+/// # What this is, and what it is not
+///
+/// **A cyclone here is imposed. It does not form out of the field, and it
+/// cannot.** A single-layer field grows no baroclinic eddies, so the three
+/// circulation cells cannot emerge from it and the module imposes them
+/// instead.[^1] The same argument holds one level down. A mesocyclone is an
+/// instability of a layered atmosphere, and this atmosphere has one layer. So
+/// the field places a low, carries it, and lets it die. Nothing here claims
+/// that a storm grew.
+///
+/// **What is imposed is the pressure deficit and nothing else.** The wind
+/// pass reads the deficit as it reads the belt of a latitude, and the
+/// deflection then turns the inflow aside. A closed circulation is what a
+/// deflected inflow is, and that part is the field's own arithmetic rather
+/// than a shape written here.[^2]
+///
+/// # What a scale of one cell means
+///
+/// **A tornado is smaller than one cell of any lattice this engine builds,
+/// and this type does not resolve one.** A cell of a world that spans pole to
+/// pole over 128 rows is about 156 kilometres across.[^3] A tornado is under
+/// one kilometre. So the small violent setting below is an intensity carried
+/// on one cell, and it stands for a severe local storm rather than a funnel.
+/// A reader who takes it for a resolved tornado is reading a claim that the
+/// lattice cannot support.
+///
+/// The large setting is different. A tropical cyclone runs to several hundred
+/// kilometres, which is a few cells, so the lattice does resolve its
+/// structure and the figures under it mean something.
+///
+/// # The parameters
+///
+/// **One shape carries both settings.** The three fields below are what
+/// separate the small violent storm from the large sustained one, and every
+/// other quantity follows from them: the wind from the deficit over the
+/// radius, the rain from the deficit at the cell, and the end from the life
+/// and from the ground under the eye.
+///
+/// The type declares its layout, because it reaches the state hash. Seven
+/// four-byte fields fill twenty-eight bytes exactly, so the type needs no
+/// padding field.[^4]
+///
+/// # References
+///
+/// [^1]: The banded circulation. [`band_pressure_at`]
+/// [^2]: The deflection. [`deflect`]
+/// [^3]: Findings register, FND-618. `docs/FINDINGS.md`
+/// [^4]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+pub struct Cyclone {
+    /// The position along the first lattice axis, in sub-cell steps of the
+    /// whole lattice.
+    pub q_fine: i32,
+    /// The position along the second lattice axis, in the same steps.
+    pub r_fine: i32,
+    /// The pressure deficit at the eye, in the units that the temperature
+    /// plane carries. It falls as the storm dies.
+    pub depth: i32,
+    /// The cells that the deficit reaches from the eye. A radius of zero is
+    /// one cell.
+    pub radius: i32,
+    /// The solves that the storm lives from its birth.
+    pub life: u32,
+    /// The solves that it has lived.
+    pub age: u32,
+    /// The identity of the storm, which keys its wander draw.
+    ///
+    /// **The slot is not the identity.** A storm that dies frees its slot,
+    /// and the next storm in that slot must not draw what the dead one drew.
+    /// The field counts identities and never reuses one.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Testing rules, section 2. `.agents/rules/testing.md`
+    pub id: u32,
+}
+
+/// The settings that raise one cyclone.
+///
+/// **This is the parameter set, and the two constants below are two points in
+/// it.** They are not two mechanisms and they are not two types. A caller may
+/// name any other point.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CycloneSetting {
+    /// The pressure deficit at the eye, in the units that the temperature
+    /// plane carries.
+    pub depth: i32,
+    /// The cells that the deficit reaches from the eye.
+    pub radius: i32,
+    /// The solves that the storm lives.
+    pub life: u32,
+}
+
+impl CycloneSetting {
+    /// A small violent storm, on one cell, over quickly.
+    ///
+    /// **This is not a resolved tornado.** One cell of a planet-wide lattice
+    /// is two orders of magnitude wider than a funnel, so this setting is an
+    /// intensity carried on a cell and nothing finer. It is the honest
+    /// reading of a tornado-level storm at this pitch.
+    pub const SEVERE: Self = Self {
+        depth: CYCLONE_DEPTH_CEILING,
+        radius: 0,
+        life: 24,
+    };
+
+    /// A large sustained storm, over several cells, lasting many solves.
+    ///
+    /// The lattice does resolve this one. A tropical cyclone runs to several
+    /// hundred kilometres, and a cell of a planet-wide lattice is about one
+    /// hundred and fifty.
+    pub const TROPICAL: Self = Self {
+        depth: 40,
+        radius: 3,
+        life: 320,
+    };
+
+    /// Reports whether the setting is inside the range that the field
+    /// carries.
+    #[must_use]
+    pub const fn is_in_range(self) -> bool {
+        self.depth >= CYCLONE_DEPTH_FLOOR
+            && self.depth <= CYCLONE_DEPTH_CEILING
+            && self.radius >= 0
+            && self.radius <= CYCLONE_RADIUS_CEILING
+            && self.life > 0
+            && self.life <= CYCLONE_LIFE_CEILING
+    }
+}
+
+impl Cyclone {
+    /// Returns the cell of the whole lattice that the eye stands over.
+    #[must_use]
+    pub const fn eye(self) -> Axial {
+        Axial::new(
+            self.q_fine.div_euclid(CYCLONE_FINE),
+            self.r_fine.div_euclid(CYCLONE_FINE),
+        )
+    }
+
+    /// Returns the pressure deficit that the storm puts on one cell.
+    ///
+    /// **The deficit is a cone.** It stands at the depth over the eye and
+    /// falls in a straight line to nothing one cell beyond the radius. So the
+    /// gradient, which is what the wind answers to, is the depth over the
+    /// radius: a small deep storm is violent, and a large one of the same
+    /// depth is broad and gentler. That is the whole difference between the
+    /// two settings, and it is one division.
+    ///
+    /// **This is public so that a test can move one input and watch the
+    /// answer move.**
+    #[must_use]
+    pub fn deficit_at(self, cell: Axial) -> i32 {
+        let span = i64::from(self.eye().distance(cell));
+        let reach = i64::from(self.radius) + 1;
+        if span >= reach {
+            return 0;
+        }
+        narrow(sim_math::share(
+            Accum(i64::from(self.depth)),
+            Accum(reach - span),
+            Accum(reach),
+        ))
+    }
+
+    /// Reports whether the storm is over.
+    ///
+    /// A storm ends on its age or on its depth. Each of the two is a
+    /// comparison, and neither is a convergence test.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+    #[must_use]
+    pub const fn is_over(self) -> bool {
+        self.age >= self.life || self.depth < CYCLONE_DEPTH_FLOOR
+    }
+}
+
+/// The sub-cell steps that one cell of the lattice spans.
+///
+/// A storm carries its position in these steps, so it drifts across a cell
+/// over several solves rather than jumping from one cell to the next.
+const CYCLONE_FINE: i32 = 64;
+
+/// The deepest eye that the field carries, in the units that the temperature
+/// plane carries.
+///
+/// The belt of a latitude swings by thirty-two of the same units over the
+/// whole globe, so a storm at this depth is a deeper low than any belt, and
+/// it stands over one or a few cells rather than over a third of the world.
+/// The value is a content constant that no measurement chose, and the blocker
+/// that holds what the wind should be worth governs it.[^1]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+pub const CYCLONE_DEPTH_CEILING: i32 = 96;
+
+/// The shallowest eye that is still a storm. A storm that falls below it
+/// ends.
+pub const CYCLONE_DEPTH_FLOOR: i32 = 8;
+
+/// The widest storm that the field carries, in cells from the eye.
+pub const CYCLONE_RADIUS_CEILING: i32 = 8;
+
+/// The longest life that the field carries, in solves.
+pub const CYCLONE_LIFE_CEILING: u32 = 4096;
+
+/// The storms that the field carries at once.
+///
+/// The stamp pass costs the footprint of every storm on every solve, so the
+/// ceiling is what bounds that cost. It is a content constant that no
+/// measurement chose.[^1]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+pub const CYCLONE_CEILING: usize = 8;
+
+/// What turns a wind into the sub-cell steps that a storm travels.
+///
+/// **This is a unit conversion and not a tuning constant.** A wind counts
+/// eight fine steps to one lattice step, and a storm counts its position in
+/// sub-cell steps of a cell. So the two constants that state those units are
+/// what this is made of, and no third declaration of either exists.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+const CYCLONE_STEER_NUMERATOR: i64 = (CYCLONE_FINE / WIND_FINE) as i64;
+
+/// The share of the steering flow that the eye travels at.
+///
+/// A real storm travels at about the speed of the flow it stands in, so the
+/// share is the whole of it. The value is a content constant that no
+/// measurement chose, and the blocker that holds what the wind should be
+/// worth governs it.[^1]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+const CYCLONE_STEER_DENOMINATOR: i64 = 1;
+
+/// The sub-cell steps that the wander adds to each axis, either way.
+///
+/// The track of a real storm is not a straight line, and a straight line is
+/// what a steering flow alone gives. The wander is a keyed draw and never a
+/// thread-local one.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+const CYCLONE_WANDER: i32 = 6;
+
+/// The depth that a storm loses on each solve over land.
+///
+/// **A storm over land loses its source.** The engine does not model the
+/// latent heat that feeds a real cyclone, so the decay is imposed in the way
+/// that the storm itself is. A storm that made landfall dies within a few
+/// tens of solves rather than lasting out its whole life.
+const CYCLONE_LANDFALL_DECAY: i32 = 3;
+
+/// The depth that a storm loses on each solve over a cold sea.
+const CYCLONE_COLD_DECAY: i32 = 2;
+
+/// The depth that a storm loses on each solve wherever it stands.
+///
+/// **Nothing here sustains a storm, so every storm is always dying.** The
+/// figure is small, so a tropical storm over a warm sea still lives out most
+/// of its life.
+const CYCLONE_DECAY: i32 = 1;
+
+/// The share of a cell that must admit a unit before the cell counts as land.
+///
+/// Water is the only ground that admits no unit, so a cell whose open share
+/// stands above this mark is mostly land.
+const CYCLONE_LAND_MARK: i64 = 1;
+
+/// What that share is measured against.
+const CYCLONE_LAND_WHOLE: i64 = 2;
+
+/// The temperature at which the sea under a storm is warm enough to hold it.
+///
+/// The published figure for tropical cyclone genesis is a sea surface near
+/// twenty-six degrees. The temperature plane counts half a degree in one unit
+/// and stands at half the heat ceiling for a temperate cell, so this mark is
+/// at the warm end of the scale rather than at the middle of it.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math. `docs/research/reports/30-the-published-atmospheric-math.md`
+const CYCLONE_WARM_MARK: i32 = 3 * HEAT_CEILING / 5;
+
+/// One in this many solves, the field tries to raise a storm.
+///
+/// **The attempt is a keyed draw, and the gates below it decide the rest.**
+/// So the rate that a world sees is the product of this period and of how
+/// much warm wet sea the world holds, rather than this number alone.
+const CYCLONE_GENESIS_PERIOD: u64 = 24;
+
+/// The share of its capacity that the air over a cell must hold before a
+/// storm may be raised there.
+const CYCLONE_GENESIS_AIR_NUMERATOR: i64 = 1;
+
+/// What that share is measured against.
+const CYCLONE_GENESIS_AIR_DENOMINATOR: i64 = 4;
+
+/// The draw index of the genesis attempt within a frame.
+const GENESIS_DRAW: u32 = 1;
+
+/// The draw index of the cell that a genesis attempt names.
+const GENESIS_CELL_DRAW: u32 = 2;
+
+/// The draw index of the first axis of the wander.
+const WANDER_Q_DRAW: u32 = 3;
+
+/// The draw index of the second axis of the wander.
+const WANDER_R_DRAW: u32 = 4;
+
+/// The entity that the two genesis draws key on.
+///
+/// **Genesis has no entity, so it names one that no cell can name.** A cell
+/// key is a 32-bit index, so this value collides with none of them.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+const GENESIS_ENTITY: u64 = u64::MAX;
+
+/// Reports whether the field tries to raise a storm on one frame.
+///
+/// The answer is a keyed draw on the world seed, the weather system and the
+/// frame. It holds no state, and it does not depend on which thread
+/// asked.[^1]
+///
+/// **This is public so that a test can change one field of the key and watch
+/// the answer move.**[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+/// [^2]: Testing rules, section 2. `.agents/rules/testing.md`
+#[must_use]
+pub fn cyclone_forms(seed: u64, tick: Tick) -> bool {
+    rng::draw_below(
+        seed,
+        rng::SYSTEM_WEATHER,
+        tick.0,
+        GENESIS_ENTITY,
+        GENESIS_DRAW,
+        CYCLONE_GENESIS_PERIOD,
+    ) == 0
+}
+
+/// Returns the cell of the whole lattice that a genesis attempt names.
+///
+/// The answer is a keyed draw over the cells of the lattice. The gates that
+/// follow it decide whether that cell may hold a storm.
+///
+/// **This is public so that a test can change one field of the key and watch
+/// the answer move.**
+#[must_use]
+pub fn cyclone_genesis_cell(seed: u64, tick: Tick, cells: u32) -> u32 {
+    if cells == 0 {
+        return 0;
+    }
+    rng::draw_below(
+        seed,
+        rng::SYSTEM_WEATHER,
+        tick.0,
+        GENESIS_ENTITY,
+        GENESIS_CELL_DRAW,
+        u64::from(cells),
+    ) as u32
+}
+
+/// Returns the sub-cell steps that the track of one storm wanders this frame.
+///
+/// The draw is keyed on the world seed, the weather system, the frame and the
+/// identity of the storm. **The identity is not the slot.** A storm that dies
+/// frees its slot, and a storm born into that slot later must not repeat the
+/// track of the dead one.[^1] [^2]
+///
+/// **This is public so that a test can change one field of the key and watch
+/// the answer move.**[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+/// [^2]: Testing rules, section 2. `.agents/rules/testing.md`
+#[must_use]
+pub fn cyclone_wander(seed: u64, tick: Tick, id: u32) -> (i32, i32) {
+    let span = (2 * CYCLONE_WANDER + 1) as u64;
+    let along = rng::draw_below(
+        seed,
+        rng::SYSTEM_WEATHER,
+        tick.0,
+        u64::from(id),
+        WANDER_Q_DRAW,
+        span,
+    ) as i32;
+    let across = rng::draw_below(
+        seed,
+        rng::SYSTEM_WEATHER,
+        tick.0,
+        u64::from(id),
+        WANDER_R_DRAW,
+        span,
+    ) as i32;
+    (along - CYCLONE_WANDER, across - CYCLONE_WANDER)
+}
+
+/// The whole of the capacity that a cell outside every storm keeps.
+const CYCLONE_KEPT_WHOLE: i64 = 64;
+
+/// The share of its capacity that the deepest eye leaves the air.
+const CYCLONE_KEPT_FLOOR: i64 = 8;
+
+/// Returns the capacity of the air under a storm.
+///
+/// **A storm is forced ascent, and ascent rains.** The eye of the deepest
+/// storm leaves the air an eighth of what its temperature would allow, so the
+/// settle pass pours seven eighths of what stands there onto the ground. A
+/// cell outside every footprint keeps the whole of its capacity and reads
+/// nothing of this.
+///
+/// **The capacity is a bound and never an assignment.** The settle pass
+/// computes the water above the bound and moves that quantity from the air
+/// plane to the ground plane of the same cell, so the water account holds
+/// through it.[^1]
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+///
+/// # References
+///
+/// [^1]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
+#[must_use]
+pub fn cyclone_capacity(base: Drops, deficit: i32) -> Drops {
+    if deficit <= 0 {
+        return base;
+    }
+    let held = i64::from(deficit.clamp(0, CYCLONE_DEPTH_CEILING));
+    let shed = sim_math::share(
+        Accum(CYCLONE_KEPT_WHOLE - CYCLONE_KEPT_FLOOR),
+        Accum(held),
+        Accum(i64::from(CYCLONE_DEPTH_CEILING)),
+    )
+    .map_or(0, |value| value.0);
+    share_of(base, CYCLONE_KEPT_WHOLE - shed, CYCLONE_KEPT_WHOLE)
+}
+
 /// What one call to the divine power did.
 ///
 /// The report is returned rather than logged, because the call is a verb of
@@ -3283,6 +3756,43 @@ pub struct WeatherField {
     ///
     /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     storms: i64,
+    /// The storms that the field is carrying, in ascending identity order.
+    ///
+    /// **This is simulated state and it enters the state hash.** A storm
+    /// carries a position, a depth and an age, and the next solve reads all
+    /// three.[^1]
+    ///
+    /// The order is the order the storms were raised in, and a storm that
+    /// ends is removed without moving the ones before it. So the order is a
+    /// fixed key and never a completion order.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: A cyclone. [`Cyclone`]
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    cyclones: Vec<Cyclone>,
+    /// The identity that the next storm takes.
+    ///
+    /// **A slot is reused and an identity is not.** The wander draw of a
+    /// storm keys on the identity, so a storm born into the slot of a dead
+    /// one would otherwise repeat the track of the dead one exactly.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Testing rules, section 2. `.agents/rules/testing.md`
+    next_cyclone: u32,
+    /// The pressure deficit that the storms put on each cell of the whole
+    /// lattice.
+    ///
+    /// **This is derived and never carried.** One pass rebuilds the whole of
+    /// it from the storms at the start of every solve, so it enters no state
+    /// hash. It is stored rather than recomputed because the wind pass and
+    /// the settle pass both read it, and a cell of it is a walk over every
+    /// storm.
+    ///
+    /// The plane is empty while no storm stands, and every reader takes zero
+    /// for a cell it does not hold.
+    depression: Vec<i32>,
     /// Every drop that has ever left the ground.
     evaporated: i64,
     /// The first tick at which each faction may inflict weather again.
@@ -3378,6 +3888,9 @@ impl WeatherField {
             wind_passes: 0,
             raised: 0,
             storms: 0,
+            cyclones: Vec::new(),
+            next_cyclone: 0,
+            depression: Vec::new(),
             evaporated: 0,
             ready: vec![Tick(0); faction_count as usize],
             passes: 0,
@@ -3907,6 +4420,15 @@ impl WeatherField {
         if ground.len() != self.cells().tile_count() as usize {
             return Err(WeatherError::LatticeMismatch);
         }
+        // The storms move, weaken and die before anything reads them, and the
+        // field then tries to raise one. The deficit plane is stamped last,
+        // so the wind pass and the settle pass below both read the storms of
+        // this frame rather than the storms of the last one.[^5]
+        //
+        // [^5]: A cyclone. [`Cyclone`]
+        self.drift_cyclones(tick, seed, ground);
+        self.raise_from_the_sea(tick, seed, ground);
+        self.stamp_cyclones();
         // The temperature of every cell moves before anything reads it. Four
         // readers follow: the pressure that drives the wind, the lift, the
         // fall, and the carry itself.[^1] [^3]
@@ -3948,6 +4470,303 @@ impl WeatherField {
         }
         self.settle(ground);
         Ok(())
+    }
+
+    /// Returns the storms that the field is carrying.
+    #[must_use]
+    pub fn cyclones(&self) -> &[Cyclone] {
+        &self.cyclones
+    }
+
+    /// Returns the storms that the field has raised over its whole life.
+    ///
+    /// The count is the identity that the next storm takes, and no identity
+    /// is reused, so it counts every storm that ever stood.
+    #[must_use]
+    pub const fn cyclones_raised(&self) -> u32 {
+        self.next_cyclone
+    }
+
+    /// Returns the pressure deficit that the storms put on one cell.
+    ///
+    /// The answer is zero for a cell that no storm reaches, and zero for
+    /// every cell while no storm stands.
+    #[must_use]
+    pub fn depression_at(&self, cell: u32) -> i32 {
+        self.depression.get(cell as usize).copied().unwrap_or(0)
+    }
+
+    /// Raises a storm over one cell of the whole lattice.
+    ///
+    /// **This is an authoring verb and not a faction power.** It names no
+    /// congregation, so the gate that holds the divine power does not govern
+    /// it: a caller that places a storm is the author of the world rather
+    /// than a god inside it.[^1] The power that a faction wields is the one
+    /// that puts water over ground it holds.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the cell lies outside the lattice, when the
+    /// setting lies outside the range the field carries, and when the field
+    /// already carries as many storms as it holds.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
+    pub fn raise_cyclone(
+        &mut self,
+        cell: u32,
+        setting: CycloneSetting,
+    ) -> Result<Cyclone, WeatherError> {
+        let Some(address) = self.cells().address_of(TileIdx(cell)) else {
+            return Err(WeatherError::NoSuchCell(cell));
+        };
+        if !setting.is_in_range() {
+            return Err(WeatherError::CycloneSettingOutOfRange);
+        }
+        if self.cyclones.len() >= CYCLONE_CEILING {
+            return Err(WeatherError::TooManyCyclones);
+        }
+        Ok(self.place_cyclone(address, setting))
+    }
+
+    /// Puts one storm on the field, at the middle of a cell.
+    ///
+    /// The identity comes from the counter and never from the slot, so a
+    /// storm born into the slot of a dead one draws its own track.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Testing rules, section 2. `.agents/rules/testing.md`
+    fn place_cyclone(&mut self, address: Axial, setting: CycloneSetting) -> Cyclone {
+        let middle = CYCLONE_FINE / 2;
+        let storm = Cyclone {
+            q_fine: address.q * CYCLONE_FINE + middle,
+            r_fine: address.r * CYCLONE_FINE + middle,
+            depth: setting.depth,
+            radius: setting.radius,
+            life: setting.life,
+            age: 0,
+            id: self.next_cyclone,
+        };
+        self.next_cyclone = self.next_cyclone.saturating_add(1);
+        self.cyclones.push(storm);
+        storm
+    }
+
+    /// Moves every storm, weakens it, and drops the ones that are over.
+    ///
+    /// **A storm travels on the flow around it and not on its own wind.** The
+    /// wind at the eye is the storm's own circulation, so a storm steered by
+    /// it would chase its own tail. The steering flow is the mean wind over
+    /// the six cells one step beyond the radius, and a symmetric circulation
+    /// sums to nothing over that ring, so what is left of the sum is the flow
+    /// that the storm sits in.
+    ///
+    /// **Nothing here sustains a storm.** The depth falls on every solve, and
+    /// it falls faster over land and over a cold sea. So a storm always ends,
+    /// and the three ways it ends are a comparison rather than a convergence
+    /// test.[^1]
+    ///
+    /// The pass walks the storms in ascending slot order, which is the order
+    /// they were raised in.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0087, an influence solve runs a fixed iteration count over the whole plane, decision D1. `docs/adrs/draft/adr-0087-an-influence-solve-runs-a-fixed-iteration-count.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn drift_cyclones(&mut self, tick: Tick, seed: u64, ground: &[CellGround]) {
+        if self.cyclones.is_empty() {
+            return;
+        }
+        let cells = self.cells();
+        let mut carried: Vec<Cyclone> = Vec::with_capacity(self.cyclones.len());
+        for storm in &self.cyclones {
+            let mut storm = *storm;
+            let steer = self.steering_at(storm);
+            let (wander_q, wander_r) = cyclone_wander(seed, tick, storm.id);
+            storm.q_fine += narrow(sim_math::share(
+                Accum(i64::from(steer.q)),
+                Accum(CYCLONE_STEER_NUMERATOR),
+                Accum(CYCLONE_STEER_DENOMINATOR),
+            )) + wander_q;
+            storm.r_fine += narrow(sim_math::share(
+                Accum(i64::from(steer.r)),
+                Accum(CYCLONE_STEER_NUMERATOR),
+                Accum(CYCLONE_STEER_DENOMINATOR),
+            )) + wander_r;
+            storm.age = storm.age.saturating_add(1);
+            storm.depth -= CYCLONE_DECAY;
+
+            // A storm that walked off the lattice is gone. The margin is what
+            // gives it somewhere to go, and a storm that crossed the margin
+            // has left the world for good.
+            let Some(at) = cells.index_of(storm.eye()) else {
+                continue;
+            };
+            let index = at.0 as usize;
+            if let Some(under) = ground.get(index) {
+                let open = under.open_tiles() * CYCLONE_LAND_WHOLE;
+                if open > under.tiles() * CYCLONE_LAND_MARK {
+                    storm.depth -= CYCLONE_LANDFALL_DECAY;
+                }
+            }
+            let heat = self.warmth.get(index).copied().unwrap_or(0);
+            if heat < CYCLONE_WARM_MARK {
+                storm.depth -= CYCLONE_COLD_DECAY;
+            }
+            if storm.is_over() {
+                continue;
+            }
+            carried.push(storm);
+        }
+        self.cyclones = carried;
+    }
+
+    /// Returns the flow that one storm travels on.
+    ///
+    /// The answer is the mean wind over the six cells one step beyond the
+    /// radius of the storm, in the six directions. A cell outside the lattice
+    /// is left out of the mean, and a storm that finds no such cell reads the
+    /// wind under its own eye.
+    fn steering_at(&self, storm: Cyclone) -> Wind {
+        let cells = self.cells();
+        let eye = storm.eye();
+        let reach = storm.radius + 1;
+        let mut sum_q = 0i64;
+        let mut sum_r = 0i64;
+        let mut found = 0i64;
+        for step in NEIGHBOURS {
+            let around = Axial::new(eye.q + step.q * reach, eye.r + step.r * reach);
+            let Some(at) = cells.index_of(around) else {
+                continue;
+            };
+            let wind = self.wind.get(at.0 as usize).copied().unwrap_or(Wind::STILL);
+            sum_q += i64::from(wind.q);
+            sum_r += i64::from(wind.r);
+            found += 1;
+        }
+        if found == 0 {
+            return cells
+                .index_of(eye)
+                .and_then(|at| self.wind.get(at.0 as usize).copied())
+                .unwrap_or(Wind::STILL);
+        }
+        Wind {
+            q: narrow(sim_math::share(Accum(sum_q), Accum(1), Accum(found))),
+            r: narrow(sim_math::share(Accum(sum_r), Accum(1), Accum(found))),
+        }
+    }
+
+    /// Tries to raise one storm out of the warm sea.
+    ///
+    /// **Nothing emerges here, and nothing can.** A single-layer field grows
+    /// no baroclinic eddies, so a low cannot form out of it. This pass places
+    /// one, and the gates below only decide where a placed one is
+    /// plausible.[^1]
+    ///
+    /// The gates are the published conditions for a tropical cyclone that
+    /// this field can read: a sea rather than land, a warm sea, and air that
+    /// already holds a share of what it can carry. **The latitude gate is not
+    /// modelled.** A real cyclone does not form within about five degrees of
+    /// the equator, because the deflection vanishes there; the deflection of
+    /// this field is the same at every latitude, so there is nothing for that
+    /// gate to read.[^2]
+    ///
+    /// The pass takes two keyed draws, whatever the field holds, so it costs
+    /// the same on every frame and it takes no branch that a thread could
+    /// change.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: The banded circulation. [`band_pressure_at`]
+    /// [^2]: The deflection. [`deflect`]
+    /// [^3]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+    fn raise_from_the_sea(&mut self, tick: Tick, seed: u64, ground: &[CellGround]) {
+        let cells = self.cells();
+        let cell = cyclone_genesis_cell(seed, tick, cells.tile_count());
+        if !cyclone_forms(seed, tick) {
+            return;
+        }
+        if self.cyclones.len() >= CYCLONE_CEILING {
+            return;
+        }
+        let index = cell as usize;
+        let Some(under) = ground.get(index) else {
+            return;
+        };
+        // A sea cell, and not a coast. Water is the only ground that admits
+        // no unit.
+        if under.tiles() <= 0 || under.open_tiles() * CYCLONE_LAND_WHOLE > under.tiles() {
+            return;
+        }
+        let heat = self.warmth.get(index).copied().unwrap_or(0);
+        if heat < CYCLONE_WARM_MARK {
+            return;
+        }
+        // The air must already hold a share of what it can carry. A dry sky
+        // has nothing for a storm to rain out, and a storm over one would be
+        // a low with no weather under it.
+        let air = self.air.get(index).copied().unwrap_or(Drops::ZERO);
+        let capacity = capacity_at(heat);
+        let asked = sim_math::share(
+            Accum(capacity.0),
+            Accum(CYCLONE_GENESIS_AIR_NUMERATOR),
+            Accum(CYCLONE_GENESIS_AIR_DENOMINATOR),
+        )
+        .map_or(0, |value| value.0);
+        if air.0 < asked {
+            return;
+        }
+        let Some(address) = cells.address_of(TileIdx(cell)) else {
+            return;
+        };
+        self.place_cyclone(address, CycloneSetting::TROPICAL);
+    }
+
+    /// Rebuilds the deficit plane from the storms.
+    ///
+    /// **The plane is derived, and this pass derives the whole of it.** No
+    /// part of the previous frame survives, so a storm that ended leaves
+    /// nothing behind and the ambient field returns to what it was.
+    ///
+    /// The pass walks the storms in slot order and the cells of each
+    /// footprint in ascending row and column order. Both orders are
+    /// fixed.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn stamp_cyclones(&mut self) {
+        if self.cyclones.is_empty() {
+            self.depression.clear();
+            return;
+        }
+        let cells = self.cells();
+        let count = cells.tile_count() as usize;
+        if self.depression.len() == count {
+            self.depression.fill(0);
+        } else {
+            self.depression = vec![0; count];
+        }
+        for storm in &self.cyclones {
+            let eye = storm.eye();
+            let reach = storm.radius;
+            for r in (eye.r - reach)..=(eye.r + reach) {
+                for q in (eye.q - reach)..=(eye.q + reach) {
+                    let address = Axial::new(q, r);
+                    let Some(at) = cells.index_of(address) else {
+                        continue;
+                    };
+                    let deficit = storm.deficit_at(address);
+                    if deficit <= 0 {
+                        continue;
+                    }
+                    let slot = &mut self.depression[at.0 as usize];
+                    *slot = slot.saturating_add(deficit).clamp(0, CYCLONE_DEPTH_CEILING);
+                }
+            }
+        }
     }
 
     /// Moves the temperature of every cell toward what the world asks.
@@ -4087,6 +4906,7 @@ impl WeatherField {
             wind: &self.wind,
             warmth: &self.warmth,
             band: &self.band,
+            depression: &self.depression,
             pressure_divisor: self.scale.pressure_divisor(),
         };
         run_in_chunks(count, threads, &mut self.wind_scratch, |low, out| {
@@ -4263,7 +5083,16 @@ impl WeatherField {
             // [^4]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
             let cooling = self.cooling_at(cell, heat);
             let climb = self.climb_at(cell, ground);
-            let capacity = travelling_capacity(capacity_at(heat), cooling, climb);
+            // **A storm is forced ascent, and ascent rains.** The deficit
+            // takes a further share of the capacity, so the air under an eye
+            // pours out most of what it holds. The move is a bound and never
+            // an assignment, so the water account holds through it.[^7]
+            //
+            // [^7]: A cyclone. [`cyclone_capacity`]
+            let capacity = cyclone_capacity(
+                travelling_capacity(capacity_at(heat), cooling, climb),
+                self.depression.get(cell).copied().unwrap_or(0),
+            );
             let held = self.air[cell];
             let poured = Drops((held.0 - capacity.0).max(0));
             self.air[cell] = Drops(held.0 - poured.0);
@@ -4413,7 +5242,16 @@ impl WeatherField {
         // makes them different.[^3]
         //
         // [^3]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+        // **A storm is state that the next step reads, so it enters the
+        // hash.** The identity counter goes in beside it, because two fields
+        // holding the same storms and a different counter give the next storm
+        // a different draw key.[^4]
+        //
+        // [^4]: A cyclone. [`Cyclone`]
         running
+            .write_u64(u64::from(self.next_cyclone))
+            .write_u64(self.cyclones.len() as u64)
+            .write(bytemuck::cast_slice(&self.cyclones))
             .write(bytemuck::cast_slice(&self.air))
             .write(bytemuck::cast_slice(&self.ground))
             .write(bytemuck::cast_slice(&self.wind))
@@ -4645,6 +5483,16 @@ struct WindPass<'a> {
     ///
     /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D2. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
     band: &'a [i32],
+    /// The pressure deficit that the storms put on each cell.
+    ///
+    /// **A storm is a low, and the pass reads it as it reads a belt.** The
+    /// plane is empty while no storm stands, and the pass then takes zero for
+    /// every cell.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: A cyclone. [`Cyclone`]
+    depression: &'a [i32],
     /// What the pressure sum is divided by. It follows the cell side, because
     /// a finer lattice holds a smaller difference between two neighbours.
     pressure_divisor: i64,
@@ -4670,7 +5518,14 @@ impl WindPass<'_> {
             .get(address.r.max(0) as usize)
             .copied()
             .unwrap_or(0);
-        warmth - band
+        // **A storm is a low, and the pass reads it as it reads a belt.** So
+        // the wind answers to the deficit through the arithmetic that is
+        // already here, and the deflection then turns the inflow into a
+        // circulation. Nothing here writes a rotation.[^2]
+        //
+        // [^2]: A cyclone. [`Cyclone`]
+        let storm = self.depression.get(index).copied().unwrap_or(0);
+        warmth - band - storm
     }
 
     /// Fills one run of the wind scratch plane.

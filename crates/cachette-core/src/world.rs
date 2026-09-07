@@ -113,8 +113,8 @@ use crate::upgrade::{
     UpgradeTableError,
 };
 use crate::weather::{
-    ground_over_lattice, CellGround, Ground, Latitudes, Storm, WeatherError, WeatherField,
-    WeatherScale, Wind,
+    ground_over_lattice, CellGround, Cyclone, CycloneSetting, Ground, Latitudes, Storm,
+    WeatherError, WeatherField, WeatherScale, Wind,
 };
 
 /// The reason that a value did not name a live entity.
@@ -7451,6 +7451,49 @@ impl World {
         };
         self.weather
             .inflict(faction, places, strength, self.tick, &ground)
+    }
+
+    /// Raises a storm over one place.
+    ///
+    /// The place is a tile, and the storm stands over the weather cell that
+    /// covers it. **The storm is imposed and it did not form.** A field of one
+    /// layer grows no low of its own, so a caller places one and the field
+    /// carries it until it dies.[^1]
+    ///
+    /// **This is an authoring verb and not a faction power.** It names no
+    /// congregation, so the gate that a god meets does not govern it.[^2] The
+    /// power that a faction wields is the one that puts water over ground the
+    /// faction holds.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the place lies outside the world, when the
+    /// setting lies outside the range the field carries, and when the field
+    /// already carries as many storms as it holds.
+    ///
+    /// # References
+    ///
+    /// [^1]: A cyclone. [`Cyclone`]
+    /// [^2]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
+    pub fn raise_cyclone(
+        &mut self,
+        place: Axial,
+        setting: CycloneSetting,
+    ) -> Result<Cyclone, WeatherError> {
+        let tile = self
+            .grid
+            .index_of(place)
+            .ok_or(WeatherError::PlaceOutsideWorld(place))?;
+        let cell = self
+            .weather_cell_of(tile)
+            .ok_or(WeatherError::PlaceOutsideWorld(place))?;
+        self.weather.raise_cyclone(cell, setting)
+    }
+
+    /// Returns the storms that the weather of the world is carrying.
+    #[must_use]
+    pub fn cyclones(&self) -> &[Cyclone] {
+        self.weather.cyclones()
     }
 
     fn cell_of(&self, tile: TileIdx) -> Option<u32> {
