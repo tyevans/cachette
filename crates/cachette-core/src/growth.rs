@@ -43,6 +43,10 @@
 //! each of them, marks each unset, and records how the placeholder was
 //! chosen.[^8]
 //!
+//! **The founding housing is derived and the others are chosen.** It reads the
+//! capacity of one tile of ordinary ground, because a birth spawns on the tile
+//! of the settlement. The register holds the derivation.[^8]
+//!
 //! # References
 //!
 //! [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, the context. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
@@ -87,12 +91,24 @@ pub const CHANCE_SCALE: u64 = Fix32::ONE.0 as u64;
 /// [^1]: Balance register, the population, the housing per person row. `docs/reference/balance.md`
 pub const HOUSING_PER_PERSON_DEFAULT: u32 = 1;
 
-/// The placeholder housing that a founded site starts with.[^1]
+/// The housing that a founded site starts with.
+///
+/// **A founding houses the people that its seat holds, and no more.** A birth
+/// spawns on the tile of the settlement, so the ground of the seat is what a
+/// new settlement can put a person on. The value is therefore the capacity of
+/// one tile of ordinary ground, which the terrain module declares. It reads
+/// that declaration rather than restating it, so the two cannot disagree.[^1]
+///
+/// The bound is under what the ground of a new site feeds, so the housing is
+/// what stops a young settlement and the store is not. A builder raises the
+/// bound with a lodging, and the balance register holds the measurement that
+/// says the store has room for that.[^2]
 ///
 /// # References
 ///
-/// [^1]: Balance register, the population, the founding housing row. `docs/reference/balance.md`
-pub const FOUNDING_HOUSING_DEFAULT: u32 = 1024;
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: Balance register, the population, the founding housing row. `docs/reference/balance.md`
+pub const FOUNDING_HOUSING_DEFAULT: u32 = crate::terrain::ORDINARY_CAPACITY;
 
 /// The placeholder store that one birth costs.[^1]
 ///

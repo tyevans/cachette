@@ -25,7 +25,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-151**
+**Next number: BLK-152**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -81,6 +81,26 @@ engine has none.
 **Work continues.** The engine states the first answer plainly and a record
 gives the reasoning.[^BLK123A] A change of rule changes the apply function and
 its tests.
+### BLK-151 — Nobody has said whether a worn lodging takes back its housing
+
+**Owner:** the project owner. **Blocks:** the wear path of the housing column
+of a settlement.
+
+A finished lodging level raises the housing of the settlement on its tile or on
+one of the six tiles beside it. The raise is written once, when the level
+rises, and the settlement stores it. Nothing lowers it. A lodging that wears
+away therefore leaves every place it gave, and a site keeps a housing that no
+built thing supports.
+
+Two rules are possible and the project cannot choose between them without a
+ruling. A worn level may take back what it gave, which makes a dwelling
+something a faction maintains. A worn level may leave the housing where it is,
+which makes a dwelling a thing that is built once. The first rule needs an
+answer about the people who no longer have a place: whether they leave, whether
+they stay above the bound, or whether the site never falls below its residents.
+
+A finding holds the measurement that opened this row.[^BLK151A]
+
 ### BLK-150 — Nobody has said what raises and lowers renown
 
 **Owner:** the project owner. **Blocks:** wiring the renown column to any
@@ -745,3 +765,5 @@ normally.
 [^BLK130B]: ADR-0143, wet ground yields more to a gatherer, decision D2. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
 [^BLK130C]: Research report 24, demonstration readability, resources and weather, section 2.1. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
 [^BLK130D]: Balance register, the weather. `docs/reference/balance.md`
+
+[^BLK151A]: Findings register, FND-571. `docs/FINDINGS.md`
