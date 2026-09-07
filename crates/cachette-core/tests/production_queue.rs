@@ -429,10 +429,11 @@ fn the_built_in_controller_queues_through_the_same_verb() {
     let mut queued = 0usize;
     for _ in 0..4 {
         world.step(1).expect("the step must run");
+        let schema = world.action_schema();
         queued += world
             .controller_log()
             .iter()
-            .filter(|command| command.kind == cachette_core::COMMAND_QUEUE)
+            .filter(|command| schema.verb_of(command.action) == Some(cachette_core::Verb::Queue))
             .filter(|command| command.applied != 0)
             .count();
     }

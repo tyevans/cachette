@@ -20,8 +20,8 @@ use std::collections::BTreeSet;
 
 use cachette_core::controller::NO_SEAT;
 use cachette_core::{
-    Axial, CensusBasis, ControllerCommand, FactionId, GameEnd, WinPath, World, WorldConfig,
-    COMMAND_BUILD, COMMAND_GATHER, SUBSYSTEM_CENSUS,
+    ActionSchema, Axial, CensusBasis, ControllerCommand, FactionId, GameEnd, Verb, WinPath, World,
+    WorldConfig, SUBSYSTEM_CENSUS,
 };
 
 const THREADS: usize = 2;
@@ -90,10 +90,16 @@ fn log_of(world: &World) -> Vec<ControllerCommand> {
 /// carriers, and each of those carries its own draw index. A test of the
 /// evaluation draw reads the evaluation commands and nothing else.
 fn evaluations_of(world: &World) -> Vec<ControllerCommand> {
+    let schema = world.action_schema();
     world
         .controller_log()
         .iter()
-        .filter(|entry| entry.kind == COMMAND_GATHER || entry.kind == COMMAND_BUILD)
+        .filter(|entry| {
+            matches!(
+                schema.verb_of(entry.action),
+                Some(Verb::Gather) | Some(Verb::Build)
+            )
+        })
         .copied()
         .collect()
 }
@@ -140,6 +146,7 @@ fn the_controller_emits_only_through_the_set_verbs_and_logs_each_command() {
     //
     // [^4]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
     let log = evaluations_of(&world);
+    let schema = world.action_schema();
     assert_eq!(log.len(), 6, "two factions, three evaluations each");
     for entry in &log {
         assert_eq!(entry.tick.0, 1);
@@ -148,7 +155,10 @@ fn the_controller_emits_only_through_the_set_verbs_and_logs_each_command() {
             "the applied field says whether the command reached a unit"
         );
         assert!(
-            entry.kind <= 1,
+            matches!(
+                schema.verb_of(entry.action),
+                Some(Verb::Gather) | Some(Verb::Build)
+            ),
             "only a gather order or a build order exists"
         );
     }
@@ -179,8 +189,14 @@ fn the_controller_emits_only_through_the_set_verbs_and_logs_each_command() {
 }
 
 /// Collects the choice of one entry as a comparable pair.
-fn choice(entry: &ControllerCommand) -> (u8, u8) {
-    (entry.kind, entry.argument)
+///
+/// The action integer holds the verb and the argument in one column, so the
+/// pair comes back by arithmetic over the schema and never from a second
+/// field.
+fn choice(schema: &ActionSchema, entry: &ControllerCommand) -> (Verb, Vec<u32>) {
+    schema
+        .decode(entry.action)
+        .expect("the log holds an action of this table")
 }
 
 #[test]
@@ -193,7 +209,7 @@ fn the_draw_depends_on_the_tick() {
         world.step(THREADS).expect("the step runs");
         let log = evaluations_of(&world);
         assert_eq!(log.len(), 1);
-        seen.insert(choice(&log[0]));
+        seen.insert(choice(&world.action_schema(), &log[0]));
     }
     assert!(
         seen.len() > 1,
@@ -215,11 +231,12 @@ fn the_draw_depends_on_the_faction() {
         world.step(THREADS).expect("the step runs");
         let log = evaluations_of(&world);
         assert_eq!(log.len(), 3);
-        for kind in [0u8, 1u8] {
-            let arguments: BTreeSet<u8> = log
+        let schema = world.action_schema();
+        for verb in [Verb::Gather, Verb::Build] {
+            let arguments: BTreeSet<Vec<u32>> = log
                 .iter()
-                .filter(|entry| entry.kind == kind)
-                .map(|entry| entry.argument)
+                .filter(|entry| schema.verb_of(entry.action) == Some(verb))
+                .map(|entry| choice(&schema, entry).1)
                 .collect();
             if arguments.len() > 1 {
                 differed = true;
@@ -242,7 +259,9 @@ fn the_draw_depends_on_the_draw_index() {
         world.step(THREADS).expect("the step runs");
         let log = evaluations_of(&world);
         assert_eq!(log.len(), 4);
-        let choices: BTreeSet<(u8, u8)> = log.iter().map(choice).collect();
+        let schema = world.action_schema();
+        let choices: BTreeSet<(Verb, Vec<u32>)> =
+            log.iter().map(|entry| choice(&schema, entry)).collect();
         if choices.len() > 1 {
             differed = true;
         }

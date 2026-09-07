@@ -14,6 +14,7 @@
 //! [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 //! [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 
+pub mod action;
 pub mod balance;
 pub mod bridge;
 pub mod campaign;
@@ -68,6 +69,9 @@ pub mod upgrade;
 pub mod weather;
 pub mod world;
 
+pub use action::{
+    ActionSchema, ActionShape, CandidateKind, PositionRow, Verb, VerbRow, ACTION_VERSION,
+};
 pub use balance::{Balance, RENOWN_TARGET};
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
 pub use census::{census, Census, CensusError};
@@ -84,10 +88,8 @@ pub use contest::{ContestError, Grievance, UnitFell};
 pub use controller::{
     CarrierAssignment, Choice, ControllerCommand, FactionRow, FactionState, FactionWeights,
     GameEnd, Terms, WinPath, ADVERT_PERIOD_DEFAULT, ADVERT_PHASE_DEFAULT, CARRIER_ASSIGNMENT_BYTES,
-    COMMAND_ADVERTISE, COMMAND_BUILD, COMMAND_CAMPAIGN, COMMAND_CARRY, COMMAND_GATHER,
-    COMMAND_PROJECT, COMMAND_QUEUE, COMMAND_RELATION, COMMAND_TRADE, CONTRACT_CARRIERS_DEFAULT,
-    CONTRACT_TERM_DEFAULT, EVALUATIONS_DEFAULT, SURPLUS_MARK_DEFAULT, TICK_LIMIT_DEFAULT,
-    WEIGHT_HIGH, WEIGHT_LOW,
+    CONTRACT_CARRIERS_DEFAULT, CONTRACT_TERM_DEFAULT, CONTROLLER_COMMAND_BYTES,
+    EVALUATIONS_DEFAULT, SURPLUS_MARK_DEFAULT, TICK_LIMIT_DEFAULT, WEIGHT_HIGH, WEIGHT_LOW,
 };
 pub use conversion::{ConversionError, Convert, UnitConverted};
 pub use descent::{

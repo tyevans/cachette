@@ -24,9 +24,10 @@ use std::collections::BTreeSet;
 use cachette_core::controller::{asking_good_of, wants_trade_step};
 use cachette_core::resource::{Amount, ResourceKind, RESOURCE_KIND_COUNT};
 use cachette_core::unit_type::SOLDIER;
+use cachette_core::Verb;
 use cachette_core::{
     Advert, Axial, CommodityId, Entity, FactionId, FactionWeights, Fix32, Tick, World, WorldConfig,
-    ADVERT_OFFERS, ADVERT_WANTS, COMMAND_TRADE, TRADE_BOUND, WORK_COMMODITY,
+    ADVERT_OFFERS, ADVERT_WANTS, TRADE_BOUND, WORK_COMMODITY,
 };
 
 /// The people each founding settles.
@@ -469,7 +470,7 @@ fn no_offer_crosses_a_war_pair() {
             world
                 .controller_log()
                 .iter()
-                .all(|entry| entry.kind != COMMAND_TRADE),
+                .all(|entry| world.action_schema().verb_of(entry.action) != Some(Verb::Trade)),
             "the controller asked for a refusal it could see coming"
         );
         assert!(
@@ -512,10 +513,10 @@ fn no_second_negotiation_opens_with_one_pair() {
         // second one with the same pair. A stage that read no live row would
         // ask the verb, and the verb would refuse.
         for faction in [ZERO, ONE] {
-            let spoke = world
-                .controller_log()
-                .iter()
-                .any(|entry| entry.faction == faction && entry.kind == COMMAND_TRADE);
+            let spoke = world.controller_log().iter().any(|entry| {
+                entry.faction == faction
+                    && world.action_schema().verb_of(entry.action) == Some(Verb::Trade)
+            });
             if !spoke {
                 continue;
             }
@@ -542,7 +543,10 @@ fn no_second_negotiation_opens_with_one_pair() {
             let steps = world
                 .controller_log()
                 .iter()
-                .filter(|entry| entry.faction == faction && entry.kind == COMMAND_TRADE)
+                .filter(|entry| {
+                    entry.faction == faction
+                        && world.action_schema().verb_of(entry.action) == Some(Verb::Trade)
+                })
                 .count();
             assert!(steps <= 1, "one faction takes one step: {steps}");
         }
