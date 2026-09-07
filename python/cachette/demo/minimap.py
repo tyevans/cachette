@@ -18,8 +18,12 @@ raster, which is one bulk array and no loop, and it takes the strength of the
 tint from the summary. A reader who removes the raster still sees which ground
 is held, and loses only the name of the holder.
 
-The disc fades to nothing at its edge. A hard circle over a square picture
-reads as a cut, and a fade reads as a window.
+**A black rim closes the disc.** The disc used to fade to nothing at its
+edge, and a fade gives an instrument no edge, so the map appeared to leak
+into the frame under it. The rim is polished black: a key light from the
+upper left catches its outer shoulder, a weaker bounced light lifts the far
+side, and a thin lit line runs the whole way round. The rim throws a short
+shadow onto the map, so it sits above the map rather than on it.
 
 References
 ----------
@@ -55,8 +59,59 @@ DIAMETER = 168
 # owns where a card goes, and this module owns where the disc goes.
 MARGIN = 14
 
-# The share of the radius over which the edge fades to nothing.
-EDGE_FADE = 0.16
+# The share of the radius that the black rim takes.
+#
+# The disc used to fade to nothing at its edge. A fade reads as a window and
+# it gives the instrument no edge, so the map appeared to leak into the frame
+# below it. A rim gives the disc a body and states where it stops.
+BEZEL_SHARE = 0.115
+
+# How far the rim reaches over the map as a shadow, as a share of the radius.
+#
+# A rim that sits on the map with no shadow reads as a ring painted onto the
+# picture. A short shadow under its inner edge lifts the rim off the map.
+BEZEL_SHADOW = 0.055
+
+# How much of the map colour the shadow of the rim keeps at its darkest.
+SHADOW_KEEP = 0.34
+
+# The value of the rim where no light reaches it, from zero to one.
+#
+# The rim is black and not pure black. A pure black ring against a dark frame
+# has no shape at all, and the eye reads a hole.
+BEZEL_BLACK = 0.045
+
+# How much the key light adds to the rim, from zero to one.
+#
+# The light comes from the upper left, which is where a viewer expects a light
+# to be. It catches the outer shoulder of the rim and makes it read as round.
+BEZEL_KEY = 0.86
+
+# How much the bounced light adds to the rim, from zero to one.
+#
+# **One highlight reads as a flat ring with a bright spot.** A polished thing
+# also carries a weaker light on the side away from the key, because the
+# ground around it throws light back. The second light is what makes the rim
+# read as polished rather than as painted.
+BEZEL_BOUNCE = 0.30
+
+# How much the thin line at the outer edge of the rim adds, from zero to one.
+#
+# The line runs the whole way round, so the disc keeps a silhouette on the
+# side the key light does not reach.
+BEZEL_LIP = 0.16
+
+# The blue that the key light of the rim leans by, from zero to one.
+#
+# A polished black surface takes the colour of what it reflects. The lean is
+# small, and it is what separates the rim from a grey ring.
+BEZEL_COOL = 0.10
+
+# The share of a pixel over which the outer edge of the rim softens.
+#
+# A circle drawn on a square grid with no softening reads as a staircase. One
+# pixel is enough, and more would bring back the fade the rim replaced.
+BEZEL_SOFTEN = 1.4
 
 # How much of the minimap colour reaches the frame at the middle of the disc.
 #
@@ -422,8 +477,8 @@ def _build(
     """Build the colour of every pixel of the disc, and how much reaches.
 
     The colour comes from three layers of the summary: water against land,
-    the height of the land, and the faction that holds the ground. The
-    weight fades to nothing at the edge, so the disc has no hard rim.
+    the height of the land, and the faction that holds the ground. A black rim
+    goes round the outside, and the weight stops at the outer edge of it.
 
     The colour comes back as one byte for each of blue, green and red, in the
     order the frame holds them. The weight comes back as a whole number from
@@ -435,6 +490,9 @@ def _build(
     coarse = _address_field(wide, *_coarse_grid(), zoom)
     colour = _paint_layers(world, summary, q, r, coarse[0], coarse[1], step)
     _outline(colour, seen, q, r)
+    # The rim goes on last, so it covers the map and the camera outline. A rim
+    # that the outline crossed would read as a broken ring.
+    _bezel(colour, rows, columns)
     # The frame holds blue, green and red in that order, and the layers give
     # red, green and blue in that order.
     packed = np.clip(colour[..., ::-1] * 255.0, 0.0, 255.0).astype(np.uint16)
@@ -712,19 +770,95 @@ def _outline(
         colour[..., at] = np.where(near, _channel(VIEW_COLOUR, shift), channel)
 
 
-def _fade(rows: np.ndarray, columns: np.ndarray) -> np.ndarray:
-    """Give back how much of the disc colour reaches the frame at each pixel.
+def _polar(
+    rows: np.ndarray, columns: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Give back where each pixel of the disc sits, about the middle.
 
-    The weight is full over the middle and falls to nothing at the rim, so the
-    disc has no hard edge. A pixel outside the rim gets nothing and the frame
-    below it stays as the engine drew it.
+    The first value is the distance from the middle, where one is the rim. The
+    other two are the step across and the step down from the middle, each as a
+    share of the radius.
+
+    **The rim and the weight both need this, and it is computed once.** Two
+    copies of the geometry of one circle would drift, and nothing would fail
+    when they did.[^1]
+
+    References
+    ----------
+    Recurring Defect Shapes, shape 1.
+    ``.agents/rules/recurring-defects.md``
     """
     middle = (DIAMETER - 1) / 2.0
     radius = DIAMETER / 2.0
-    away = np.hypot(rows - middle, columns - middle) / radius
-    solid = 1.0 - EDGE_FADE
-    weight = np.clip((1.0 - away) / EDGE_FADE, 0.0, 1.0)
-    return np.where(away < solid, STRENGTH, weight * STRENGTH)
+    across = (columns - middle) / radius
+    down = (rows - middle) / radius
+    return np.hypot(across, down), across, down
+
+
+def _bezel(colour: np.ndarray, rows: np.ndarray, columns: np.ndarray) -> None:
+    """Paint the black rim of the disc over the colour, in place.
+
+    The rim is a ring of polished black around the map. Two lights give it a
+    shape: a key light from the upper left that catches its outer shoulder,
+    and a weaker bounced light on the far side. A thin lit line runs round the
+    outer edge, so the disc keeps a silhouette all the way round.
+
+    The rim also throws a short shadow onto the map under its inner edge, so
+    it sits above the map rather than on it.
+
+    The colour holds red, green and blue in that order, each from zero to one.
+    """
+    away, across, down = _polar(rows, columns)
+    inner = 1.0 - BEZEL_SHARE
+    # The shadow the rim throws over the map, just inside the rim.
+    shade = np.clip((away - (inner - BEZEL_SHADOW)) / BEZEL_SHADOW, 0.0, 1.0)
+    colour *= (1.0 - shade * (1.0 - SHADOW_KEEP))[..., None]
+
+    # Where a pixel sits across the rim. Zero is the inner edge and one is the
+    # outer edge.
+    band = np.clip((away - inner) / BEZEL_SHARE, 0.0, 1.0)
+    # How much the key light reaches a pixel. The light comes from the upper
+    # left, so the value is largest where the step across and the step down
+    # are both negative.
+    lit = np.clip(-(across + down) / 1.4142, -1.0, 1.0)
+    # The outer shoulder of the rim, and the inner valley of it. A rim with
+    # one bright band reads as a painted ring, and two bands read as a turned
+    # edge.
+    shoulder = np.exp(-(((band - 0.74) / 0.20) ** 2))
+    valley = np.exp(-(((band - 0.28) / 0.24) ** 2))
+    key = np.clip(lit, 0.0, 1.0) ** 3 * shoulder
+    bounce = np.clip(-lit, 0.0, 1.0) ** 2 * valley
+    lip = np.exp(-(((band - 0.97) / 0.10) ** 2))
+    value = BEZEL_BLACK + BEZEL_KEY * key + BEZEL_BOUNCE * bounce + BEZEL_LIP * lip
+    value = np.clip(value, 0.0, 1.0)
+    # The key light leans blue, because a polished black surface takes the
+    # colour of what it reflects.
+    channels = (
+        value * (1.0 - BEZEL_COOL * key),
+        value * (1.0 - BEZEL_COOL * key * 0.4),
+        np.clip(value + BEZEL_COOL * key, 0.0, 1.0),
+    )
+    on_rim = away >= inner
+    for at, channel in enumerate(channels):
+        colour[..., at] = np.where(on_rim, channel, colour[..., at])
+
+
+def _fade(rows: np.ndarray, columns: np.ndarray) -> np.ndarray:
+    """Give back how much of the disc colour reaches the frame at each pixel.
+
+    The map keeps a little of the frame below it, so the disc stays part of
+    the picture. **The rim keeps none of it.** A rim that let the frame
+    through would not read as black, and the border the disc needs would
+    depend on what lay under it.
+
+    The weight falls to nothing over one pixel at the outer edge, which takes
+    the staircase off the circle and nothing else.
+    """
+    away, _, _ = _polar(rows, columns)
+    inner = 1.0 - BEZEL_SHARE
+    soften = BEZEL_SOFTEN / (DIAMETER / 2.0)
+    edge = np.clip((1.0 - away) / soften, 0.0, 1.0)
+    return np.where(away < inner, STRENGTH, edge)
 
 
 def _mix(
