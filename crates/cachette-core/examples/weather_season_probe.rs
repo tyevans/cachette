@@ -10,7 +10,7 @@
 //! and the swing that counts as a real season.
 
 use cachette_core::weather::{season_at, SEASON_PERIOD_TICKS};
-use cachette_core::{Tick, WeatherScale};
+use cachette_core::{Latitudes, Tick, WeatherScale, LATITUDE_FINE};
 
 fn argument(position: usize, fallback: u64) -> u64 {
     std::env::args()
@@ -25,6 +25,9 @@ fn main() {
     let mark = argument(3, 60) as i32;
     let scale = WeatherScale::from_bits(bits).expect("the scale describes a lattice");
     let rows = extent / scale.side();
+    // The latitudes of the world. A world that states none is a planet, so
+    // the probe reports the planet reading.
+    let latitudes = Latitudes::DEFAULT;
     // The sun stands at one limit a quarter of the way through the swing and
     // at the other three quarters of the way through it.
     let summer = Tick((SEASON_PERIOD_TICKS / 4) as u64);
@@ -32,11 +35,12 @@ fn main() {
 
     println!("extent {extent} scale bits {bits}, {rows} rows, swing mark {mark}");
     println!("  row  latitude   midsummer  midwinter  swing  mean");
+    println!("  the latitude is in whole degrees");
     let mut swinging = 0u32;
     let mut coldest_summer = i32::MAX;
     for row in 0..rows {
-        let north = season_at(summer, row, rows, scale);
-        let south = season_at(winter, row, rows, scale);
+        let north = season_at(summer, latitudes.of_row(row, rows));
+        let south = season_at(winter, latitudes.of_row(row, rows));
         let swing = (north - south).abs();
         if swing >= mark {
             swinging += 1;
@@ -47,7 +51,7 @@ fn main() {
             coldest_summer = coldest_summer.min(north.max(south));
         }
         if rows <= 16 || row % (rows / 16) == 0 || row + 1 == rows {
-            let latitude = row as i64 * scale.side_tiles() - i64::from(extent) / 2;
+            let latitude = i64::from(latitudes.of_row(row, rows)) / i64::from(LATITUDE_FINE);
             println!(
                 "  {row:>4} {latitude:>9}   {north:>9}  {south:>9} {swing:>6} {:>5}",
                 (north + south) / 2

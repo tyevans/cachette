@@ -140,6 +140,8 @@ pub enum WeatherError {
     LatticeMismatch,
     /// The caller asked for a cell side above the ceiling the scale carries.
     ScaleAboveCeiling(u32),
+    /// The caller asked for a latitude span that does not fit on the globe.
+    LatitudeSpanOutsideTheGlobe(i32),
     /// The caller named a faction that this world does not hold.
     NoSuchFaction(u16),
     /// The caller named a place outside the world.
@@ -171,6 +173,10 @@ impl core::fmt::Display for WeatherError {
             Self::ScaleAboveCeiling(bits) => write!(
                 formatter,
                 "the weather scale {bits} is above the ceiling {SCALE_BITS_CEILING}"
+            ),
+            Self::LatitudeSpanOutsideTheGlobe(span) => write!(
+                formatter,
+                "the latitude span {span} does not fit between the two poles"
             ),
             Self::NoSuchFaction(faction) => {
                 write!(formatter, "this world holds no faction {faction}")
@@ -376,8 +382,8 @@ impl WeatherScale {
         // lift takes a share of the room each time, so the lifts that fill it
         // are the denominator over the numerator, and each lift waits a
         // period.
-        let lifts = (LIFT_OF_ROOM_DENOMINATOR + LIFT_OF_ROOM_NUMERATOR - 1)
-            / LIFT_OF_ROOM_NUMERATOR;
+        let lifts =
+            (LIFT_OF_ROOM_DENOMINATOR + LIFT_OF_ROOM_NUMERATOR - 1) / LIFT_OF_ROOM_NUMERATOR;
         let forming = lifts * LIFT_PERIOD as i64;
         let reach = (self.transport_passes() as i64) * (SPEED_CEILING as i64) * forming;
         ((reach + SEND_DENOMINATOR - 1) / SEND_DENOMINATOR) as u32
@@ -433,6 +439,139 @@ impl WeatherScale {
     #[must_use]
     pub const fn side_tiles(self) -> i64 {
         self.side() as i64
+    }
+}
+
+/// The hundredths of a degree in one degree of latitude.
+///
+/// **A latitude is a whole number of hundredths of a degree.** The unit is
+/// small enough that one row of the finest lattice this engine supports gets
+/// its own value, and large enough that the whole range from pole to pole
+/// stays far inside a 32-bit number.
+pub const LATITUDE_FINE: i32 = 100;
+
+/// The latitude of a pole, in hundredths of a degree.
+pub const LATITUDE_POLE: i32 = 90 * LATITUDE_FINE;
+
+/// The hundredths of a degree in one whole turn.
+const TURN_FINE: i64 = 4 * LATITUDE_POLE as i64;
+
+/// The latitudes that the rows of a world stand at.
+///
+/// **The world states its own latitude span. The weather never reads the raw
+/// row.** The row axis of the lattice carries a latitude, and the two ends of
+/// that axis are the two ends of the span. A world that spans the whole globe
+/// is a planet, with poles, a warm belt and a season that reverses across the
+/// middle. A world that spans three degrees is one region of a planet, and
+/// every latitude term in the field then goes flat and costs nothing.[^1]
+///
+/// **The two readings differ by one constant and not by a model.** That is
+/// why the span is configuration. The engine holds one insolation geometry
+/// and one banded circulation, and the span decides how much of them the
+/// world sees.[^1]
+///
+/// The default is a whole planet: the centre stands at the equator and the
+/// span runs from pole to pole. The project owner chose the planet reading
+/// against the region reading, and a record holds the choice.[^2]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 9. `docs/research/reports/30-the-published-atmospheric-math.md`
+/// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Latitudes {
+    centre: i32,
+    span: i32,
+}
+
+impl Latitudes {
+    /// A whole planet. The centre stands at the equator and the span runs
+    /// from pole to pole.
+    pub const PLANET: Self = Self {
+        centre: 0,
+        span: 2 * LATITUDE_POLE,
+    };
+
+    /// The latitudes a world takes when the caller states none.
+    ///
+    /// **A world is a planet until somebody says otherwise.** The banded
+    /// circulation, the subtropical deserts and the equatorial rain belt are
+    /// what the project wants to see, and none of them exists inside a span
+    /// of three degrees.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    pub const DEFAULT: Self = Self::PLANET;
+
+    /// Builds a span from a centre latitude and a span, both in hundredths of
+    /// a degree.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the span is negative or wider than the globe,
+    /// and when either end of the span passes a pole.
+    pub const fn new(centre: i32, span: i32) -> Result<Self, WeatherError> {
+        if span < 0 || span > 2 * LATITUDE_POLE {
+            return Err(WeatherError::LatitudeSpanOutsideTheGlobe(span));
+        }
+        let low = centre - span / 2;
+        let high = centre + span / 2;
+        if low < -LATITUDE_POLE || high > LATITUDE_POLE {
+            return Err(WeatherError::LatitudeSpanOutsideTheGlobe(span));
+        }
+        Ok(Self { centre, span })
+    }
+
+    /// Returns the centre latitude, in hundredths of a degree.
+    #[must_use]
+    pub const fn centre(self) -> i32 {
+        self.centre
+    }
+
+    /// Returns the span from the first row to the last, in hundredths of a
+    /// degree.
+    #[must_use]
+    pub const fn span(self) -> i32 {
+        self.span
+    }
+
+    /// Returns the latitude of the middle of one row of a lattice.
+    ///
+    /// **The row is a row of the world and not of the whole lattice.** The
+    /// lattice carries a margin, so a whole-lattice row and a world row are
+    /// different things and a reader that confuses them samples the wrong
+    /// cells.[^1]
+    ///
+    /// The first row stands at the low end of the span and the last row at
+    /// the high end. A height of zero gives the centre.
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-569. `docs/FINDINGS.md`
+    #[must_use]
+    pub fn of_row(self, row: u32, height: u32) -> i32 {
+        if height == 0 {
+            return self.centre;
+        }
+        // The part of the span, measured from the middle, that the middle of
+        // this row stands at. The numerator runs from one less than the
+        // height to one less than the height the other way, so the two end
+        // rows sit half a row inside the two ends of the span.
+        let offset = sim_math::share(
+            Accum(i64::from(self.span)),
+            Accum(2 * i64::from(row) + 1 - i64::from(height)),
+            Accum(2 * i64::from(height)),
+        )
+        .map_or(0, |value| value.0);
+        (i64::from(self.centre) + offset).clamp(-i64::from(LATITUDE_POLE), i64::from(LATITUDE_POLE))
+            as i32
+    }
+}
+
+impl Default for Latitudes {
+    fn default() -> Self {
+        Self::DEFAULT
     }
 }
 
@@ -1086,15 +1225,20 @@ const HEAT_FROM_LOW_GROUND: i32 = 192;
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 const GROUND_DIVISOR: i64 = 4;
 
-/// The degrees the season adds at the warm centre.
+/// The degrees that the sun adds at the warmest place and the warmest moment.
 ///
-/// The season takes the same count away at the cold edge of the band, so the
-/// term runs from this above zero to this below it.[^1]
+/// **Two parts make it up, and the sum is what the heat scale reserves.** One
+/// part is the belt of the latitude, which the annual mean of the insolation
+/// gives. The other is the season, which the daily value against that annual
+/// mean gives. The sun takes the same count away at the coldest place and the
+/// coldest moment, so the term runs from this above zero to this below it.[^1]
+/// [^2]
 ///
 /// # References
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const SEASON_SWING: i32 = 80;
+/// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D3. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+const SEASON_SWING: i32 = LATITUDE_SWING + SEASON_ANOMALY_SWING;
 
 /// The ticks in which the sun completes one whole swing.
 ///
@@ -1112,18 +1256,6 @@ const SEASON_SWING: i32 = 80;
 /// One half of it lasts a thousand ticks, which is long enough for a place to
 /// hold a wet part of the year and a dry part.
 pub const SEASON_PERIOD_TICKS: i64 = 2048;
-
-/// The part of the way from the middle of the world to a pole that the sun
-/// reaches at the top of its swing.
-///
-/// This is the tilt of the world. The Earth reaches about a quarter of the
-/// way. This world reaches half, because the swing must be readable in a
-/// picture and a larger tilt gives a larger seasonal difference at every
-/// latitude.
-const TILT_NUMERATOR: i64 = 1;
-
-/// The whole of the tilt above.
-const TILT_DENOMINATOR: i64 = 2;
 
 /// The degrees that a saturated sky takes away from a cell.
 ///
@@ -1424,7 +1556,74 @@ const _: () = assert!(LIFT_OF_ROOM_NUMERATOR <= LIFT_OF_ROOM_DENOMINATOR);
 /// # References
 ///
 /// [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D3. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
-pub const AIR_SATURATION: Drops = Drops(2048);
+pub const AIR_SATURATION: Drops = capacity_at(HEAT_CEILING);
+
+/// The temperature scale of the field, as the hundredths of a degree Celsius
+/// that one degree of warmth is worth.
+///
+/// **Every published curve needs a temperature, and the warmth of a cell is
+/// an abstract count.** So the field declares one linear map from the count
+/// to a temperature, in one place, and every published form reads it.[^1]
+///
+/// Half a kelvin for each count, with the bottom of the count at seventy
+/// degrees below zero, covers every surface temperature a planet holds.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 1.5. `docs/research/reports/30-the-published-atmospheric-math.md`
+pub const WARMTH_FINE: i32 = 50;
+
+/// The temperature of a cell of no warmth, in hundredths of a degree Celsius.
+pub const WARMTH_FLOOR: i32 = -70 * 100;
+
+/// The water that the air holds at the freezing point of water.
+///
+/// **This is the anchor of the saturation curve and nothing else.** The
+/// published curve gives a ratio between two temperatures, so one temperature
+/// must carry a stated count of drops for the rest to follow. The freezing
+/// point is the anchor, because it is the one temperature a reader recognises
+/// without a table.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 1.5. `docs/research/reports/30-the-published-atmospheric-math.md`
+const CAPACITY_AT_FREEZING: i64 = 2048;
+
+/// The Magnus numerator of the published saturation curve, in ten-thousandths.
+///
+/// The published curve is `6.1094 * exp(17.625 * T / (243.04 + T))` in
+/// hectopascals, with the temperature in degrees Celsius. The base-two
+/// logarithm of it is `17.625 / ln 2` times the same rational function, and
+/// this constant is that quotient in ten-thousandths.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, sections 1.1 and 1.4. `docs/research/reports/30-the-published-atmospheric-math.md`
+const MAGNUS_NUMERATOR: i64 = 254_275;
+
+/// The whole of the Magnus numerator above.
+const MAGNUS_FINE: i64 = 10_000;
+
+/// The Magnus offset of the published curve, in hundredths of a degree.
+const MAGNUS_OFFSET: i64 = 24_304;
+
+/// The entries in the table of the fractional part of the exponent.
+const POWER_ENTRIES: usize = 8;
+
+/// Two raised to each eighth of one, in the fixed-point form of the project.
+///
+/// **The whole part of the exponent is a shift and the fraction is this
+/// table.** The whole part is therefore exact at any temperature, and the
+/// error of the curve does not grow with the range. Eight entries with a
+/// linear interpolation hold the published curve to under a tenth of one part
+/// in a thousand.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 1.4. `docs/research/reports/30-the-published-atmospheric-math.md`
+const POWER_TABLE: [i64; POWER_ENTRIES + 1] = [
+    65536, 71468, 77936, 84990, 92682, 101_070, 110_218, 120_194, 131_072,
+];
 
 /// The water that the air above a cell of no heat holds.
 ///
@@ -1458,16 +1657,24 @@ pub const CLOUD_SHARE_WHOLE: i64 = 255;
 /// warm region has a large capacity, so the same water sits below the mark
 /// and the sky stays clear.
 ///
-/// The curve is the square of the temperature as a share of the scale, which
-/// is two truncating divisions and no wide type. A straight line left the
-/// polar capacity too near the tropical one.
+/// **The curve is the published one.** It is the Magnus form of Alduchov and
+/// Eskridge, which is the recommended set for meteorology and holds to about
+/// four parts in a thousand from forty degrees below zero to fifty above
+/// it.[^2]
 ///
-/// **The floor is not small, and a steeper curve is wrong here.** A cube and
-/// a fourth power both put the polar capacity under twenty drops. The
-/// transport moves a share of the air of a cell, that share truncates, and a
-/// cell holding under about sixteen drops therefore sends its neighbours
-/// nothing at all. A capacity that small stops the water reaching any inland
-/// cell, so the pole went clear again by a new route.
+/// The earlier curve doubled the capacity at a fixed temperature step. The
+/// published curve does not: its doubling width runs from about seven kelvin
+/// at the cold end to about fourteen at the warm end, and the best fixed
+/// doubling is wrong by a third at the cold end. That is the end where a
+/// player expects tundra and ice.[^2]
+///
+/// **The integer form is a rational exponent and a small table.** The base-two
+/// logarithm of the published curve is one multiply and one divide. The whole
+/// part of that logarithm is a shift and is exact, so the error does not grow
+/// with the temperature range. Only the fraction reads a table, and the table
+/// has eight entries. The worst error of the form against the published curve
+/// is under a tenth of one part in a thousand, and the commit body holds the
+/// measurement.[^2]
 ///
 /// **This never creates or destroys water.** It is a bound that the settle
 /// pass reads, and every quantity that pass moves is an exact integer move
@@ -1481,16 +1688,59 @@ pub const CLOUD_SHARE_WHOLE: i64 = 255;
 /// # References
 ///
 /// [^1]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
+/// [^2]: Research report 30, the published atmospheric math, sections 1.1 to 1.5. `docs/research/reports/30-the-published-atmospheric-math.md`
 #[must_use]
-pub fn capacity_at(warmth: i32) -> Drops {
-    let heat = i64::from(warmth.clamp(0, HEAT_CEILING));
-    let whole = Accum(i64::from(HEAT_CEILING));
-    let span = AIR_SATURATION.0 - CAPACITY_FLOOR;
-    let once = sim_math::share(Accum(span), Accum(heat), whole).map_or(0, |value| value.0);
-    let twice = sim_math::share(Accum(once), Accum(heat), whole).map_or(0, |value| value.0);
-    let thrice = sim_math::share(Accum(twice), Accum(heat), whole).map_or(0, |value| value.0);
-    let fourth = sim_math::share(Accum(thrice), Accum(heat), whole).map_or(0, |value| value.0);
-    Drops((CAPACITY_FLOOR + fourth).clamp(CAPACITY_FLOOR, AIR_SATURATION.0))
+pub const fn capacity_at(warmth: i32) -> Drops {
+    let heat = if warmth < 0 {
+        0
+    } else if warmth > HEAT_CEILING {
+        HEAT_CEILING
+    } else {
+        warmth
+    };
+    // The temperature of the cell, in hundredths of a degree Celsius.
+    let degrees = (heat as i64) * (WARMTH_FINE as i64) + (WARMTH_FLOOR as i64);
+    // The base-two logarithm of the capacity against the capacity at the
+    // freezing point, in the fixed-point form of the project. One multiply
+    // and one divide, and no table.
+    let one = Fix32::ONE.0 as i64;
+    let exponent = match sim_math::share(
+        Accum(one * MAGNUS_NUMERATOR),
+        Accum(degrees),
+        Accum(MAGNUS_FINE * (MAGNUS_OFFSET + degrees)),
+    ) {
+        Some(value) => value.0,
+        None => 0,
+    };
+    // The whole part is a shift and the fraction reads the table. The shift
+    // is arithmetic, so the whole part floors and the fraction stays
+    // positive.
+    let whole = exponent >> 16;
+    let fraction = exponent - (whole << 16);
+    let entry = (fraction * (POWER_ENTRIES as i64)) >> 16;
+    let within = fraction * (POWER_ENTRIES as i64) - (entry << 16);
+    let low = POWER_TABLE[entry as usize];
+    let high = POWER_TABLE[entry as usize + 1];
+    let power = low
+        + match sim_math::share(Accum(high - low), Accum(within), Accum(one)) {
+            Some(value) => value.0,
+            None => 0,
+        };
+    // The multiply runs before the shift, so the shift keeps the accuracy
+    // that the table gave.
+    let shift = 16 - whole;
+    let held = if shift >= 63 {
+        0
+    } else if shift >= 0 {
+        (CAPACITY_AT_FREEZING * power) >> shift
+    } else {
+        (CAPACITY_AT_FREEZING * power) << (-shift)
+    };
+    if held < CAPACITY_FLOOR {
+        Drops(CAPACITY_FLOOR)
+    } else {
+        Drops(held)
+    }
 }
 
 /// Returns the capacity of air that cooled and climbed on its way to a cell.
@@ -1563,10 +1813,26 @@ const LIFT_DRAW: u32 = 0;
 /// content constant that no measurement chose, and a blocker holds the
 /// question of what weather should be worth.[^1]
 ///
+/// **The mark is a share of the ceiling of the plane, and the ceiling moved.**
+/// The ceiling is the capacity of the hottest cell the scale allows, and it
+/// rose by more than an order of magnitude when the capacity became the
+/// published saturation curve.[^2] The mark rose with it, and it has to: a
+/// mark left where it stood called every cell of every world wet, which is the
+/// reading that once made wetness separate nothing.[^1]
+///
+/// **The share fell from a thirty-second to a sixty-fourth at the same time.**
+/// The world runs cold against the temperature scale it now declares, so the
+/// water it holds sits well under what the ceiling allows, and a thirty-second
+/// of the ceiling stood above the wettest cell of a coarse world. A blocker
+/// holds where the heat base should stand, and the share follows it.[^3] The
+/// commit body holds the readings.
+///
 /// # References
 ///
 /// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
-pub const WET_MARK: Drops = Drops(AIR_SATURATION.0 / 32);
+/// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+/// [^3]: Blockers register, BLK-151. `docs/BLOCKERS.md`
+pub const WET_MARK: Drops = Drops(AIR_SATURATION.0 / 64);
 
 /// The largest strength that a god may inflict.
 ///
@@ -1834,131 +2100,403 @@ pub fn lag_of(ground: CellGround) -> i64 {
     1 + extra.max(0)
 }
 
-/// Returns a smooth fall from one to zero over a part of a whole.
+/// Returns where the sun stands at one tick, as a declination.
 ///
-/// The answer is one when the part is zero, zero when the part reaches the
-/// whole, and it falls between them along the curve `3u^2 - 2u^3` of the
-/// share `u`. **The slope of that curve is zero at both ends**, so a field
-/// built from it holds no kink where the fall begins and none where it ends.
-/// A straight fall has a kink at each end, the pressure gradient reads the
-/// kink as a step, and the wind then holds a straight line across the map.
+/// The declination is the latitude at which the sun stands overhead. It runs
+/// from the obliquity of the world at one solstice to the same figure the
+/// other way at the other, and it crosses the equator at each equinox. The
+/// answer is in hundredths of a degree.
 ///
-/// The answer is in Q16.16. The arithmetic goes through the arithmetic
-/// module and the intermediate product is 128 bits wide, so no input a
-/// lattice holds overflows it.[^1]
-///
-/// **This is public so that a test can move one input and watch the answer
-/// move.**
-///
-/// # References
-///
-/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-#[must_use]
-pub fn smooth_fall(part: i64, whole: i64) -> Fix32 {
-    if whole <= 0 {
-        return Fix32::ZERO;
-    }
-    let part = part.clamp(0, whole);
-    // The share of the way across, in Q16.16.
-    let unit = i64::from(Fix32::ONE.0);
-    let share = sim_math::share(Accum(unit), Accum(part), Accum(whole)).map_or(0, |value| value.0);
-    // 3u^2 - 2u^3, computed as u^2 * (3 - 2u) with one fixed-point shift for
-    // each product.
-    let squared = sim_math::share(Accum(share), Accum(share), Accum(unit)).map_or(0, |v| v.0);
-    let rest = 3 * unit - 2 * share;
-    let risen = sim_math::share(Accum(squared), Accum(rest), Accum(unit)).map_or(0, |v| v.0);
-    Fix32(clamp_to_fix(unit - risen))
-}
-
-/// Returns where the sun stands at one tick, in tiles from the middle row.
-///
-/// **The sun swings and it never wraps.** The position follows a sine of the
-/// tick over the season period, and the amplitude is the tilt of the world
-/// times the distance from the middle row to a pole. So the sun crosses the
-/// middle row twice in a period, rests at each limit, and turns back.[^1]
-///
-/// The answer is in tiles, so it does not follow the pitch of the lattice.
+/// **The swing never wraps.** The declination follows a sine of the tick over
+/// the season period, so the sun crosses the equator twice in a period, rests
+/// at each limit and turns back. That is the simple published form, and the
+/// report says it is enough here.[^1]
 ///
 /// **This is public so that a test can move one input and watch the answer
 /// move.**
 ///
 /// # References
 ///
-/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+/// [^1]: Research report 30, the published atmospheric math, sections 4.1 and 11. `docs/research/reports/30-the-published-atmospheric-math.md`
 #[must_use]
-pub fn sun_at(tick: Tick, height_tiles: i64) -> i64 {
-    let amplitude = sun_amplitude(height_tiles);
+pub fn declination_at(tick: Tick) -> i32 {
     let wave = sim_math::sine(tick.0 as i64, SEASON_PERIOD_TICKS).unwrap_or(Fix32::ZERO);
-    sim_math::share(
-        Accum(amplitude),
+    narrow(sim_math::share(
+        Accum(i64::from(OBLIQUITY)),
         Accum(i64::from(wave.0)),
         Accum(i64::from(Fix32::ONE.0)),
-    )
-    .map_or(0, |value| value.0)
+    ))
 }
 
 /// Returns the degrees the sun adds to one cell at one tick.
 ///
-/// **One term gives the season and the cold poles together.** The term reads
-/// how far the cell sits from where the sun stands, and the sun swings north
-/// and south over the season period. A cell in the middle of the world is
-/// near the sun for the whole swing, so it is warm all year. A cell at a pole
-/// is near the sun for none of it, so it is cold all year and coldest at the
-/// far end of the swing. Nothing states that a pole is cold. It follows.[^1]
+/// **The term is the published insolation geometry and not a fall away from
+/// where the sun stands.** The daily mean energy that the top of the
+/// atmosphere receives has a closed form in the latitude and the declination,
+/// and that form holds the polar day. At the solstice the pole receives about
+/// a third more daily energy than the equator, and no function of the
+/// distance from the sun can produce that shape. The earlier term was such a
+/// function, and it gave a pole that was cold all year.[^1]
 ///
-/// **The fall away from the sun is smooth at both ends.** The reach is the
-/// greatest distance any cell can sit from the sun, so the curve spans its
-/// whole range and its steepest part lands at the middle latitudes. The slope
-/// is zero under the sun and zero at the far pole, and it is largest between
-/// them, which is where a front belongs.
+/// **Two parts make the term, because the two answer different questions.**
+/// The annual mean of the geometry falls from the equator to the pole, and
+/// that part is the climate belt of a latitude. The daily value against that
+/// annual mean is the season, and that part reverses across the equator. They
+/// carry separate amplitudes, because the mean stands in equilibrium and the
+/// season is damped by the heat that the ground and the sea hold.[^2]
 ///
-/// **A term that added the same degrees everywhere would move nothing.** The
-/// wind answers to the difference between two cells, and one offset added to
-/// every cell cancels in that difference exactly.
+/// **The two normalisers are properties of the globe and not of the world.**
+/// They are read at the equator, at a pole, and at the middle latitude of the
+/// same geometry, whatever span the world states. So a world that spans three
+/// degrees reads a nearly flat slice of the same table and the term goes
+/// flat, rather than stretching a four percent change across the whole
+/// scale.[^1]
 ///
-/// The term reads the tick and the row. It reads no clock and takes no
-/// draw.[^1]
+/// The term reads the tick and the latitude. It reads no clock and takes no
+/// draw.
 ///
 /// **This is public so that a test can move one input and watch the answer
 /// move.**
 ///
 /// # References
 ///
-/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+/// [^1]: Research report 30, the published atmospheric math, sections 4.3, 4.4 and 9. `docs/research/reports/30-the-published-atmospheric-math.md`
+/// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D3. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
 #[must_use]
-pub fn season_at(tick: Tick, row: u32, height: u32, scale: WeatherScale) -> i32 {
-    if height == 0 {
-        return 0;
-    }
-    let side = scale.side_tiles();
-    let height_tiles = i64::from(height) * side;
-    let half = height_tiles / 2;
-    // The latitude of the middle of the cell, in tiles from the middle row.
-    let latitude = i64::from(row) * side + side / 2 - half;
-    let sun = sun_at(tick, height_tiles);
-    let apart = (latitude - sun).abs();
-    // The greatest distance any cell reaches from the sun, which is the pole
-    // furthest from it at the top of the swing. The curve therefore spans its
-    // whole range and nothing clamps flat.
-    let reach = (half + sun_amplitude(height_tiles)).max(1);
-    let warmth = smooth_fall(apart, reach);
-    // The curve runs from one under the sun to zero at the far pole. The
-    // season runs from the swing above zero to the swing below it.
-    narrow(sim_math::share(
-        Accum(i64::from(2 * SEASON_SWING)),
-        Accum(i64::from(warmth.0)),
-        Accum(i64::from(Fix32::ONE.0)),
-    )) - SEASON_SWING
+pub fn season_at(tick: Tick, latitude: i32) -> i32 {
+    let table = insolation();
+    let daily = table.daily_at(latitude, declination_at(tick));
+    let mean = table.mean_at(latitude);
+    // The belt of the latitude. It runs from the whole swing at the equator
+    // to the whole swing the other way at a pole.
+    let belt = narrow(sim_math::share(
+        Accum(i64::from(LATITUDE_SWING)),
+        Accum(2 * mean - i64::from(table.top) - i64::from(table.floor)),
+        Accum(i64::from(table.top) - i64::from(table.floor)),
+    ))
+    .clamp(-LATITUDE_SWING, LATITUDE_SWING);
+    // The season. It is the daily value against the annual mean of the same
+    // latitude, so it is zero at the equinox everywhere.
+    let season = narrow(sim_math::share(
+        Accum(i64::from(SEASON_ANOMALY_SWING)),
+        Accum(daily - mean),
+        Accum(i64::from(table.reference)),
+    ))
+    .clamp(-SEASON_ANOMALY_SWING, SEASON_ANOMALY_SWING);
+    (belt + season).clamp(-SEASON_SWING, SEASON_SWING)
 }
 
-/// Returns the tiles from the middle row that the sun reaches at its limit.
-fn sun_amplitude(height_tiles: i64) -> i64 {
-    sim_math::share(
-        Accum(height_tiles / 2),
-        Accum(TILT_NUMERATOR),
-        Accum(TILT_DENOMINATOR),
-    )
-    .map_or(0, |value| value.0)
+/// Returns the pressure that the banded circulation adds at one latitude.
+///
+/// **The three cells of each hemisphere cannot emerge from this model, so the
+/// model imposes them.** The middle cell of the three is thermally indirect
+/// and eddy driven. A single-layer field has no vertical structure, so it has
+/// no baroclinic eddies, so it never grows that cell. Three belts also need
+/// three pressure extremes, and one temperature profile that falls from the
+/// equator to the pole has two. The belts therefore never appear on their
+/// own, whatever the field does.[^1]
+///
+/// **So the field adds one offset to the pressure before the gradient reads
+/// it.** The offset is a low at the equator, a high at thirty degrees, a low
+/// at sixty and a high at each pole, which is the published order of the
+/// belts. It is one cosine of six times the latitude, so both hemispheres
+/// carry the same shape without a second statement of it.[^1]
+///
+/// The high at thirty degrees is the mechanism that makes a desert belt. Air
+/// leaves a high, so the subtropics diverge and the equator converges.
+///
+/// **The offset never reaches the temperature.** It reaches the wind and
+/// nothing else, so the capacity of the air and the rain still read the
+/// temperature that the sun and the ground gave.[^1]
+///
+/// The amplitude is a tuning constant. The report could not verify the
+/// pressure of each belt, and a blocker holds what the wind should be
+/// worth.[^1] [^2]
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, sections 5.1 and 5.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+/// [^2]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+#[must_use]
+pub fn band_pressure_at(latitude: i32) -> i32 {
+    // A quarter turn ahead of six times the latitude gives the cosine of six
+    // times the latitude. The sign is negative, so the equator is a low.
+    let phase = 6 * i64::from(latitude) + i64::from(LATITUDE_POLE);
+    let wave = sim_math::sine(phase, TURN_FINE).unwrap_or(Fix32::ZERO);
+    -narrow(sim_math::share(
+        Accum(i64::from(BAND_SWING)),
+        Accum(i64::from(wave.0)),
+        Accum(i64::from(Fix32::ONE.0)),
+    ))
+}
+
+/// The daily mean insolation of the globe, against the latitude and the
+/// declination.
+///
+/// **The table is a pure function of the published geometry and of nothing
+/// else.** It holds no world, no span and no pitch. A world reads a slice of
+/// it that its own span chooses, so the region reading and the planet reading
+/// differ by one constant rather than by a model.[^1]
+///
+/// The table is built once by integer arithmetic from the sine table that the
+/// arithmetic module holds. It is never built with floating point, because
+/// the result enters simulated state.[^2]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, sections 4.4 and 9. `docs/research/reports/30-the-published-atmospheric-math.md`
+/// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+struct Insolation {
+    /// The daily mean insolation, in watts for each square metre, at each
+    /// latitude band and each declination step.
+    daily: Vec<i16>,
+    /// The annual mean insolation at each latitude band.
+    mean: Vec<i16>,
+    /// The annual mean at the equator.
+    top: i16,
+    /// The annual mean at a pole.
+    floor: i16,
+    /// The daily value at the solstice against the annual mean, at the middle
+    /// latitude. It is the normaliser of the season part.
+    reference: i16,
+}
+
+/// The latitude bands that the insolation table holds.
+const INSOLATION_BANDS: usize = 256;
+
+/// The declination steps that the insolation table holds.
+///
+/// The table holds one more entry than this, because the last step is the
+/// solstice itself and the interpolation reads the entry after the one it
+/// starts from.
+const DECLINATION_STEPS: usize = 64;
+
+/// The tilt of the world, in hundredths of a degree.
+///
+/// This is the published obliquity of the Earth. It is what creates the
+/// season, and the report keeps it and drops every other orbital term.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, sections 4.1 and 4.2. `docs/research/reports/30-the-published-atmospheric-math.md`
+const OBLIQUITY: i32 = 2344;
+
+/// The solar constant, in watts for each square metre.
+///
+/// This is the published figure of the 2015 resolution of the International
+/// Astronomical Union.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 4.1. `docs/research/reports/30-the-published-atmospheric-math.md`
+const SOLAR_CONSTANT: i64 = 1361;
+
+/// The ratio of a circumference to a diameter, in the fixed-point form of the
+/// project.
+///
+/// The insolation form divides by it once. It is a mathematical constant and
+/// not a measurement, so it belongs beside the arithmetic that reads it.
+const PI_FIXED: i64 = 205_887;
+
+/// The middle latitude, in hundredths of a degree.
+///
+/// The season normaliser is read here. A season that reached its whole swing
+/// at the pole would leave the middle latitudes with almost no season at all,
+/// because the polar swing is twice the swing at forty-five degrees.
+const MIDDLE_LATITUDE: i32 = 45 * LATITUDE_FINE;
+
+/// The degrees that the belt of a latitude adds at the equator.
+const LATITUDE_SWING: i32 = 40;
+
+/// The degrees that the season adds at the middle latitude at the solstice.
+const SEASON_ANOMALY_SWING: i32 = 40;
+
+/// The pressure that the banded circulation adds at a subtropical high.
+///
+/// **No published amplitude stands behind this.** The report verified the
+/// position of each belt and not its pressure, and a blocker holds the
+/// question of what the wind should be worth.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, sections 5.1 and 12. `docs/research/reports/30-the-published-atmospheric-math.md`
+/// [^2]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+const BAND_SWING: i32 = 32;
+
+impl Insolation {
+    /// Builds the table from the published geometry.
+    fn build() -> Self {
+        let mut daily = vec![0i16; INSOLATION_BANDS * (DECLINATION_STEPS + 1)];
+        let mut mean = vec![0i16; INSOLATION_BANDS];
+        for band in 0..INSOLATION_BANDS {
+            let latitude = Self::latitude_of_band(band);
+            for step in 0..=DECLINATION_STEPS {
+                let declination = -i64::from(OBLIQUITY)
+                    + 2 * i64::from(OBLIQUITY) * step as i64 / DECLINATION_STEPS as i64;
+                daily[band * (DECLINATION_STEPS + 1) + step] =
+                    clamp_to_watts(daily_insolation(latitude, declination as i32));
+            }
+            // The annual mean walks the year in equal steps of time, and not
+            // in equal steps of declination. The declination is a sine of the
+            // time, so the two are not the same average.
+            let mut total = 0i64;
+            for step in 0..DECLINATION_STEPS {
+                let wave =
+                    sim_math::sine(step as i64, DECLINATION_STEPS as i64).unwrap_or(Fix32::ZERO);
+                let declination = narrow(sim_math::share(
+                    Accum(i64::from(OBLIQUITY)),
+                    Accum(i64::from(wave.0)),
+                    Accum(i64::from(Fix32::ONE.0)),
+                ));
+                total += daily_insolation(latitude, declination);
+            }
+            mean[band] = clamp_to_watts(total / DECLINATION_STEPS as i64);
+        }
+        let top = mean[INSOLATION_BANDS / 2];
+        let floor = mean[0];
+        let middle = (Self::band_of_latitude(MIDDLE_LATITUDE) / i64::from(Fix32::ONE.0)) as usize;
+        let reference = (i64::from(daily[middle * (DECLINATION_STEPS + 1) + DECLINATION_STEPS])
+            - i64::from(mean[middle]))
+        .abs()
+        .max(1);
+        Self {
+            daily,
+            mean,
+            top,
+            floor,
+            reference: clamp_to_watts(reference),
+        }
+    }
+
+    /// Returns the latitude of one band, in hundredths of a degree.
+    fn latitude_of_band(band: usize) -> i32 {
+        let span = 2 * i64::from(LATITUDE_POLE);
+        (-i64::from(LATITUDE_POLE) + span * band as i64 / (INSOLATION_BANDS as i64 - 1)) as i32
+    }
+
+    /// Returns the band of one latitude, in bands scaled by the fixed-point
+    /// unit, so that the caller can interpolate between two bands.
+    fn band_of_latitude(latitude: i32) -> i64 {
+        let one = i64::from(Fix32::ONE.0);
+        let low = -i64::from(LATITUDE_POLE);
+        let span = 2 * i64::from(LATITUDE_POLE);
+        let scaled = (i64::from(latitude) - low) * (INSOLATION_BANDS as i64 - 1) * one / span;
+        scaled.clamp(0, (INSOLATION_BANDS as i64 - 1) * one)
+    }
+
+    /// Returns the annual mean insolation at one latitude.
+    fn mean_at(&self, latitude: i32) -> i64 {
+        let one = i64::from(Fix32::ONE.0);
+        let scaled = Self::band_of_latitude(latitude);
+        let band = (scaled / one) as usize;
+        let within = scaled - (band as i64) * one;
+        let low = i64::from(self.mean[band]);
+        let high = i64::from(self.mean[(band + 1).min(INSOLATION_BANDS - 1)]);
+        low + (high - low) * within / one
+    }
+
+    /// Returns the daily mean insolation at one latitude and one declination.
+    fn daily_at(&self, latitude: i32, declination: i32) -> i64 {
+        let one = i64::from(Fix32::ONE.0);
+        let scaled = Self::band_of_latitude(latitude);
+        let band = (scaled / one) as usize;
+        let within = scaled - (band as i64) * one;
+        let below = self.at_band(band, declination);
+        let above = self.at_band((band + 1).min(INSOLATION_BANDS - 1), declination);
+        below + (above - below) * within / one
+    }
+
+    /// Returns the daily mean insolation of one band at one declination.
+    fn at_band(&self, band: usize, declination: i32) -> i64 {
+        let one = i64::from(Fix32::ONE.0);
+        let span = 2 * i64::from(OBLIQUITY);
+        let scaled =
+            ((i64::from(declination) + i64::from(OBLIQUITY)) * DECLINATION_STEPS as i64 * one
+                / span)
+                .clamp(0, DECLINATION_STEPS as i64 * one);
+        let step = (scaled / one) as usize;
+        let within = scaled - (step as i64) * one;
+        let row = band * (DECLINATION_STEPS + 1);
+        let low = i64::from(self.daily[row + step]);
+        let high = i64::from(self.daily[row + (step + 1).min(DECLINATION_STEPS)]);
+        low + (high - low) * within / one
+    }
+}
+
+/// Clamps a wide value into the watt range the table stores.
+fn clamp_to_watts(value: i64) -> i16 {
+    value.clamp(i64::from(i16::MIN), i64::from(i16::MAX)) as i16
+}
+
+/// Returns the table, building it on the first call.
+///
+/// **The table is immutable and it is a pure function of constants.** So one
+/// build serves every field, every thread and every run, and the same index
+/// gives the same value on every target.
+fn insolation() -> &'static Insolation {
+    static TABLE: std::sync::OnceLock<Insolation> = std::sync::OnceLock::new();
+    TABLE.get_or_init(Insolation::build)
+}
+
+/// Returns the daily mean insolation at the top of the atmosphere.
+///
+/// The answer is in watts for each square metre. The latitude and the
+/// declination are both in hundredths of a degree.
+///
+/// **This is the published closed form.** The half day length comes from the
+/// latitude and the declination, and it is a whole half turn under a polar
+/// day and nothing under a polar night. That is what makes the curve rise
+/// again toward the summer pole.[^1]
+///
+/// The arithmetic goes through the arithmetic module. The sine reads the
+/// table that module holds, and the inverse cosine searches the same
+/// table.[^2]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 4.1. `docs/research/reports/30-the-published-atmospheric-math.md`
+/// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decisions D1 and D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+///
+/// **This is public so that a test can hold it against the published
+/// table.** The report states the daily mean at six latitudes at three points
+/// of the year, and a test that reads this reads the geometry rather than the
+/// term the temperature takes from it.
+#[must_use]
+pub fn daily_insolation(latitude: i32, declination: i32) -> i64 {
+    let one = i64::from(Fix32::ONE.0);
+    let quarter = i64::from(LATITUDE_POLE);
+    let sine_of =
+        |degrees: i64| i64::from(sim_math::sine(degrees, TURN_FINE).unwrap_or(Fix32::ZERO).0);
+    let sin_latitude = sine_of(i64::from(latitude));
+    let cos_latitude = sine_of(i64::from(latitude) + quarter);
+    let sin_declination = sine_of(i64::from(declination));
+    let cos_declination = sine_of(i64::from(declination) + quarter);
+    // The two products of the published form. The half day length is the
+    // inverse cosine of minus the first over the second, which avoids the
+    // tangent and therefore avoids the pole.
+    let along = sin_latitude * sin_declination / one;
+    let across = cos_latitude * cos_declination / one;
+    let half_day = if across <= 0 {
+        if along > 0 {
+            (sim_math::SINE_STEPS / 2) << 16
+        } else {
+            0
+        }
+    } else {
+        let asked = (-along * one / across).clamp(-one, one);
+        sim_math::arc_cosine_steps(Fix32(asked as i32))
+    };
+    // The first term of the published form. The half day length is in table
+    // steps, and a half turn is half the steps, so the term divides by that.
+    let first = (along * half_day / (sim_math::SINE_STEPS / 2)) >> 16;
+    // The second term. The sine of the half day length, divided by the ratio
+    // of a circumference to a diameter.
+    let sine_of_half = i64::from(sim_math::sine_of_steps(half_day).0);
+    let second = across * sine_of_half / one * one / PI_FIXED;
+    SOLAR_CONSTANT * (first + second) / one
 }
 
 /// Returns the degrees the water in the air over one cell takes away.
@@ -2021,15 +2559,33 @@ pub fn asked_warmth(ground: i32, season: i32, cloud: i32) -> i32 {
 
 /// The degrees a cell holds before any of the three terms moves it.
 ///
-/// **The four terms together span the scale exactly**, so nothing clamps.
+/// **The four terms reach the bottom of the scale and they no longer reach
+/// the top of it.** The two checks below still hold, because they read the
+/// swing the sun term reserves. The sun term cannot reach that swing any
+/// more: its two parts are the belt of a latitude and the season, and the
+/// published geometry never peaks both at one place at one moment. The belt
+/// peaks at the equator, where the season is near nothing, and the season
+/// peaks at the middle latitudes, where the belt is near nothing.[^1]
+///
+/// **So the top of the scale is out of reach by about the season part, and
+/// the world runs cold against the temperature that the scale now
+/// declares.** A blocker holds the question of where the base should
+/// stand.[^2]
+///
 /// A clamp would put a flat region into the temperature field, the pressure
 /// gradient would read the edge of that region as a step, and the wind would
-/// hold a straight line across the map. That is the defect the smooth fall
-/// away from the sun exists to remove, and a clamp would put it back.
+/// hold a straight line across the map. The bottom of the scale is reachable,
+/// at a winter pole, and nothing clamps there.
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 4.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+/// [^2]: Blockers register, BLK-151. `docs/BLOCKERS.md`
 const HEAT_BASE: i32 = 112;
 
-// The four terms reach the bottom of the scale together and the top of it
-// together. The check fails the build rather than a test.
+// The four terms reach the bottom of the scale together. The second check
+// reads the swing the sun term reserves at the top, and the sun term no
+// longer reaches that swing. Both checks fail the build rather than a test.
 const _: () = assert!(HEAT_BASE - SEASON_SWING - CLOUD_SWING == 0);
 const _: () = assert!(
     HEAT_BASE + (HEAT_FROM_WATER + HEAT_FROM_LOW_GROUND) / GROUND_DIVISOR as i32 + SEASON_SWING
@@ -2120,6 +2676,31 @@ pub struct WeatherField {
     ///
     /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
     scale: WeatherScale,
+    /// The latitudes that the rows of the world stand at.
+    ///
+    /// **The weather reads a latitude and never a raw row.** The span decides
+    /// whether the world is a planet or one region of one, and it is the only
+    /// thing that decides it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    latitudes: Latitudes,
+    /// The pressure that the banded circulation adds to each row of the whole
+    /// lattice.
+    ///
+    /// **The index is a row of the whole lattice and not a row of the
+    /// world.** The lattice carries a margin, so the two are different, and a
+    /// reader that confuses them shifts every belt by the margin.[^1]
+    ///
+    /// The table is a fixed function of the latitude of the row, so the field
+    /// builds it once and the wind pass reads one entry for each cell.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-569. `docs/FINDINGS.md`
+    /// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D2. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    band: Vec<i32>,
     faction_count: u16,
     /// The water in the air above each cell, in cell index order. It is empty
     /// until the first drop enters the world.
@@ -2213,6 +2794,31 @@ impl WeatherField {
         scale: WeatherScale,
         faction_count: u16,
     ) -> Result<Self, WeatherError> {
+        Self::with_latitudes(lattice, scale, Latitudes::DEFAULT, faction_count)
+    }
+
+    /// Builds a field over a cell lattice, at a stated latitude span.
+    ///
+    /// **The span decides whether the world is a planet or one region of
+    /// one.** A span from pole to pole gives poles, a banded circulation and
+    /// a season that reverses across the equator. A narrow span gives a flat
+    /// latitude term, and the climate then comes from the ground and the sea
+    /// alone.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the faction count is above the ceiling the
+    /// project supports.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    pub fn with_latitudes(
+        lattice: PaddedLattice,
+        scale: WeatherScale,
+        latitudes: Latitudes,
+        faction_count: u16,
+    ) -> Result<Self, WeatherError> {
         if faction_count > FACTION_CEILING {
             return Err(WeatherError::FactionCountAboveCeiling(faction_count));
         }
@@ -2222,9 +2828,26 @@ impl WeatherField {
         //
         // [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
         let count = lattice.whole().tile_count() as usize;
+        // **The belt table is indexed by a row of the whole lattice.** The
+        // latitude of a row is the latitude of the world row under it, so a
+        // margin row beyond a pole carries the pressure of the pole. That is
+        // the same rule the temperature already holds for a margin row.[^2]
+        //
+        // [^2]: The padded lattice. [`PaddedLattice::inner_row_of`]
+        let rows = lattice.whole().height();
+        let world_rows = lattice.inner().height();
+        let ring = lattice.ring();
+        let band = (0..rows)
+            .map(|row| {
+                let world_row = row.saturating_sub(ring).min(world_rows.saturating_sub(1));
+                band_pressure_at(latitudes.of_row(world_row, world_rows))
+            })
+            .collect();
         Ok(Self {
             lattice,
             scale,
+            latitudes,
+            band,
             faction_count,
             air: Vec::new(),
             ground: Vec::new(),
@@ -2271,6 +2894,50 @@ impl WeatherField {
     #[must_use]
     pub const fn scale(&self) -> WeatherScale {
         self.scale
+    }
+
+    /// Returns the latitudes that the rows of the world stand at.
+    #[must_use]
+    pub const fn latitudes(&self) -> Latitudes {
+        self.latitudes
+    }
+
+    /// Returns the latitude of one cell of the whole lattice.
+    ///
+    /// **The argument is a cell of the whole lattice, and the answer is the
+    /// latitude of the world row under it.** A margin cell beyond a pole
+    /// carries the latitude of the pole, in the same way that it carries the
+    /// temperature term of the pole.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-569. `docs/FINDINGS.md`
+    #[must_use]
+    pub fn latitude_at(&self, cell: u32) -> i32 {
+        self.latitudes.of_row(
+            self.lattice.inner_row_of(cell),
+            self.lattice.inner().height(),
+        )
+    }
+
+    /// Returns the pressure that the banded circulation adds at one cell of
+    /// the whole lattice.
+    ///
+    /// **This never reaches the temperature.** It reaches the wind and
+    /// nothing else.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D2. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    #[must_use]
+    pub fn band_at(&self, cell: u32) -> i32 {
+        let Some(address) = self.cells().address_of(TileIdx(cell)) else {
+            return 0;
+        };
+        self.band
+            .get(address.r.max(0) as usize)
+            .copied()
+            .unwrap_or(0)
     }
 
     /// Returns the transport passes that one solve runs on this field.
@@ -2793,6 +3460,7 @@ impl WeatherField {
         //
         // [^3]: The padded lattice. [`PaddedLattice::inner_row_of`]
         let height = self.lattice.inner().height();
+        let latitudes = self.latitudes;
         for (cell, under) in ground.iter().enumerate() {
             let row = self.lattice.inner_row_of(cell as u32);
             let air = self.air.get(cell).copied().unwrap_or(Drops::ZERO);
@@ -2803,7 +3471,7 @@ impl WeatherField {
             let capacity = capacity_at(self.warmth.get(cell).copied().unwrap_or(0));
             let asked = asked_warmth(
                 heat_of(*under),
-                season_at(tick, row, height, self.scale),
+                season_at(tick, latitudes.of_row(row, height)),
                 cloud_at(air, capacity),
             );
             let Some(held) = self.warmth.get_mut(cell) else {
@@ -2899,6 +3567,7 @@ impl WeatherField {
             cells: self.cells(),
             wind: &self.wind,
             warmth: &self.warmth,
+            band: &self.band,
             pressure_divisor: self.scale.pressure_divisor(),
         };
         run_in_chunks(count, threads, &mut self.wind_scratch, |low, out| {
@@ -3446,12 +4115,45 @@ struct WindPass<'a> {
     cells: Grid,
     wind: &'a [Wind],
     warmth: &'a [i32],
+    /// The pressure that the banded circulation adds at each row of the whole
+    /// lattice.
+    ///
+    /// **The index is a row of the whole lattice.** The pass reads the row
+    /// out of the address it already computed, so it needs no second walk and
+    /// no plane over the cells.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D2. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    band: &'a [i32],
     /// What the pressure sum is divided by. It follows the cell side, because
     /// a finer lattice holds a smaller difference between two neighbours.
     pressure_divisor: i64,
 }
 
 impl WindPass<'_> {
+    /// Returns what the wind of one cell answers to.
+    ///
+    /// **The pressure of a cell is its temperature less the offset that the
+    /// banded circulation puts at its latitude.** Hot air rises and the
+    /// pressure falls where it does, so a high temperature and a low band
+    /// offset both draw the wind in. The offset is what puts a divergent belt
+    /// at thirty degrees and a convergent one at the equator, which no
+    /// temperature profile gives on its own.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D2. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    fn drive(&self, index: usize, address: Axial) -> i32 {
+        let warmth = self.warmth.get(index).copied().unwrap_or(0);
+        let band = self
+            .band
+            .get(address.r.max(0) as usize)
+            .copied()
+            .unwrap_or(0);
+        warmth - band
+    }
+
     /// Fills one run of the wind scratch plane.
     ///
     /// The order is drag, then the acceleration the pressure asks for, then
@@ -3468,7 +4170,7 @@ impl WindPass<'_> {
             let Some(address) = self.cells.address_of(TileIdx(index as u32)) else {
                 continue;
             };
-            let here = self.warmth.get(index).copied().unwrap_or(0);
+            let here = self.drive(index, address);
 
             // The acceleration the pressure across this cell asks for. Hot
             // air rises and the pressure falls where it does, so the sum
@@ -3482,7 +4184,7 @@ impl WindPass<'_> {
                 let Some(at) = self.cells.index_of(neighbour) else {
                     continue;
                 };
-                let there = self.warmth.get(at.0 as usize).copied().unwrap_or(0);
+                let there = self.drive(at.0 as usize, neighbour);
                 let pull = i64::from(there - here);
                 asked_q += i64::from(NEIGHBOURS[direction].q) * pull;
                 asked_r += i64::from(NEIGHBOURS[direction].r) * pull;

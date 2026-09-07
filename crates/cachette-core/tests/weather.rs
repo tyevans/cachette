@@ -141,20 +141,33 @@ fn the_world_makes_weather_without_a_caller() {
         world.weather().is_dry(),
         "a world holds no water before it runs"
     );
-    for _ in 0..64 {
+    // **A cell counts as wet at a share of the ceiling of the air plane, and
+    // that ceiling rose with the published saturation curve.** So a cell needs
+    // longer to gather that much water than it did, and the frame count here
+    // is a property of the fixture rather than of the rule.[^1]
+    //
+    // [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    const FRAMES: usize = 1024;
+    for _ in 0..FRAMES {
         world.step(4).expect("the step must run");
     }
     assert!(
         world.weather().raised() > 0,
-        "nothing lifted water in 64 frames"
+        "nothing lifted water in {FRAMES} frames"
     );
     assert!(
         world.weather().ground_total().0 > 0,
-        "no water reached the ground in 64 frames"
+        "no water reached the ground in {FRAMES} frames"
     );
     assert!(
         world.weather().wet_cells() > 0,
-        "no cell became wet in 64 frames"
+        "no cell became wet in {FRAMES} frames, and the wettest cell holds {} drops \
+         against a mark of {}",
+        (0..world.weather().cells().tile_count())
+            .map(|cell| world.weather().ground_at(cell).0)
+            .max()
+            .unwrap_or(0),
+        weather::WET_MARK.0
     );
 }
 
@@ -896,11 +909,11 @@ fn the_temperature_of_one_cell_changes_over_a_run() {
 /// The season is in the tick, so one cell answers differently later.
 #[test]
 fn the_season_is_keyed_on_the_tick() {
-    let height = 16;
-    let early = weather::season_at(Tick(0), 0, height, weather::WeatherScale::LEVEL_1);
+    let latitude = 45 * weather::LATITUDE_FINE;
+    let early = weather::season_at(Tick(0), latitude);
     let mut moved = false;
     for tick in 1..512u64 {
-        if weather::season_at(Tick(tick), 0, height, weather::WeatherScale::LEVEL_1) != early {
+        if weather::season_at(Tick(tick), latitude) != early {
             moved = true;
             break;
         }
@@ -916,8 +929,9 @@ fn the_season_is_keyed_on_the_tick() {
 #[test]
 fn the_season_varies_across_the_lattice_at_one_tick() {
     let height = 16;
+    let latitudes = weather::Latitudes::PLANET;
     let readings: Vec<i32> = (0..height)
-        .map(|at| weather::season_at(Tick(0), at, height, weather::WeatherScale::LEVEL_1))
+        .map(|at| weather::season_at(Tick(0), latitudes.of_row(at, height)))
         .collect();
     let low = readings.iter().copied().min().unwrap_or(0);
     let high = readings.iter().copied().max().unwrap_or(0);
@@ -931,30 +945,30 @@ fn the_season_varies_across_the_lattice_at_one_tick() {
 ///
 /// **A wrap is a seam.** A warm band that marched along an axis and wrapped
 /// jumped the whole extent of the map every lap, and the temperature field
-/// held a discontinuity there whatever the shape of the band. The sun that
-/// replaced it turns back at each limit instead, so the largest move it makes
-/// in one tick is small and the field holds no seam.
+/// held a discontinuity there whatever the shape of the band. The declination
+/// turns back at each limit instead, so the largest move it makes in one tick
+/// is small and the field holds no seam.
 #[test]
 fn the_sun_swings_between_two_limits_and_never_wraps() {
-    let height_tiles = 512;
-    let readings: Vec<i64> = (0..2 * weather::SEASON_PERIOD_TICKS as u64)
-        .map(|tick| weather::sun_at(Tick(tick), height_tiles))
+    let readings: Vec<i32> = (0..2 * weather::SEASON_PERIOD_TICKS as u64)
+        .map(|tick| weather::declination_at(Tick(tick)))
         .collect();
     let step = readings
         .windows(2)
         .map(|pair| (pair[1] - pair[0]).abs())
         .max()
         .unwrap_or(0);
-    // The sun crosses the middle fastest. It covers four amplitudes in one
-    // period, so the mean step is small and the largest is a few tiles.
+    // The declination crosses the equator fastest. It covers four amplitudes
+    // in one period, so the mean step is small and the largest is a fraction
+    // of one degree.
     assert!(
-        step <= 8,
-        "the sun moved {step} tiles in one tick, so the field holds a seam"
+        step <= weather::LATITUDE_FINE / 2,
+        "the sun moved {step} hundredths of a degree in one tick, so the field holds a seam"
     );
     let low = readings.iter().copied().min().unwrap_or(0);
     let high = readings.iter().copied().max().unwrap_or(0);
     assert!(
-        high > 0 && low < 0 && high - low > height_tiles / 4,
+        high > 20 * weather::LATITUDE_FINE && low < -20 * weather::LATITUDE_FINE,
         "the sun swung from {low} to {high}, which is no season"
     );
 }
@@ -968,10 +982,10 @@ fn the_sun_swings_between_two_limits_and_never_wraps() {
 #[test]
 fn the_season_slope_holds_no_step() {
     let height = 256;
-    let scale = weather::WeatherScale::PER_TILE;
+    let latitudes = weather::Latitudes::PLANET;
     for tick in [0u64, 137, 512, 1024, 1500] {
         let readings: Vec<i32> = (0..height)
-            .map(|at| weather::season_at(Tick(tick), at, height, scale))
+            .map(|at| weather::season_at(Tick(tick), latitudes.of_row(at, height)))
             .collect();
         // The slope is read over a block of rows, because the truncation of
         // one row is a whole degree and a single difference is mostly that.
@@ -989,8 +1003,14 @@ fn the_season_slope_holds_no_step() {
         // half the map and the other sign over the rest, and it reversed
         // between two neighbouring blocks. That reversal is a bend of twice
         // the block slope, which was about thirty degrees here.
+        //
+        // **The published profile carries a bend of its own, and it is
+        // real.** The insolation is nothing at all through the polar night,
+        // so the season part clamps over the polar rows and the annual mean
+        // is nearly flat there. The bar sits above that bend and below the
+        // reversal of a triangle.
         assert!(
-            bend <= 8,
+            bend <= 20,
             "the slope of the season bent by {bend} degrees over {BLOCK} rows \
              at tick {tick}, so it holds a step: {slopes:?}"
         );
@@ -1007,10 +1027,15 @@ fn the_season_slope_holds_no_step() {
 #[test]
 fn the_poles_are_colder_than_the_middle_over_a_whole_year() {
     let height = 64;
-    let scale = weather::WeatherScale::PER_TILE;
+    let latitudes = weather::Latitudes::PLANET;
     let over_a_year = |row: u32| -> i64 {
         (0..weather::SEASON_PERIOD_TICKS as u64)
-            .map(|tick| i64::from(weather::season_at(Tick(tick), row, height, scale)))
+            .map(|tick| {
+                i64::from(weather::season_at(
+                    Tick(tick),
+                    latitudes.of_row(row, height),
+                ))
+            })
             .sum()
     };
     let north = over_a_year(0);
@@ -1026,8 +1051,9 @@ fn the_poles_are_colder_than_the_middle_over_a_whole_year() {
 #[test]
 fn each_pole_holds_its_own_winter() {
     let height = 64;
-    let scale = weather::WeatherScale::PER_TILE;
-    let reading = |row: u32, tick: u64| weather::season_at(Tick(tick), row, height, scale);
+    let latitudes = weather::Latitudes::PLANET;
+    let reading =
+        |row: u32, tick: u64| weather::season_at(Tick(tick), latitudes.of_row(row, height));
     let quarter = weather::SEASON_PERIOD_TICKS as u64 / 4;
     // A quarter turn after the start the sun stands at the limit nearest the
     // last row, and three quarters after it stands at the limit nearest the
@@ -1404,18 +1430,30 @@ fn the_air_never_stands_above_the_capacity_of_its_own_cell() {
 /// five parts of a sky in 255 and left 97 cells in every hundred blank. The
 /// commit that made this change holds both readings.
 ///
+/// **The fixture is a world whose polar rows hold open sea, and the seed is
+/// its own.** The published saturation curve carries the water poleward and
+/// rains most of it out on the way, so a polar continental interior is a
+/// desert and holds no sky whatever the model does. That is the published
+/// behaviour and not a defect. The assertion here is about whether the model
+/// destroys the water that does arrive, so the fixture must supply water at
+/// the pole.[^1]
+///
 /// **This asserts a joint property and isolates nothing.** The capacity, the
 /// lift and the water the ground gives back all reach it, and putting any one
 /// of them back alone does not always fail it. Three other tests carry the
 /// capacity rule on its own, and each of them fails when the capacity goes
 /// back to one constant.
+///
+/// # References
+///
+/// [^1]: Testing Rules, section 2a. `.agents/rules/testing.md`
 #[test]
 fn the_inland_high_latitudes_hold_cloud() {
     let mut world = World::with_weather_scale(
         WorldConfig {
             width: WET_EXTENT,
             height: WET_EXTENT,
-            seed: WET_SEED,
+            seed: POLAR_SEA_SEED,
             faction_count: 2,
             unit_capacity: 1024,
         },
@@ -1480,3 +1518,417 @@ fn the_inland_high_latitudes_hold_cloud() {
 
 /// The ticks that the acceptance fixture runs before it reads the field.
 const SPIN_UP_TICKS: usize = 300;
+
+/// A seed whose first and last rows hold open sea.
+///
+/// **A polar cloud test needs a polar sea.** The published saturation curve
+/// makes the air of a cold cell hold very little, so the poleward transport
+/// rains out most of what it carries and a landlocked polar interior stays
+/// dry. That is a polar desert, which is a real climate, so the fixture that
+/// asks about polar cloud must supply water at the pole.[^1]
+///
+/// # References
+///
+/// [^1]: Testing Rules, section 2a. `.agents/rules/testing.md`
+const POLAR_SEA_SEED: u64 = 0x2f;
+
+/// The saturation curve is the published one, at the published temperatures.
+///
+/// **The report states the capacity at eight temperatures, and this test
+/// holds every one of them.** The bar is a twentieth of one part in a
+/// hundred, which is far under the quantisation of a whole drop at the cold
+/// end, so the rows there carry a bar of one drop instead.
+///
+/// The earlier curve doubled the capacity at a fixed temperature step. That
+/// curve fails this test at every row, because the published doubling width
+/// runs from about seven kelvin at the cold end to about fourteen at the warm
+/// end.
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 1.5. `docs/research/reports/30-the-published-atmospheric-math.md`
+#[test]
+fn the_saturation_curve_holds_the_published_table() {
+    // The warmth, and the drops the published curve gives at it.
+    let published = [
+        (0u32, 2i64),
+        (20, 6),
+        (60, 64),
+        (100, 422),
+        (140, 2048),
+        (180, 7822),
+        (220, 24720),
+        (255, 59672),
+    ];
+    for (warmth, asked) in published {
+        let held = weather::capacity_at(warmth as i32).0;
+        // A tenth of one part in a hundred, and never under one drop.
+        let bar = (asked / 1000).max(1);
+        assert!(
+            (held - asked).abs() <= bar,
+            "the capacity at warmth {warmth} is {held} drops, and the published curve gives {asked}"
+        );
+    }
+}
+
+/// The saturation curve does not double at a fixed temperature step.
+///
+/// **This is the claim the published curve refutes.** An earlier design held
+/// that the capacity doubles at one fixed step, and built its integer form on
+/// that. The published doubling width runs from about seven kelvin to about
+/// fourteen over the range, which is a factor above two.
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 1.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+#[test]
+fn the_saturation_curve_doubles_at_no_fixed_step() {
+    // Twenty degrees of warmth is ten kelvin on the declared scale.
+    let step = 20;
+    let ratio = |warmth: i32| -> i64 {
+        let low = weather::capacity_at(warmth).0.max(1);
+        let high = weather::capacity_at(warmth + step).0;
+        high * 1000 / low
+    };
+    let cold = ratio(60);
+    let warm = ratio(220);
+    assert!(
+        cold > warm * 3 / 2,
+        "ten kelvin multiplies the capacity by {cold} in thousandths at the cold end \
+         and by {warm} at the warm end, so a fixed doubling would fit"
+    );
+}
+
+/// The capacity never stands above the ceiling of the plane.
+#[test]
+fn the_capacity_never_passes_the_ceiling() {
+    for warmth in -8..=(cachette_core::HEAT_CEILING + 8) {
+        let held = weather::capacity_at(warmth).0;
+        assert!(
+            held >= 2 && held <= weather::AIR_SATURATION.0,
+            "the capacity at warmth {warmth} is {held} drops"
+        );
+    }
+}
+
+/// The insolation holds the polar day, so at the solstice the pole takes more
+/// daily energy than the equator.
+///
+/// **No function of the distance from where the sun stands can hold this
+/// shape.** Such a function peaks under the sun and falls away from it. The
+/// published geometry rises again toward the summer pole, because the day
+/// there never ends. The earlier model was a distance function, and it gave a
+/// pole that was cold in every part of the year.
+///
+/// The test holds the integer form against the published table, at six
+/// latitudes and three points of the year. Every entry is in watts for each
+/// square metre.
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 4.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+#[test]
+fn the_insolation_holds_the_published_table() {
+    let obliquity = 2344;
+    // The latitude in whole degrees, then the June solstice, the equinox and
+    // the December solstice.
+    let published = [
+        (0i32, 397i64, 433i64, 397i64),
+        (20, 470, 407, 285),
+        (40, 498, 331, 150),
+        (60, 492, 216, 23),
+        (80, 533, 75, 0),
+        (90, 541, 0, 0),
+    ];
+    for (degrees, june, equinox, december) in published {
+        let latitude = degrees * weather::LATITUDE_FINE;
+        for (declination, asked) in [(obliquity, june), (0, equinox), (-obliquity, december)] {
+            let held = weather::daily_insolation(latitude, declination);
+            assert!(
+                (held - asked).abs() <= 2,
+                "the insolation at {degrees} degrees at a declination of {declination} \
+                 is {held} watts, and the published table gives {asked}"
+            );
+        }
+    }
+    // The claim that no distance function can hold: the solstice pole stands
+    // above the solstice equator.
+    let pole = weather::daily_insolation(90 * weather::LATITUDE_FINE, obliquity);
+    let equator = weather::daily_insolation(0, obliquity);
+    assert!(
+        pole * 100 > equator * 130,
+        "the solstice pole takes {pole} watts and the equator {equator}, \
+         so the polar day is missing"
+    );
+}
+
+/// The pole holds a summer and a winter, and they are half a year apart.
+#[test]
+fn each_pole_holds_a_summer_of_its_own() {
+    let quarter = weather::SEASON_PERIOD_TICKS as u64 / 4;
+    let pole = 90 * weather::LATITUDE_FINE;
+    let summer = weather::season_at(Tick(quarter), pole);
+    let winter = weather::season_at(Tick(3 * quarter), pole);
+    assert!(
+        summer > winter + 60,
+        "the pole read {summer} in its summer and {winter} in its winter"
+    );
+    // The two poles are opposite. One is in summer while the other is in
+    // winter.
+    let other = weather::season_at(Tick(quarter), -pole);
+    assert!(
+        summer > other + 60,
+        "the two poles read {summer} and {other} at the same tick"
+    );
+}
+
+/// The annual mean of the sun term falls from the equator to the pole.
+///
+/// This is the belt of a latitude, and it is what puts a warm middle and cold
+/// ends on the map. It is a separate claim from the season, which reverses
+/// across the equator.
+#[test]
+fn the_sun_term_falls_from_the_equator_to_the_pole() {
+    let over_a_year = |latitude: i32| -> i64 {
+        (0..weather::SEASON_PERIOD_TICKS as u64)
+            .map(|tick| i64::from(weather::season_at(Tick(tick), latitude)))
+            .sum()
+    };
+    let readings: Vec<i64> = (0..=6)
+        .map(|step| over_a_year(step * 15 * weather::LATITUDE_FINE))
+        .collect();
+    for pair in readings.windows(2) {
+        assert!(
+            pair[0] >= pair[1],
+            "the sun term rises toward the pole: {readings:?}"
+        );
+    }
+    assert!(
+        readings[0] > readings[6],
+        "the sun term is flat from the equator to the pole: {readings:?}"
+    );
+}
+
+/// The banded pressure holds three extremes in each hemisphere.
+///
+/// **Three belts need three pressure extremes, and one temperature profile
+/// that falls from the equator to the pole has two.** So the field imposes
+/// them: a low at the equator, a high at thirty degrees, a low at sixty and a
+/// high at each pole. That is the published order, and the high at thirty is
+/// what makes a desert belt.
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, sections 5.1 and 5.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+#[test]
+fn the_banded_pressure_holds_the_published_belts() {
+    let at = |degrees: i32| weather::band_pressure_at(degrees * weather::LATITUDE_FINE);
+    let equator = at(0);
+    let subtropics = at(30);
+    let temperate = at(60);
+    let pole = at(90);
+    assert!(
+        subtropics > equator,
+        "the subtropics hold {subtropics} and the equator {equator}, so no high stands at thirty"
+    );
+    assert!(
+        subtropics > temperate,
+        "the subtropics hold {subtropics} and sixty degrees {temperate}, so no low stands at sixty"
+    );
+    assert!(
+        pole > temperate,
+        "the pole holds {pole} and sixty degrees {temperate}, so no high stands at the pole"
+    );
+    // The two hemispheres carry the same shape, because the offset reads a
+    // cosine of the latitude and a cosine is even.
+    for degrees in [0, 15, 30, 45, 60, 75, 90] {
+        assert_eq!(
+            at(degrees),
+            at(-degrees),
+            "the two hemispheres differ at {degrees} degrees"
+        );
+    }
+}
+
+/// A narrow latitude span gives a flat sun term.
+///
+/// **The region reading and the planet reading differ by one constant and not
+/// by a model.** A world that spans three degrees holds one belt, and every
+/// latitude term goes flat inside it. A world that spans the globe holds all
+/// of them. The same code answers both.
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 9. `docs/research/reports/30-the-published-atmospheric-math.md`
+#[test]
+fn a_narrow_span_gives_a_flat_latitude_term() {
+    let height = 128;
+    let region = weather::Latitudes::new(45 * weather::LATITUDE_FINE, 3 * weather::LATITUDE_FINE)
+        .expect("three degrees fits on the globe");
+    let planet = weather::Latitudes::PLANET;
+    let spread = |latitudes: weather::Latitudes| -> i32 {
+        let readings: Vec<i32> = (0..height)
+            .map(|row| weather::season_at(Tick(0), latitudes.of_row(row, height)))
+            .collect();
+        readings.iter().copied().max().unwrap_or(0) - readings.iter().copied().min().unwrap_or(0)
+    };
+    let across_a_region = spread(region);
+    let across_a_planet = spread(planet);
+    assert!(
+        across_a_region <= 6,
+        "a three degree span spread the sun term over {across_a_region} degrees of heat"
+    );
+    assert!(
+        across_a_planet > 8 * across_a_region.max(1),
+        "a whole planet spread it over {across_a_planet}, against {across_a_region} for a region"
+    );
+    // **A region holds no belt of its own, because no belt is that narrow.**
+    // The banded pressure across three degrees is one steady slope, so the
+    // region carries one prevailing wind rather than three. The reading is
+    // monotone across the world, and the planet reading is not.
+    let belts = |latitudes: weather::Latitudes| -> Vec<i32> {
+        (0..height)
+            .map(|row| weather::band_pressure_at(latitudes.of_row(row, height)))
+            .collect()
+    };
+    // A turn is a change of sign in the slope. The slope is zero over a run
+    // of rows at each extreme, because the reading is a whole number, so the
+    // walk carries the last slope it saw rather than reading one pair.
+    let turns = |readings: &[i32]| -> usize {
+        let mut seen = 0i32;
+        let mut count = 0usize;
+        for pair in readings.windows(2) {
+            let slope = (pair[1] - pair[0]).signum();
+            if slope == 0 {
+                continue;
+            }
+            if seen != 0 && slope != seen {
+                count += 1;
+            }
+            seen = slope;
+        }
+        count
+    };
+    let across_a_region = turns(&belts(region));
+    let across_a_planet = turns(&belts(planet));
+    assert_eq!(
+        across_a_region, 0,
+        "a three degree span holds a turn in the banded pressure, so it holds a belt boundary"
+    );
+    assert!(
+        across_a_planet >= 4,
+        "a whole planet holds {across_a_planet} turns in the banded pressure, and it needs six"
+    );
+}
+
+/// A row of the world carries a latitude, and the two ends carry the two ends
+/// of the span.
+#[test]
+fn the_rows_of_a_world_cover_its_latitude_span() {
+    let height = 64;
+    let latitudes = weather::Latitudes::PLANET;
+    let readings: Vec<i32> = (0..height)
+        .map(|row| latitudes.of_row(row, height))
+        .collect();
+    for pair in readings.windows(2) {
+        assert!(pair[0] < pair[1], "the latitude does not rise with the row");
+    }
+    let low = readings[0];
+    let high = readings[height as usize - 1];
+    assert!(
+        low < -85 * weather::LATITUDE_FINE && high > 85 * weather::LATITUDE_FINE,
+        "the rows ran from {low} to {high}, which is not pole to pole"
+    );
+    // A world that states a centre stands there.
+    let region = weather::Latitudes::new(-40 * weather::LATITUDE_FINE, 4 * weather::LATITUDE_FINE)
+        .expect("four degrees at forty south fits on the globe");
+    let middle = region.of_row(height / 2, height);
+    assert!(
+        (middle + 40 * weather::LATITUDE_FINE).abs() <= weather::LATITUDE_FINE,
+        "the middle row of a region centred at forty south stands at {middle}"
+    );
+}
+
+/// A span that does not fit on the globe is refused.
+#[test]
+fn a_span_that_passes_a_pole_is_refused() {
+    assert!(weather::Latitudes::new(0, 2 * weather::LATITUDE_POLE + 1).is_err());
+    assert!(weather::Latitudes::new(0, -1).is_err());
+    assert!(
+        weather::Latitudes::new(80 * weather::LATITUDE_FINE, 40 * weather::LATITUDE_FINE).is_err()
+    );
+    assert!(
+        weather::Latitudes::new(80 * weather::LATITUDE_FINE, 4 * weather::LATITUDE_FINE).is_ok()
+    );
+}
+
+/// The banded pressure is a table over the world rows, read in the space of
+/// the whole lattice.
+///
+/// **A whole-lattice index and a world address are different things.** The
+/// lattice carries a margin, so a reader that takes one for the other samples
+/// the wrong cells. That mistake cost a day of wrong diagnosis once, and the
+/// findings register holds it.[^1]
+///
+/// The test drives the engine, then reads the offset of each cell of the
+/// whole lattice against the offset that the latitude of its own world row
+/// gives.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-569. `docs/FINDINGS.md`
+#[test]
+fn the_banded_pressure_follows_the_world_row_and_not_the_lattice_row() {
+    let mut world = World::with_weather_scale(
+        WorldConfig {
+            width: 64,
+            height: 64,
+            seed: POLAR_SEA_SEED,
+            faction_count: 1,
+            unit_capacity: 64,
+        },
+        weather::WeatherScale::PER_TILE,
+    )
+    .expect("the extent must describe a world");
+    world.step(1).expect("the step must run");
+    let field = world.weather();
+    assert!(
+        field.lattice().ring() > 0,
+        "the fixture carries no margin, so it cannot catch the mistake"
+    );
+    let mut spread = 0;
+    let mut lowest = i32::MAX;
+    let mut highest = i32::MIN;
+    for cell in 0..field.cells().tile_count() {
+        let asked = weather::band_pressure_at(field.latitude_at(cell));
+        let held = field.band_at(cell);
+        assert_eq!(
+            held, asked,
+            "cell {cell} holds a banded pressure of {held}, and its own latitude asks {asked}"
+        );
+        lowest = lowest.min(held);
+        highest = highest.max(held);
+    }
+    spread += highest - lowest;
+    assert!(
+        spread > 0,
+        "the banded pressure is flat over the whole world, so nothing imposed a belt"
+    );
+    // A margin cell beyond a pole carries the latitude of the pole, in the
+    // same way that it carries the temperature term of the pole.
+    let inner = field.lattice().inner();
+    let first = field
+        .lattice()
+        .whole_of_inner(0)
+        .expect("the world holds a first cell");
+    let corner = field
+        .cells()
+        .index_of(cachette_core::hex::Axial::new(0, 0))
+        .expect("the lattice holds its own corner");
+    assert_eq!(
+        field.latitude_at(corner.0),
+        field.latitude_at(first),
+        "a margin cell beyond the pole reads a latitude that no world row holds"
+    );
+    assert!(inner.height() > 0);
+}

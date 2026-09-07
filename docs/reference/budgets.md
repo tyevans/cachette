@@ -89,6 +89,17 @@ that held it and says how the value was reached.
 | World shape | Rhombus | BLK-014 | Owner decision. A tile index is a raw axial pair |
 | Maximum factions | 63 | BLK-013 | Owner decision. One bit for each faction in a 64-bit mask, with one value reserved for no faction |
 
+**The tile edge is a game unit and the weather does not read it.** The row axis
+of a world carries a latitude, the world states the span from its first row to
+its last, and a world that states none spans the globe from pole to pole. So a
+world of 16.7 million tiles is a planet, and the 330 km above is not the
+distance between its two poles. The two rows stay, because every crossing time,
+dwell and march figure in this table is derived from the tile edge and each of
+them is still consistent with the others. **Read the tile edge as the unit that
+fixes how long a unit takes to walk a tile, and never as the distance that
+carries a climate.** The project owner ruled on 6 September 2026, against a
+report that found the two readings and could not settle them.[^20] [^21]
+
 The tile upgrade fraction picks sparse storage over dense storage. The
 character layer figure is derived by scaling, not measured. BLK-007 holds every
 figure in this document, and the run that narrowed it measured none of
@@ -313,3 +324,5 @@ a footnote.
 [^17]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D3. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
 [^18]: Decisions register, DEC-097. `docs/DECISIONS.md`
 [^19]: Findings register, FND-259. `docs/FINDINGS.md`
+[^20]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+[^21]: Research report 30, the published atmospheric math, section 9. `docs/research/reports/30-the-published-atmospheric-math.md`
