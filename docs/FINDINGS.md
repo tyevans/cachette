@@ -15742,6 +15742,15 @@ them against it. The check is mechanical and it costs one pass: for each term,
 name its zero, and name what the published constant it rides on already averages
 over.
 
+**Do not wait for each term to fail.** A rule stated once, beside the one
+instance that produced it, reaches that instance and nothing else. It was four
+decisions above the term it should have governed, in the same file, and it did
+not reach it. Apply the rule to every radiative and terrain term deliberately,
+as a pass. Three terms have now been found with a wrong zero, and the third was
+found by reading the rule rather than by watching a table go wrong. That is the
+first time the rule has caught anything before the symptom did, and it is the
+argument for doing the pass.
+
 
 ### FND-615 — The belt kept a share of the sun and the season kept all of it
 
@@ -15783,9 +15792,49 @@ is continental. **A term that reproduced the last of that ratio would be fitting
 one planet's geography into a function of latitude.**
 
 
+### FND-616 — The class shares of this world were compared to Earth's without correcting for where the land sits
+
+**What the project believed.** The share of each climate class over the land of
+this world is comparable to the published share of that class over the land of
+Earth.[^F616A] Every weather change tonight was judged against that comparison.
+
+**What is true.** The two worlds do not put their land in the same places, and
+the class of a cell is mostly a function of its latitude. This world holds
+23 percent of its land poleward of 74 degrees, where Earth holds 7. It holds
+3 percent within 15 degrees of the equator, where Earth holds 10. **A comparison
+of the two totals therefore measures the terrain generator as much as it
+measures the weather.**
+
+**The correction is one weighting.** Take the class shares of each latitude band
+of this world, and combine them with the land area Earth holds in that band
+rather than the land area this world holds. The result says what this world's
+climate rules would produce on Earth's land, which is what the published shares
+describe.
+
+**Evidence.** Measured 7 September 2026 on one development machine (x86-64),
+seed 0x2f. The total absolute error over the five first-letter classes falls
+from 39.8 points to 23.9 points under the reweighting, with no change to the
+engine. **Two of the three gaps are geography and one is not.** The tropical
+share moves from 5.0 to 12.8 against a published 19.0, and the continental share
+from 34.1 to 27.4 against 24.6. The temperate share moves from 6.7 to 6.9
+against 13.4, which is no movement at all.
+
+**What follows.** **The continental band is not eating the temperate one.** The
+continental surplus is polar land, and it is mostly the terrain generator. The
+temperate shortfall survives the reweighting untouched, so it is the one class
+gap that is a defect in the weather. It is a dry gap and not a cold one: the
+band at 37 degrees south holds 931 land cells at 225 mm and grades 88 percent
+arid, where the band at 37 degrees north holds 403 cells at 587 mm and grades
+49 percent temperate.
+
+**Report every class figure both ways from here.** A single total invites the
+project to fix the terrain generator by changing the physics.
+
+
 ## References
 
 [^F612A]: The motion probe. `crates/cachette-core/examples/weather_motion_probe.rs`
 [^F612C]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
 [^F614A]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
 [^F615A]: Research report 32, zonal mean surface temperature, section 7. `docs/research/reports/32-zonal-mean-surface-temperature.md`
+[^F616A]: Peel, Finlayson and McMahon, updated world map of the Koppen-Geiger climate classification, 2007. Hydrology and Earth System Sciences 11, 1633 to 1644.

@@ -2585,13 +2585,22 @@ pub struct HeightRange {
 impl HeightRange {
     /// The relief a world takes when the caller states none.
     ///
-    /// The project owner chose the figure, and the scale constants table
-    /// holds it beside the tile edge.[^1]
+    /// The scale constants table holds the figure beside the tile edge.[^1]
+    ///
+    /// **A world states its own relief, so this is a default and not a
+    /// constant of the physics.** A caller that wants a different vertical
+    /// scale passes one.
+    ///
+    /// **The figure is what the lapse rate reads a cell against, and not what
+    /// the lapse rate takes off the world.** The ground term is an anomaly
+    /// about the mean land height, so the range sets how far cells stand
+    /// apart and not how cold the world is.[^2]
     ///
     /// # References
     ///
     /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
-    pub const DEFAULT: Self = Self { metres: 1500 };
+    /// [^2]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    pub const DEFAULT: Self = Self { metres: 4000 };
 
     /// Builds a relief from a height in metres.
     ///
