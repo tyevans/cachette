@@ -117,7 +117,7 @@ rounding step or the ground that blocks sight, for the same reason.
 [^1]: PRD-0001, a faction sees only what its own units observe. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
 [^2]: ADR-0059, fog storage grows with observed area, not with world area. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^3]: ADR-0164, every stored value the step reads enters the state hash. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
-[^4]: Backlog item 0495. `docs/backlog/proposed/0495-build-the-observation-plane-and-let-every-reader-answer-for-one-faction.md`
+[^4]: Backlog item 0495. `docs/backlog/complete/0495-build-the-observation-plane-and-let-every-reader-answer-for-one-faction.md`
 [^5]: Blockers register, BLK-050 and BLK-007. `docs/BLOCKERS.md`
 [^6]: Testing rules, sections 2 and 2a. `.agents/rules/testing.md`
 [^7]: Findings register, FND-560. `docs/FINDINGS.md`

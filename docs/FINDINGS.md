@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-571**
+**Next number: FND-572**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -3523,6 +3523,33 @@ the scope rule names as recording an intent as a fact.
 
 
 ## G. Process
+
+### FND-571 — A backlog item said that nothing in the engine held the sight rule, and three quarters of it was built
+
+**Believed.** Backlog item 0495 said that no column, no plane and no table held
+what a faction has observed, and that a search of the tree for the words of the
+subject returned one reserved bit, one doc comment and no storage. It listed
+four parts of the work and described all four as missing. The accepted record
+it implements says the same thing in its own context section.[^F568A] [^F568B]
+
+**True.** Three of the four parts were built before the item was taken. The
+observation module of the core crate holds the two layers, the four block
+forms, the rebuild and two of the three derived masks, and the step calls the
+rebuild on every ordinary tick with no flag and no gate.[^F568C] Only the
+readers were missing, and one of the three derived masks. The item was written
+before the module existed, and nothing moved it when the module landed.
+
+**Evidence.** A worker who took the item found the module and the pass. The
+audit of the learner surface had found the same thing a day earlier and stated
+it as its first claim.[^F568D] The priority index had been corrected and the
+item file had not, so the index and the item disagreed and nothing failed.
+
+**Follows.** An item in `proposed/` decays in the same way a summary decays. It
+states the state of the tree at the moment it was written, and nothing fails
+when the tree moves. **Read the code before you plan against a proposed item,
+and repair the item in the same change.** The priority index is the cheaper
+place to carry a state, because a check reads it and a worker reads it first.
+
 
 ### FND-482 — Three trade records existed twice under two sets of numbers, and both sets were marked as drafts under review
 
@@ -14029,3 +14056,7 @@ nearest recorded shape is a value a caller can set and cannot read back.[^F569B]
 [^F558A]: Findings register, FND-051. `docs/FINDINGS.md`
 [^F560A]: Backlog item 0108. `docs/backlog/complete/0108-let-a-unit-observe-the-tiles-around-it.md`
 [^F560B]: Findings register, FND-548. `docs/FINDINGS.md`
+[^F568A]: Backlog item 0495. `docs/backlog/complete/0495-build-the-observation-plane-and-let-every-reader-answer-for-one-faction.md`
+[^F568B]: ADR-0059, fog storage grows with observed area, not with world area, the context. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+[^F568C]: The observation module of the core crate. `crates/cachette-core/src/observation.rs`
+[^F568D]: Research report 31, the state of the learner surface, claim 1. `docs/research/reports/31-the-state-of-the-learner-surface.md`

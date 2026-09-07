@@ -266,6 +266,29 @@ pub enum BlockForm {
 }
 
 impl BlockForm {
+    /// Reports whether the block names the tile at one offset inside it.
+    ///
+    /// This is the one place that reads a payload, so a reader that walks a
+    /// block never repeats the bit layout.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    #[must_use]
+    pub fn holds(&self, offset: u32) -> bool {
+        match self {
+            Self::None => false,
+            Self::All => true,
+            Self::Few(offsets) => offsets.binary_search(&offset).is_ok(),
+            Self::Many(words) => {
+                let word = (offset / 64) as usize;
+                words
+                    .get(word)
+                    .is_some_and(|bits| bits & (1u64 << (offset % 64)) != 0)
+            }
+        }
+    }
+
     /// Returns the form as a small integer, for the state hash.
     const fn tag(&self) -> u64 {
         match self {
@@ -365,17 +388,9 @@ impl TileLayer {
         };
         let block = self.layout.block_of_key(key) as usize;
         let offset = offset_of_key(self.layout, key);
-        match self.blocks.get(block) {
-            None | Some(BlockForm::None) => false,
-            Some(BlockForm::All) => true,
-            Some(BlockForm::Few(offsets)) => offsets.binary_search(&offset).is_ok(),
-            Some(BlockForm::Many(words)) => {
-                let word = (offset / 64) as usize;
-                words
-                    .get(word)
-                    .is_some_and(|bits| bits & (1u64 << (offset % 64)) != 0)
-            }
-        }
+        self.blocks
+            .get(block)
+            .is_some_and(|form| form.holds(offset))
     }
 
     /// Replaces every block of the layer with the blocks a rebuild produced.
@@ -527,8 +542,7 @@ impl TileLayer {
 
 /// Returns the offset of a tile inside its block.
 fn offset_of_key(layout: BlockLayout, key: u64) -> u32 {
-    let bits = 2 * layout.block_bits();
-    (key & ((1u64 << bits) - 1)) as u32
+    layout.offset_of_key(key)
 }
 
 /// Returns how many offsets one block of the lattice spans.

@@ -29,6 +29,7 @@ pub mod descent;
 pub mod effective;
 pub mod event;
 pub mod event_layout;
+pub mod faction_view;
 pub mod founding;
 pub mod growth;
 pub mod hash;
@@ -92,6 +93,7 @@ pub use descent::{
     Descent, DescentError, DescentId, HouseId, Parents, DESCENT_CEILING, RELATION_DEPTH,
 };
 pub use event::{ResourceTaken, TileChanged};
+pub use faction_view::{Admit, FactionTile, Ground, MaskedSummary, SeenTile, SeenUnit, Sighting};
 pub use founding::{
     Founding, FoundingError, FoundingOutcome, Provision, SettleError, SettleOutcome, Survey,
 };

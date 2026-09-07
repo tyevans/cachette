@@ -168,6 +168,53 @@ impl CellSummary {
         }
     }
 
+    /// Builds the part of one tile that the generated world fixes.
+    ///
+    /// This is the one place that says which fields the ground of a tile
+    /// contributes, so a masked reader and the pyramid rebuild cannot
+    /// disagree about it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    pub(crate) const fn of_ground(passable: bool, height: Fix32, food: Amount) -> Self {
+        Self {
+            tiles: 1,
+            open_tiles: if passable { 1 } else { 0 },
+            units: 0,
+            held_tiles: 0,
+            value_total: Accum(0),
+            height_total: sim_math::accumulate(Accum(0), height),
+            food_total: food.to_accum(),
+        }
+    }
+
+    /// Builds the part of a summary that a frame can change.
+    ///
+    /// This is the one place that says which fields a frame contributes.[^1]
+    /// The food a frame contributes is negative, because the ground part
+    /// already holds what the tiles started with.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    pub(crate) const fn of_frame(
+        units: i64,
+        held_tiles: i64,
+        value_total: Accum,
+        food_taken: i64,
+    ) -> Self {
+        Self {
+            tiles: 0,
+            open_tiles: 0,
+            units,
+            held_tiles,
+            value_total,
+            height_total: Accum(0),
+            food_total: Accum(-food_taken),
+        }
+    }
+
     /// Returns the tiles the summary covers. Extensive.
     #[must_use]
     pub const fn tiles(self) -> i64 {
@@ -656,15 +703,11 @@ fn ground_of_block(layout: BlockLayout, resources: ResourceField, block: u32) ->
         let food = resources
             .original(address, ResourceKind::Food)
             .unwrap_or(Amount::ZERO);
-        summary = summary.combine(CellSummary {
-            tiles: 1,
-            open_tiles: i64::from(ground.kind.is_passable()),
-            units: 0,
-            held_tiles: 0,
-            value_total: Accum(0),
-            height_total: sim_math::accumulate(Accum(0), ground.height),
-            food_total: food.to_accum(),
-        });
+        summary = summary.combine(CellSummary::of_ground(
+            ground.kind.is_passable(),
+            ground.height,
+            food,
+        ));
     }
     summary
 }
@@ -721,21 +764,18 @@ fn moving_part(
         food_taken += food_taken_in_run(depletion, start as u32, end as u32);
     }
 
-    Ok(CellSummary {
-        tiles: 0,
-        open_tiles: 0,
-        units: bridge.in_block(arena, block)?.len() as i64,
+    // The ground part holds the food the tiles started with, so the moving
+    // part holds what was taken, as a negative amount. Nothing takes more
+    // from a tile than the tile ever held, and the world invariant is what
+    // checks that, so the sum of the two parts is never below zero.[^1]
+    //
+    // [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    Ok(CellSummary::of_frame(
+        bridge.in_block(arena, block)?.len() as i64,
         held_tiles,
         value_total,
-        height_total: Accum(0),
-        // The ground part holds the food the tiles started with, so the moving
-        // part holds what was taken, as a negative amount. Nothing takes more
-        // from a tile than the tile ever held, and the world invariant is what
-        // checks that, so the sum of the two parts is never below zero.[^1]
-        //
-        // [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
-        food_total: Accum(-food_taken),
-    })
+        food_taken,
+    ))
 }
 
 /// Returns the food taken from one contiguous run of tiles.

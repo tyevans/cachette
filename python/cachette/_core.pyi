@@ -331,6 +331,23 @@ class PositionColumns(TypedDict):
     rank: npt.NDArray[np.uint8]
     holder: npt.NDArray[np.uint64]
 
+class FactionVisibleUnitColumns(TypedDict):
+    """Every unit one faction sees now.
+
+    A faction sees a unit when it sees the tile that unit stands on. The three
+    arrays hold one entry for each unit, at one index.
+
+    The order is fixed. The walk runs over the factions in faction order, and
+    over the units of each faction in slot order.
+
+    This answers the present frame and never a memory. A unit that walked out
+    of sight leaves the arrays.
+    """
+
+    unit: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    faction: npt.NDArray[np.uint16]
+
 class FactionUnitColumns(TypedDict):
     """One column for each field of a live soldier of one faction.
 
@@ -500,6 +517,74 @@ class ChoiceReport(TypedDict):
     best_name: str | None
     intent: int
     chooses_next_frame: bool
+
+class FactionRegionSummary(TypedDict):
+    """The summary of one cell, over the tiles one faction may read.
+
+    The reader combines only the tiles that the sight rule admits, so a cell
+    cannot state what its tiles hide.
+
+    The admit entry names the rule the call took. It holds ``now`` for the
+    tiles the faction sees this frame, and ``ever`` for the tiles it has ever
+    seen.
+
+    The admitted entry counts the tiles the rule admitted. The withheld entry
+    counts the tiles it refused. A withheld count of zero says that the
+    faction reads the whole cell.
+
+    A tile the faction saw once and does not see now adds the ground alone.
+    It adds no unit, no held tile and no value.
+
+    The value total and the height total are Q16.16 values as their raw
+    integers. The food total is a whole count of units of stock.
+    """
+
+    q: int
+    r: int
+    faction: int
+    admit: str
+    admitted: int
+    withheld: int
+    tiles: int
+    open_tiles: int
+    units: int
+    held_tiles: int
+    value_total: int
+    height_total: int
+    food_total: int
+
+class FactionTileReport(TypedDict):
+    """What one faction may read about one tile.
+
+    The sighting entry holds ``never``, ``remembered`` or ``seen``.
+
+    A ``never`` answer carries no ground at all. Every ground entry is
+    ``None``, so a reader tells that answer from a place that holds nothing.
+
+    A ``remembered`` answer carries the ground of the place and no more. It
+    reports no unit, no holder and no upgrade, because each of those is a
+    fact of the present frame.
+
+    A ``seen`` answer carries the present frame as well. The value is a
+    Q16.16 value as its raw integer. The stock and generated entries hold one
+    amount for each kind of resource, in the order of the kind numbering.
+    """
+
+    q: int
+    r: int
+    faction: int
+    sighting: str
+    kind: int | None
+    passable: bool | None
+    height: int | None
+    generated: list[int] | None
+    value: int | None
+    capacity: int | None
+    stock: list[int] | None
+    holder: int | None
+    upgrade: int | None
+    upgrade_level: int
+    units: int
 
 class TileReport(TypedDict):
     """What one tile holds.
@@ -1199,6 +1284,9 @@ class World:
     def destination_count(self) -> int: ...
     def set_destination_count(self, count: int) -> None: ...
     def faction_units(self, faction: int) -> FactionUnitColumns: ...
+    def faction_visible_units(
+        self, faction: int
+    ) -> FactionVisibleUnitColumns: ...
     @property
     def settlement_count(self) -> int: ...
     def found_settlements(
@@ -1211,6 +1299,12 @@ class World:
     def found_group(self, group: int, faction: int) -> FoundingColumns: ...
     def founding_survey(self, group: int, faction: int) -> SurveyColumns: ...
     def region_summary(self, q: int, r: int) -> RegionSummary: ...
+    def faction_tile_report(
+        self, faction: int, q: int, r: int
+    ) -> FactionTileReport: ...
+    def faction_region_summary(
+        self, faction: int, q: int, r: int, admit: str = ...
+    ) -> FactionRegionSummary: ...
     def site_economy(self, site: int, commodity: int = ...) -> SiteEconomy: ...
     def site_production(self, site: int, commodity: int = ...) -> SiteProduction: ...
     def site_housing(self, site: int) -> SiteHousing: ...
