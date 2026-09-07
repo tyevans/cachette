@@ -199,6 +199,33 @@
         </div>
       </form>
 
+      <section class="card add-rounds">
+        <h2>Add rounds to this session</h2>
+        <p class="note">
+          This adds rounds to this session. The next round revises the
+          drawings you liked, and reads the drawings you refused as a
+          warning. Write and save your feedback first. The loop reads it
+          from disk.
+        </p>
+        <form method="post" action="{{ base }}/rounds" class="inline">
+          <label>Rounds
+            <select name="rounds">
+              {% for value in round_choices %}
+                <option value="{{ value }}" {{ 'selected' if value == 3 else '' }}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label>Variants
+            <select name="variants">
+              {% for value in variant_choices %}
+                <option value="{{ value }}" {{ 'selected' if value == 4 else '' }}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <button type="submit">Add rounds</button>
+        </form>
+      </section>
+
       <section class="card analysis">
         <h2>What the liked drawings share</h2>
         <p class="note">

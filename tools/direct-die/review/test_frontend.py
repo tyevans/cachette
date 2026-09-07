@@ -40,6 +40,7 @@ import packs as pack_module  # noqa: E402
 import app as app_module  # noqa: E402
 from app import create_app  # noqa: E402
 from make_fixtures import build_workspace  # noqa: E402
+from runs import RunManager  # noqa: E402
 from store import SessionStore, write_json_atomically  # noqa: E402
 
 # The sessions of the fixture workspace that the front end tests read.
@@ -867,3 +868,155 @@ def test_accepting_a_rule_for_a_style_with_no_file_shows_an_error(
         follow_redirects=True,
     )
     assert "no rules file" in response.text.lower()
+
+
+# -- adding rounds to an existing session ------------------------------------
+
+
+def test_start_job_with_an_existing_session_makes_one_item(
+    paths: dict[str, Path],
+) -> None:
+    (paths["sessions"] / "cartoon" / "20260904-090000-forest").mkdir(
+        parents=True, exist_ok=True
+    )
+    runner = RunManager(
+        runs_root=paths["runs"],
+        sessions_root=paths["sessions"],
+        tool_directory=HERE,
+        command=fake_tool_command,
+    )
+    job = runner.start_job(
+        "cartoon",
+        [(None, "a dense stand of trees")],
+        rounds=1,
+        variants=1,
+        session_id="20260904-090000-forest",
+    )
+    assert len(job.items) == 1
+    assert job.items[0].session_id == "20260904-090000-forest"
+
+
+def test_start_job_rejects_a_session_that_does_not_exist(
+    paths: dict[str, Path],
+) -> None:
+    runner = RunManager(
+        runs_root=paths["runs"],
+        sessions_root=paths["sessions"],
+        tool_directory=HERE,
+        command=fake_tool_command,
+    )
+    with pytest.raises(ValueError):
+        runner.start_job(
+            "cartoon",
+            [(None, "a subject")],
+            rounds=1,
+            variants=1,
+            session_id="no-such-session",
+        )
+
+
+def test_add_rounds_reuses_the_existing_session_identifier(
+    running_client: TestClient, paths: dict[str, Path]
+) -> None:
+    response = running_client.post(
+        f"/s/{CHOSEN}/rounds",
+        data={"rounds": 1, "variants": 1},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    job_id = response.headers["location"].removeprefix("/runs/")
+    record = json.loads((paths["runs"] / job_id / "job.json").read_text())
+    assert len(record["items"]) == 1
+    assert record["items"][0]["session"] == CHOSEN.split("/")[1]
+
+
+def test_add_rounds_reads_the_subject_from_the_round_metadata(
+    running_client: TestClient, paths: dict[str, Path]
+) -> None:
+    # The water session subject in the round metadata is "open water", which
+    # differs from the slug table default "open water, deep and still". The
+    # test would pass on either text if the two agreed, so the fixture picks
+    # a session where they differ.
+    response = running_client.post(
+        f"/s/{LIVE}/rounds",
+        data={"rounds": 1, "variants": 1},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    job_id = response.headers["location"].removeprefix("/runs/")
+    record = json.loads((paths["runs"] / job_id / "job.json").read_text())
+    assert record["items"][0]["subject"] == "open water"
+
+
+def test_add_rounds_to_a_session_that_does_not_exist_starts_nothing(
+    client: TestClient, paths: dict[str, Path]
+) -> None:
+    before = list((paths["runs"]).glob("*"))
+    response = client.post(
+        "/s/cartoon/no-such-session/rounds",
+        data={"rounds": 1, "variants": 1},
+        follow_redirects=True,
+    )
+    assert "no such session" in response.text.lower()
+    assert list((paths["runs"]).glob("*")) == before
+
+
+def test_add_rounds_while_a_run_is_in_flight_starts_nothing(
+    paths: dict[str, Path],
+) -> None:
+    gate = paths["runs"] / "gate"
+    script = (
+        "import pathlib, sys, time\n"
+        "target = pathlib.Path(sys.argv[1])\n"
+        "while not target.exists():\n"
+        "    time.sleep(0.05)\n"
+    )
+
+    def command(
+        python: str,
+        style: str,
+        subject: str,
+        session_id: str,
+        rounds: int,
+        variants: int,
+    ) -> list[str]:
+        return [python, "-c", script, str(gate)]
+
+    client = TestClient(
+        create_app(
+            paths["sessions"],
+            paths["styleguide"],
+            paths["packs"],
+            paths["runs"],
+            run_command=command,
+        )
+    )
+    first = client.post(
+        f"/s/{CHOSEN}/rounds",
+        data={"rounds": 1, "variants": 1},
+        follow_redirects=False,
+    )
+    first_job_id = first.headers["location"].removeprefix("/runs/")
+    assert wait_until(lambda: "running" in client.get(f"/runs/{first_job_id}").text)
+
+    jobs_before = list((paths["runs"]).glob("*"))
+    second = client.post(
+        f"/s/{CHOSEN}/rounds",
+        data={"rounds": 1, "variants": 1},
+        follow_redirects=True,
+    )
+    assert "already" in second.text.lower() or "in flight" in second.text.lower()
+    assert list((paths["runs"]).glob("*")) == jobs_before
+
+    gate.parent.mkdir(parents=True, exist_ok=True)
+    gate.write_text("go", encoding="utf-8")
+    assert wait_until(lambda: "done" in client.get(f"/runs/{first_job_id}").text)
+
+
+def test_the_round_page_and_the_session_page_render_the_add_rounds_control(
+    client: TestClient,
+) -> None:
+    round_page = client.get(f"/s/{CHOSEN}/round-01")
+    assert f"/s/{CHOSEN}/rounds" in round_page.text
+    session_page = client.get(f"/s/{CHOSEN}")
+    assert f"/s/{CHOSEN}/rounds" in session_page.text

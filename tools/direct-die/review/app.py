@@ -347,6 +347,42 @@ def create_app(
             auto_reload=True,
         )
 
+    @app.post("/s/{asset}/{session_id}/rounds")
+    def add_rounds(
+        request: Request,
+        asset: str,
+        session_id: str,
+        rounds: int = Form(default=3),
+        variants: int = Form(default=4),
+    ) -> Response:
+        """Add rounds to one session, and start the run at once.
+
+        The new round revises the drawings the person liked, and reads the
+        drawings the person refused as a warning. The loop reads both from
+        the feedback file that the round page already writes.
+        """
+        rounds = max(1, min(rounds, max(ROUND_CHOICES)))
+        variants = max(1, min(variants, max(VARIANT_CHOICES)))
+        if not store.session_directory(asset, session_id).is_dir():
+            return page(
+                "error.html", request, message=f"no such session: {asset}/{session_id}"
+            )
+        if runner.item_for_session(asset, session_id) is not None:
+            return page(
+                "error.html",
+                request,
+                message=f"a run of {asset}/{session_id} is already in flight",
+            )
+        session = store.load_session(asset, session_id)
+        subject = session.subject or session_id
+        try:
+            job = runner.start_job(
+                asset, [(None, subject)], rounds, variants, session_id=session_id
+            )
+        except (ValueError, OSError) as error:
+            return page("error.html", request, message=str(error))
+        return no_store(RedirectResponse(f"/runs/{job.job_id}", status_code=303))
+
     @app.get("/s/{asset}/{session_id}/{round_name}", response_class=HTMLResponse)
     def round_page(
         request: Request, asset: str, session_id: str, round_name: str
