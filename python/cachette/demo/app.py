@@ -57,7 +57,7 @@ if TYPE_CHECKING:
     # importing them at run time would fail.
     from cachette._core import FoundingReport, FrameReading, GameEnd
 from cachette.demo.clock import SPEEDS, Clock, says
-from cachette.demo.settings import Settings
+from cachette.demo.settings import Settings, load_video, save_video
 from cachette.demo.surface import Surface
 from cachette.demo.toasts import Announcer
 
@@ -704,7 +704,15 @@ def main(argv: list[str] | None = None) -> int:
         prog="python -m cachette.demo",
         description="Watch the world run, from the control plane.",
     )
-    parser.add_argument("--width", type=int, default=WINDOW_WIDTH)
+    parser.add_argument(
+        "--width",
+        type=int,
+        default=0,
+        help=(
+            "the window width; the run opens at the size it last saved by "
+            "default, and this width governs this run without saving"
+        ),
+    )
     parser.add_argument(
         "--height",
         type=int,
@@ -855,13 +863,35 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as refusal:
         print(f"the engine refused the world: {refusal}")
         return 2
+    # **A run opens in the video state the last run saved.** A file that is
+    # absent or damaged gives the opening state back, so the memory can never
+    # stop the run.
+    saved = load_video()
+    # A picture and a run to the end open no window, so the saved window state
+    # governs neither. Both keep the sizes they always had.
+    opens_window = not arguments.picture and not arguments.run_to_end
+    # **A size on the command line governs this run, and it saves nothing.**
+    # The watcher who types a size asks for one run at that size. The size the
+    # watcher last chose by hand stays in the file, and the next run without a
+    # size opens at it.
+    typed_size = arguments.width > 0 or arguments.height > 0
+    width = arguments.width or WINDOW_WIDTH
+    height = arguments.height or default_height
+    if opens_window and not typed_size:
+        # A saved size can be larger than the display of this run. The window
+        # library knows the display, and it gives no size without one.
+        display = screen_size()
+        if display is not None:
+            saved.fit_within(*display)
+        width, height = saved.size
     demo = Demo(
         world,
         Names(world.seed),
-        width=arguments.width,
-        height=arguments.height or default_height,
+        width=width,
+        height=height,
         threads=arguments.threads,
     )
+    demo.settings.video = saved
     if arguments.tick_limit > 0:
         demo.world.set_tick_limit(arguments.tick_limit)
     # The seed comes first, before any other line. A run that ends badly is
@@ -915,7 +945,7 @@ def main(argv: list[str] | None = None) -> int:
     print("click a tile to point at it")
     print("close the window or press escape to stop")
 
-    status = _run_window(demo, arguments.frames)
+    status = _run_window(demo, arguments.frames, restore_size=not typed_size)
     print_census(demo.world)
     return status
 
@@ -1127,7 +1157,31 @@ def window_size(window: object, fallback: tuple[int, int]) -> tuple[int, int]:
     return fallback
 
 
-def _apply_settings(demo: Demo, window: object) -> None:
+def screen_size() -> tuple[int, int] | None:
+    """Give back the size of the display in pixels, or None without one.
+
+    The import is here and not at the top of the module, so a caller that only
+    wants a frame in memory needs no window library.
+
+    A box with no display gives None. The window library reaches the display
+    through the operating system, and it raises in several ways when there is
+    none, so this catches the failure rather than the type of it.
+    """
+    try:
+        from pyglet.display import get_display
+
+        screen = get_display().get_default_screen()
+        return (int(screen.width), int(screen.height))
+    except Exception:
+        return None
+
+
+def _apply_settings(
+    demo: Demo,
+    window: object,
+    with_size: bool = True,
+    remember: bool = True,
+) -> None:
     """Give the window the video settings, and resize the pixels to match.
 
     The surface is the memory the engine fills. A window of a new size needs a
@@ -1135,10 +1189,23 @@ def _apply_settings(demo: Demo, window: object) -> None:
 
     The surface follows the size the window reports, not the size the settings
     hold. The two differ while the window is fullscreen.
+
+    **Only a key press writes the file.** This is the one place a video setting
+    reaches the window, so it is the one place the file needs a write. A key
+    press writes the file at once, so a run that stops badly keeps the change
+    the watcher just made. No frame writes the file, because no frame comes
+    through here.
+
+    The caller that opens the window passes False for the memory. A size that
+    this display forced down, and a size that the command line named, both
+    govern this run alone. Neither replaces the size the watcher last chose by
+    hand.
     """
-    refused = demo.settings.apply_to(window)
+    refused = demo.settings.apply_to(window, with_size=with_size)
     if refused:
         print(f"the window refused: {', '.join(refused)}")
+    if remember and not save_video(demo.settings.video):
+        print("the video settings were not saved")
     width, height = window_size(window, demo.settings.video.size)
     if (width, height) != (demo.surface.width, demo.surface.height):
         demo.surface = Surface(width, height)
@@ -1231,7 +1298,7 @@ class WindowPicture:
         self.image.set_data("BGRA", self.pitch, surface.to_bytes())
 
 
-def _run_window(demo: Demo, frame_limit: int) -> int:
+def _run_window(demo: Demo, frame_limit: int, restore_size: bool = True) -> int:
     """Drives the window until it closes.
 
     The import is here and not at the top of the module, so that a caller that
@@ -1253,6 +1320,11 @@ def _run_window(demo: Demo, frame_limit: int) -> int:
         )
         return image
 
+    # The window opens at the size the caller chose, so the size is already
+    # right and only the other two settings need a call. A fullscreen window
+    # takes no size at all, and the settings order the fullscreen call before
+    # the size call for that reason.
+    _apply_settings(demo, window, with_size=restore_size, remember=False)
     picture = WindowPicture(make_image, demo.surface)
     keys = pyglet.window.key.KeyStateHandler()
     window.push_handlers(keys)
