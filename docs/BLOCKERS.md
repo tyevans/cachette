@@ -25,11 +25,49 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-154**
+**Next number: BLK-156**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
 ## Open
+
+### BLK-155 — The subtropics receive one percent of the rain the equator receives
+
+**Owner:** the project owner. **Blocks:** every climate class that a dry test
+decides, and the temperate band in particular.
+
+**The rain field is collapsed onto the equator.** Measured over the
+demonstration world, at an extent of 128, at seed `0x2f`, at the tile pitch,
+settled for 400 ticks and sampled over one season period, on 6 September 2026
+on one development machine (x86-64): the land within eight degrees of the
+equator holds 17,432 units of the probe's rain scale, and the land near thirty
+degrees north holds 344. **The subtropics receive 1 percent of what the
+equator receives.** The probe carries its own test of this, and the test says
+the figure must be well under a hundred percent. One percent is not the right
+side of that test. It is off the scale the test was written for.
+
+**The published belt of deserts is a fall, not a collapse.** The subtropical
+high descends and dries, and that is why the deserts of the Earth sit near
+thirty degrees.[^BLK155A] The fall is real. A fall to one hundredth is not
+what the published circulation gives.
+
+**This caps a climate that no other change can reach.** The Köppen aridity
+test runs before every temperature test, so an arid cell never reaches the
+temperate test whatever its temperature does. At thirty-seven degrees, which
+is where the published classification puts the temperate climates, 61 percent
+of the land grades arid. **So the temperate band cannot pass about 39 percent
+of that latitude while this stands**, and the published share of the land of
+the Earth is 13.4 percent temperate against 30.2 percent arid.[^BLK155B]
+
+**What would close this.** A measurement of what the transport carries out of
+the equatorial band, and a statement of how much of the rain of a world the
+wettest band may hold. The evaporation, the transport share and the rain-out
+share each reach this, and no measurement says which one carries it.
+
+**What the project does meanwhile.** The temperate band stays short of its
+published share, and the desert band stays above it. A change to the season or
+to the temperature profile moves the cells that are not already arid, and it
+leaves this untouched.
 
 ### BLK-153 — Nobody has said whether a unit sent to a project may feed itself on the way
 
@@ -825,6 +863,8 @@ normally.
 
 [^BLK153A]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^BLK153B]: Findings register, FND-589. `docs/FINDINGS.md`
+[^BLK155A]: Research report 30, the published atmospheric math, section 5.1. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^BLK155B]: Research report 30, the published atmospheric math, section 8.1. `docs/research/reports/30-the-published-atmospheric-math.md`
 [^BLK122A]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decisions D1 and D4. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
 [^BLK123A]: ADR-0132, conversion changes the faction of a unit and adds no second allegiance, decision D2. `docs/adrs/draft/adr-0132-conversion-changes-the-faction-of-a-unit.md`
 [^BLK130A]: ADR-0142, a god inflicts weather only on ground its own faction holds, decisions D2 and D4. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`

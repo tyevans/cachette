@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-602**
+**Next number: FND-603**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -15002,3 +15002,60 @@ immediately before this work.
 [^F601A]: The Köppen probe. `crates/cachette-core/examples/weather_koppen_probe.rs`
 [^F601B]: Research report 30, the published atmospheric math, section 8. `docs/research/reports/30-the-published-atmospheric-math.md`
 [^F601C]: Research report 30, the published atmospheric math, section 4.4. `docs/research/reports/30-the-published-atmospheric-math.md`
+
+
+### FND-602 — A diffusion on the carried temperature cannot flatten the profile, because the driver pins it
+
+**Believed.** The mid-latitudes and the poles stand too cold because the
+temperature follows the insolation with no transport term. A published energy
+balance model carries a diffusion of heat toward the poles, and the engine
+carries none.[^F601C] Adding one would flatten the profile and lift the polar
+summer above freezing.
+
+**True.** The first half holds. The engine carries no transport term and a
+published model does. **The second half does not.** A diffusion on the carried
+temperature plane changes nothing that a reader can see, at any pass count the
+engine can afford.
+
+**The driver is the reason.** Each pass moves the temperature of a cell one
+eighth of the way toward what the world asks of that cell. That is a
+relaxation to a local value, and it competes with the diffusion. The diffusion
+smooths over the square root of the ratio between the two, which is about one
+cell at one pass and about seven cells at thirty-two. **The profile it must
+flatten is 128 cells from pole to pole.** Flattening it needs about 10,900
+passes for each tick.
+
+**Evidence.** Three runs of the Köppen probe over one demonstration world, at
+an extent of 128, at seed `0x2f`, at the tile pitch, settled for 400 ticks and
+sampled every 8 ticks over one season period, on 6 September 2026 on one
+development machine (x86-64). Every figure is derived.[^F601A]
+
+The mean temperature of every latitude band is the same to the whole degree
+with no transport pass, with one, and with thirty-two: −26, −19, −5, 12, 23,
+26, 25, 22, 12, −5, −17, −24. The ice cap holds 1 percent of the land in all
+three. **Thirty-two passes are indistinguishable from none.**
+
+**The term is not merely inert. It is slightly harmful.** The temperate band
+falls from 123 cells to 109, because the pass smooths the local contrast that
+was carrying a few marginal cells over the threshold. It costs a pass over
+every cell and it returns less than nothing.
+
+**What follows.** **A transport term belongs in what the field is driven
+toward, and not in what it carries.** The published model diffuses against a
+radiative relaxation whose timescale is a tenth of a year. The engine relaxes
+to a prescribed profile in eight ticks of a 2048-tick year, which is not a
+relaxation but an assignment. **Nothing can compete with an assignment.**
+
+So the profile must be flattened where it is prescribed, which is the belt
+that the insolation table builds. That is the same answer the project already
+reached for the circulation bands: a single-layer field cannot grow the eddies
+that do the transport on the Earth, so the result of that transport is imposed
+rather than awaited.[^F602C]
+
+**That change needs a published target profile, and this work could not verify
+one.** No zonal mean land temperature against latitude was reachable from an
+accessible source. The next attempt needs that data before it starts.
+
+## References
+
+[^F602C]: Research report 30, the published atmospheric math, section 5.3. `docs/research/reports/30-the-published-atmospheric-math.md`
