@@ -15831,6 +15831,56 @@ arid, where the band at 37 degrees north holds 403 cells at 587 mm and grades
 project to fix the terrain generator by changing the physics.
 
 
+### FND-617 — The subtropics are not too dry. The equator is too wet and the poles never receive anything
+
+**What the project believed.** The rain over land runs about 23 to 1 from the
+equator to the subtropics against a published 4 to 10, so the subtropics are too
+dry, and that dryness is what holds the temperate share down.[^F617A]
+
+**What is true.** The ratio is right and the reading of it is wrong. The probe
+normalises so that the mean land cell of the world receives the mean annual
+rainfall of Earth's land, so a band figure is comparable to Earth in millimetres
+and not only in shape. Read that way, **the subtropical bands are correct and
+the equator is five times too wet**. The band at 21 degrees receives 688 mm
+against about 700, and the band at 37 degrees north receives 587 mm against
+about 600. The equatorial bands receive about 11,000 mm against about 2,200.
+
+**The two equatorial bands hold 2.9 percent of the land of this world and take
+38.3 percent of its rain.** Because the normaliser divides by the mean, one band
+taking a third of the water grades every other band as a desert. The subtropics
+looked dry because the equator was hoarding, not because they were short.
+
+**The poles are the other end of it.** The bands at 82 degrees receive 49 and
+60 mm against about 200. The bands at 52 degrees receive 1,287 and 1,516 mm
+against about 650. Water piles up where the air converges and never reaches the
+cold end of the world.
+
+**Nothing in a single-layer field can carry it there, and the module already
+says so about the wind.** The three circulation cells cannot emerge from one
+layer, because a single layer has no baroclinic eddies and one temperature
+profile that falls to the pole gives two pressure extremes and not three. The
+module therefore imposes the cells. **Poleward moisture transport fails for the
+same reason and needs the same remedy.** On Earth the moisture that reaches the
+middle and high latitudes is carried by those eddies and by the upper branch of
+the overturning, and this field has neither.
+
+**A condensed phase that travels does not fix it, and would make it worse.**
+The published conversion and fallout times are about 1,000 seconds each. One
+tick of this model is 15,409 seconds and one weather cell of the probe world
+spans about 156 km, so condensate at 20 m/s travels about a quarter of one cell
+before it falls. What little it does travel, it travels with the surface wind,
+and the imposed belts send the surface wind toward the equator. **A term that
+advected condensate would concentrate the rain further where it is already five
+times too high.**
+
+**What follows.** A poleward moisture flux must be imposed, in the shape and for
+the reason the pressure belts are imposed, and its amplitude is a tuning
+constant under the blocker that already governs the wind.[^F617B] **Do not read
+a normalised band figure as a statement about that band alone.** The normaliser
+couples every band to every other one, so a defect in the wettest band is
+reported as a defect in all the others.
+
+
 ## References
 
 [^F612A]: The motion probe. `crates/cachette-core/examples/weather_motion_probe.rs`
@@ -15838,3 +15888,5 @@ project to fix the terrain generator by changing the physics.
 [^F614A]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
 [^F615A]: Research report 32, zonal mean surface temperature, section 7. `docs/research/reports/32-zonal-mean-surface-temperature.md`
 [^F616A]: Peel, Finlayson and McMahon, updated world map of the Koppen-Geiger climate classification, 2007. Hydrology and Earth System Sciences 11, 1633 to 1644.
+[^F617A]: Blockers register, BLK-155. `docs/BLOCKERS.md`
+[^F617B]: Blockers register, BLK-130. `docs/BLOCKERS.md`
