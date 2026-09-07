@@ -65,11 +65,22 @@ const uint DRAWN = 1u;
 const uint CLIFF = 2u;
 const uint WATER = 4u;
 
+// Bring a point back inside the page, the way the array renderer rolls a
+// field: a point off one edge comes back on the other.
+//
+// **The remainder operator of this language is undefined when either side is
+// negative.** The array renderer relies on a remainder that is never
+// negative, so the two disagree at the first row and the first column alone.
+// Nothing else on the page reads a negative coordinate, so a page whose
+// ground stops short of the edge hides the fault completely. This form is
+// defined for every input. The page is far smaller than the largest whole
+// number a real number holds exactly, so the division below is exact.
+int wrap_one(int at, int by) {
+    return at - by * int(floor(float(at) / float(by)));
+}
+
 ivec2 wrapped(ivec2 at) {
-    return ivec2(
-        ((at.x % page_size.x) + page_size.x) % page_size.x,
-        ((at.y % page_size.y) + page_size.y) % page_size.y
-    );
+    return ivec2(wrap_one(at.x, page_size.x), wrap_one(at.y, page_size.y));
 }
 
 ivec2 held_in(ivec2 at) {
@@ -253,11 +264,10 @@ uniform int draws_sky;
 uniform int draws_wash;
 uniform int cloud_step;
 uniform int cloud_lift;
-uniform ivec2 box_origin;
 uniform ivec2 fit_size;
 uniform ivec2 fit_at;
-uniform ivec2 page_span;
-uniform float fit_scale;
+uniform isampler2D fit_x;
+uniform isampler2D fit_y;
 
 float share_at(ivec2 at) {
     int take = texelFetch(page_take, at, 0).r;
@@ -341,8 +351,17 @@ void main() {
     ivec2 inside = pixel - fit_at;
     if (inside.x >= 0 && inside.x < fit_size.x
         && inside.y >= 0 && inside.y < fit_size.y) {
-        ivec2 source = ivec2(vec2(inside) / fit_scale);
-        source = clamp(source, ivec2(0), page_span - 1) + box_origin;
+        // **The two lists say which point of the page each pixel shows.**
+        // The array renderer builds them, and the shader reads them rather
+        // than working the mapping out again. A mapping worked out twice is
+        // one value declared twice: the two divide a whole number by the same
+        // scale at different widths, and near a boundary they land on
+        // neighbouring points. On a hatched page those two points are far
+        // apart in colour, so the picture differs where nothing is wrong.
+        ivec2 source = ivec2(
+            texelFetch(fit_x, ivec2(inside.x, 0), 0).r,
+            texelFetch(fit_y, ivec2(inside.y, 0), 0).r
+        );
         out_colour = shade(source);
     }
     // The array renderer packs the colour by cutting the fraction away, so

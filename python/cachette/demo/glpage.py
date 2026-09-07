@@ -122,7 +122,6 @@ class Device:
         back quietly to a slower one.
         """
         import pyglet
-
         from pyglet import gl
 
         self.gl = gl
@@ -160,12 +159,12 @@ class Device:
         if not _wanted_headless():
             try:
                 return pyglet.window.Window(width=16, height=16, visible=False)
-            except Exception as refusal:  # noqa: BLE001
+            except Exception as refusal:
                 failures.append(f"a hidden window: {refusal}")
         try:
             pyglet.options["headless"] = True
             return pyglet.window.Window(width=16, height=16, visible=False)
-        except Exception as refusal:  # noqa: BLE001
+        except Exception as refusal:
             failures.append(f"a display-free context: {refusal}")
         message = "the machine gives no graphics context (" + "; ".join(failures) + ")"
         raise DeviceGap(message)
@@ -228,12 +227,8 @@ class Device:
         # texture with no mip levels and the default filter.
         gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MIN_FILTER, gl.GL_NEAREST)
         gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_MAG_FILTER, gl.GL_NEAREST)
-        gl.glTexParameteri(
-            gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP_TO_EDGE
-        )
-        gl.glTexParameteri(
-            gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP_TO_EDGE
-        )
+        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_S, gl.GL_CLAMP_TO_EDGE)
+        gl.glTexParameteri(gl.GL_TEXTURE_2D, gl.GL_TEXTURE_WRAP_T, gl.GL_CLAMP_TO_EDGE)
         self._textures[name] = (handle, width, height, layout)
         return handle
 
@@ -412,7 +407,9 @@ class Device:
 
 # How each kind of field is stored, given as the storage form, the band order
 # and the number type. One name here is one kind of field the page uploads.
-def _layouts() -> tuple[dict[str, tuple[int, int, int]], dict[str, Any], dict[str, int]]:
+def _layouts() -> tuple[
+    dict[str, tuple[int, int, int]], dict[str, Any], dict[str, int]
+]:
     """Give back the three tables that describe every texture layout.
 
     The tables name constants of the graphics library, so they are built
@@ -449,7 +446,7 @@ class _Late:
     reports the gap rather than failing at the import.
     """
 
-    __slots__ = ("_held", "_at")
+    __slots__ = ("_at", "_held")
 
     def __init__(self, at: int) -> None:
         self._at = at

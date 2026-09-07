@@ -48,6 +48,7 @@ ADR-0067, the viewer reads the world and never writes to it, decision D3.
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -64,6 +65,7 @@ if TYPE_CHECKING:
 
     from cachette import World
     from cachette._core import Camera, FrameReading
+    from cachette.demo.view import View
 
 __all__ = ["DeviceGap", "GlSketch"]
 
@@ -116,7 +118,9 @@ def _defines() -> str:
         "FAR_REACH": FAR_REACH,
     }
     lines = [f"#define {name} {value!r}" for name, value in whole.items()]
-    lines += [f"const float {name} = {float(value)!r};" for name, value in numbers.items()]
+    lines += [
+        f"const float {name} = {float(value)!r};" for name, value in numbers.items()
+    ]
     lines += [
         f"const vec3 {name} = vec3({float(band[0])!r}, {float(band[1])!r}, "
         f"{float(band[2])!r});"
@@ -150,16 +154,22 @@ class GlSketch(Sketch):
         self,
         world: World,
         *,
+        view: View | None = None,
         relief: float = ink.RELIEF,
-        lean: float = ink.LEAN,
         sky: bool = True,
     ) -> None:
-        """Build the renderer for one world."""
-        super().__init__(world, relief=relief, lean=lean, sky=sky)
+        """Build the renderer for one world.
+
+        **The view says where the watcher stands, and this holds no angle of
+        its own.** The turn and the lean are read from it on every frame, so a
+        mouse that moves the view moves the page.
+        """
+        super().__init__(world, view=view, relief=relief, sky=sky)
         self._device: Device | None = None
-        # What the page last sent to the device, so that a frame that reuses a
-        # page does not send it again.
-        self._stamp: tuple[Any, ...] | None = None
+        # The page last sent to the device, held so that a frame which reuses
+        # a page does not send it again. Holding it also keeps it alive, so no
+        # later page can take its place in memory and pass the test above.
+        self._stamp: Ground | None = None
         self._pages: dict[str, Any] = {}
         self._palette: np.ndarray | None = None
 
@@ -195,8 +205,11 @@ class GlSketch(Sketch):
         The turn and the lift are a function of the camera and the size of the
         frame, so this runs when the camera moves and not on every frame.
         """
-        stamp = (ground.window, ground.shape, id(ground))
-        if self._stamp == stamp:
+        # **The test is the page itself, not a description of it.** The build
+        # gives back a new page whenever the window, the frame or either angle
+        # moves, so holding the last page and comparing it by identity cannot
+        # miss a change that a list of its properties would forget to name.
+        if self._stamp is ground:
             return
         device = self.device
         drawn = ground.drawn
@@ -211,7 +224,7 @@ class GlSketch(Sketch):
         device.upload("page_take", ground.take.astype(np.int32), "r32i")
         rows, columns = drawn.shape
         device.upload("page_grain", self._paper_grain(rows, columns), "r32f")
-        self._stamp = stamp
+        self._stamp = ground
 
     def _send_tiles(self, ground: Ground) -> None:
         """Put the fields that change with the world on the device.
@@ -257,11 +270,14 @@ class GlSketch(Sketch):
             wind_q = winds["q"].reshape(rows, columns).astype(np.float32)
             wind_r = winds["r"].reshape(rows, columns).astype(np.float32)
             # The wind stands on the axes of the hex grid, and the page turns
-            # those axes, so the wind turns with them.
+            # those axes, so the wind turns with them. The angles come from
+            # the view, which is the one place that holds them.
             plan_x = wind_q + wind_r * 0.5
             plan_y = wind_r * ink.ROW_PITCH
-            page_dx = plan_x - plan_y
-            page_dy = (plan_x + plan_y) * self._lean
+            along_turn = math.cos(self.view.turn)
+            across_turn = math.sin(self.view.turn)
+            page_dx = plan_x * along_turn - plan_y * across_turn
+            page_dy = (plan_x * across_turn + plan_y * along_turn) * self.view.lean
             length = np.hypot(page_dx, page_dy)
             moving = length > 0.0
             page_dx = np.where(moving, page_dx / np.where(moving, length, 1.0), 1.0)
@@ -353,7 +369,8 @@ class GlSketch(Sketch):
                 np.clip(found_y // safe, 0, height - 1).astype(np.int32),
             )
         at_x, at_y = ground.sample
-        return frame[at_y, at_x]
+        window: np.ndarray = frame[at_y, at_x]
+        return window
 
     # ------------------------------------------------------------------
     # The frame
@@ -417,6 +434,7 @@ class GlSketch(Sketch):
         device.ensure("wash_settled", "r32f")
         device.ensure("wash_blurred", "rg32f", bands=2)
 
+        fit_w, fit_h = self._send_fit(ground, width, height)
         program = self._program(
             "composite", source.TONE + source.HATCH + source.COMPOSITE
         )
@@ -435,16 +453,12 @@ class GlSketch(Sketch):
             ("wash_settled", 10),
             ("wash_blurred", 11),
             ("palette", 12),
+            ("fit_x", 13),
+            ("fit_y", 14),
         ]
         for name, unit in units:
             device.bind(program, name, unit)
 
-        first_row, last_row, first_col, last_col = ground.box
-        span_rows = last_row - first_row
-        span_cols = last_col - first_col
-        scale = min(width / span_cols, height / span_rows)
-        fit_w = max(int(span_cols * scale), 1)
-        fit_h = max(int(span_rows * scale), 1)
         rise = max(int(page_cols * self._relief), 1)
 
         program["page_size"] = (page_cols, page_rows)
@@ -454,17 +468,20 @@ class GlSketch(Sketch):
         )
         program["rise"] = float(rise)
         program["light"] = tuple(float(band) for band in ink.LIGHT)
-        program["palette_len"] = len(self._palette)
+        # The pass that sends the tiles reads the palette from the engine and
+        # sends it, and it ran above, so the palette is here.
+        palette = self._palette
+        if palette is None:
+            message = "the palette did not reach the device before the frame"
+            raise DeviceGap(message)
+        program["palette_len"] = len(palette)
         program["faction_count"] = int(self._world.faction_count)
         program["draws_sky"] = 1 if self._sky else 0
         program["draws_wash"] = 1 if washes else 0
         program["cloud_step"] = max(int(page_cols * ink.CLOUD_SHADOW_STEP), 1)
         program["cloud_lift"] = int(rise * ink.CLOUD_HEIGHT)
-        program["box_origin"] = (first_col, first_row)
-        program["page_span"] = (span_cols, span_rows)
         program["fit_size"] = (fit_w, fit_h)
         program["fit_at"] = ((width - fit_w) // 2, (height - fit_h) // 2)
-        program["fit_scale"] = float(scale)
         program.stop()
 
         device.run(program, width, height, "rgba8")
@@ -478,6 +495,35 @@ class GlSketch(Sketch):
             (packed[..., 0] << 16) | (packed[..., 1] << 8) | packed[..., 2]
         ).astype(np.uint32)
         return result
+
+    def _send_fit(self, ground: Ground, width: int, height: int) -> tuple[int, int]:
+        """Say which point of the page each pixel of the frame shows.
+
+        The page is wider and shorter than the frame, because the turn spreads
+        the world across the paper. It is scaled to fit rather than cut, so a
+        watcher sees the whole world the camera covers.
+
+        **The array renderer works this mapping out, and this takes it from
+        there.** A shader that worked it out again would divide the same whole
+        number by the same scale at a different width. Near a boundary the two
+        land on neighbouring points of the page, and on a hatched page two
+        neighbouring points are far apart in colour. The mapping is two short
+        lists, so it crosses to the device whole.
+
+        Gives back the size of the fitted page in pixels.
+        """
+        first_row, last_row, first_col, last_col = ground.box
+        rows = last_row - first_row
+        cols = last_col - first_col
+        scale = min(width / cols, height / rows)
+        fit_w = max(int(cols * scale), 1)
+        fit_h = max(int(rows * scale), 1)
+        take_x = np.clip((np.arange(fit_w) / scale).astype(np.int32), 0, cols - 1)
+        take_y = np.clip((np.arange(fit_h) / scale).astype(np.int32), 0, rows - 1)
+        device = self.device
+        device.upload("fit_x", (take_x + first_col)[None, :], "r32i")
+        device.upload("fit_y", (take_y + first_row)[None, :], "r32i")
+        return fit_w, fit_h
 
     def _blur_wash(self, ground: Ground, page_cols: int, page_rows: int) -> None:
         """Blur the settled pigment at both reaches, down the page and across.
