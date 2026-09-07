@@ -181,12 +181,14 @@ links. Convert them before you extend them.
 the list. A register does not decay; a summary does. This section held a
 summary once, it went stale, and the finding records what that cost.[^3]
 
-**One blocker the project owner owns is open, and it holds one question:
-whether an upgrade changes hands when the ground does.** The register is the
-current statement of it.[^12] The questions beside it are answered. A unit
-builds only on ground that its own faction holds. Anyone may destroy an
-upgrade. A unit-level destruction takes work, and a faction-level removal is
-instant. The scale constants table holds the values.[^13]
+**An upgrade changes hands with the ground.** A faction that takes a city
+takes the roads, the terraces, the lodging and the walls that stand there, and
+a faction that razes a city destroys them. The blocker that held the question
+is resolved, and the register is the current statement of it.[^12] The
+questions beside it were already answered. A unit builds only on ground that
+its own faction holds. Anyone may destroy an upgrade. A unit-level destruction
+takes work, and a faction-level removal is instant. The scale constants table
+holds the values.[^13]
 
 A benchmark now runs on the target platform, and a register holds what it
 measured.[^14] Most cost figures are still derived, and the blocker that

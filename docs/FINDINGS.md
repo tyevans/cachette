@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-586**
+**Next number: FND-589**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -12456,7 +12456,6 @@ public interface, and everyone would learn to ignore it.
 [^F493E]: ADR-0159, a project order names one category for each unit and one seed set for the faction. `docs/adrs/accepted/adr-0159-a-project-order-names-one-category-and-one-seed-set.md`
 [^F491C]: Decision Record Scope, section 4.6. `.agents/rules/adr-scope.md`
 [^F487A]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
-[^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F487C]: Testing Rules, section 2a. `.agents/rules/testing.md`
 [^F487D]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D4. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^F340A]: Findings register, FND-325, in this document.
@@ -14461,7 +14460,110 @@ case when it was written and stopped reaching it later. Nothing failed, because
 a test that asserts a zero passes hardest when the case never arrives.
 
 
+### FND-586 — A city could never change hands, so a war could take the ground and the people and end nothing
+
+**Believed.** A war reaches an end. A faction that takes the ground around a
+city and kills the people in it has beaten that faction, and the domination
+reader ends the game when one faction holds every seat or every rival is
+empty.[^F542C]
+
+**True.** A settlement's faction was written at its founding and never again.
+One assignment wrote it and the founding was its only caller, so no verb, no
+stage and no control-plane call could move a city from one faction to another.
+Held ground is decided by the reach of the city nearest a tile, so the ground
+of a faction returned to it as soon as the lease of an invader decayed.[^F586B]
+A faction with no unit and no person kept its cities, kept its ground and kept
+its seat for ever, and its cities kept producing.
+
+**Evidence.** A sweep of the demonstration world over eight seeds, at three
+factions, at an extent of 48, to a tick limit of 4000, on 6 September 2026 on
+one development machine (x86-64). Before the change, territory ended six of the
+eight at the tick limit and domination ended two. After the change, domination
+ended eight of eight, and every one of them ended well inside the limit. The
+commit body holds the two tables and the command that produced them. The
+figures stay derived until the target platform measures them.[^28]
+
+**What follows.** **A fact that nothing writes leaves every reader of it
+unreachable.** The domination reader, the campaign objective that takes a
+settlement tile, and the elimination path all read a fact that no write site
+produced. Each passed its own test, because each test wrote the fact by hand.
+
+**Ask which write site is missing when a reader never fires.** The readers were
+correct throughout. What was absent was the one assignment a conquest needed,
+and a count of the game ends by path is the measurement that found it.
+
+### FND-587 — Two facts about one conquest lived in two columns, and nothing failed when they disagreed
+
+**Believed.** A capture moves a site to the taker and moves the residents of
+that site with it. A resident is a unit, and moving a unit is one write to the
+faction column of the unit.
+
+**True.** A unit may name a character, and the character carries a faction of
+its own. A capture that moved the unit and not the character left the two
+disagreeing. Nothing read both, so nothing failed. The disagreement surfaced
+one pass later and by accident. The elimination pass removes the characters of
+a faction that leaves, the losing faction left the game on the tick its last
+city changed hands, and the invariant check then found a live unit naming a
+character the arena no longer held.
+
+**A second instance of the same shape appeared in the same work.** A faction
+claims ground through the holder column and through a lease that outranks the
+reach of every city.[^F587A] A release that cleared the holder and left the
+lease gave the tile straight back on the next spread, from a lease that nobody
+could raise or lower any more.
+
+**Evidence.** Both were found by putting the defect back and running the test.
+The character case failed the world invariant check. The lease case needed a
+fixture built for it, in which a faction holds ground by a lease at the claim
+threshold rather than by a city. A fixture that held ground only through a city
+stayed green with the release removed, because the spread already gives that
+ground up on the next tick.
+
+**What follows.** **Count the columns a fact lives in before you write one of
+them.** The through-line of the recurring shapes is one fact in more than one
+place with nothing that fails on disagreement, and a conquest touches several
+of those places at once.[^F487B]
+
+**A fixture that holds ground the cheap way tests the cheap path.** The lease
+case is the whole reason the release exists, and the first fixture never
+supplied it.[^F492B]
+
+### FND-588 — Two guards this work added cannot be reached, and the register says so rather than the tests
+
+**Believed.** A guard that a test drives is a guard the project has tested.
+
+**True.** Two guards in this work refuse a case that the rest of the work
+already makes impossible. Both were found by putting the defect back and
+watching the test stay green.
+
+**The first is the refusal that stops a faction that has left the game from
+winning it.** Every game end reader now walks the factions that may still win.
+The elimination releases the ground of a faction that leaves and removes its
+characters, so such a faction holds nothing that any reader reads. No fixture
+could be built in which removing the refusal changed the winner.
+
+**The second is the clearing of the home of a unit whose site is lost.** A raze
+destroys the residents of the site, and a resident is exactly a unit whose home
+names that site. No live unit can name the freed slot, whatever the loss does
+about it.
+
+**Evidence.** Both were measured by replacing the guard and running the test
+that covers it. Both tests stayed green. Six other put-back experiments in the
+same work failed as they should, and the commit body holds every row.
+
+**What follows.** **Say that a guard is unreached rather than letting a green
+test imply it is covered.** The refusal about a winner stays, because the rule
+about who may win must be stated where a later reader will see it, and a later
+reader may not depend on held ground.
+
+**A put-back experiment answers a question a passing test cannot.** Both guards
+read as tested until the experiment ran.[^F492B]
+
 ## References
+
+[^F579B]: ADR-0150, held ground is the ground within reach of a city its faction owns. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+[^F580A]: ADR-0153, a tile's lease follows the units that stand on it, decision D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+[^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 
 [^F572A]: Backlog item 0495, build the observation plane and let every reader answer for one faction. `docs/backlog/complete/0495-build-the-observation-plane-and-let-every-reader-answer-for-one-faction.md`
 [^F572C]: Project orientation, the design principles. `AGENTS.md`
@@ -14581,9 +14683,9 @@ a test that asserts a zero passes hardest when the case never arrives.
 [^F568D]: Research report 31, the state of the learner surface, claim 1. `docs/research/reports/31-the-state-of-the-learner-surface.md`
 [^F580A]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^F580B]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the alternatives it rejects. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-[^F581A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^F588A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F582A]: Backlog item 0516. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
 [^F585B]: The flat observation array and its schema. `crates/cachette-core/src/faction_observation.rs`
-[^F581B]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
-[^F581C]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+[^F588B]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+[^F588C]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F585B]: Findings register, FND-572. `docs/FINDINGS.md`

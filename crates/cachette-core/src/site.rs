@@ -611,6 +611,34 @@ impl SettlementArena {
         Some(self.factions[slot as usize])
     }
 
+    /// Writes the faction of a settlement and reports whether it wrote.
+    ///
+    /// **This is the one place a standing settlement changes hands.** The
+    /// founding writes the faction of a new settlement, and this writes the
+    /// faction of one that already stands. A conquest therefore changes one
+    /// column and nothing else: the tile, the store, the housing and the
+    /// identity all stay as they were, so what stands at the site passes to
+    /// the taker whole.[^1]
+    ///
+    /// Returns `false` when the identity is dead, and `false` when the
+    /// faction is at or above the ceiling. The caller handles the absent
+    /// settlement or skips it.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or it is destroyed, decision D1. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    pub fn set_faction(&mut self, entity: Entity, faction: FactionId) -> bool {
+        if faction.0 >= FACTION_CEILING {
+            return false;
+        }
+        let Some(slot) = self.slot_of(entity) else {
+            return false;
+        };
+        self.factions[slot as usize] = faction;
+        true
+    }
+
     /// Returns the settlement that stands on an address.
     ///
     /// Returns `None` when the address is outside the world, and `None`

@@ -322,3 +322,127 @@ impl SettlementFounded {
         }
     }
 }
+
+/// What a faction did with a site it took.
+///
+/// The type is a one-byte integer and not an enumeration with a hidden
+/// discriminant width, because the event that holds it must be plain
+/// data.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+pub type TakeKind = u8;
+
+/// The taker kept the site. It stands, under the faction that took it.
+pub const TAKE_KIND_CAPTURED: TakeKind = 1;
+/// The taker destroyed the site. Nothing stands on the tile.
+pub const TAKE_KIND_RAZED: TakeKind = 2;
+
+/// A site changed hands, or the faction that took it destroyed it.
+///
+/// **A site leaves the faction that founded it by one path, and this event
+/// is that path.** The capture pass writes it when a site changes hands, and
+/// the raze verb writes it when a site is destroyed. A reader that had only
+/// the founding log would see a settlement come into existence and never see
+/// it leave one faction for another.
+///
+/// The identity of a razed site never resolves again, so a reader that holds
+/// the identity reads this event and not the arena.[^1]
+///
+/// The layout is 8 + 8 + 4 + 2 + 2 + 1 + 7 bytes, which is 32 bytes at an
+/// alignment of 8. The trailing array declares every padding byte, so the
+/// type holds no uninitialised byte.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+/// [^2]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+pub struct SiteTaken {
+    /// The tick at which the site was taken.
+    pub tick: Tick,
+    /// The site, as its identity in bits.
+    ///
+    /// The value is the whole identity and not a slot index. A slot index
+    /// survives the loss of what it named.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D1. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    pub site: u64,
+    /// The tile it stood on.
+    pub tile: TileIdx,
+    /// The faction that held it before.
+    pub from: FactionId,
+    /// The faction that took it.
+    pub to: FactionId,
+    /// What the taker did with it.
+    pub kind: TakeKind,
+    /// The declared padding. Always zero.
+    pub padding: [u8; 7],
+}
+
+impl SiteTaken {
+    /// Builds an event with zero padding.
+    #[must_use]
+    pub const fn new(
+        tick: Tick,
+        site: u64,
+        tile: TileIdx,
+        from: FactionId,
+        to: FactionId,
+        kind: TakeKind,
+    ) -> Self {
+        Self {
+            tick,
+            site,
+            tile,
+            from,
+            to,
+            kind,
+            padding: [0; 7],
+        }
+    }
+}
+
+/// A faction left the game.
+///
+/// The faction held no site and no unit, so nothing of it could act and
+/// nothing of it could grow. The pass releases the ground it held and it
+/// writes this event. A faction leaves the game once, and it never
+/// returns.
+///
+/// The layout is 8 + 8 + 2 + 6 bytes, which is 24 bytes at an alignment of
+/// 8. The trailing array declares every padding byte, so the type holds no
+/// uninitialised byte.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
+pub struct FactionEliminated {
+    /// The tick on which the faction left the game.
+    pub tick: Tick,
+    /// The tiles it held when it left, which the pass released.
+    pub released: u64,
+    /// The faction that left.
+    pub faction: FactionId,
+    /// The declared padding. Always zero.
+    pub padding: [u8; 6],
+}
+
+impl FactionEliminated {
+    /// Builds an event with zero padding.
+    #[must_use]
+    pub const fn new(tick: Tick, released: u64, faction: FactionId) -> Self {
+        Self {
+            tick,
+            released,
+            faction,
+            padding: [0; 6],
+        }
+    }
+}
