@@ -66,6 +66,9 @@ def test_a_batch_gives_what_the_worlds_give_alone(workers: int, threads: int) ->
         assert [row.index for row in rows] == list(range(len(SEEDS)))
         for row in rows:
             assert row.error is None
+            # A row reports a count or an error, never neither. The assertion
+            # above rules out the error, and this one states the other half.
+            assert row.events is not None
             batched_counts[row.index].append(row.events)
 
     for index, seed in enumerate(SEEDS):

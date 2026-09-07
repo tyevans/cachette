@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+from typing import Any
 
 import pytest
 
@@ -32,9 +33,14 @@ SCALES = {"fix32", "int"}
 PATHS = {"domination", "territory", "renown", "wonder", None}
 
 
-def manifest() -> list[dict]:
-    """Read the rows of the manifest."""
-    return json.loads(MANIFEST.read_text())["params"]
+def manifest() -> list[dict[str, Any]]:
+    """Read the rows of the manifest.
+
+    A row holds a name, a setter, a kind, a scale and three bounds, so the
+    values of one row are of several types.
+    """
+    rows: list[dict[str, Any]] = json.loads(MANIFEST.read_text())["params"]
+    return rows
 
 
 def a_world() -> World:

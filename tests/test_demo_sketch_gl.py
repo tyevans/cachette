@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import math
 import os
+from typing import cast
 
 import numpy as np
 import pytest
@@ -25,6 +26,7 @@ import pytest
 from cachette import Camera, World
 from cachette.demo import sketch as ink
 from cachette.demo import sketch_gl
+from cachette.demo import sketch_shader as source
 from cachette.demo.app import Demo, main
 from cachette.demo.glpage import SCRATCH_UNIT, Device, DeviceGap
 from cachette.demo.sketch import Sketch
@@ -413,7 +415,7 @@ BEHIND_HEIGHT = 0.08
 RIDGE_TURN = math.pi
 
 
-def ridge_world(behind: float) -> tuple[object, Camera]:
+def ridge_world(behind: float) -> tuple[World, Camera]:
     """Give back a world with a ridge across it, and a camera that fits it.
 
     The ground behind the ridge stands at the height the caller names. The
@@ -429,7 +431,10 @@ def ridge_world(behind: float) -> tuple[object, Camera]:
     # No tile is water, so the water level is nought and the whole height of
     # the ground is relief.
     kinds = np.full((RIDGE_SIDE, RIDGE_SIDE), ink.WATER_KIND + 1, dtype=np.uint8)
-    ground = Ground(world, heights.ravel(), kinds.ravel())
+    # The proxy answers every reader the renderer reads and hands the rest to
+    # the world it holds, so it stands where a world stands. It is not a
+    # ``World``, and this is the one place that says so.
+    ground = cast(World, Ground(world, heights.ravel(), kinds.ravel()))
     return ground, Camera.fitting(world, WIDTH, HEIGHT)
 
 
@@ -623,9 +628,9 @@ def test_the_shader_takes_every_constant_from_the_module_that_declares_it() -> N
             f"the shader does not take {name} from the sketch module"
         )
     # No number of the page is typed into the shader sources themselves.
-    for source in (sketch_gl.source.HATCH, sketch_gl.source.COMPOSITE):
-        assert "CONTOUR_STEP =" not in source
-        assert "HATCH_SPACING =" not in source
+    for body in (source.HATCH, source.COMPOSITE):
+        assert "CONTOUR_STEP =" not in body
+        assert "HATCH_SPACING =" not in body
 
 
 def test_the_window_keeps_its_own_frame_buffer_after_a_page() -> None:

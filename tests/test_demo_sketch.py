@@ -462,7 +462,9 @@ DRAG_SLACK = 3
 MOVE_EXPLAINS = 0.30
 
 
-def travel_between(before: np.ndarray, after: np.ndarray, reach: int) -> tuple:
+def travel_between(
+    before: np.ndarray, after: np.ndarray, reach: int
+) -> tuple[int, int, float]:
     """Say how far the drawing moved, and how much of the change that explains.
 
     The answer is the shift across, the shift down, and the share of the

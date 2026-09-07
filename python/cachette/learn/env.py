@@ -42,7 +42,7 @@ positions each verb declares, decision D1.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import numpy as np
 
@@ -52,6 +52,10 @@ from .reward import Reward, RewardStep, Weighting
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Sequence
+
+    import numpy.typing as npt
+
+    from cachette._core import GameEnd, ObservationSchema
 
 # The reader names the environment is allowed to call on a world.
 #
@@ -91,6 +95,34 @@ FACTION_SCOPED_READERS: frozenset[str] = frozenset(
         "seed",
     }
 )
+
+
+class SeatWorld(Protocol):
+    """What an environment calls on a world it did not build itself.
+
+    An environment builds its own world for a normal episode. A test hands it
+    a proxy instead, to record which readers the episode reaches for, and the
+    proxy is not a ``World``. This states the six calls the episode makes, so
+    that the door describes what it takes.
+    """
+
+    def faction_observation(self, faction: int) -> npt.NDArray[np.int64]:
+        """Give back the flat observation array of one faction."""
+
+    def observation_schema(self) -> ObservationSchema:
+        """Give back the layout of the observation array."""
+
+    def legal_actions(self, faction: int) -> npt.NDArray[np.uint8]:
+        """Give back one byte for each action row of one faction."""
+
+    def act(self, faction: int, action: int) -> bool:
+        """Run one action for one faction, and say whether the verb took it."""
+
+    def step(self, threads: int) -> int:
+        """Run the world for one tick, and give back the event count."""
+
+    def game_end(self) -> GameEnd | None:
+        """Give back how the game ended, or nothing while it runs."""
 
 
 @dataclass(frozen=True)
@@ -217,15 +249,19 @@ class Env:
         """
         return self._require_world()
 
-    def adopt(self, world: World) -> np.ndarray:
+    def adopt(self, world: SeatWorld) -> np.ndarray:
         """Take a world the caller built, and start an episode on it.
 
         A test uses this to hand the environment a world that watches which
         readers the environment calls. The world must already be seeded and
         must already give the seat to the caller.
+
+        **A vector environment cannot hold what this door takes.** A batch
+        steps real worlds, so the environment holds the argument as one, and
+        this is the only place that widens it.
         """
-        self._world = world
-        self._reward = Reward(world, self._config.seat, self._weighting)
+        self._world = cast(World, world)
+        self._reward = Reward(self._world, self._config.seat, self._weighting)
         self._decisions = 0
         self._terminated = False
         self._truncated = False
