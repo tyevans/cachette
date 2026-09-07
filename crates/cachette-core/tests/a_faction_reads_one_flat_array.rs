@@ -609,8 +609,17 @@ fn held_by_hand(world: &World, faction: FactionId, cell: usize) -> (i64, i64) {
 fn the_schema_reports_the_layout_version() {
     let world = a_still_world();
     assert_eq!(world.observation_schema().version(), OBSERVATION_VERSION);
-    assert!(
-        OBSERVATION_VERSION > 1,
-        "the field set moved, so the version moved with it"
+    // **The version is pinned beside the field set, so neither moves alone.**
+    // This once asserted that the version stood above one. That is a compile
+    // time comparison of two constants: it is true whatever the fields do, so
+    // it stated nothing and could never fail.
+    //
+    // The pair below can fail. Add or remove a field and the count moves, so
+    // the assertion fails until the version moves with it, which is the whole
+    // of the rule this test exists to hold.
+    assert_eq!(
+        (OBSERVATION_VERSION, world.observation_schema().rows().len()),
+        (3, 30),
+        "the field set and the version must move together",
     );
 }

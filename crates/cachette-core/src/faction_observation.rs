@@ -122,7 +122,7 @@ use crate::world::World;
 /// # References
 ///
 /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-pub const OBSERVATION_VERSION: u32 = 2;
+pub const OBSERVATION_VERSION: u32 = 3;
 
 /// One field of the observation array.
 ///
