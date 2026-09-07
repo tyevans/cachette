@@ -169,6 +169,12 @@ pub const WEAR_CAUSE_ARMY: WearCause = 2;
 pub const WEAR_CAUSE_BOTH: WearCause = 3;
 /// A caller ordered the destruction. No wear ended it.
 pub const WEAR_CAUSE_ORDERED: WearCause = 4;
+/// The ground under the upgrade burned.
+///
+/// The fire outranks the other two causes, because it takes far more in one
+/// tick than either of them. A tile that burns and also carries a hostile
+/// army reports the fire.
+pub const WEAR_CAUSE_FIRE: WearCause = 5;
 
 /// An upgrade is gone from its tile.
 ///

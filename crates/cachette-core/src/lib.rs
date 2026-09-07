@@ -32,6 +32,7 @@ pub mod event;
 pub mod event_layout;
 pub mod faction_observation;
 pub mod faction_view;
+pub mod fire;
 pub mod founding;
 pub mod growth;
 pub mod hash;
@@ -97,6 +98,12 @@ pub use descent::{
 };
 pub use event::{FactionEliminated, ResourceTaken, SiteTaken, TileChanged};
 pub use faction_view::{Admit, FactionTile, Ground, MaskedSummary, SeenTile, SeenUnit, Sighting};
+pub use fire::{
+    FireEnded, FireField, FireStarted, FireTile, GroundReading, UnitBurned, BURN_FOR_EACH_TICK,
+    CHANCE_WHOLE, DOUSE_WORK_FOR_EACH_UNIT, END_CAUSE_BURNT_OUT, END_CAUSE_DOUSED,
+    INTENSITY_CEILING, LIGHTNING_WHOLE, START_CAUSE_LIGHTNING, START_CAUSE_ORDERED,
+    START_CAUSE_SPREAD,
+};
 pub use founding::{
     Founding, FoundingError, FoundingOutcome, Provision, SettleError, SettleOutcome, Survey,
 };
