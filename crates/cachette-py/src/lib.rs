@@ -12,9 +12,11 @@
 //! [^1]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/REGISTRY.md`
 //! [^2]: ADR-0042, the interpreter is released for the whole step. `docs/adrs/REGISTRY.md`
 
+mod batch;
 mod columns;
 pub mod logs;
 
+use crate::batch::{PyBatch, StepRow};
 use crate::columns::columns_of;
 use crate::logs::{log_names, log_of, unknown_log_message};
 use cachette_core::campaign::{CampaignEvent, CampaignRow};
@@ -9065,6 +9067,8 @@ fn stock_ceiling_of_one_settlement() -> i64 {
 #[pyo3(name = "_core")]
 fn cachette_core_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_class::<PyWorld>()?;
+    module.add_class::<PyBatch>()?;
+    module.add_class::<StepRow>()?;
     module.add_class::<PyCamera>()?;
     module.add_function(wrap_pyfunction!(version, module)?)?;
     module.add_function(wrap_pyfunction!(stock_ceiling_of_one_settlement, module)?)?;
