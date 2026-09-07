@@ -151,4 +151,4 @@ half.[^16]
 [^15]: Findings register, FND-581. `docs/FINDINGS.md`
 [^16]: Backlog item 0514. `docs/backlog/proposed/0514-let-a-faction-found-a-city-during-a-run.md`
 [^17]: Decisions register, DEC-278. `docs/DECISIONS.md`
-[^18]: Findings register, FND-590. `docs/FINDINGS.md`
+[^18]: Findings register, FND-591. `docs/FINDINGS.md`

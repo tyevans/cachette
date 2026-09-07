@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-591**
+**Next number: FND-592**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -14610,7 +14610,7 @@ reader may not depend on held ground.
 **A put-back experiment answers a question a passing test cannot.** Both guards
 read as tested until the experiment ran.[^F492B]
 
-### FND-590 — Giving the engine a raze rule made a seeded run burn far more cities than it keeps
+### FND-591 — Giving the engine a raze rule made a seeded run burn far more cities than it keeps
 
 **Believed.** A rule that keeps a city the taker can supply and burns one it
 cannot gives conquest two shapes. A near conquest grows the taker and a far one
