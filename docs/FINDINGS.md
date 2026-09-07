@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-592**
+**Next number: FND-594**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -2333,6 +2333,63 @@ defect was the shape of one term and the size of another.
 **Five of the weather defects this project has found were a value written down
 where it should have been derived.** Both halves of this one are that shape
 again.
+### FND-592 — The way between two settlements was believed to be planned, and the branch that planned it could never run
+
+**Believed.** The plan solver chose a way between the seat of a faction and
+another settlement of that faction. The solver held a loop over the
+settlements, the decision record names a way between one site and another, and
+a test asserted that a faction with two cities zoned a way between them.[^F545D]
+
+**True.** The branch was inert. The solver anchored one window on the seat, and
+it asked that window for the cost of reaching each other settlement. The window
+radius is a balance value and the founding rule keeps two settlements of one
+faction apart by a distance that is more than twice it. Every settlement
+therefore lay outside the window, the window answered no cost, and the branch
+skipped every candidate on every tick of every world.
+
+**The test could not see it.** The fixture founded its second city inside the
+window radius, and it asserted that the pair sat inside the radius. The founding
+verb never places a second city there, so the fixture modelled a world the
+engine does not build. The fixture measured the window, not the way.[^F496G]
+
+**Evidence.** A run of the demonstration world over four seeds reports the
+distance between each pair of settlements of one faction. The least distance in
+every run equals the founding distance, and no run holds a pair inside the
+window radius. A separate run counts the pairs that a standing road joins, and
+it counts none.
+
+**What follows.** A way between two settlements chains a fixed number of fixed
+windows, each aimed at the far end. A fixture for a way places its two
+settlements at least the founding distance apart, and the assertion that the
+pair sits inside the radius is the wrong assertion. Two values that must agree
+were declared in two files with nothing that fails when they disagree, which is
+the first recurring shape.[^F487B]
+
+### FND-593 — A way was believed to stand wherever a unit walks
+
+**Believed.** A way between two places follows the cheapest path over ground
+that admits a unit. The path search refuses a tile that admits nobody, and
+nothing else was thought to bar a way.
+
+**True.** A unit walks the mountain and a road does not fit the mountain. The
+ground fit of the joining category admits the plain, the forest and the hill,
+and the mountain admits a unit at the ordinary capacity. A way whose cheapest
+path crosses high ground therefore holds a tile that no unit can ever build.
+The plan holds that project, the build pass refuses it on every tick, and the
+two settlements at the ends stay apart while the plan reads as though it joined
+them.
+
+**Evidence.** A fixture founded two cities sixteen steps apart and ran nine
+hundred ticks. The road that touched the seat grew to about a hundred tiles and
+stopped eleven steps short of the far city, and the count did not move over a
+further two thousand one hundred ticks. The way crossed high ground, and the
+tiles on it were never built.
+
+**What follows.** The window a way reads admits only ground the joining
+category fits. The window a deposit and a yield read is unchanged, because
+those two ask where a unit may go and not where a road may stand. A pair of
+settlements that no such ground joins now yields no project, which is a plan
+that says nothing rather than a plan that lies.
 
 ## D. Cost estimates that were wrong
 
