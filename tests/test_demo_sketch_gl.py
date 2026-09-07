@@ -146,6 +146,172 @@ def drawn_both_ways(
     return frames[0], frames[1]
 
 
+# The upgrade category of a road, as the engine numbers it, and the work the
+# road fixture below gives one level of one road.
+#
+# A builder that works for hundreds of steps starves before the level stands,
+# so the fixture makes a road cheap. The work measures nothing.
+ROAD = 0
+LAST_CATEGORY = 6
+ROAD_WORK = 8
+
+# How many steps the road fixture gives a build before it calls it stuck.
+ROAD_STEPS = 200
+
+# The roads the fixture builds. Four of them run in a line, so each joins its
+# neighbours, and one stands away from every other, so nothing reaches it.
+#
+# **A fixture whose roads all stand alone, or all stand in one line, measures
+# itself.** The two renderers reach the place inside a tile by two different
+# routes, and a way that runs is what tells the two routes apart.[^1]
+#
+# [^1]: Testing Rules, section 2a. ``.agents/rules/testing.md``
+ROAD_RUN = ((6, 6), (7, 6), (8, 6), (9, 6))
+ROAD_ALONE = (7, 9)
+
+
+def a_world_with_roads() -> tuple[World, Camera]:
+    """Give back a world that carries a road network, and a camera for it."""
+    world, camera = build()
+    table = world.upgrade_table()
+    levels = len(table["ground_fit"]) // (LAST_CATEGORY + 1)
+    for level in range(1, levels + 1):
+        row = {
+            name: int(np.asarray(column)[ROAD * levels + level - 1])
+            for name, column in table.items()
+        }
+        row["work"] = ROAD_WORK
+        world.define_upgrade_row(ROAD, level, **row)
+    places = [*ROAD_RUN, ROAD_ALONE]
+    for place in places:
+        if not world.tile_report(*place)["passable"]:
+            pytest.skip(f"the fixture world admits no unit at {place}")
+    world.zone_projects(0, places, ROAD)
+    units = world.spawn_soldiers(places, faction=0)
+    world.order_build(units, ROAD)
+    for _ in range(ROAD_STEPS):
+        world.step(1)
+        if all(world.tile_report(*place)["upgrade_complete"] for place in places):
+            break
+    else:  # pragma: no cover - the fixture asserts its own outcome
+        message = "the fixture built no road"
+        raise AssertionError(message)
+    return world, camera
+
+
+def _drawn(
+    world: World, camera: Camera, make: type[Sketch], relief: bool
+) -> np.ndarray:
+    """Draw one frame with one renderer, and give back a copy of the pixels."""
+    drawing = make(world, view=View())
+    if not relief:
+        drawing._raised = np.zeros_like(drawing._raised)
+    surface = Surface(WIDTH, HEIGHT)
+    drawing(camera, WIDTH, HEIGHT, surface.pixels)
+    if isinstance(drawing, GlSketch):
+        drawing.close()
+    return surface.pixels.copy()
+
+
+def _road_mask(
+    world: World, camera: Camera, make: type[Sketch], relief: bool
+) -> np.ndarray:
+    """Give back the pixels the roads of a world drew, for one renderer.
+
+    The world is drawn as it stands and again with every road destroyed. The
+    pixels that differ are the pixels the ways drew, and the ground under them
+    cancels. **The call takes the roads out of the world it is given.**
+    """
+    ways = world.road_ways()
+    places = [(int(q), int(r)) for q, r in zip(ways["q"], ways["r"], strict=True)]
+    before = _drawn(world, camera, make, relief)
+    assert world.destroy_upgrades(places) == len(places)
+    after = _drawn(world, camera, make, relief)
+    marked: np.ndarray = before != after
+    return marked
+
+
+def test_the_two_renderers_draw_one_road_network_on_a_flat_page() -> None:
+    """A road draws alike on the processor and on the graphics device.
+
+    **The two reach the place inside a tile by two routes.** The array
+    renderer keeps the offset that the backward read threw away. The device
+    renderer turns the column and the row of the page back into the plan of
+    the world. One number by two routes is the shape that goes wrong
+    silently, so this holds the two pictures together.
+
+    The page is flat here, in the way that every exact agreement test in this
+    module is, because the two renderers cover different points of the paper
+    where the ground has relief.
+
+    The world carries roads that join and one road that joins nothing, so a
+    renderer that lost the joins draws a different picture from the other.
+    """
+    device_or_skip()
+    world, camera = a_world_with_roads()
+    joins = world.road_ways()["joins"]
+    assert int((joins == 0).sum()) > 0, "no road in the fixture stands alone"
+    assert int((joins != 0).sum()) > 0, "no road in the fixture joins another"
+    assert_agree(
+        _drawn(world, camera, Sketch, relief=False),
+        _drawn(world, camera, GlSketch, relief=False),
+    )
+
+
+# How much of the ways that one renderer draws on a lifted page the other must
+# draw as well.
+#
+# **The two renderers do not cover the same points of a lifted page**, so the
+# mark of a way lands on neighbouring points and the two masks do not agree
+# pixel for pixel. This is the share that must overlap, and it is far above
+# what a lost inverse of the lift would leave: a renderer that read the wrong
+# row would put the ways on different tiles altogether.
+# **This was measured against the defect it stops.** With the inverse of the
+# lift in place the two masks overlap on about 92 percent of the pixels either
+# of them marks. With the inverse taken out they overlap on about 63 percent,
+# because the device renderer then draws the ways on the wrong tiles.
+RELIEF_WAY_OVERLAP = 0.80
+
+# How far the lifted test magnifies the page, and which road it looks at.
+#
+# **A road drawn three pixels wide measures nothing.** At the camera that fits
+# the whole world a way covers a few dozen pixels, and two masks of a few
+# dozen pixels overlap by chance. The camera below puts a way across enough of
+# the frame for the comparison to mean something.
+WAY_ZOOM = 6.0
+
+
+def test_the_two_renderers_draw_one_road_network_on_a_lifted_page() -> None:
+    """The device renderer takes the lift back out of the row it reads.
+
+    The array renderer carries the place inside a tile through the lift. The
+    device renderer has no such carry: it takes the height the mesh pass wrote
+    and moves the row back by it. A renderer that skipped that step draws the
+    ways somewhere else entirely.
+    """
+    device_or_skip()
+    world, fitted = a_world_with_roads()
+    ways = world.road_ways()
+    camera = Camera(tile_size=fitted.tile_width * WAY_ZOOM)
+    camera.look_at(int(ways["q"][0]), int(ways["r"][0]), WIDTH, HEIGHT)
+    other, _ = a_world_with_roads()
+    on_processor = _road_mask(world, camera, Sketch, relief=True)
+    on_device = _road_mask(other, camera, GlSketch, relief=True)
+    both = int((on_processor & on_device).sum())
+    either = int((on_processor | on_device).sum())
+    # A handful of pixels would overlap by chance, so the test asserts that
+    # there is a way on the frame worth comparing.
+    assert both > 100, (
+        f"the two renderers marked {both} pixels in common, which is too few "
+        f"to compare; the camera does not put a way on the frame"
+    )
+    overlap = both / either
+    assert overlap >= RELIEF_WAY_OVERLAP, (
+        f"the ways the two renderers drew overlap on {overlap:.2%} of the "
+        f"pixels either of them marked, and {RELIEF_WAY_OVERLAP:.0%} must"
+    )
+
+
 def assert_agree(on_processor: np.ndarray, on_device: np.ndarray) -> None:
     """Hold the two frames within the stated tolerance."""
     gap = np.abs(bands(on_processor) - bands(on_device))

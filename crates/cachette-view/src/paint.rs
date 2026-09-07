@@ -55,6 +55,7 @@ use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World};
 use crate::overlay::{self, Layer};
 use crate::text;
 use crate::tween::{between, Motion, Pace};
+use crate::ways::{draws_as_a_way, road_ways, Way};
 
 /// The colour each category of upgrade tints its tile with, by category
 /// number.
@@ -709,6 +710,31 @@ const UNIT_LEAST_RADIUS: i32 = 3;
 /// # References
 ///
 /// [^1]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
+/// How wide a way draws at each level, as a share of the width of a tile.
+///
+/// The level is the width, so a watcher tells a better road from a poorer one
+/// without reading a legend. Index zero is a way that is still being made.
+const WAY_WIDTH: [f32; 3] = [0.10, 0.20, 0.34];
+
+/// The colour of the metalling of a way.
+const WAY_COLOUR: u32 = 0x00c8_9a4a;
+
+/// The colour of the casing that runs along each side of a way.
+///
+/// The casing separates the way from the ground under it, whatever the ground
+/// is, in the same way that the rim of a glyph does.
+const WAY_CASING: u32 = 0x0038_2818;
+
+/// The colour of the crown that runs down the middle of the best way.
+///
+/// **The crown is the second channel of the level.** The width carries the
+/// level on its own, and a watcher reads a width against a neighbour rather
+/// than on its own, so the best way carries a mark that needs no neighbour.
+const WAY_CROWN: u32 = 0x00f0_dcb4;
+
+/// The level at and above which a way draws a crown down its middle.
+const CROWNED_LEVEL: u8 = 2;
+
 const UNIT_RIM: u32 = 0x0008_0a0c;
 
 /// The tile width from which a crowd shows its count as a badge, in pixels.
@@ -2223,7 +2249,15 @@ pub fn draw_paced(
                     // a site under work washes there too.
                     //
                     // [^17]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
-                    if site.is_complete() || !close {
+                    // **A way draws no wash and no glyph where the ribbon
+                    // reads.** The ribbon pass runs after every tile is
+                    // painted, because a ribbon leaves one tile and enters
+                    // the next, and a tile painted later would cover half of
+                    // it. Below the width at which a ribbon reads, the tint
+                    // is the only mark the tile can carry, so a way tints
+                    // there as anything else does.
+                    let as_a_way = draws_as_a_way(site.category);
+                    if (site.is_complete() || !close) && !(as_a_way && close) {
                         canvas.shade(
                             left,
                             top,
@@ -2241,7 +2275,7 @@ pub fn draw_paced(
                     // stands.[^19]
                     //
                     // [^19]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
-                    if close {
+                    if close && !as_a_way {
                         mark_site(canvas, left, top, wide, tall, site);
                     }
                 }
@@ -2288,6 +2322,13 @@ pub fn draw_paced(
         }
     }
 
+    // The ways run over the ground the loop above painted. They are drawn
+    // here, and not tile by tile, because a ribbon leaves one tile and enters
+    // the next.
+    if any_upgrade && camera.tile_width >= SITE_LEAST_TILE {
+        draw_ways(world, camera, canvas);
+    }
+
     // What the pass painted of the overlay. The key reads it after this
     // pass, so the words a watcher sees come from the pass that made the
     // picture.
@@ -2307,6 +2348,123 @@ pub fn draw_paced(
     );
     motion.end();
     painted
+}
+
+/// Draws every road that the window covers, as a ribbon and not as a tile.
+///
+/// **A road is a way.** It runs from somewhere to somewhere, it joins another
+/// road at a junction, it bends, and it ends. A coloured cell says that a
+/// tile carries the road property. It does not draw a road.
+///
+/// The ribbon runs from the middle of a tile out to the middle of the edge it
+/// shares with each neighbour that carries a road. The neighbour draws to the
+/// same point from its own side, so the two halves meet exactly and the way
+/// is continuous. A tile that joins one neighbour ends there. A tile that
+/// joins two bends. A tile that joins three or more is a junction. A tile
+/// that joins nothing draws a mark, because a made thing that nothing reaches
+/// is still a made thing.
+///
+/// The joins come from the one derivation that every renderer reads, so the
+/// engine renderer and the sketchbook renderer cannot draw two different road
+/// networks from one world.[^1]
+///
+/// Call this after the pass that paints the tiles and before the pass that
+/// paints the units. A tile painted after a ribbon would cover half of it.
+///
+/// The cost follows the roads and the window. The engine stores an upgrade
+/// sparsely, so the whole road set is one slice however large the world
+/// is.[^2] A road outside the canvas is dropped before anything is drawn.
+///
+/// This reads the world and writes nothing to it.[^3]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+/// [^3]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+pub fn draw_ways(world: &World, camera: Camera, canvas: &mut Canvas) {
+    let margin = camera.tile_width.max(camera.tile_height) + 2.0;
+    let right = canvas.width() as f32 + margin;
+    let foot = canvas.height() as f32 + margin;
+    for way in road_ways(world) {
+        let (x, y) = camera.centre_of(way.address);
+        if x < -margin || y < -margin || x > right || y > foot {
+            continue;
+        }
+        draw_one_way(canvas, camera, way, (x, y));
+    }
+}
+
+/// Draws the ribbon of one road, and the crown of a road that carries one.
+///
+/// The ribbon goes down in two coats. The casing is the wider coat and it
+/// separates the way from the ground under it. The metalling is the narrower
+/// coat on top of it. A way that is still being made lays the casing alone,
+/// so a watcher reads marked-out ground rather than a road that carries
+/// traffic.
+fn draw_one_way(canvas: &mut Canvas, camera: Camera, way: Way, middle: (f32, f32)) {
+    let width = camera.tile_width * WAY_WIDTH[usize::from(way.level).min(WAY_WIDTH.len() - 1)];
+    let casing = ((width * 0.5) as i32).max(1);
+    let metal = (casing - 1).max(0);
+    // The point the ribbon runs out to in each direction it joins. The point
+    // is the middle of the shared edge, which is half way between the two
+    // tile centres, so the neighbour reaches the same point from its side.
+    let mut reaches: Vec<(f32, f32)> = Vec::new();
+    for (direction, step) in NEIGHBOURS.iter().enumerate() {
+        if !way.joins_direction(direction) {
+            continue;
+        }
+        let (nx, ny) = camera.centre_of(way.address.add(*step));
+        reaches.push(((middle.0 + nx) * 0.5, (middle.1 + ny) * 0.5));
+    }
+    if reaches.is_empty() {
+        // Nothing reaches this road. A disc says that somebody made
+        // something here and that it goes nowhere yet.
+        canvas.fill_disc(middle.0 as i32, middle.1 as i32, casing, WAY_CASING);
+        if metal > 0 && way.level > 0 {
+            canvas.fill_disc(middle.0 as i32, middle.1 as i32, metal, WAY_COLOUR);
+        }
+        return;
+    }
+    // Each coat is laid over the whole way before the next one starts. A
+    // ribbon drawn one arm at a time would put the casing of the second arm
+    // over the metalling of the first, and every junction would carry a seam.
+    for reach in &reaches {
+        stroke(canvas, middle, *reach, casing, WAY_CASING);
+    }
+    if way.level == 0 {
+        return;
+    }
+    if metal > 0 {
+        for reach in &reaches {
+            stroke(canvas, middle, *reach, metal, WAY_COLOUR);
+        }
+    }
+    if way.level >= CROWNED_LEVEL && metal >= 2 {
+        for reach in &reaches {
+            stroke(canvas, middle, *reach, metal / 3, WAY_CROWN);
+        }
+    }
+}
+
+/// Lays one arm of a ribbon, from one point to another, at a half width.
+///
+/// The arm is a run of discs. A disc at each end rounds the cap and a disc at
+/// the middle rounds every join, so a bend reads as a bend and a junction
+/// reads as a junction without anything working out an angle.
+fn stroke(canvas: &mut Canvas, from: (f32, f32), to: (f32, f32), half: i32, colour: u32) {
+    let (across, down) = (to.0 - from.0, to.1 - from.1);
+    let steps = across.abs().max(down.abs()).ceil().max(1.0);
+    let count = steps as i32;
+    for step in 0..=count {
+        let share = step as f32 / steps;
+        canvas.fill_disc(
+            (from.0 + across * share) as i32,
+            (from.1 + down * share) as i32,
+            half,
+            colour,
+        );
+    }
 }
 
 /// Marks each place that a faction founded.

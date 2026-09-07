@@ -71,6 +71,23 @@ class TileWinds(TypedDict):
     q: npt.NDArray[np.int32]
     r: npt.NDArray[np.int32]
 
+class RoadWays(TypedDict):
+    """Where every road runs, as one column for each part of the answer.
+
+    Every column holds one entry for each road tile, and entry ``n`` of each
+    one describes the same tile. The order is ascending tile order.
+
+    ``q`` and ``r`` give the address. ``level`` is the level that stands
+    there, and zero means that the first level is still under construction.
+    ``joins`` is a bit for each of the six neighbours, and bit ``i`` is set
+    when the neighbour in direction ``i`` carries a road too.
+    """
+
+    q: npt.NDArray[np.int32]
+    r: npt.NDArray[np.int32]
+    level: npt.NDArray[np.uint8]
+    joins: npt.NDArray[np.uint8]
+
 class OverlayPaint(TypedDict):
     """What one overlay paints on every tile, as one column for each part.
 
@@ -1284,6 +1301,7 @@ class World:
     def stands_in_territory(self, guest: int, host: int) -> bool: ...
     def holds(self, faction: int, q: int, r: int) -> bool: ...
     def city_reach(self, site: int) -> int: ...
+    def road_ways(self) -> RoadWays: ...
     def tile_holders(self) -> npt.NDArray[np.uint16]: ...
     def tile_heights(self) -> npt.NDArray[np.int32]: ...
     def tile_kinds(self) -> npt.NDArray[np.uint8]: ...

@@ -220,6 +220,53 @@ GLAZE_LIFT = 1.25
 # alone.
 GRAIN_SEED = 0x5C4E_7C48
 
+# How wide a road draws, as a share of the width of a tile, by level.
+#
+# **A road is a way and not a tile.** It runs from somewhere to somewhere, it
+# joins another road at a junction, it bends, and it ends. The ribbon runs
+# through the middle of a tile and out to the middle of each edge it shares
+# with a road beside it, so the two halves of a join meet exactly.
+#
+# The first entry is a tile that carries no road. The second is a way that is
+# still being made. The third and the fourth are the two levels that stand.
+# **The width carries the level**, so a watcher tells a better road from a
+# poorer one without reading a legend.
+WAY_WIDTH = (0.0, 0.14, 0.28, 0.44)
+
+# The level at and above which a road draws a line down its middle.
+#
+# **The crown is the second channel of the level.** A width reads against a
+# neighbour, and a road with no neighbour to compare against would say
+# nothing. A line down the middle needs no comparison.
+CROWNED_LEVEL = 3
+
+# How heavy a road mark is, in page points.
+#
+# **The mark belongs to the page and not to the ground**, in the same way that
+# the hatch does. A pencil study keeps the weight of its marks while the
+# subject moves.
+WAY_INK = 2.2
+
+# How dark the two edges of a road are, how dark the ground between them is,
+# and how dark the line down the middle of the best road is.
+#
+# **The edges carry the way and the ground between them carries the surface.**
+# Two lines on their own read as a long thin loop when a watcher looks
+# closely. A light tone between them reads as a made surface, and the edges
+# still lead the eye along it.
+#
+# The middle is lighter than the edges, because the edges are what a watcher
+# follows and the middle only says which road it is.
+WAY_EDGE_INK = 0.92
+WAY_FILL_INK = 0.20
+WAY_CROWN_INK = 0.55
+
+# How dark a road that is still being made is.
+#
+# A way under work draws one light line down the middle and no edges, so a
+# watcher reads marked-out ground rather than a road that carries traffic.
+WAY_PLANNED_INK = 0.35
+
 # How much bare paper stays around the ground, in pixels.
 MARGIN = 24
 
@@ -442,6 +489,8 @@ class Ground:
         "tone",
         "water",
         "window",
+        "within_q",
+        "within_r",
     )
 
     # The window of tiles this page covers, the size of the frame it was built
@@ -469,6 +518,12 @@ class Ground:
     held_height: np.ndarray
     depth: np.ndarray
     rise: int
+    # Where inside its own tile each point of the page stands, in tiles, on
+    # each axis of the grid. Both run from minus one half to one half. A mark
+    # that runs through a tile rather than filling it needs this, and nothing
+    # else the build makes carries it.
+    within_q: np.ndarray
+    within_r: np.ndarray
 
     def __init__(
         self,
@@ -547,6 +602,7 @@ class Sketch:
             "cloud_shares",
             "tile_winds",
             "overlay_paint",
+            "road_ways",
         ):
             if not hasattr(world, name):
                 message = (
@@ -845,7 +901,7 @@ class Sketch:
         deep = self._deep[first_r:last_r, first_q:last_q]
 
         stood = self.projection(window, width, height, int(stand[2]))
-        take, held = self._turn(stood)
+        take, held, within_q, within_r = self._turn(stood)
         ground.held = held
         plan = np.where(held, raised.ravel()[take], 0.0).astype(np.float32)
         wet = held & (water.ravel()[take])
@@ -859,6 +915,15 @@ class Sketch:
         ground.water = drawn & wet.ravel()[lifted]
         held_height = np.where(drawn, plan.ravel()[lifted], 0.0).astype(np.float32)
         depth_here = np.where(drawn, depth.ravel()[lifted], 0.0).astype(np.float32)
+        # The lift moves a point up the page, and a pixel under it belongs to
+        # the face the lift exposed. The offset inside a tile follows the
+        # point and not the pixel, in the same way that the height does.
+        ground.within_q = np.where(drawn, within_q.ravel()[lifted], 0.0).astype(
+            np.float32
+        )
+        ground.within_r = np.where(drawn, within_r.ravel()[lifted], 0.0).astype(
+            np.float32
+        )
         page_rows, page_cols = drawn.shape
         ground.page_x = np.broadcast_to(
             np.arange(page_cols, dtype=np.float32), (page_rows, page_cols)
@@ -981,16 +1046,25 @@ class Sketch:
         tile_r = grid_r.ravel()[None, :] + steps[:, 1:2]
         return tile_q, tile_r
 
-    def _turn(self, stood: Projection) -> tuple[np.ndarray, np.ndarray]:
+    def _turn(
+        self, stood: Projection
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Name the tile of the window that stands at each point of the page.
 
         **The pass reads backwards, one tile for each point of the page.** A
         pass that scattered the tiles forward would leave a hole between two
         of them, and a page of holes is a page of dust.
 
-        Returns the tile of the window that stands at each point of the turned
-        page, as an index into the window, and the mask of the points that
-        hold one.
+        Returns four arrays: the tile of the window that stands at each point
+        of the turned page, as an index into the window; the mask of the
+        points that hold one; and where inside that tile the point stands, on
+        each axis of the grid.
+
+        **The offset inside a tile falls out of the same arithmetic.** The
+        pass already turns a point back into a place in the grid and rounds it
+        to the nearest tile. What the rounding threw away is the offset, so a
+        mark that runs through a tile costs a subtraction here and no second
+        pass.
         """
         first_q, first_r, last_q, last_r = stood.window
         across = last_q - first_q
@@ -1012,7 +1086,9 @@ class Sketch:
         take_q = np.rint(tile_q).astype(np.int32)
         held = (take_q >= 0) & (take_q < across) & (take_r >= 0) & (take_r < down)
         take = np.clip(take_r, 0, down - 1) * across + np.clip(take_q, 0, across - 1)
-        return take.astype(np.int32), held
+        within_q = (tile_q - take_q).astype(np.float32)
+        within_r = (tile_r - take_r).astype(np.float32)
+        return take.astype(np.int32), held, within_q, within_r
 
     @staticmethod
     def _lift(
@@ -1143,9 +1219,133 @@ class Sketch:
         page = (
             page * (1.0 - ground.coverage[..., None]) + INK * ground.coverage[..., None]
         )
+        # The ways go over the hatch. A road is a made thing, and a mark that
+        # the hatch of the ground crossed would read as ground.
+        stood = self.projection(ground.window, width, height, int(ground.stand[2]))
+        page = self._ways(page, ground, stood.scale)
         edge = ground.outline[..., None]
         inked: np.ndarray = np.clip(page * (1.0 - edge) + INK * edge, 0.0, 255.0)
         return inked
+
+    def road_lattice(self) -> tuple[np.ndarray, np.ndarray]:
+        """Give back the joins and the level of a road, for every tile.
+
+        The answer is two arrays shaped like the world. The first holds one
+        bit for each of the six neighbours of a tile, and bit ``i`` is set
+        when the neighbour in direction ``i`` carries a road. The second holds
+        nothing where no road runs, one where a road is still being made, and
+        the level above that where a road stands.
+
+        **The joins are the engine's own, and this names no neighbour.** A
+        renderer that worked out which tiles touch would hold a second copy of
+        a rule the engine already applies, and nothing would fail when the two
+        disagreed.[^1]
+
+        **The crossing follows the roads and not the world.** The engine holds
+        an upgrade sparsely and answers the whole road network in one call, so
+        a world of sixteen million tiles with a hundred roads costs a hundred
+        entries. This module scatters them onto the lattice that the drawing
+        reads, in one array write and never in a loop.[^2]
+
+        [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+        [^2]: ADR-0040, Python is a control plane, not a data plane,
+        decisions D1 and D2.
+        `docs/adrs/draft/adr-0040-python-is-a-control-plane-not-a-data-plane.md`
+        """
+        ways = self._world.road_ways()
+        rows, columns = self._world.height, self._world.width
+        joins = np.zeros((rows, columns), dtype=np.uint8)
+        # Nothing stands for a tile with no road, so a level that stands moves
+        # up by one. A road under work stands at level nought in the engine,
+        # and nought is also the tile that carries nothing.
+        level = np.zeros((rows, columns), dtype=np.uint8)
+        column, row = ways["q"], ways["r"]
+        if column.size:
+            joins[row, column] = ways["joins"]
+            level[row, column] = ways["level"] + 1
+        return joins, level
+
+    def _ways(self, page: np.ndarray, ground: Ground, scale: float) -> np.ndarray:
+        """Draw every road on the page, as a ribbon and not as a filled cell.
+
+        **A road is a way.** It runs from somewhere to somewhere, it joins
+        another road at a junction, it bends, and it ends. A coloured cell
+        says that a tile carries the road property. It does not draw a road.
+
+        The ribbon runs from the middle of a tile out to the middle of the
+        edge it shares with each neighbour that carries a road. The neighbour
+        draws to the same point from its own side, so the two halves meet and
+        the way is continuous. A tile that joins one neighbour ends there. A
+        tile that joins two bends. A tile that joins three or more is a
+        junction. A tile that joins nothing draws a mark, because a made thing
+        that nothing reaches is still a made thing.
+
+        **The marks are the two edges of the way, and not a fill.** That is
+        how a road is drawn on a map and in a study: a watcher follows two
+        lines and reads the ground between them. The best road adds a line
+        down the middle, so a watcher tells the two levels apart without
+        comparing one road against another. A way that is still being made
+        draws the middle line alone.
+
+        **The pass costs the road and not the page.** The distance to the
+        ribbon is worked out at the points that show a road and nowhere else,
+        so a world with no road pays one test.
+        """
+        joins_of, level_of = self.road_lattice()
+        if not level_of.any():
+            return page
+        level = self._gather(ground, level_of.astype(np.int32))
+        # A road lies on the top of the ground. The face that the lift exposed
+        # is a cliff below that top, so the ribbon does not run down it.
+        here = ground.drawn & ~ground.cliff & (level > 0)
+        if not here.any():
+            return page
+        joins = self._gather(ground, joins_of.astype(np.int32))[here]
+        level = level[here]
+        # Where the point stands inside its tile, in the plan of the world. A
+        # row of the grid steps half a column across, so the offset on the
+        # page is not the offset on the grid.
+        off_q = ground.within_q[here]
+        off_r = ground.within_r[here]
+        plan_x = off_q + off_r * 0.5
+        plan_y = off_r * ROW_PITCH
+        # The distance to the ribbon. It opens at the distance to the middle
+        # of the tile, which is the cap of a way that ends here and the round
+        # of a junction that turns here.
+        near = np.hypot(plan_x, plan_y)
+        # The directions are the engine's own. This module states no order,
+        # so a renumbering in the engine cannot leave a second order here.
+        from cachette import World as WorldType
+
+        for direction, (step_q, step_r) in enumerate(WorldType.direction_offsets()):
+            joined = ((joins >> direction) & 1).astype(bool)
+            if not joined.any():
+                continue
+            # The middle of the shared edge is half way between the two tile
+            # middles, so the neighbour reaches the same point from its side.
+            reach_x = (step_q + step_r * 0.5) * 0.5
+            reach_y = step_r * ROW_PITCH * 0.5
+            span = reach_x * reach_x + reach_y * reach_y
+            along = np.clip((plan_x * reach_x + plan_y * reach_y) / span, 0.0, 1.0)
+            arm = np.hypot(plan_x - along * reach_x, plan_y - along * reach_y)
+            near = np.where(joined, np.minimum(near, arm), near)
+        # The weight of a mark belongs to the page, so the width of a line is
+        # a count of page points turned into a share of a tile.
+        line = WAY_INK / max(scale, 1e-3)
+        half = np.take(np.array(WAY_WIDTH, dtype=np.float32), level) * 0.5
+        # A road that is still being made carries the middle line alone.
+        planned = level == 1
+        edge = np.clip(1.0 - np.abs(near - half) / line, 0.0, 1.0)
+        middle = np.clip(1.0 - near / line, 0.0, 1.0)
+        surface = np.clip((half - near) / line, 0.0, 1.0)
+        laid_ink = np.maximum(edge * WAY_EDGE_INK, surface * WAY_FILL_INK)
+        ink = np.where(planned, middle * WAY_PLANNED_INK, laid_ink)
+        crowned = level >= CROWNED_LEVEL
+        ink = np.where(crowned, np.maximum(ink, middle * WAY_CROWN_INK), ink)
+        weight = np.zeros(ground.drawn.shape, dtype=np.float32)
+        weight[here] = ink
+        laid: np.ndarray = page * (1.0 - weight[..., None]) + INK * weight[..., None]
+        return laid
 
     def _gather(self, ground: Ground, field: np.ndarray) -> np.ndarray:
         """Give every pixel of the page the number of the tile it shows."""

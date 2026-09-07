@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-626**
+**Next number: FND-627**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -996,6 +996,40 @@ the text a person confirms, which generation the first checkpoint lands on.
 Keeping the best centre rather than the newest one is correct, because an
 evolution strategy walks and a walk can end downhill. The defect is the claim,
 and not the behaviour.
+
+
+### FND-626 — Every upgrade was believed to be a mark in the middle of one tile
+
+**Believed.** An upgrade is a thing that stands on a tile. Both renderers
+therefore tinted the whole cell and drew a small shape in the middle of it. A
+report measured the readability of that pair and the drawing followed it, and a
+test asserted that a finished road washes the whole tile.[^F626A]
+
+**False for a road.** A road is a way. It runs from somewhere to somewhere, it
+joins another road at a junction, it bends, and it ends. A coloured cell says
+that a tile carries the road property. It does not draw a road, and a watcher
+cannot read where a road goes from a set of coloured cells.
+
+**Evidence.** Two pictures of one network, drawn from the same world. The first
+gives each road tile a tint and a bar. A watcher reads seven coloured cells and
+cannot say which of them are one road. The second draws a ribbon from the
+middle of each tile out to the middle of each edge it shares with a road, and a
+watcher follows the run, the branch and the junction. The commit body holds the
+command that made both.
+
+**What follows.** **A category is either a way or a thing that stands, and the
+drawing asks which.** The set is declared once, and both renderers and the
+tests read that one declaration.[^F626B] A way draws a ribbon that crosses the
+tile boundary, so it is drawn after every tile is painted rather than tile by
+tile. A thing that stands keeps the tint and the shape that the report chose.
+
+The test that asserted a finished site washes its tile now names a category
+that stands, because the claim was never about a road.
+
+Below the width at which a ribbon reads, the engine renderer still tints a road
+tile. A tint is the only mark a tile a few pixels wide can carry, and that is a
+statement about the zoom and not about what a road is.
+
 
 
 ## C. Defects found in specified rules
@@ -16099,3 +16133,5 @@ ramp, and the cloud column pins the map from a tile to its weather cell.
 [^F619B]: Findings register, FND-618. `docs/FINDINGS.md`
 [^F624A]: Findings register, FND-610. `docs/FINDINGS.md`
 [^F624B]: The four bulk tile readers, and the test that holds them to the engine. `tests/test_bulk_tile_readers.py`
+[^F626A]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+[^F626B]: The one derivation of a way, and which categories draw as one. `crates/cachette-view/src/ways.rs`

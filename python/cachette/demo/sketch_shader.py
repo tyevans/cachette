@@ -263,6 +263,91 @@ void main() {
 # **The order is the order a pencil study is made in.** The paper carries its
 # grain, the wash of the faction goes on it, the cloud crosses over the ground,
 # the wash of an overlay glazes what is under it, and the ink goes on last.
+# The ways that run over the ground, drawn where a road stands.
+#
+# **A road is a way and not a tile.** It runs from somewhere to somewhere, it
+# joins another road at a junction, it bends, and it ends. The ribbon runs from
+# the middle of a tile out to the middle of the edge it shares with each
+# neighbour that carries a road, so the two halves of a join meet exactly.
+#
+# **The offset inside a tile comes from the page and not from a second
+# texture.** The mesh pass writes the height of the ground and the tile at each
+# point. The lift is a whole count of rows and it follows that height, so the
+# row of the flat page follows from the row of the lifted page. Turning that
+# row and its column back into the plan of the world gives the place inside the
+# tile, and the arithmetic is the arithmetic of the array renderer read
+# backwards.
+#
+# A point on the face that the lift exposed is not on the top of the ground, so
+# no way runs over it.
+WAYS = """
+uniform isampler2D tile_joins;
+uniform isampler2D tile_level;
+uniform vec2 plan_half;
+uniform vec2 turn_by;
+uniform vec2 way_page_middle;
+uniform float way_scale;
+uniform float way_lean;
+uniform float way_rise;
+uniform float lift_margin;
+uniform float row_pitch;
+uniform int draws_ways;
+
+// Where inside its own tile one point of the page stands, in tiles, on each
+// axis of the grid. Both parts run from minus one half to one half.
+vec2 within_tile(ivec2 at, float raised) {
+    float flat_row = float(at.y) - way_rise - lift_margin + floor(raised * way_rise);
+    float across = float(at.x) - way_page_middle.x;
+    float down = (flat_row - way_page_middle.y) / way_lean;
+    float plan_x = (across * turn_by.x + down * turn_by.y) / way_scale + plan_half.x;
+    float plan_y = (down * turn_by.x - across * turn_by.y) / way_scale + plan_half.y;
+    float tile_r = plan_y / row_pitch;
+    float tile_q = plan_x - tile_r * 0.5;
+    return vec2(tile_q - floor(tile_q + 0.5), tile_r - floor(tile_r + 0.5));
+}
+
+// How dark the ways at one point of the page are, from none to one.
+float way_ink_at(ivec2 at) {
+    if (draws_ways == 0) { return 0.0; }
+    uint mark = flags_at(at);
+    if ((mark & DRAWN) == 0u || (mark & CLIFF) != 0u) { return 0.0; }
+    int take = take_at(at);
+    if (take < 0) { return 0.0; }
+    ivec2 tile = tile_of(take);
+    int level = texelFetch(tile_level, tile, 0).r;
+    if (level <= 0) { return 0.0; }
+    int joins = texelFetch(tile_joins, tile, 0).r;
+    vec2 inside = within_tile(at, height_at(at));
+    vec2 plan = vec2(inside.x + inside.y * 0.5, inside.y * row_pitch);
+    // The distance to the ribbon. It opens at the distance to the middle of
+    // the tile, which is the cap of a way that ends here and the round of a
+    // junction that turns here.
+    float near = length(plan);
+    for (int direction = 0; direction < 6; direction += 1) {
+        if (((joins >> direction) & 1) == 0) { continue; }
+        vec2 step_by = WAY_STEPS[direction];
+        // The middle of the shared edge is half way between the two tile
+        // middles, so the neighbour reaches the same point from its side.
+        vec2 reach = vec2(
+            (step_by.x + step_by.y * 0.5) * 0.5,
+            step_by.y * row_pitch * 0.5
+        );
+        float span = dot(reach, reach);
+        float along = clamp(dot(plan, reach) / span, 0.0, 1.0);
+        near = min(near, length(plan - along * reach));
+    }
+    float line = max(WAY_INK / max(way_scale, 1e-3), 1e-6);
+    float half_wide = WAY_WIDTH[clamp(level, 0, WAY_LEVELS - 1)] * 0.5;
+    float edge = clamp(1.0 - abs(near - half_wide) / line, 0.0, 1.0);
+    float middle = clamp(1.0 - near / line, 0.0, 1.0);
+    float surface = clamp((half_wide - near) / line, 0.0, 1.0);
+    if (level == 1) { return middle * WAY_PLANNED_INK; }
+    float ink = max(edge * WAY_EDGE_INK, surface * WAY_FILL_INK);
+    if (level >= CROWNED_LEVEL) { ink = max(ink, middle * WAY_CROWN_INK); }
+    return ink;
+}
+"""
+
 COMPOSITE = """
 uniform sampler2D tile_cloud;
 uniform sampler2D tile_across_x;
@@ -354,6 +439,13 @@ vec3 shade(ivec2 at) {
     // The ink goes on last, over every wash.
     float cover = coverage_at(at);
     page = page * (1.0 - cover) + INK * cover;
+
+    // The ways go over the hatch. A road is a made thing, and a mark that
+    // the hatch of the ground crossed would read as ground. The array
+    // renderer lays them in this order.
+    float way = way_ink_at(at);
+    page = page * (1.0 - way) + INK * way;
+
     float edge = outline_at(at);
     return clamp(page * (1.0 - edge) + INK * edge, 0.0, 255.0);
 }

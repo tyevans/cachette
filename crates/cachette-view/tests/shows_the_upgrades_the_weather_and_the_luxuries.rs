@@ -609,6 +609,35 @@ fn a_builder(world: &World, soldiers: &[(Entity, Axial)]) -> Entity {
         .0
 }
 
+/// Returns a category that stands on its tile and that this ground fits.
+///
+/// **A way is not a thing that stands.** A road draws a ribbon through the
+/// ground it crosses, so it washes no tile and it fills no corner. A test
+/// about the wash of a site therefore asks the drawing which categories
+/// stand, rather than naming one.[^1]
+///
+/// The table holds no row for every category on every ground, so the choice
+/// is made against the table and not against a guess.
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+fn a_standing_category(world: &World, address: Axial) -> UpgradeCategory {
+    let ground = world
+        .tile_kind(address)
+        .expect("the address is a tile of the world");
+    UpgradeCategory::ALL
+        .into_iter()
+        .find(|category| {
+            !cachette_view::ways::draws_as_a_way(*category)
+                && world
+                    .upgrade_table()
+                    .row(*category, 1)
+                    .is_some_and(|row| row.fits(ground))
+        })
+        .expect("the ground fits a category that stands on its tile")
+}
+
 #[test]
 fn a_site_under_work_marks_the_middle_and_a_finished_site_washes_the_tile() {
     // A site under work drew as a wash whose weight ran from a floor of 56.
@@ -620,28 +649,33 @@ fn a_site_under_work_marks_the_middle_and_a_finished_site_washes_the_tile() {
     let mut begun = world.clone();
     let mut finished = world;
     let builder = a_builder(&begun, &soldiers);
-    // A road takes a tile the faction's plan zones, so each world zones the
-    // tile the builder stands on. Without a project the engine refuses the
-    // order, and this test would measure the refusal rather than the marks.
+    // A category that stands on its tile and that this ground fits. A road is
+    // a way: it draws a ribbon through the ground and washes no tile, so it
+    // would measure nothing here.
     let stands = begun
         .soldiers()
         .address(builder)
         .expect("the builder stands on a tile of the world");
+    let kind = a_standing_category(&begun, stands);
+    // A category whose row asks for no held ground takes a tile the faction's
+    // plan zones, so each world zones the tile the builder stands on. Without
+    // a project the engine refuses the order, and this test would measure the
+    // refusal rather than the marks.
     begun
-        .zone_project(FactionId(0), stands, UpgradeCategory::ROAD)
+        .zone_project(FactionId(0), stands, kind)
         .expect("the plan takes the project");
     finished
-        .zone_project(FactionId(0), stands, UpgradeCategory::ROAD)
+        .zone_project(FactionId(0), stands, kind)
         .expect("the plan takes the project");
-    assert!(begun.order_build(builder, UpgradeCategory::ROAD).is_ok());
-    assert!(finished.order_build(builder, UpgradeCategory::ROAD).is_ok());
+    assert!(begun.order_build(builder, kind).is_ok());
+    assert!(finished.order_build(builder, kind).is_ok());
     begun.step(1).expect("the step must run");
     let site = begun
         .upgrade_sites()
         .first()
         .copied()
         .expect("the ordered build placed a site");
-    assert!(!site.is_complete(), "one tick finished the road");
+    assert!(!site.is_complete(), "one tick finished the site");
     let address = address_of(&begun, site.tile.0);
 
     let mut ticks = 0;
@@ -649,7 +683,9 @@ fn a_site_under_work_marks_the_middle_and_a_finished_site_washes_the_tile() {
         .upgrade_at(address)
         .is_none_or(|site| !site.is_complete())
     {
-        assert!(ticks < 200, "the road was never finished");
+        // A category that stands costs more work than a road does, so the
+        // bound is generous. It bounds the loop; it is not a measurement.
+        assert!(ticks < 2000, "the site was never finished");
         finished.step(1).expect("the step must run");
         ticks += 1;
     }
