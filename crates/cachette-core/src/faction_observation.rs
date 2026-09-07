@@ -69,14 +69,22 @@
 //!
 //! # What the read costs
 //!
-//! The reader takes the summary the pyramid rebuilt and the aggregates the
-//! engine already keeps. It walks no unit, and it walks the tiles of a cell
-//! only where the faction has observed part of that cell.[^2]
+//! The standing and the boards come from the aggregates the engine already
+//! keeps, and they walk no cell.
 //!
 //! **A cell the faction has never seen a tile of costs no tile work.** The
-//! mask answers for the whole block, so the walk runs over the cells the
-//! faction observed and never over the whole lattice. The reader reads the
-//! layer of the faction once, not once for each cell.
+//! block form of the fog layer answers for the whole block, so the walk runs
+//! over the cells the faction observed and never over the whole lattice. The
+//! reader reads the layer of the faction once, not once for each cell.
+//!
+//! **A cell the faction has observed part of costs a walk over the tiles of
+//! that cell.** The record asks the reader to start no pass over the tiles,
+//! and to take the summary the pyramid rebuilt instead.[^2] The rebuilt cell
+//! counts tiles the faction has not seen, so this reader cannot take it
+//! without stating what those tiles hide. The walk therefore stands, and it
+//! is bounded by the ground the faction has walked rather than by the world.
+//! A derived per-faction level would remove it, and that level is state the
+//! step would carry for every faction, whether or not a learner reads it.
 //!
 //! # Determinism
 //!
