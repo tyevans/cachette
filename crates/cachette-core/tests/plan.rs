@@ -411,6 +411,12 @@ fn the_solver_gives_one_plan_at_every_thread_count() {
 fn a_place_past_the_search_radius_yields_no_project() {
     // The extreme: the second city is outside the window the search builds,
     // so no path reaches it and no project names its tile.
+    //
+    // **A place is not a settlement.** A settlement past the radius is
+    // reached, because a way between two settlements chains windows. The tile
+    // of a settlement still takes no project, because a settlement carries a
+    // settlement and never a way. The window itself still answers nothing
+    // past its radius, which is what this test reads.
     let (mut world, _, other) = two_cities(SEED);
     world.set_plan_rules(world.plan_rules().with_bound(64));
     let tight = world.plan_rules();
@@ -880,4 +886,310 @@ fn a_project_refuses_a_build_order_that_names_another_category() {
         Some(UpgradeCategory::TERRACE),
         "the pass built the category the verb refused"
     );
+}
+
+// ---------------------------------------------------------------------------
+// D3. A way joins two settlements that stand further apart than one window
+// ---------------------------------------------------------------------------
+
+/// How far apart the two settlements of the join fixture stand.
+///
+/// **The gap must pass the search radius, or the fixture measures nothing.**
+/// One window centred on either settlement then holds the other, and a single
+/// window answers the join. The founding rule keeps two settlements of one
+/// faction further apart than that, so a fixture inside the radius models a
+/// world the founding verb never builds.[^1]
+///
+/// The gap is the founding distance, so the fixture stands at the closest two
+/// settlements of one faction ever stand.
+///
+/// # References
+///
+/// [^1]: The founding distance. `crates/cachette-core/src/founding.rs`
+const JOIN_GAP: u32 = 16;
+
+/// How many ticks the join fixture runs.
+///
+/// A way of the gap above holds about that many tiles, and each tile takes
+/// the work of one road. The count is the ticks the builders need, with room
+/// for the ground that sends the way round.
+const JOIN_TICKS: u32 = 900;
+
+/// How many builders the join fixture founds.
+///
+/// A unit builds the project nearest to it, so a way of many tiles needs many
+/// units. The count is large enough that every tile of the way carries a
+/// builder before the run ends.
+const JOIN_BUILDERS: u32 = 8;
+
+/// Builds a world with two cities of one faction, further apart than one
+/// window is wide.
+///
+/// The seat carries a group of builders. The second city stands past the
+/// search radius, so no single window holds both, and the solver reaches it
+/// only by chaining windows.
+fn two_far_cities(seed: u64) -> (World, Axial, Axial) {
+    let mut world = bare(seed);
+    let seat = open_from(&world, Axial::new(20, 40));
+    let other = open_from(&world, Axial::new(20 + JOIN_GAP as i32, 40));
+    assert_ne!(seat, other, "the fixture needs two places");
+    // **The extreme this fixture reaches is the gap.** A fixture inside the
+    // radius measures one window, and one window is what the founding rule
+    // never gives.[^1]
+    //
+    // [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+    assert!(
+        seat.distance(other) > world.plan_rules().radius(),
+        "the fixture put its two places {} steps apart, inside the radius of {}",
+        seat.distance(other),
+        world.plan_rules().radius()
+    );
+    world
+        .found_group_at(seat, JOIN_BUILDERS, ZERO)
+        .expect("the ground admits a founding");
+    world
+        .found_settlement(other, ZERO)
+        .expect("the ground admits a second city");
+    // A second faction, far away, so that no faction holds the world. A game
+    // end stops every controller, and a stopped controller plans nothing and
+    // orders nobody.[^1]
+    //
+    // [^1]: ADR-0148, a game end is recorded once and stops the controllers. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    let far = open_from(&world, Axial::new(80, 80));
+    world
+        .found_group_at(far, 4, FactionId(1))
+        .expect("the ground admits a second faction");
+    // **No evaluation draws.** The demonstration controller otherwise draws a
+    // category and orders the whole faction to build it where it stands, and
+    // that order competes with the project order for the same units. The
+    // fixture removes the competing draw so that it measures the way, in the
+    // same way the project order test does.
+    world.set_controller_evaluations(0);
+    (world, seat, other)
+}
+
+/// Reports whether a road that stands joins two addresses.
+///
+/// The walk crosses a tile that carries a finished road, and it ends when it
+/// touches the far address. A settlement carries a settlement and never a
+/// road, so a walk that asked the far tile for a road would join nothing.
+fn a_road_joins(world: &World, from: Axial, to: Axial) -> bool {
+    let mut seen = vec![from];
+    let mut queue = vec![from];
+    while let Some(here) = queue.pop() {
+        for neighbour in world.grid().neighbours(here).into_iter().flatten() {
+            if neighbour == to {
+                return true;
+            }
+            if seen.contains(&neighbour) {
+                continue;
+            }
+            if world.finished_upgrade(neighbour) != Some(UpgradeCategory::ROAD) {
+                continue;
+            }
+            seen.push(neighbour);
+            queue.push(neighbour);
+        }
+    }
+    false
+}
+
+/// The solver zones a way to a settlement that stands past one window.
+///
+/// **This is the hole the chain of windows closes.** The solver anchored one
+/// window on the seat, and it asked for a way between the seat and a place
+/// inside that window. Two settlements of one faction stand further apart
+/// than the window is wide, so no settlement was ever a candidate and no
+/// faction ever planned a way to its own second city.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+#[test]
+fn a_faction_zones_a_way_to_a_settlement_past_one_window() {
+    let (mut world, seat, other) = two_far_cities(SEED);
+    world.step(1).expect("the step runs");
+    let plan = plan_of(&world);
+    assert!(
+        !plan.is_empty(),
+        "the solver planned nothing for two cities"
+    );
+    let radius = world.plan_rules().radius();
+    let places: Vec<Axial> = plan
+        .iter()
+        .filter(|project| project.category == UpgradeCategory::ROAD)
+        .filter_map(|project| world.grid().address_of(project.tile))
+        .collect();
+    assert!(
+        places.iter().any(|address| address.distance(seat) > radius),
+        "no project stands past one window of the seat, so no chain ran: {places:?}"
+    );
+    assert!(
+        places.iter().any(|address| address.distance(other) <= 1),
+        "no project reaches the second city: {places:?}"
+    );
+}
+
+/// The chain of windows gives one way at every thread count.
+///
+/// The way between two settlements is the one target that reads more than one
+/// window, so it is the one that a thread count could reorder. The chain runs
+/// in one order and it takes the same number of windows in every world, so
+/// three runs at three thread counts give one plan.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+/// [^2]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+#[test]
+fn the_chain_of_windows_gives_one_way_at_every_thread_count() {
+    let plans: Vec<Vec<Project>> = [1usize, 2, 12]
+        .into_iter()
+        .map(|threads| {
+            let (mut world, _, _) = two_far_cities(SEED);
+            for _ in 0..3 {
+                world.step(threads).expect("the step runs");
+            }
+            plan_of(&world)
+        })
+        .collect();
+    assert_eq!(plans[0], plans[1], "one thread and two threads disagree");
+    assert_eq!(
+        plans[1], plans[2],
+        "two threads and twelve threads disagree"
+    );
+    assert!(!plans[0].is_empty(), "the fixture planned nothing");
+}
+
+/// The chain takes the same number of windows whatever the world holds.
+///
+/// **The hop count is derived and it never reads the world.** It is the plan
+/// bound divided by the window radius, rounded up, and each hop relaxes its
+/// window the fixed pass count the rules give. A world with two settlements
+/// far apart and a world with one settlement therefore run the same solver
+/// passes, and a reader sees that from outside.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+#[test]
+fn the_chain_takes_a_hop_count_the_world_cannot_change() {
+    let rules = PlanRules::DEFAULT;
+    assert_eq!(
+        rules.join_hops(),
+        rules.bound().div_ceil(rules.radius()),
+        "the hop count is not the bound over the radius"
+    );
+    // A far pair and a lone seat are the two ends of what a world can hold.
+    // Both worlds seat two factions, because the census counts the passes of
+    // every faction and a world with fewer seats would run fewer passes for
+    // that reason and not for the hop count.
+    let (mut far, _, _) = two_far_cities(SEED);
+    let mut lone = bare(SEED);
+    let seat = open_from(&lone, Axial::new(20, 40));
+    lone.found_group_at(seat, 4, ZERO)
+        .expect("the ground admits a founding");
+    let far_away = open_from(&lone, Axial::new(80, 80));
+    lone.found_group_at(far_away, 4, FactionId(1))
+        .expect("the ground admits a second faction");
+    lone.set_controller_evaluations(0);
+    let passes = i64::from(far.plan_rules().solver_passes()) * 2;
+    for tick in 1..=4 {
+        far.step(1).expect("the step runs");
+        lone.step(1).expect("the step runs");
+        assert_eq!(
+            census(&far, "plan_passes"),
+            passes * tick,
+            "the world with a far pair ran a different number of passes"
+        );
+        assert_eq!(
+            census(&lone, "plan_passes"),
+            census(&far, "plan_passes"),
+            "two worlds ran a different number of passes"
+        );
+    }
+}
+
+/// Two settlements of one faction end joined by a road that stands.
+///
+/// **This test drives the engine and not the mechanism.** It founds the two
+/// cities and it then only steps the world. The solver zones the way, the
+/// controller sends the idle units, the build pass raises each road, and the
+/// walk at the end reads the ground rather than the plan.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, sections 5 and 6. `.agents/rules/testing.md`
+#[test]
+fn two_settlements_of_one_faction_end_joined_by_a_road() {
+    let (mut world, seat, other) = two_far_cities(SEED);
+    for _ in 0..JOIN_TICKS {
+        world.step(1).expect("the step runs");
+    }
+    assert!(world.check_invariants());
+    let standing = addresses()
+        .into_iter()
+        .filter(|address| world.finished_upgrade(*address) == Some(UpgradeCategory::ROAD))
+        .count();
+    assert!(
+        a_road_joins(&world, seat, other),
+        "no road joins the two cities after {JOIN_TICKS} ticks, \
+         with {standing} roads standing and {} projects left.\n{}",
+        plan_of(&world).len(),
+        join_report(&world, seat, other)
+    );
+}
+
+/// Returns what the run left on the ground between two cities.
+///
+/// The report says how far the road that starts at the first city reaches
+/// toward the second, what each plan project asks for, and where the standing
+/// roads lie. A bare count cannot tell a way that stops short from a set of
+/// roads on other ground.
+fn join_report(world: &World, seat: Axial, other: Axial) -> String {
+    let mut seen = vec![seat];
+    let mut queue = vec![seat];
+    while let Some(here) = queue.pop() {
+        for neighbour in world.grid().neighbours(here).into_iter().flatten() {
+            if seen.contains(&neighbour) {
+                continue;
+            }
+            if world.finished_upgrade(neighbour) != Some(UpgradeCategory::ROAD) {
+                continue;
+            }
+            seen.push(neighbour);
+            queue.push(neighbour);
+        }
+    }
+    let nearest = seen
+        .iter()
+        .map(|address| address.distance(other))
+        .min()
+        .unwrap_or(u32::MAX);
+    let mut categories: Vec<String> = Vec::new();
+    for category in [
+        UpgradeCategory::ROAD,
+        UpgradeCategory::TERRACE,
+        UpgradeCategory::LODGING,
+    ] {
+        let held = plan_of(world)
+            .iter()
+            .filter(|project| project.category == category)
+            .count();
+        categories.push(format!("{category:?}={held}"));
+    }
+    let on_way: usize = addresses()
+        .into_iter()
+        .filter(|address| world.finished_upgrade(*address) == Some(UpgradeCategory::ROAD))
+        .filter(|address| {
+            address.distance(seat) + address.distance(other) <= seat.distance(other) + 4
+        })
+        .count();
+    format!(
+        "  the road that touches the seat holds {} tiles and reaches within {nearest} of \
+         the far city\n  the plan holds {}\n  {on_way} standing roads lie near the line \
+         between the two cities",
+        seen.len() - 1,
+        categories.join(", ")
+    )
 }

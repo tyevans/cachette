@@ -7,8 +7,14 @@
 //!
 //! One solver writes the plan at the controller stage, in a fixed pass count.
 //! It reads the sites of one faction, the deposits inside one bounded window
-//! and the ground the faction holds. It reads no unit, and it reads no tile
-//! outside the window.[^1]
+//! and the ground the faction holds. It reads no unit.[^1]
+//!
+//! **A way between two settlements chains windows, and no other target
+//! does.** Two settlements of one faction stand further apart than one window
+//! is wide, so a deposit and a yield read the one window at the seat, and a
+//! way walks a fixed number of windows toward the far settlement. The chain
+//! length is derived from the plan bound and the window radius, and it is not
+//! a value of its own.
 //!
 //! **No function here names a category.** The solver asks the upgrade table
 //! which category joins two places: the category whose row asks for no held
@@ -238,6 +244,37 @@ impl PlanRules {
     #[must_use]
     pub const fn radius(self) -> u32 {
         self.radius
+    }
+
+    /// Returns the windows a way between two settlements chains together.
+    ///
+    /// **This is derived, and it is not a balance row.** Two settlements of
+    /// one faction stand further apart than one window is wide, because the
+    /// founding rule keeps them apart by more than the radius above.[^1] One
+    /// window centred on either end therefore reaches neither the far end nor
+    /// the ground between them. The search chains a fixed number of windows
+    /// instead, each of the radius above, and each aimed at the far end.
+    ///
+    /// The number comes from the two values beside it, and from nothing else.
+    /// A way lives in the plan, the plan holds the bound above, so a way
+    /// longer than the bound can never be zoned whole. One window advances
+    /// the search by at most its radius. The chain therefore takes the bound
+    /// divided by the radius, rounded up. A longer chain would plan a way the
+    /// plan cannot hold, and a shorter one would stop before the bound is
+    /// spent.
+    ///
+    /// A radius of zero gives one window, which covers one tile and plans
+    /// nothing.
+    ///
+    /// # References
+    ///
+    /// [^1]: The founding distance. `crates/cachette-core/src/founding.rs`
+    #[must_use]
+    pub const fn join_hops(self) -> u32 {
+        if self.radius == 0 {
+            return 1;
+        }
+        self.bound.div_ceil(self.radius)
     }
 
     /// Folds the rules into the state hash.
@@ -660,6 +697,35 @@ impl PathWindow {
     /// [^2]: Balance register, the plan. `docs/reference/balance.md`
     #[must_use]
     pub fn build(ground: &Ground<'_>, centre: TileIdx, rules: PlanRules) -> Option<Self> {
+        Self::build_over(ground, centre, rules, false)
+    }
+
+    /// Builds the window over the ground a way may stand on.
+    ///
+    /// **A way crosses only ground the joining category fits.** A unit walks
+    /// over the mountain and it lays no way there, so a way through the
+    /// mountain holds a tile that no unit can ever build. The plan then holds
+    /// a project that nothing finishes, and the two settlements at the ends
+    /// stay apart for ever while the plan reads as though it joined them.[^1]
+    ///
+    /// The window a deposit and a yield read admits every passable tile, as
+    /// before. Only the way between two settlements asks for this one.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    #[must_use]
+    pub fn build_for_a_way(ground: &Ground<'_>, centre: TileIdx, rules: PlanRules) -> Option<Self> {
+        Self::build_over(ground, centre, rules, true)
+    }
+
+    /// Builds the window and relaxes it the fixed pass count.
+    fn build_over(
+        ground: &Ground<'_>,
+        centre: TileIdx,
+        rules: PlanRules,
+        for_a_way: bool,
+    ) -> Option<Self> {
         let address = ground.grid.address_of(centre)?;
         let radius = i32::try_from(rules.radius()).ok()?;
         let side = (radius as usize) * 2 + 1;
@@ -685,6 +751,13 @@ impl PathWindow {
                 let Some(step) = ground.step_cost(here) else {
                     continue;
                 };
+                // A way stands only where the joining category fits. The
+                // centre is always admitted, because a settlement may stand
+                // on ground that carries no way, and a way that could not
+                // start at its own end would never start.
+                if for_a_way && here != address && ground.joining_category(index).is_none() {
+                    continue;
+                }
                 let cell = window.cell_of(here)?;
                 window.tile[cell] = index.0;
                 window.step[cell] = step;
@@ -740,6 +813,46 @@ impl PathWindow {
             cell = self.cell_of(back)?;
         }
         None
+    }
+
+    /// Returns the address of the window that stands nearest one place.
+    ///
+    /// **The answer must stand nearer the place than the centre does.** A
+    /// cell that stands no nearer would let the chain of windows step back
+    /// and forth between two cells for ever, so a hop that cannot close the
+    /// gap answers nothing and the chain stops there.
+    ///
+    /// The key is the hex distance to the place, then the cost of the way to
+    /// the cell, then the tile index. The distance comes first because the
+    /// hop exists to close the gap. The cost comes second, so two cells at
+    /// one distance take the cheaper way. The tile index breaks the last
+    /// tie, so no container decides.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    #[must_use]
+    pub fn nearest_to(&self, place: Axial) -> Option<Axial> {
+        let held = self.centre.distance(place);
+        let mut best: Option<(u32, i64, u32, Axial)> = None;
+        for cell in 0..self.tile.len() {
+            let index = self.tile[cell];
+            if index == NO_TILE || self.cost[cell] == NO_PATH {
+                continue;
+            }
+            let Some(here) = self.address_of(cell) else {
+                continue;
+            };
+            let span = here.distance(place);
+            if span >= held {
+                continue;
+            }
+            let key = (span, self.cost[cell], index, here);
+            if best.is_none_or(|kept| key < kept) {
+                best = Some(key);
+            }
+        }
+        best.map(|(_, _, _, here)| here)
     }
 
     /// Relaxes every cell of the window once, in ascending cell order.
@@ -850,13 +963,16 @@ pub fn solve(
     for _ in 0..rules.solver_passes() {
         plan.count_pass();
         sweep_finished(ground, faction, plan);
-        let Some(window) = PathWindow::build(ground, needs.seat, rules) else {
+        // **The seat window answers three of the four targets, and not the
+        // fourth.** A way between two settlements starts at a settlement that
+        // may be nowhere near the seat, and it reaches further than one
+        // window, so it builds its own chain of windows. A seat the ground
+        // refuses leaves that chain the only target the pass can take.
+        let window = PathWindow::build(ground, needs.seat, rules);
+        let Some(target) = choose_target(ground, faction, needs, window.as_ref(), plan) else {
             continue;
         };
-        let Some(target) = choose_target(ground, faction, needs, &window, plan) else {
-            continue;
-        };
-        written += write_path(ground, faction, needs, &window, target, plan);
+        written += write_path(ground, faction, needs, window.as_ref(), &target, plan);
     }
     written
 }
@@ -900,15 +1016,65 @@ fn choose_target(
     ground: &Ground<'_>,
     faction: FactionId,
     needs: &Needs<'_>,
-    window: &PathWindow,
+    window: Option<&PathWindow>,
     plan: &PlanRegister,
 ) -> Option<Target> {
     // A faction whose every site is full grows nobody, so a lodging comes
     // before a way and before a yield while that holds.
-    if let Some(address) = choose_lodging_ground(ground, faction, needs, window, plan) {
+    if let Some(address) =
+        window.and_then(|window| choose_lodging_ground(ground, faction, needs, window, plan))
+    {
         return Some(Target::Lodging(address));
     }
-    let mut best: Option<(i64, u32, Axial)> = None;
+    // **A way between two settlements outranks a way to a deposit and a
+    // raise of one tile, and the worth is the traffic each carries.** A way
+    // to a deposit serves the one settlement that gathers from it. A raise
+    // serves the one tile it stands on. A way between two settlements
+    // carries every load that moves between them, in both directions, for
+    // as long as both stand. The three are not scored against one number,
+    // because no measurement gives one; they are ordered by what each
+    // serves.
+    if let Some(way) = choose_way(ground, needs, plan) {
+        return Some(Target::Way(way));
+    }
+    // No settlement asks for a way. The deposits of the window come next,
+    // and the ground the faction holds comes last.
+    let window = window?;
+    if let Some(address) = choose_deposit(ground, faction, needs, window, plan) {
+        return Some(Target::Join(address));
+    }
+    choose_yield_ground(ground, faction, needs, window, plan).map(Target::Raise)
+}
+
+/// Chooses the way between two settlements of one faction that the solver
+/// lays next.
+///
+/// **The faction lays a tree over its settlements and never every pair.**
+/// Every pair is the square of the settlement count, and this engine plans
+/// for a large world.[^1] Each settlement other than the seat takes one
+/// anchor: the settlement nearest to it that stands nearer the seat than it
+/// does, and the seat itself when no other does. The anchor of a settlement
+/// therefore stands strictly nearer the seat, so the edges form a tree rooted
+/// at the seat and no edge closes a ring. A faction with a settlement count
+/// of `n` lays `n` less one ways, and never `n` squared over two.
+///
+/// The choice reads the settlements of one faction and the plan of one
+/// faction. It reads no unit and no tile, so its cost follows neither the
+/// population nor the world.[^2]
+///
+/// The edges are taken in ascending order of the gap they close, and the tile
+/// index breaks a tie. The first edge whose way is not already laid is the
+/// one this pass takes. A way that already stands whole, or that the plan
+/// already zones whole, asks for nothing.
+///
+/// # References
+///
+/// [^1]: ADR-0096, cost follows the lattice, not the population, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+/// [^2]: ADR-0152, a faction plans its roads and zones with one solver, decision D2. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+fn choose_way(ground: &Ground<'_>, needs: &Needs<'_>, plan: &PlanRegister) -> Option<Vec<TileIdx>> {
+    let rules = plan.rules();
+    let seat_address = ground.grid.address_of(needs.seat)?;
+    let mut edges: Vec<(u32, u32, u32)> = Vec::new();
     for site in needs.sites {
         if *site == needs.seat {
             continue;
@@ -916,45 +1082,185 @@ fn choose_target(
         let Some(address) = ground.grid.address_of(*site) else {
             continue;
         };
-        let Some(cost) = window.cost_of(address) else {
+        let Some(anchor) = anchor_of(ground, needs, *site, address, seat_address) else {
             continue;
         };
-        if joined_all_the_way(ground, faction, needs, window, address, plan) {
+        let Some(anchor_address) = ground.grid.address_of(anchor) else {
+            continue;
+        };
+        edges.push((anchor_address.distance(address), site.0, anchor.0));
+    }
+    // The sort is by the gap, then by the far settlement, then by the anchor.
+    // Every part of the key is a tile index or a distance, so no container
+    // decides the order.[^3]
+    //
+    // [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    edges.sort_unstable();
+    for (_, far, anchor) in edges {
+        let Some(address) = ground.grid.address_of(TileIdx(far)) else {
+            continue;
+        };
+        let Some(way) = join_way(ground, TileIdx(anchor), address, rules) else {
+            continue;
+        };
+        if laid_all_the_way(ground, needs, &way) {
             continue;
         }
-        let key = (cost, site.0, address);
-        if best.is_none_or(|held| key < held) {
-            best = Some(key);
+        return Some(way);
+    }
+    None
+}
+
+/// Returns the settlement one settlement takes its way from.
+///
+/// The anchor is the settlement of the faction nearest to this one among
+/// those that stand strictly nearer the seat. The seat is always a candidate,
+/// so this answers a settlement for every settlement but the seat. A tie
+/// takes the lower tile index.
+///
+/// The strict test is what makes a tree: an anchor stands nearer the seat
+/// than the settlement it anchors, so following the anchors from any
+/// settlement reaches the seat and never returns to where it started.
+fn anchor_of(
+    ground: &Ground<'_>,
+    needs: &Needs<'_>,
+    site: TileIdx,
+    address: Axial,
+    seat_address: Axial,
+) -> Option<TileIdx> {
+    let span_to_seat = address.distance(seat_address);
+    let mut best = (seat_address.distance(address), needs.seat.0);
+    for other in needs.sites {
+        if *other == site || *other == needs.seat {
+            continue;
+        }
+        let Some(other_address) = ground.grid.address_of(*other) else {
+            continue;
+        };
+        if other_address.distance(seat_address) >= span_to_seat {
+            continue;
+        }
+        let key = (other_address.distance(address), other.0);
+        if key < best {
+            best = key;
         }
     }
-    if let Some((_, _, address)) = best {
-        return Some(Target::Join(address));
+    Some(TileIdx(best.1))
+}
+
+/// Returns the way from one tile to one place, in walking order.
+///
+/// **The search is a fixed chain of fixed windows.** Two settlements stand
+/// further apart than one window is wide, so one window reaches neither the
+/// far end nor the ground between. Each hop builds one window at the tile the
+/// last hop reached, takes the cell of that window nearest the far end, and
+/// walks to it. The chain makes the hop count the rules derive, and never one
+/// hop more or fewer.[^1]
+///
+/// **Nothing here stops on a condition.** The hop count is fixed and it does
+/// not change with the input. A hop that cannot close the gap answers
+/// nothing, and the chain then returns the part it walked, which is a shorter
+/// answer and not a shorter search. The window itself relaxes the fixed pass
+/// count the rules give.[^1]
+///
+/// The way is cut at the plan bound, because a way longer than the bound
+/// cannot be zoned whole.
+///
+/// Returns nothing when the chain took no step at all.
+///
+/// # References
+///
+/// [^1]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+fn join_way(
+    ground: &Ground<'_>,
+    from: TileIdx,
+    to: Axial,
+    rules: PlanRules,
+) -> Option<Vec<TileIdx>> {
+    let bound = (rules.bound() as usize).max(1);
+    let mut walked = vec![from];
+    for _ in 0..rules.join_hops() {
+        let anchor = *walked.last()?;
+        let Some(anchor_address) = ground.grid.address_of(anchor) else {
+            break;
+        };
+        if anchor_address == to {
+            break;
+        }
+        let Some(window) = PathWindow::build_for_a_way(ground, anchor, rules) else {
+            break;
+        };
+        let Some(step) = window.nearest_to(to) else {
+            break;
+        };
+        let Some(leg) = window.path_to(ground.grid, step) else {
+            break;
+        };
+        walked.extend(leg.into_iter().skip(1));
+        if walked.len() >= bound {
+            walked.truncate(bound);
+            break;
+        }
     }
-    // No site asks for a way. The deposits of the window come next, and the
-    // ground the faction holds comes last.
-    if let Some(address) = choose_deposit(ground, faction, needs, window, plan) {
-        return Some(Target::Join(address));
-    }
-    choose_yield_ground(ground, faction, needs, window, plan).map(Target::Raise)
+    (walked.len() > 1).then_some(walked)
+}
+
+/// Reports whether a way between two settlements stands.
+///
+/// **The test asks the ground and never the plan.** A way that the plan zones
+/// whole is not a way that stands, and a solver that took a zoned way for a
+/// finished one would move on and spend the rest of the plan bound on other
+/// roads. The builders then spread over every road the plan holds, and the
+/// way between the two settlements is the one that no builder ever reaches
+/// the far end of.
+///
+/// A way therefore holds the plan until it stands. The passes still run their
+/// fixed count and write nothing while that is true, which is a shorter
+/// answer and not a shorter search.[^1]
+///
+/// A settlement tile carries a settlement and never a way, so it counts as
+/// standing. A tile whose ground admits no joining category counts as
+/// standing too, because no project can ever name it.
+///
+/// # References
+///
+/// [^1]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+fn laid_all_the_way(ground: &Ground<'_>, needs: &Needs<'_>, way: &[TileIdx]) -> bool {
+    way.iter().all(|tile| {
+        *tile == needs.seat
+            || needs.sites.binary_search(tile).is_ok()
+            || ground.joined(*tile)
+            || ground.joining_category(*tile).is_none()
+    })
 }
 
 /// What the solver plans toward.
 ///
-/// A join asks for a way between the seat and one place, and it writes every
-/// tile of the path. A raise asks the ground of one held tile to give more,
-/// and it writes one tile.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// A join asks for a way between the seat and one place inside the seat
+/// window, and it writes every tile of the path. A way asks for a road
+/// between two settlements, which the chain of windows already walked, and it
+/// writes every tile of that walk. A raise asks the ground of one held tile
+/// to give more, and it writes one tile.
+#[derive(Clone, Debug, PartialEq, Eq)]
 enum Target {
     /// Join the seat to this place.
     Join(Axial),
+    /// Lay this way between two settlements, in walking order.
+    Way(Vec<TileIdx>),
     /// Raise the yield of this tile.
     Raise(Axial),
     /// Lodge more people at this tile.
     Lodging(Axial),
 }
 
-/// Reports whether every tile of the path to one place already carries a
+/// Reports whether every tile of the path to one deposit already carries a
 /// finished joining upgrade or a project of this faction.
+///
+/// **A deposit reads the plan and a settlement does not.** A road to a
+/// deposit that the plan already zones asks for nothing more, because the
+/// deposit is one end and the plan holds the whole way to it inside one
+/// window. A way between two settlements is longer than one window and it
+/// holds the plan until it stands, so it asks the ground alone.
 fn joined_all_the_way(
     ground: &Ground<'_>,
     faction: FactionId,
@@ -1222,8 +1528,8 @@ fn write_path(
     ground: &Ground<'_>,
     faction: FactionId,
     needs: &Needs<'_>,
-    window: &PathWindow,
-    target: Target,
+    window: Option<&PathWindow>,
+    target: &Target,
     plan: &mut PlanRegister,
 ) -> u32 {
     let limit = plan.rules().projects_per_pass();
@@ -1231,11 +1537,14 @@ fn write_path(
         return 0;
     }
     let (tiles, raise) = match target {
-        Target::Join(address) => match window.path_to(ground.grid, address) {
-            Some(path) => (path, false),
-            None => return 0,
-        },
-        Target::Raise(address) | Target::Lodging(address) => match ground.grid.index_of(address) {
+        Target::Way(way) => (way.clone(), false),
+        Target::Join(address) => {
+            match window.and_then(|window| window.path_to(ground.grid, *address)) {
+                Some(path) => (path, false),
+                None => return 0,
+            }
+        }
+        Target::Raise(address) | Target::Lodging(address) => match ground.grid.index_of(*address) {
             Some(tile) => (vec![tile], true),
             None => return 0,
         },
@@ -1247,7 +1556,16 @@ fn write_path(
         if written >= limit {
             break;
         }
-        if !raise && (tile == needs.seat || ground.joined(tile)) {
+        // **A settlement tile takes no way.** A settlement carries a
+        // settlement, so a way zoned there would be refused on every tick and
+        // would count a refusal for as long as both stood.[^3]
+        //
+        // [^3]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+        if !raise
+            && (tile == needs.seat
+                || needs.sites.binary_search(&tile).is_ok()
+                || ground.joined(tile))
+        {
             continue;
         }
         // **A lodging takes a tile the plan already names.** The plan
@@ -1261,7 +1579,7 @@ fn write_path(
             continue;
         }
         let category = match target {
-            Target::Join(_) => ground.joining_category(tile),
+            Target::Join(_) | Target::Way(_) => ground.joining_category(tile),
             Target::Raise(_) => ground
                 .grid
                 .address_of(tile)
