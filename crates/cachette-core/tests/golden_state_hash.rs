@@ -503,8 +503,25 @@ fn wonder(world: &mut World) {
 fn gather(world: &mut World) {
     // The periods are a parameter of the kind, so the scenario states them
     // and the engine holds no test value.
+    //
+    // **The period this states is a base, and the engine scales it.** The
+    // recovery pass multiplies the base by the moisture band of the level 1
+    // cell that covers the tile, and it divides by the improvement standing on
+    // the tile.[^4] The scenario improves nothing, so only the moisture reaches
+    // it. A world starts with no water on the ground, and the frames this
+    // scenario runs are far too few for the weather to wet it, so every deposit
+    // here sits in the parched band for the whole run. That band is the worst
+    // one for both kinds that recover.
+    //
+    // The base is therefore the smallest the rule allows. The scenario asserts
+    // the effective period below rather than trusting this reasoning, because
+    // the scale is a value the engine owns and this line is a second site for
+    // it.[^5]
+    //
+    // [^4]: Balance register, the moisture bands. `docs/reference/balance.md`
+    // [^5]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
     world.set_recovery_rules(
-        RecoveryRules::from_ticks([Some(5), Some(7), None]).expect("no period is zero"),
+        RecoveryRules::from_ticks([Some(1), Some(1), None]).expect("no period is zero"),
     );
     // The promotion threshold is a parameter of the kind in the same way the
     // recovery periods are, so the scenario states it and the engine holds no
@@ -561,6 +578,26 @@ fn gather(world: &mut World) {
             found.len()
         );
         deposits.extend(found);
+    }
+    // **A deposit must recover more than once inside the frames the scenario
+    // runs.** The period the engine acts on is the base above scaled by the
+    // moisture of the ground, and the scenario cannot predict that scale
+    // without repeating a table the engine owns. It reads the answer back
+    // instead, from the same rule the pass reads.
+    //
+    // Without this the only guard is the ledger check after the run, which
+    // reports that the scenario recovered nothing and names no reason. This
+    // one names the period, the kind and the tile.
+    for (address, kind) in &deposits {
+        let Some(period) = world.recovery_period_at(*address, *kind) else {
+            continue;
+        };
+        assert!(
+            u64::from(period) * 2 <= FRAMES,
+            "the {kind:?} deposit at {address:?} recovers every {period} ticks, \
+             and the scenario runs {FRAMES} frames, so the run cannot reach a \
+             second recovery and the ledger check below would measure nothing",
+        );
     }
     // **One deposit carries a site, and its gatherers call it home.** Without
     // that pair no unit of this scenario ever stands on the tile of its own
