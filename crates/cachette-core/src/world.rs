@@ -2128,8 +2128,8 @@ impl World {
     ///
     /// The call clears the seed set of every plane, so no order steers
     /// anything until the caller sends a set again. A unit that was sent to a
-    /// plane the world no longer holds reads no direction, and it takes the
-    /// keyed draw rather than standing still.[^2]
+    /// plane the world no longer holds reads no direction, and the next step
+    /// releases it rather than leaving it sent for ever.[^2]
     ///
     /// The cost is the cell count times the number of planes, in bytes. No
     /// figure appears here, because one blocker governs every cost figure this
@@ -2153,8 +2153,9 @@ impl World {
     /// The outer option reports whether the address and the destination name
     /// an entry. The inner one reports whether the cell holds a direction at
     /// all. **A cell that holds a seed, and a cell the reach never arrived
-    /// at, both hold none**, and a unit there falls back to the keyed draw
-    /// rather than standing still.[^1]
+    /// at, both hold none.** The fine field answers the first case at the
+    /// pitch of one tile, and the step releases a sent unit that neither
+    /// field steers.[^1]
     ///
     /// # References
     ///
@@ -5563,6 +5564,20 @@ impl World {
                     .place(soldier, address)
                     .expect("the granted address is inside the world and admits a unit");
             }
+            // **The release runs here, in the stage that applies the step,
+            // and it reads the tile the unit now stands on.** A unit that
+            // reached the tile it was sent to is free from this line on, so
+            // it reads its option row again and it gathers and delivers.
+            // Nothing released a sent unit before, and the defect was
+            // invisible for as long as arrival was impossible.[^31]
+            //
+            // The release takes no frame from the unit. The choice pass
+            // already wrote an intent for it, and the gather and the delivery
+            // of this frame run below and read no send, so a unit released
+            // here acts on the frame it is released.
+            //
+            // [^31]: Findings register, FND-572. `docs/FINDINGS.md`
+            self.release_sent_units();
         }
 
         // The bridge rebuilds here, at the barrier, and after the structural
@@ -10882,6 +10897,63 @@ impl World {
         );
     }
 
+    /// Frees every sent unit that its destination plane no longer steers.
+    ///
+    /// **A verb that sends a unit must state what releases it.** A sent unit
+    /// climbs its destination plane and reads no option row, so a unit that
+    /// arrives and stays sent neither gathers nor delivers. Nothing released
+    /// such a unit, and the defect was invisible for as long as arrival was
+    /// impossible.[^1]
+    ///
+    /// The pass frees two kinds of unit, and one rule names both. A unit that
+    /// stands on a tile of the seed set has arrived. A unit that reads no
+    /// direction from the fine field and none from the coarse one is somewhere
+    /// its plane leads nowhere: the plane holds no seed, the seed it held is
+    /// gone, or the ground between the two refuses the unit. Neither kind may
+    /// stay sent, because neither takes another step.
+    ///
+    /// **The release is the destination the caller set, and nothing else.**
+    /// The pass clears the home site of no unit and the intent of no unit.
+    ///
+    /// The walk is over the arena in slot order, and it writes the send column
+    /// of one unit for each entry. No entry reads what another wrote, so the
+    /// order decides nothing and the result is the same at any thread
+    /// count.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-572. `docs/FINDINGS.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn release_sent_units(&mut self) {
+        let layout = self.pyramid.layout();
+        let mut released: Vec<Entity> = Vec::new();
+        for unit in self.soldiers.iter() {
+            let Some(Some(destination)) = self.soldiers.sent(unit) else {
+                continue;
+            };
+            let Some(tile) = self.soldiers.tile(unit) else {
+                continue;
+            };
+            let Some(key) = layout.key_of(tile) else {
+                continue;
+            };
+            let state = send_state(
+                destination,
+                tile,
+                layout.block_of_key(key),
+                &self.approaches,
+                &self.destinations,
+            );
+            if matches!(state, SendState::Steer(_)) {
+                continue;
+            }
+            released.push(unit);
+        }
+        for unit in released {
+            self.soldiers.set_sent(unit, None);
+        }
+    }
+
     /// Rebuilds the derived unit structure when the arena has moved past it.
     ///
     /// **This is the one place that makes the world readable again.** The
@@ -11770,6 +11842,64 @@ struct UnitWalk<'a> {
     live: &'a [Entity],
 }
 
+/// What the destination plane of a sent unit says about the tile it stands on.
+///
+/// A plane answers one of three things, and the movement pass and the release
+/// pass both read this answer. **The rule is one function, so no reader
+/// declares a second time what arrival means.**[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SendState {
+    /// The plane names the neighbour that the unit steps onto.
+    Steer(u8),
+    /// The unit stands on a tile of the seed set. It has arrived.
+    Arrived,
+    /// The plane names no step and no arrival. It leads the unit nowhere.
+    Lost,
+}
+
+/// Returns what the destination plane says to a unit on one tile.
+///
+/// **The fine field wins over the coarse one.** The coarse field answers for
+/// a block of tiles, and the fine one answers for a tile of a block that
+/// holds a seed. A unit outside every seeded block reads no fine entry and
+/// takes the coarse answer, which is the answer it read before the fine field
+/// existed.[^1]
+///
+/// The lost answer covers three cases with one rule: the plane holds no seed,
+/// the seed it held is gone, and the unit stands where neither field reaches.
+/// A unit that reads it is released rather than steered, because a plane that
+/// leads nowhere would otherwise hold the unit for ever.[^2]
+///
+/// The function reads one entry of each field, keyed on the tile and the cell
+/// of the unit. It reads no neighbour and it scores none, so a unit still
+/// searches nothing.[^3]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-315. `docs/FINDINGS.md`
+/// [^2]: Findings register, FND-572. `docs/FINDINGS.md`
+/// [^3]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+fn send_state(
+    destination: u16,
+    tile: TileIdx,
+    cell: u32,
+    approaches: &ApproachField,
+    destinations: &SeededField,
+) -> SendState {
+    match approaches.offset(destination, tile) {
+        Some(AT_SEED) => SendState::Arrived,
+        Some(direction) => SendState::Steer(direction),
+        None => match destinations.direction(destination, cell) {
+            Some(Some(direction)) => SendState::Steer(direction),
+            _ => SendState::Lost,
+        },
+    }
+}
+
 fn soldier_moves(
     tick: Tick,
     seed: u64,
@@ -11930,16 +12060,32 @@ fn soldier_moves(
                         // The clause sits above the steering, because a unit
                         // that arrived has nowhere further to be steered.
                         //
+                        // **A sent unit never draws a direction.** It steps
+                        // where its plane says, or it stands still and the
+                        // step releases it once it has applied the moves of
+                        // this frame. The fall-back to the keyed draw made a
+                        // sent unit wander, and that wandering was the only
+                        // thing that ever carried a load home.[^26]
+                        //
                         // [^25]: Findings register, FND-315. `docs/FINDINGS.md`
-                        let approach = match sent {
-                            Some(destination) => {
-                                approaches.offset(destination, soldiers.tile(*soldier)?)
-                            }
+                        // [^26]: Findings register, FND-572. `docs/FINDINGS.md`
+                        let send = match sent {
+                            Some(destination) => Some(send_state(
+                                destination,
+                                soldiers.tile(*soldier)?,
+                                cell,
+                                approaches,
+                                destinations,
+                            )),
                             None => None,
                         };
-                        if approach == Some(AT_SEED) {
-                            return None;
-                        }
+                        let steered = match send {
+                            Some(SendState::Steer(direction)) => Some(direction),
+                            // A unit that arrived, and a unit whose plane
+                            // leads nowhere, both take no step.
+                            Some(_) => return None,
+                            None => None,
+                        };
                         // **The homeward leg reads the same mechanism, keyed
                         // on the faction.** The return field holds one
                         // direction for a block of tiles, so it says nothing
@@ -11972,22 +12118,14 @@ fn soldier_moves(
                                 return None;
                             }
                         }
-                        let steer = match (sent, option) {
+                        let steer = match (steered, option) {
                             // **The destination plane wins over the option
                             // row.** A caller that sends a unit somewhere has
                             // said where it goes, and the option the unit
                             // scored for itself says only what it wants.[^20]
-                            // **The fine field wins over the coarse one.**
-                            // The coarse field answers for a block, and the
-                            // fine one answers for a tile of the block that
-                            // holds the target. A unit outside every seeded
-                            // block reads no fine entry and takes the coarse
-                            // answer, which is the answer it read before the
-                            // fine field existed.[^25]
-                            (Some(destination), _) => match approach {
-                                Some(direction) => Some(Some(direction)),
-                                None => destinations.direction(destination, cell),
-                            },
+                            // Which field answered is decided above, and the
+                            // fine field wins over the coarse one there.[^25]
+                            (Some(direction), _) => Some(Some(direction)),
                             (None, Some(option)) => match OPTIONS[option as usize].ranked {
                                 Ranked::Cell(_) => exits.exit(cell, option),
                                 // **The fine field wins over the coarse
