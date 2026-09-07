@@ -29,6 +29,7 @@ sends it is one action integer.
 from __future__ import annotations
 
 import json
+import math
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
@@ -301,8 +302,17 @@ def train(
         if isinstance(written, (int, float)):
             first_generation = int(written) + 1
         if best_path.exists():
+            # **A stored best score that is not a real number means that no
+            # centre has been chosen yet.** That is the state a fresh run
+            # starts in, so it reads back as the value a fresh run starts
+            # from. A run with no validation seeds stores the quiet value for
+            # every generation, and a resumed run that took it as it stands
+            # would compare every later score against a quantity that no
+            # score is greater than. The best centre would then never move
+            # again, the run would keep printing generations, and nothing
+            # would say that the search had stopped choosing.
             score = load_policy(best_path)[1].get("best_score")
-            if isinstance(score, (int, float)):
+            if isinstance(score, (int, float)) and math.isfinite(score):
                 resumed_best = float(score)
         print(
             f"  {name} resumes from {latest_path} at generation {first_generation}",

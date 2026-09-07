@@ -21,6 +21,7 @@ References
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -195,3 +196,68 @@ def test_the_best_file_and_the_latest_file_are_not_the_same_file(
     # The report names both, so a reader loads the one it means.
     assert result["weights"].endswith("t.npz")
     assert result["latest_weights"].endswith("t-latest.npz")
+
+
+def test_a_run_with_no_validation_seeds_stores_no_best_score(
+    tmp_path: Path, pool: list[int]
+) -> None:
+    """The file says that nothing chose this centre, rather than scoring it.
+
+    A run with no validation seeds has no way to tell one centre from
+    another, so its best file is its latest file and the score entry holds
+    the quiet value. This states the input the resume test needs.
+    """
+    train(
+        "t",
+        WORLD,
+        WEIGHTING,
+        TrainConfig(**{**vars(TRAIN), "generations": 1}),
+        tmp_path,
+        pool,
+        validation=[],
+    )
+    _, meta = load_policy(tmp_path / "t.npz")
+    stored = meta["best_score"]
+    assert isinstance(stored, float)
+    assert math.isnan(stored), "a run that chose no centre scored one"
+
+
+def test_a_resume_that_adds_validation_seeds_can_still_choose_a_centre(
+    tmp_path: Path, pool: list[int]
+) -> None:
+    """A resume must not inherit a best score that no score can beat.
+
+    The first run has no validation seeds, so it stores the quiet value for
+    the best score. A resume that read that value as it stands would compare
+    every later score against it, and no comparison against it is ever true.
+    The best centre would never move, and the run would say nothing: it
+    prints its generations and writes its checkpoints as usual.
+
+    **The two runs must differ in their validation setting.** A resume that
+    keeps the setting of the first run never reaches the case, so it would
+    measure the fixture rather than the trainer.
+    """
+    train(
+        "t",
+        WORLD,
+        WEIGHTING,
+        TrainConfig(**{**vars(TRAIN), "generations": 1}),
+        tmp_path,
+        pool,
+        validation=[],
+    )
+    result = train(
+        "t",
+        WORLD,
+        WEIGHTING,
+        TrainConfig(**{**vars(TRAIN), "generations": 3}),
+        tmp_path,
+        pool,
+        validation=viable_seeds(WORLD, 2, 20_000),
+        validate_every=1,
+        resume=True,
+    )
+    assert result["best_generation"] >= 0, "the resumed run chose no centre"
+    chosen = result["best_validation"]
+    assert chosen is not None
+    assert math.isfinite(chosen), "the resumed run kept the quiet value"

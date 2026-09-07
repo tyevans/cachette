@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-626**
+**Next number: FND-630**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -16099,3 +16099,86 @@ ramp, and the cloud column pins the map from a tile to its weather cell.
 [^F619B]: Findings register, FND-618. `docs/FINDINGS.md`
 [^F624A]: Findings register, FND-610. `docs/FINDINGS.md`
 [^F624B]: The four bulk tile readers, and the test that holds them to the engine. `tests/test_bulk_tile_readers.py`
+
+
+### FND-628 — A resumed run inherited a best score that no later score could beat
+
+**Believed.** A resumed training run continues the run it reads. It takes the
+centre, the generation counter and the best score the earlier run reached, so
+it neither repeats generations already paid for nor overwrites a better centre
+with a worse one. The trainer states this in its own prose, and the resume path
+reads all three from the stored files.[^F628A]
+
+**False for the best score.** A run with no validation seeds chooses no centre,
+because it has no way to tell one centre from another. It stores a quiet value
+for the best score rather than leaving the key out, so that a file always loads.
+That quiet value is not a real number, and no comparison against it is ever
+true. A run resumed with validation seeds therefore held a best score that no
+score could beat. Its best centre could never move again.
+
+**The failure says nothing.** The resumed run validates on the schedule it was
+given, prints every score, writes the resume point every generation, and ends
+with a report. Only the chosen generation shows it, and that number reads as
+minus one, which is also what a run that has not validated yet reads.
+
+**Evidence.** A test starts a run of one generation with no validation seeds,
+then resumes it with two validation seeds and a validation every generation.
+With the defect in place the resumed run scored 14.5 at generation 1 and 17.0 at
+generation 2, printed both, and reported a chosen generation of minus one. With
+the fix in place it chooses generation 1. The defect was put back and the test
+went red, which is the only proof that the fixture reaches the case.[^F628B]
+
+**What follows.** **Read a value that means "nothing was chosen" as that state,
+not as a quantity.** The fix is at the read. A stored best score that is not a
+real number now reads back as the value a fresh run starts from, which is the
+state it describes. The write is unchanged, because a file that omits the key
+fails further away than the file.
+
+**A resume test must change the setting that the resume path reads.** A resume
+that keeps the validation setting of the first run never reaches this case, so
+it measures the fixture and not the trainer. The testing rule names this
+shape.[^F628C]
+
+### FND-629 — An annotation claimed less than the class held, and four correct callers took the blame
+
+**Believed.** The seated game of the league runner holds a world through the
+narrow door that one faction sees through. The class declared that door on the
+attribute, on the value its reset gives back, and on the property that reads it.
+A single-seat environment holds the same narrow door, and it widens the type in
+one place with a cast, for a test that hands it a watching proxy.[^F629A]
+
+**False.** The seated game builds a real world in its own reset and never adopts
+a foreign one. It has no widening door, because it needs none. The narrow door
+was therefore a second declaration of what the class holds, and it disagreed
+with the code. The reward reader takes a whole world, and a batch takes a
+sequence of whole worlds, so the narrower type was wrong at every use.
+
+**The errors appeared at the callers, not at the declaration.** One false
+annotation produced four type errors: two in the runner where it builds a batch,
+one where a reward reads the world, and one in a test that asked the world for
+its action layout. All four callers were correct. A reader working from the
+error list would have widened a caller or cast the value away, and the false
+declaration would have survived.
+
+**Evidence.** The test that injects a watching proxy carried a suppression to
+get past the same annotation. Correcting the class made that suppression
+unused, which is the checker saying that the annotation had been the
+defect.[^F629B]
+
+**What follows.** **An annotation is a declaration site.** The recurring defect
+rule names one value declared in two places, and it gives examples where a
+second copy of a constant loses to the first.[^F590A] This is the same shape
+pointing the other way: the code was right and the declaration was wrong, and
+nothing failed at run time because Python does not read an annotation.
+
+**Read the declaration before you widen a caller.** When one type error appears
+at several correct callers, the fault is upstream of all of them.
+
+
+## References
+
+[^F628A]: The trainer, the resume path. `python/cachette/learn/train.py`
+[^F628B]: The resume tests. `tests/test_learner_checkpoint.py`
+[^F628C]: Testing Rules, section 2a, on what a fixture must supply. `.agents/rules/testing.md`
+[^F629A]: The single-seat environment and the door it widens. `python/cachette/learn/env.py`
+[^F629B]: The seated league tests. `tests/test_learner_league.py`
