@@ -15837,6 +15837,11 @@ project to fix the terrain generator by changing the physics.
 equator to the subtropics against a published 4 to 10, so the subtropics are too
 dry, and that dryness is what holds the temperate share down.[^F617A]
 
+**Corrected on 7 September 2026. The figures below were measured on a 128-row
+world whose two equatorial bands held 95 and 97 land cells, and the excess they
+report is mostly geography and resolution.**[^F618C] Read the conclusion, which
+holds, and not the multiples.
+
 **What is true.** The ratio is right and the reading of it is wrong. The probe
 normalises so that the mean land cell of the world receives the mean annual
 rainfall of Earth's land, so a band figure is comparable to Earth in millimetres
@@ -15881,6 +15886,53 @@ couples every band to every other one, so a defect in the wettest band is
 reported as a defect in all the others.
 
 
+### FND-618 — The land of a band is not a sample of the band, and the probe world was one third the width of a storm
+
+**What the project believed.** The rain figure of a latitude band describes the
+climate of that latitude, so the bands can be compared with each other and with
+Earth.[^F618A]
+
+**What is true.** The probe measures rain over the land of a band, and **the
+land fraction of a band varies from 6 percent to 66 percent in the probe
+world.** Land is drier than open water in every band except the equatorial ones,
+where a few islands stand where the wind of a whole ocean converges and are
+wetter. So the land figure is biased down in most bands and up at the equator,
+and a comparison across bands compounds both.
+
+Measured over the same world both ways, the land figure divided by the whole
+band figure runs from 0.38 to 0.93 in every band away from the equator, and
+reaches 1.40 and 1.61 in the two equatorial bands. **The equator-to-subtropics
+ratio is 19 to 1 over land and 7.3 to 1 over the whole band.** Earth's whole
+surface gives about 3.6 to 1.
+
+**The second cause is the size of the probe world.** One weather cell of a
+128-row world spans about 156 km. The published travel of a condensed drop is
+about 20 km, so the world could not resolve a moisture gradient. Doubling the
+world to 256 rows, with no change to the engine, moved the land fraction of the
+equatorial bands from 6 and 7 percent to 27 and 32, and moved the whole-band
+ratio from 7.3 to 1 down to between 3.5 and 5.6 to 1, which brackets Earth.
+
+**The class table moves the same way with no engine change.** On Earth's land
+distribution the temperate share moves from 6.9 percent to 12.1 against a
+published 13.4, and the total absolute error over the five classes moves from
+23.9 points to 19.7.
+
+**What follows.** **The equatorial excess is geography and resolution, and it is
+not a defect in the weather.** No imposed moisture flux is needed, and a flux
+fitted to the 128-row figure would have tuned the engine against the instrument.
+
+**Do not compare a land-only figure across bands whose land fraction differs.**
+Report the whole-band figure beside it, and treat a band where the two disagree
+as reporting its geography. **Do not quote a weather figure from a world whose
+cell is wider than the process being measured.**
+
+**This corrects the register.** An earlier finding states that the equator is
+five times too wet.[^F618B] That figure was taken on the 128-row world, whose
+two equatorial bands held 95 and 97 land cells. At 256 rows the same bands read
+between 0.8 and 2.0 times Earth. The conclusion of that finding, that the
+subtropics are correct and were misread through the normaliser, still holds.
+
+
 ## References
 
 [^F612A]: The motion probe. `crates/cachette-core/examples/weather_motion_probe.rs`
@@ -15890,3 +15942,6 @@ reported as a defect in all the others.
 [^F616A]: Peel, Finlayson and McMahon, updated world map of the Koppen-Geiger climate classification, 2007. Hydrology and Earth System Sciences 11, 1633 to 1644.
 [^F617A]: Blockers register, BLK-155. `docs/BLOCKERS.md`
 [^F617B]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+[^F618A]: Blockers register, BLK-155. `docs/BLOCKERS.md`
+[^F618B]: Findings register, FND-617. `docs/FINDINGS.md`
+[^F618C]: Findings register, FND-618. `docs/FINDINGS.md`
