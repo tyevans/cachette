@@ -16114,39 +16114,53 @@ temperature and the bank on the same tick, so it fails on the first cell that
 breaks the rule.
 
 
-### FND-631 — The class error the register quotes has no instrument in the tree
+### FND-631 — The class error progression is not evidence of a better model, and no instrument in the tree computes any part of it
 
-**Believed.** The class error against the published climate shares is a figure
-the weather probe reports, so a later worker can measure it before and after a
-change.[^F631A]
+**Believed.** The class error against the published climate shares fell from
+53.4 points to 42.4, to 39.8, to 23.9, to 19.7 as the weather work went on, and
+that progression measures the model getting better.[^F631A]
 
-**False.** The probe reports the class share of each latitude band and the class
-share over the land of the world. It never reported the error against the
-published shares, and it never reported the reweighting onto the land
-distribution of Earth. Both of the register figures were computed by hand,
-outside the tree, and the weights were not written down anywhere.
+**False in three separate ways, and each one is enough on its own.**
 
-**Why it matters here.** This world holds far more of its land at high latitude
-than Earth does, and the register says so.[^F631B] So the unweighted error over
-the land of this world moves the wrong way when the poles are corrected: making
-the polar cells polar grows the polar class, which is already near its published
-share over this world's land and far under it over Earth's. **A worker who takes
-the unweighted figure for the reweighted one reads a correction as a
-regression.**
+**First, two of the five figures are not written anywhere.** A search of the
+whole tree finds 53.4 and 42.4 in no document. The only files that hold those
+digits are lock files, golden state hashes and one drawing, and none of them is
+a class error. The earliest figure the register holds is 39.8.
 
-**What was done and what was not.** The probe now reports the class error over
-the land of this world, so that figure is reproducible from the tree. The
-reweighted figure is still not, because the land area of Earth in each band is
-not in the tree and this worker could not verify it. The unweighted figure
-compares one run of the probe with another run of it. **It does not compare this
-world with Earth.**
+**Second, the register states plainly that two of the transitions were not
+engine changes, and it says so in its own text.** The move from 39.8 to 23.9 is
+the reweighting onto the land distribution of Earth, and the register says it
+happened "with no change to the engine". The move from 23.9 to 19.7 is the world
+growing from 128 rows to 256, and the register says "the class table moves the
+same way with no engine change". **So the whole of the recorded fall is the
+instrument and the world size, and none of it is the physics.**
 
-**What follows.** **A figure that a register quotes needs an instrument that a
-later reader can run.** A number computed by hand in a session is gone when the
-session ends, and the register then states a figure that nobody can reproduce or
-refute. Put the weights in the tree beside the probe, or state in the register
-that the figure was taken by hand.
+**Third, nothing in the tree computes a class error.** No script, no test and no
+probe produced 39.8, 23.9 or 19.7. The only code that grades a cell against the
+published scheme is the weather probe, and before this work it printed the class
+share of each band and the class share over the land of the world. It never
+printed an error against the published shares, and it never reweighted onto the
+land of Earth. **All three figures were computed by hand, in a session, and the
+weights were never written down.**
 
+**What follows, and the first part is uncomfortable.** **The progression cannot
+be quoted as evidence that the weather model improved.** Two of its steps are
+declared instrument changes in the register itself, and the two earliest figures
+have no source at all. A reader who takes the sequence for a record of physical
+progress is reading a record of measurement changes.
+
+**A figure that a register quotes needs an instrument that a later reader can
+run.** A number computed by hand in a session is gone when the session ends, and
+the register then states a figure that nobody can reproduce or refute. This is
+the shape where one fact lives in one place that nothing checks.[^F590A]
+
+**What was done and what was not.** The probe now computes the class error and
+prints it, over the whole land of the world and over each of two belts, so those
+figures are reproducible from the tree. **The reweighted figure is still not**,
+because the land area of Earth in each band is not in the tree and this worker
+could not verify it. **Do not compare a figure this probe prints against 19.7.**
+The two are different instruments: one grades the land this world has, and the
+other grades what this world's rules would produce on the land Earth has.
 
 ### FND-632 — The latent heat clamp binds over the whole high-latitude belt, because the belt of this model is nearly flat
 
@@ -16160,13 +16174,22 @@ melting point, which is the correction that was wanted. It takes the warmest
 month of the band below the pole down with it, and the published reading of
 that band stands well above the melting point.
 
-**The size of the clamp is not the cause, so no value of the melt cost fixes
-it.** The two bands of this model are nearly the same cell. Before the change
-their annual means, their coldest months and their warmest months all sit
-within a few degrees of each other. The freeze bank is a function of how far
-below the melting point a cell stands and for how long, so two bands that cold
-in the same way bank in the same way. A melt cost that empties one bank in time
-empties the other in nearly the same time, and one that holds one holds both.
+**The two bands of this model are nearly the same cell.** Before the change
+their annual means, their coldest months and their warmest months all sit within
+a few degrees of each other. The freeze bank is a function of how far below the
+melting point a cell stands and for how long, so two bands that are cold in the
+same way bank in the same way.
+
+**Whether a melt cost exists that separates them is not settled here, and the
+first draft of this finding asserted that none does.** That assertion went
+beyond the measurement. The clamp holds both bands at the melting point, which
+says that each bank covers its own summer, and it does not say by how much
+either one covers it. If one bank covers its summer several times over and the
+other only just, then a larger melt cost releases the second and holds the
+first. **The measurement that settles it is the freeze bank of each band against
+the warming its summer asks for**, and this register carries the answer when
+somebody takes it. Read the paragraph below as the reason to expect a small
+margin, not as the margin.
 
 **The cause is the record that this term extends, and that record names it.**
 The belt of the published energy balance that this project imposes is flatter
@@ -16199,7 +16222,6 @@ and the register already holds one instance of that mistake.[^F618C]
 [^F632A]: Findings register, FND-619. `docs/FINDINGS.md`
 [^F630A]: The polar clamp test. `crates/cachette-core/tests/polar_ground_holds_at_the_melting_point.rs`
 [^F631A]: Findings register, FND-616 and FND-618. `docs/FINDINGS.md`
-[^F631B]: Findings register, FND-616. `docs/FINDINGS.md`
 
 [^F612A]: The motion probe. `crates/cachette-core/examples/weather_motion_probe.rs`
 [^F612C]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`

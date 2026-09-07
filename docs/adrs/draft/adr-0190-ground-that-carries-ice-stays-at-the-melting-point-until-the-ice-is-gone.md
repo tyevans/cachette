@@ -145,8 +145,9 @@ this record, and the classification of such a cell moves with it.
 only at the pole.** The two bands are nearly the same cell in this model: they
 stand at nearly one annual mean, one coldest month and one warmest month. The
 bank is a function of how far below the melting point a cell stands and for how
-long, so two bands that are cold in the same way bank in the same way, and the
-balance value of D4 cannot separate them. **The cause is the flatness of the
+long, so two bands that are cold in the same way bank in the same way. **Whether
+the balance value of D4 can separate them is not settled**, and the register
+says what measurement settles it. **The cause is the flatness of the
 belt, which the record this one extends already names**, and the register holds
 the measurement.[^11] [^12] A worker who tunes the balance value against the
 band below the pole is tuning this term against a defect in another one.
