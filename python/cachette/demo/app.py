@@ -390,6 +390,16 @@ class Demo:
         A press moves the view by a share of the window, so it covers the same
         part of the picture at every zoom. The verbs live in the engine, so no
         number here is a second copy of a number there.
+
+        **A press names a direction across the frame, and the page may stand
+        at an angle.** The step therefore goes through the same rule that a
+        drag goes through, so the keys and the hand move the map one way.
+
+        The rule may be applied to the press rather than to the pixels the
+        press asks for. The step the engine takes is one length on both axes,
+        and the rule is linear with no constant term, so taking the angle out
+        first and stepping second gives the answer that stepping first and
+        taking the angle out second would give.
         """
         width, height = self.surface.width, self.surface.height
         if zoom > 0:
@@ -397,8 +407,30 @@ class Demo:
         elif zoom < 0:
             self.camera.zoom_out(width, height)
         if across or down:
+            across, down = self.frame_step_to_ground(across, down)
             self.camera.nudge(across, down, width, height)
         self.camera.clamp(self.world, width, height)
+
+    def frame_step_to_ground(self, across: float, down: float) -> tuple[float, float]:
+        """Turn a step across the frame into the step the ground must take.
+
+        **The hand and the keyboard ask the same question, so it is answered
+        here once.** A drag and a press both name a direction across the
+        frame, and a page that stands at an angle turns the ground under both
+        of them. This lived beside the drag alone, and the keys then scrolled
+        along the axes of the flat map while the picture stood turned.[^1]
+
+        A renderer that draws the map square to the ground answers nothing,
+        and the step reaches the camera as it was given.
+
+        [^1]: Recurring Defect Shapes, shape 1.
+        `.agents/rules/recurring-defects.md`
+        """
+        step = getattr(self.renderer, "ground_step", None)
+        if step is None:
+            return across, down
+        turned: tuple[float, float] = step(self.camera, across, down)
+        return turned
 
     def announce(self, reading: FrameReading) -> None:
         """Say when a soldier becomes a character, and name the person.
@@ -747,9 +779,7 @@ class Demo:
         The mouse therefore holds no angle of its own, and neither does this.
         The renderer that draws the angles is the one that inverts them.
         """
-        step = getattr(self.renderer, "ground_step", None)
-        if step is not None:
-            across, down = step(self.camera, across, down)
+        across, down = self.frame_step_to_ground(across, down)
         self.view.pan_by(across, down)
 
 

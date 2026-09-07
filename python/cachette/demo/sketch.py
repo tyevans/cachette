@@ -293,6 +293,42 @@ def _lines(phase: np.ndarray, spacing: float, weight: np.ndarray) -> np.ndarray:
     return ruled
 
 
+def _slid(field: np.ndarray, step: int, axis: int) -> np.ndarray:
+    """Move a field along an axis, and leave nothing where it came from.
+
+    **The world does not wrap.** A neighbour outside the world is absent, and
+    the edge of the world is an edge.[^1] A field rolled off one side of the
+    page and back onto the other therefore says that a place is next to a
+    place it is not next to. The sky did that, and a watcher read a hatch and
+    a shadow shaped like ground that stood on the far side of the map.[^2]
+
+    A positive step moves the field towards the higher index.
+
+    [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial,
+    decision D2.
+    ``adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md``
+
+    [^2]: Findings register, FND-627. ``docs/FINDINGS.md``
+    """
+    moved = np.zeros_like(field)
+    reach = abs(step)
+    if reach >= field.shape[axis]:
+        return moved
+    if step == 0:
+        return field.copy()
+    if axis == 1:
+        if step > 0:
+            moved[:, step:] = field[:, :-step]
+        else:
+            moved[:, :-reach] = field[:, reach:]
+        return moved
+    if step > 0:
+        moved[step:, :] = field[:-step, :]
+    else:
+        moved[:-reach, :] = field[reach:, :]
+    return moved
+
+
 def _smooth(field: np.ndarray, radius: int) -> np.ndarray:
     """Give back the mean of each point and the points around it.
 
@@ -1468,6 +1504,20 @@ class Sketch:
 
         **The sky carries the lightest marks on the page.** A sky drawn as
         heavily as the land buries the land.
+
+        **The page has an edge and the sky stops at it.** The world does not
+        wrap, so a point off the page is not a point of another part of the
+        world.[^1] It carries no cloud, and it casts no shadow.
+
+        **The cloud crosses the paper and its shadow does not.** A cloud
+        stands above the ground and a watcher reads it over bare paper. A
+        shadow falls on something, and there is nothing outside the map for it
+        to fall on.[^2]
+
+        [^1]: ADR-0017, the world is a rhombus, so a tile index is raw axial,
+        decision D2.
+        `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+        [^2]: Findings register, FND-627. `docs/FINDINGS.md`
         """
         rows, columns = self._world.height, self._world.width
         cloud = self._world.cloud_shares().reshape(rows, columns).astype(
@@ -1494,14 +1544,24 @@ class Sketch:
         share = self._gather(ground, cloud)
         across_x = self._gather(ground, page_dy)
         across_y = self._gather(ground, -page_dx)
+        # **The page has an edge, and the sky stops at it.** A field rolled
+        # off one side and back onto the other casts the shadow of one part
+        # of the world onto another part, and a watcher reads a mark shaped
+        # like ground that is somewhere else.
         step = max(int(ground.drawn.shape[1] * CLOUD_SHADOW_STEP), 1)
-        under = np.clip((np.roll(share, step, axis=1) - CLOUD_FLOOR), 0.0, 1.0)
+        under = np.clip((_slid(share, step, 1) - CLOUD_FLOOR), 0.0, 1.0)
+        # **A shadow falls on something.** The cloud is drawn above the
+        # ground, so it crosses bare paper, and a shadow that crossed the
+        # paper with it drew a grey copy of the ground beside the ground. A
+        # watcher read a shape like the terrain that stood in the wrong
+        # place.[^2]
+        under = under * ground.drawn
         page = page * (1.0 - under[..., None] * CLOUD_SHADOW_DEPTH)
 
         lift = int(rise * CLOUD_HEIGHT)
-        above = np.roll(share, -lift, axis=0)
-        turn_x = np.roll(across_x, -lift, axis=0)
-        turn_y = np.roll(across_y, -lift, axis=0)
+        above = _slid(share, -lift, 0)
+        turn_x = _slid(across_x, -lift, 0)
+        turn_y = _slid(across_y, -lift, 0)
         thick = np.clip((above - CLOUD_FLOOR) / (1.0 - CLOUD_FLOOR), 0.0, 1.0)
         # The distance across the wind. A line of constant phase runs along
         # the wind, so the hatch runs with the circulation.

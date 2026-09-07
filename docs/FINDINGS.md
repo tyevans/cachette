@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-627**
+**Next number: FND-629**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -1029,6 +1029,70 @@ that stands, because the claim was never about a road.
 Below the width at which a ribbon reads, the engine renderer still tints a road
 tile. A tint is the only mark a tile a few pixels wide can carry, and that is a
 statement about the zoom and not about what a road is.
+
+
+
+### FND-627 — The sky was drawn as though the world wrapped
+
+**Believed.** The sky pass reads the cloud of a point further down the page and
+the shadow of a point across it. Both readings rolled off one edge of the page
+and back onto the other, in both renderers, and a comment said that the shader
+rolled the field the way the array renderer does. The two agreed, so nothing
+failed.
+
+**The world does not wrap.** A neighbour outside the world is absent, and the
+edge of the world is an edge.[^F627A] A point off the page is not a point of
+another part of the world. It carries no cloud.
+
+**A shadow falls on something.** The cloud is drawn above the tallest ground,
+so its hatch crosses bare paper on purpose. The shadow crossed the paper with
+it and multiplied the paper down, which drew a grey copy of the terrain beside
+the terrain.
+
+**Evidence.** A world drawn at the camera that fits it, with paper visible
+beside the map. The roll drew a wedge of cloud hatch on the paper below the
+map, hard-edged, shaped like ground that stands on the far side of the world. A
+frame drawn with the sky switched off carried no mark on the paper at all,
+which is what separated the sky from every other pass. The commit body holds
+the counts and the commands.
+
+**What follows.** **A pass that reads a neighbouring point must ask whether
+that point exists.** The sky now reads nothing off the page, and its shadow
+lands on ground alone. The cloud itself still crosses the paper above the map,
+because a cloud stands above the ground and a watcher reads it there.
+
+The silhouette still rolls a mask by one point, and that roll is inert: the
+ground stops short of the edge of the page by a margin, so the mask is false on
+both sides of it.
+
+**The clamp in the shader was not the cause.** Every reader of the page clamps
+a point to the nearest edge texel rather than answering that the point is
+absent. A build that answered the empty value instead drew a frame identical to
+the clamped one, and every agreement test passed unchanged. The clamp is
+reachable only by the neighbour taps of the tone and of the silhouette, and
+those mirror the edge handling of the array renderer on purpose.
+
+### FND-628 — The keyboard was believed to scroll the map the way the hand does
+
+**Believed.** The renderer says how a step across the frame reaches the ground,
+and the callers ask it. The rule is written once, beside the drag.
+
+**Only the drag asked it.** The keyboard called the pan verb of the camera
+directly, with no turn taken out. The sketch renderer stands the page at an
+angle, so a press for right scrolled the map along the axis of the flat map and
+the drawing went somewhere that is not right. The mouse was correct the whole
+time, which is why the rule looked like it was applied.[^F628A]
+
+**Evidence.** The two call sites, one calling the renderer and one not. A
+quarter turn sends a sideways press down the map, and the camera moved along
+one axis alone before the repair.
+
+**What follows.** One method on the run answers the question, and both callers
+reach it. **The rule may be applied to the press rather than to the pixels the
+press asks for**, because the step the engine takes is one length on both axes
+and the rule is linear with no constant term. A pan verb that scaled its two
+axes differently would break that, and the repair would then have to work in
+pixels.
 
 
 
@@ -16135,3 +16199,5 @@ ramp, and the cloud column pins the map from a tile to its weather cell.
 [^F624B]: The four bulk tile readers, and the test that holds them to the engine. `tests/test_bulk_tile_readers.py`
 [^F626A]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
 [^F626B]: The one derivation of a way, and which categories draw as one. `crates/cachette-view/src/ways.rs`
+[^F627A]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D2. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
+[^F628A]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
