@@ -40,11 +40,32 @@ which is the game the run is judged on. A run that measured its centre inside
 its own league would move the opponent and the policy together, and no number
 of that run could be compared with a number of another.
 
+# A generation may be scored in several processes
+
+The episodes of one generation are independent, so they could use the whole
+machine. One interpreter cannot use it, because the section between two
+decisions runs in one process and every engine worker of that process waits
+for it. A run therefore splits the candidates across worker processes, and
+each process scores the pairs it owns.
+
+**A worker never receives a candidate.** It receives the centre, the
+generation number and the pair range, and it draws the same perturbations
+this module draws. It sends back the scores.
+
+**The combination is ordered by the candidate index.** A sharded run and a
+single-process run give the same weights for the same seed, at every shard
+count.[^1]
+
 # The learner-side arithmetic is float, and the engine's is not
 
 The weights, the scores and the update are floating point. None of them
 enters the world. The engine holds integers, and the only thing this module
 sends it is one action integer.
+
+# References
+
+[^1]: ADR-0192, a generation is scored in shards and combined in candidate
+order. ``docs/adrs/draft/adr-0192-a-generation-is-scored-in-shards.md``
 """
 
 from __future__ import annotations
@@ -53,6 +74,7 @@ import json
 import math
 import time
 from collections.abc import Mapping, Sequence
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import NotRequired, TypedDict
@@ -102,7 +124,16 @@ class TrainConfig:
     sigma: float = 1.5
     # The fraction of the centre that one generation moves.
     learning_rate: float = 0.3
+    # How many engine workers one process gives its batch. **This is a per
+    # process count, whatever the shard count is.** A run of five processes
+    # with this at twelve asks for sixty workers on the machine.
     workers: int = 4
+    # How many worker processes score one generation. One process scores the
+    # whole generation in the process that asked for it, and starts nothing.
+    # **The caller states this. Nothing derives it from the core count**, and
+    # a second declaration site that silently disagreed with the worker count
+    # is the defect shape this project names first.
+    shards: int = 1
     seed: int = 0
     # The seats a candidate may take. An empty list puts one candidate in one
     # world, in the seat the environment names, and every other seat keeps the
@@ -290,6 +321,68 @@ def score_generation(
     )
 
 
+def shell_policy(kind: str, probe: Env, hidden: int) -> Trainable:
+    """Build the untrained policy of one kind, sized from the world.
+
+    **The trainer and a worker process both build this, and they must build
+    the same thing.** A worker rebuilds its candidates from the centre, so it
+    needs the shell the centre was taken from. The projection of a network
+    comes from one fixed seed, so two processes build one projection.
+
+    The lengths come from the engine schemas through the probe environment.
+    This module states none of its own.
+    """
+    if kind == "mlp":
+        return MLPPolicy.zeros(probe.action_length, probe.observation_length, hidden)
+    return LinearPolicy.zeros(probe.action_length, probe.observation_length)
+
+
+def generation_noise(seed: int, generation: int, pairs: int, size: int) -> np.ndarray:
+    """Draw the perturbation of every pair of one generation.
+
+    **The noise of a generation is a function of the generation.** A single
+    stream advanced by each generation would give a resumed run different
+    perturbations from the run it continues, so a resume would silently be a
+    different experiment. It also lets a worker process draw the same
+    perturbations the trainer draws, from the two numbers alone.
+
+    Each row is one direction of unit length. **The size of a perturbation
+    must not depend on the dimension or on the norm the centre happened to
+    reach.** A raw normal vector of many entries has a length near the square
+    root of that count, so a fixed sigma would mean one thing for a linear
+    policy and another for a network.
+    """
+    rng = np.random.default_rng([seed, generation])
+    noise = rng.standard_normal((pairs, size))
+    return noise / np.linalg.norm(noise, axis=1, keepdims=True)
+
+
+def pair_candidates(
+    policy: Trainable,
+    centre: np.ndarray,
+    noise: np.ndarray,
+    sigma: float,
+    first_pair: int,
+    last_pair: int,
+) -> list[Trainable]:
+    """Build the candidates of a range of pairs, in candidate index order.
+
+    Antithetic sampling: each perturbation is tried in both directions, so
+    the estimate of the direction costs no extra variance from the mean of
+    the population. Candidate ``2 * pair`` is the plus half and
+    ``2 * pair + 1`` is the minus half.
+
+    **A worker process calls this with the pairs of its own shard.** The
+    noise it passes is the whole generation's noise, so the row of a pair is
+    the row that pair has in every process.
+    """
+    return [
+        policy.rebuild(centre + sign * sigma * noise[index])
+        for index in range(first_pair, last_pair)
+        for sign in (1.0, -1.0)
+    ]
+
+
 def unit(vector: np.ndarray) -> np.ndarray:
     """Return the vector scaled to unit length, or the vector when it is zero.
 
@@ -362,6 +455,10 @@ def train(
     # run with no validation seeds wrote nothing at all until it ended, so an
     # early stop lost everything. Writing only the latest meant the first full
     # run stored a centre taken from inside a collapsed region.
+    # The shard module calls this one, so this import sits here rather than at
+    # the top of the file. A module-level import would be a cycle.
+    from .shard import ShardPool, run_sharded_generation
+
     best_path = out_dir / f"{name}.npz"
     latest_path = out_dir / f"{name}-latest.npz"
     probe = Env(env_config, weighting)
@@ -405,11 +502,7 @@ def train(
             },
         )
 
-    policy: Trainable
-    if kind == "mlp":
-        policy = MLPPolicy.zeros(probe.action_length, probe.observation_length, hidden)
-    else:
-        policy = LinearPolicy.zeros(probe.action_length, probe.observation_length)
+    policy: Trainable = shell_policy(kind, probe, hidden)
     # The generation a resumed run starts at. A run that starts fresh starts
     # at zero.
     first_generation = 0
@@ -531,156 +624,181 @@ def train(
             best_score, best_policy, best_generation = scored, current, generation
         return scored
 
-    for generation in range(first_generation, train_config.generations):
-        # **The noise of a generation is a function of the generation.** A
-        # single stream advanced by each generation would give a resumed run
-        # different perturbations from the run it continues, so a resume
-        # would silently be a different experiment.
-        rng = np.random.default_rng([train_config.seed, generation])
-        # A fresh seed set for each generation, taken from the pool in a
-        # fixed order, so a repeat of this run takes the same worlds.
-        offset = generation * train_config.seeds_per_generation
-        seeds = [
-            seed_pool[(offset + index) % len(seed_pool)]
-            for index in range(train_config.seeds_per_generation)
-        ]
-        centre = unit(policy.flat())
-        # Each row is one direction of unit length. **The size of a
-        # perturbation must not depend on the dimension or on the norm the
-        # centre happened to reach.** A raw normal vector of d entries has
-        # length about the square root of d, so a fixed sigma means one thing
-        # for a linear policy and another for a network.
-        noise = rng.standard_normal((pairs, centre.size))
-        noise = noise / np.linalg.norm(noise, axis=1, keepdims=True)
-        # Antithetic sampling: each perturbation is tried in both directions,
-        # so the estimate of the direction costs no extra variance from the
-        # mean of the population.
-        candidates = [
-            policy.rebuild(centre + sign * train_config.sigma * noise[index])
-            for index in range(pairs)
-            for sign in (1.0, -1.0)
-        ]
-        played = score_generation(
-            env_config,
-            weighting,
-            candidates,
-            seeds,
-            train_config,
-            f"{name} generation {generation:2d}",
+    # **The pool decides whether a generation is sharded, and the shard count
+    # decides whether there is a pool.** One process opens nothing and scores
+    # the generation here, which is the path every earlier run took.
+    #
+    # The pool stays open for the whole run, so a generation pays no process
+    # start cost, and the matrix thread variables it sets hold for as long as
+    # a worker might start.
+    opened: AbstractContextManager[ShardPool | None]
+    if train_config.shards > 1:
+        opened = ShardPool(train_config.shards)
+        print(
+            f"  {name} scores each generation in {train_config.shards} processes "
+            f"of {train_config.workers} workers",
+            flush=True,
         )
-        scores, ticks, won = played.ranked, played.ticks, played.won
-        shaped = rank_shape(scores)
-        gradient = np.zeros_like(centre)
-        for index in range(pairs):
-            weight = shaped[2 * index] - shaped[2 * index + 1]
-            gradient += weight * noise[index]
-        # The rank shaping already threw away the scale of the reward, so the
-        # length of this sum carries no information worth keeping. The
-        # trainer therefore takes a step of a fixed size along the direction,
-        # and the learning rate is the fraction of the centre that one
-        # generation moves.
-        policy = policy.rebuild(
-            unit(centre + train_config.learning_rate * unit(gradient))
-        )
+    else:
+        opened = nullcontext(None)
 
-        # The spread of a generation is what the ranking ranks. A spread of
-        # zero means every candidate chose the same actions, and the update
-        # that follows it carries no information. The run reports it, so the
-        # failure that killed the first attempt is visible while it happens.
-        spread = float(scores.max() - scores.min())
-        # The spread of the raw return is reported beside the spread of the
-        # ranked score, because the two answer different questions and a run
-        # that reported one of them could not be compared with the other.
-        absolute_spread = float(played.absolute.max() - played.absolute.min())
-        last = generation == train_config.generations - 1
-        validating = last or generation % validate_every == validate_every - 1
-        checked = validate(policy, generation) if validating else None
-
-        # **The highest candidate of a generation is the highest of many
-        # draws on a few seeds, so it is usually the luckiest and not the
-        # best.** The reported best therefore says nothing about whether the
-        # population found a policy the centre should move toward. Playing
-        # that candidate on the validation seeds says it: a candidate that
-        # holds its score there is a real gain the centre is not taking, and
-        # a candidate that falls back to the score of the centre was luck.
-        #
-        # This chooses nothing. The stored best centre is decided by
-        # `validate` above and by nothing here.
-        candidate_checked: float | None = None
-        if validating and validation and checked is not None:
-            highest = int(np.argmax(played.absolute))
-            candidate_checked = score_on_validation(
-                candidates[highest],
-                f"{name} candidate {generation:2d}",
-                list(validation),
-            )
-            print(
-                f"  {name} generation {generation:2d} "
-                f"candidate {highest:4d} scored {played.absolute[highest]:9.1f} "
-                f"on its own seeds and {candidate_checked:9.1f} on the "
-                f"validation seeds, where the centre scored {checked:9.1f}",
-                flush=True,
+    with opened as pool:
+        for generation in range(first_generation, train_config.generations):
+            # A fresh seed set for each generation, taken from the pool in a
+            # fixed order, so a repeat of this run takes the same worlds.
+            offset = generation * train_config.seeds_per_generation
+            seeds = [
+                seed_pool[(offset + index) % len(seed_pool)]
+                for index in range(train_config.seeds_per_generation)
+            ]
+            centre = unit(policy.flat())
+            noise = generation_noise(train_config.seed, generation, pairs, centre.size)
+            label = f"{name} generation {generation:2d}"
+            # **A worker process builds its own candidates from the centre and
+            # the generation number.** Only the centre crosses to it, so this
+            # process builds the population only when it plays the population
+            # itself.
+            if pool is None:
+                played = score_generation(
+                    env_config,
+                    weighting,
+                    pair_candidates(
+                        policy, centre, noise, train_config.sigma, 0, pairs
+                    ),
+                    seeds,
+                    train_config,
+                    label,
+                )
+            else:
+                played = run_sharded_generation(
+                    env_config,
+                    weighting,
+                    train_config,
+                    seeds,
+                    generation,
+                    centre,
+                    pool,
+                    kind,
+                    hidden,
+                    label,
+                )
+            scores, ticks, won = played.ranked, played.ticks, played.won
+            shaped = rank_shape(scores)
+            gradient = np.zeros_like(centre)
+            for index in range(pairs):
+                weight = shaped[2 * index] - shaped[2 * index + 1]
+                gradient += weight * noise[index]
+            # The rank shaping already threw away the scale of the reward, so the
+            # length of this sum carries no information worth keeping. The
+            # trainer therefore takes a step of a fixed size along the direction,
+            # and the learning rate is the fraction of the centre that one
+            # generation moves.
+            policy = policy.rebuild(
+                unit(centre + train_config.learning_rate * unit(gradient))
             )
 
-        # **The latest centre is written every generation, unconditionally.**
-        # No validation gate and no improvement gate. This is the resume
-        # point, and a run that stops between two validation passes must
-        # still leave one behind.
-        quiet = float("nan")
-        store(
-            policy,
-            latest_path,
-            generation,
-            spread,
-            quiet if checked is None else checked,
-            quiet if best_score == -np.inf else best_score,
-        )
-        # The best centre moves only when a validation pass finds something
-        # better. A run with no validation seeds has no way to tell one
-        # centre from another, so its latest centre is also its best.
-        if not validation or best_generation == generation:
+            # The spread of a generation is what the ranking ranks. A spread of
+            # zero means every candidate chose the same actions, and the update
+            # that follows it carries no information. The run reports it, so the
+            # failure that killed the first attempt is visible while it happens.
+            spread = float(scores.max() - scores.min())
+            # The spread of the raw return is reported beside the spread of the
+            # ranked score, because the two answer different questions and a run
+            # that reported one of them could not be compared with the other.
+            absolute_spread = float(played.absolute.max() - played.absolute.min())
+            last = generation == train_config.generations - 1
+            validating = last or generation % validate_every == validate_every - 1
+            checked = validate(policy, generation) if validating else None
+
+            # **The highest candidate of a generation is the highest of many
+            # draws on a few seeds, so it is usually the luckiest and not the
+            # best.** The reported best therefore says nothing about whether
+            # the population found a policy the centre should move toward.
+            # Playing that candidate on the validation seeds says it: a
+            # candidate that holds its score there is a real gain the centre
+            # is not taking, and one that falls back to the score of the
+            # centre was luck.
+            #
+            # This chooses nothing. The stored best centre is decided by
+            # `validate` above and by nothing here.
+            candidate_checked: float | None = None
+            if validating and validation and checked is not None:
+                highest = int(np.argmax(played.absolute))
+                candidate_checked = score_on_validation(
+                    pair_candidates(
+                        policy, centre, noise, train_config.sigma, 0, pairs
+                    )[highest],
+                    f"{name} candidate {generation:2d}",
+                    list(validation),
+                )
+                print(
+                    f"  {name} generation {generation:2d} "
+                    f"candidate {highest:4d} scored "
+                    f"{played.absolute[highest]:9.1f} on its own seeds and "
+                    f"{candidate_checked:9.1f} on the validation seeds, "
+                    f"where the centre scored {checked:9.1f}",
+                    flush=True,
+                )
+
+            # **The latest centre is written every generation, unconditionally.**
+            # No validation gate and no improvement gate. This is the resume
+            # point, and a run that stops between two validation passes must
+            # still leave one behind.
+            quiet = float("nan")
             store(
-                best_policy,
-                best_path,
-                best_generation if validation else generation,
+                policy,
+                latest_path,
+                generation,
                 spread,
                 quiet if checked is None else checked,
                 quiet if best_score == -np.inf else best_score,
             )
-        history.append(
-            {
-                "generation": generation,
-                "best": float(scores.max()),
-                "mean": float(scores.mean()),
-                "worst": float(scores.min()),
-                "spread": spread,
-                "absolute_spread": absolute_spread,
-                "absolute_mean": float(played.absolute.mean()),
-                "world_ticks": ticks,
-                "won": won,
-                "validation": checked,  # may be None on a generation that skips it
-                # What the centre scored above the built-in controller on the
-                # same seeds. This is the number that says whether the whole
-                # population improved, and a relative score cannot say it.
-                "yardstick": yardstick,
-                "above_controller": (
-                    None
-                    if checked is None or yardstick is None
-                    else checked - yardstick
-                ),
-                "seconds": round(time.time() - started, 1),
-            }
-        )
-        print(
-            f"  {name} generation {generation:2d} "
-            f"mean {scores.mean():9.1f} best {scores.max():9.1f} "
-            f"spread {spread:8.1f} abs-spread {absolute_spread:8.1f} "
-            f"won {won:5.2f} "
-            f"ticks {ticks} "
-            f"valid {'-' if checked is None else f'{checked:9.1f}'} "
-            f"[{history[-1]['seconds']:.0f}s]",
-            flush=True,
-        )
+            # The best centre moves only when a validation pass finds something
+            # better. A run with no validation seeds has no way to tell one
+            # centre from another, so its latest centre is also its best.
+            if not validation or best_generation == generation:
+                store(
+                    best_policy,
+                    best_path,
+                    best_generation if validation else generation,
+                    spread,
+                    quiet if checked is None else checked,
+                    quiet if best_score == -np.inf else best_score,
+                )
+            history.append(
+                {
+                    "generation": generation,
+                    "best": float(scores.max()),
+                    "mean": float(scores.mean()),
+                    "worst": float(scores.min()),
+                    "spread": spread,
+                    "absolute_spread": absolute_spread,
+                    "absolute_mean": float(played.absolute.mean()),
+                    "world_ticks": ticks,
+                    "won": won,
+                    "validation": checked,  # may be None on a generation that skips it
+                    # What the centre scored above the built-in controller on the
+                    # same seeds. This is the number that says whether the whole
+                    # population improved, and a relative score cannot say it.
+                    "yardstick": yardstick,
+                    "above_controller": (
+                        None
+                        if checked is None or yardstick is None
+                        else checked - yardstick
+                    ),
+                    "seconds": round(time.time() - started, 1),
+                }
+            )
+            print(
+                f"  {name} generation {generation:2d} "
+                f"mean {scores.mean():9.1f} best {scores.max():9.1f} "
+                f"spread {spread:8.1f} abs-spread {absolute_spread:8.1f} "
+                f"won {won:5.2f} "
+                f"ticks {ticks} "
+                f"valid {'-' if checked is None else f'{checked:9.1f}'} "
+                f"[{history[-1]['seconds']:.0f}s]",
+                flush=True,
+            )
 
     return {
         "name": name,
@@ -741,9 +859,12 @@ __all__ = [
     "asdict",
     "evaluate",
     "field_starts",
+    "generation_noise",
+    "pair_candidates",
     "rank_shape",
     "run_population",
     "score_generation",
+    "shell_policy",
     "train",
     "viable_seeds",
     "write_report",

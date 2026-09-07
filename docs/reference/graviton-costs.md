@@ -1682,6 +1682,31 @@ The last row divides the price an hour by the throughput. Dollars an hour
 compares two prices. Dollars for each million ticks compares two machines, and
 that is the figure that says whether a larger instance is worth what it costs.
 
+## One process against five, at one training shape
+
+**The project owner took these two figures on the target platform, and the
+worker who recorded them did not take them.** Both come from one instance of
+the 64 vCPU Graviton type. That type has no simultaneous multithreading, so 64
+virtual cores are 64 physical cores.
+
+The quantity is the count of simulated ticks a second, over every process of
+the run. Each shape names the process count, the engine worker count of one
+process, and the world count of one process.
+
+| Shape | Ticks a second, one process | Ticks a second, all processes |
+|---|---|---|
+| 1 process, 64 workers, 512 worlds | 2,201 | 2,201 |
+| 5 processes, 12 workers, 144 worlds each | 1,231 | 5,999 |
+
+**More processes fill the machine, and more workers inside one process do
+not.** The section between two decisions runs in one interpreter, and every
+engine worker of that process waits for it. One decision-record row states the
+constraint that follows from this reading.[^SHARD]
+
+The rows do not name the extent, the faction count or the decision interval,
+and a later run must add them. A tick of one world size is not a tick of
+another, so these two figures compare only with each other.
+
 ## What does not belong here
 
 - A derived figure. The other target register holds those.[^2]
@@ -1747,3 +1772,5 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^ADR105]: ADR-0105, a total order needs no repeated identifier, only no repeated key. `docs/adrs/draft/adr-0105-a-total-order-needs-no-repeated-key.md`
 
 [^DECIDE309]: Findings register, FND-309. `docs/FINDINGS.md`
+
+[^SHARD]: ADR-0192, a generation is scored in shards and combined in candidate order, decision D1. `docs/adrs/draft/adr-0192-a-generation-is-scored-in-shards.md`
