@@ -131,6 +131,13 @@ RELIEF = 0.115
 # interlock, so a row stands this far below the row behind it.
 ROW_PITCH = 0.8660254
 
+# How many spare rows the page keeps above the lift and below the foot.
+#
+# The lift moves a point up the page by the height of the ground under it, and
+# the face below it reaches down to where the point stood. The page therefore
+# needs room at both ends, and this is the room it keeps.
+LIFT_MARGIN = 4
+
 # How many tiles of margin the window takes around the tiles the camera names.
 #
 # The rows of a hex grid interlock, so a rectangle of pixels covers a slanted
@@ -278,27 +285,105 @@ def _grown(mask: np.ndarray, radius: int) -> np.ndarray:
     return wide
 
 
-def _box(marked: np.ndarray) -> tuple[int, int, int, int]:
-    """Give back the part of a page that holds the ground, with a margin.
+class Projection:
+    """Where each tile of the window falls on the page, before the lift.
 
-    The turn spreads the world across a rectangle, and the world fills the
-    diamond inside it. The corners hold nothing, so a page that kept them
-    would show the world small in the middle of the frame.
+    **One object holds the projection, and both renderers read it.** The array
+    renderer reads the page backwards, one tile for each point. The device
+    renderer draws the tiles forwards, as a mesh. A projection worked out
+    twice would be one value declared twice, and the two would part company
+    without anything failing.
 
-    **The ground sets the edge, and not the marks.** The sky reaches past the
-    ground, and a page cut to the sky would show the land small. A sketch lets
-    the sky run off the sheet.
+    The turn is how far the page rotates the ground about the up direction.
+    The lean is how far the page tips away from the watcher. A world seen
+    square to the page reads as a flat map however far the ground is lifted,
+    so the page turns before it lifts.
     """
-    rows = np.nonzero(marked.any(axis=1))[0]
-    cols = np.nonzero(marked.any(axis=0))[0]
-    if not rows.size or not cols.size:
-        return 0, marked.shape[0], 0, marked.shape[1]
-    return (
-        max(int(rows[0]) - MARGIN, 0),
-        min(int(rows[-1]) + MARGIN + 1, marked.shape[0]),
-        max(int(cols[0]) - MARGIN, 0),
-        min(int(cols[-1]) + MARGIN + 1, marked.shape[1]),
+
+    __slots__ = (
+        "cols",
+        "flat_rows",
+        "lean",
+        "plan_tall",
+        "plan_wide",
+        "rise",
+        "rows",
+        "scale",
+        "turn",
+        "window",
     )
+
+    # The window of tiles, the two angles, and the numbers that follow from
+    # them: how far the plan of the window reaches, how many page points one
+    # tile covers, and how large the page is before and after the lift.
+    window: tuple[int, int, int, int]
+    turn: float
+    lean: float
+    plan_wide: float
+    plan_tall: float
+    scale: float
+    cols: int
+    flat_rows: int
+    rise: int
+    rows: int
+
+    def __init__(
+        self,
+        window: tuple[int, int, int, int],
+        width: int,
+        height: int,
+        turn: float,
+        lean: float,
+        relief: float,
+    ) -> None:
+        """Work out the page this window, this frame and these angles give."""
+        first_q, first_r, last_q, last_r = window
+        across = last_q - first_q
+        down = last_r - first_r
+        self.window = window
+        self.turn = turn
+        self.lean = lean
+        # The window in the plan of the world, before the turn. A row of a hex
+        # grid steps half a column across and less than a row down.
+        self.plan_wide = across + down * 0.5
+        self.plan_tall = down * ROW_PITCH
+        turn_x, turn_y = math.cos(turn), math.sin(turn)
+        # How far the turned plan reaches across the page and down it. A
+        # rectangle turned through an angle covers this much of each
+        # direction, and the page is cut to fit it.
+        span_x = self.plan_wide * abs(turn_x) + self.plan_tall * abs(turn_y)
+        span_y = self.plan_wide * abs(turn_y) + self.plan_tall * abs(turn_x)
+        self.scale = min(
+            width / max(span_x, 1e-3),
+            height / max(span_y * lean, 1e-3),
+        )
+        self.cols = max(int(span_x * self.scale) + 2, 2)
+        self.flat_rows = max(int(span_y * self.scale * lean) + 2, 2)
+        # How far the tallest ground rises, in page points, and how tall the
+        # page is once the lift has moved every point up by its own height.
+        self.rise = max(int(self.cols * relief), 1)
+        self.rows = self.flat_rows + self.rise + LIFT_MARGIN * 2
+
+    def to_page(
+        self, tile_q: np.ndarray, tile_r: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """Say where a place in the grid falls on the page, before the lift.
+
+        The place is given in tiles of the world, and it may lie between two
+        tiles. The answer is the column of the page and the row of the flat
+        page, both as real numbers.
+        """
+        first_q, first_r = self.window[0], self.window[1]
+        rel_q = tile_q - first_q
+        rel_r = tile_r - first_r
+        plan_x = rel_q + rel_r * 0.5
+        plan_y = rel_r * ROW_PITCH
+        turn_x, turn_y = math.cos(self.turn), math.sin(self.turn)
+        across = (plan_x - self.plan_wide / 2.0) * self.scale
+        down = (plan_y - self.plan_tall / 2.0) * self.scale
+        column = across * turn_x - down * turn_y + self.cols / 2.0
+        row = (across * turn_y + down * turn_x) * self.lean + self.flat_rows / 2.0
+        return column, row
 
 
 class Ground:
@@ -383,12 +468,14 @@ class Sketch:
     """
 
     __slots__ = (
+        "_deep",
         "_grain",
         "_grain_size",
         "_ground",
         "_heights",
         "_kinds",
         "_level",
+        "_raised",
         "_relief",
         "_scratch",
         "_sky",
@@ -458,6 +545,19 @@ class Sketch:
         # the camera moves.
         under = self._heights[self._water]
         self._level = float(under.max()) if under.size else 0.0
+        # **The lifted height of the ground crosses the boundary once.** The
+        # land starts at the level of the water and the water lies flat, so
+        # the field below is a function of the terrain alone. The device
+        # renderer uploads it once as vertex data, and a field smoothed over a
+        # window would hold a different value at the edge of every window.
+        land = np.clip(self._heights - self._level, 0.0, None) / max(
+            1.0 - self._level, 1e-3
+        )
+        raised = _smooth(np.where(self._water, 0.0, land), SMOOTHING)
+        self._raised = np.where(self._water, 0.0, raised).astype(np.float32)
+        self._deep = np.clip(
+            1.0 - self._heights / max(self._level, 1e-3), 0.0, 1.0
+        ).astype(np.float32)
         self._ground: Ground | None = None
         self._scratch: dict[str, npt.NDArray[np.uint32]] = {}
         self._grain: np.ndarray | None = None
@@ -602,22 +702,18 @@ class Sketch:
         """
         ground = Ground(window, (height, width), stand)
         first_q, first_r, last_q, last_r = window
-        heights = self._heights[first_r:last_r, first_q:last_q]
         water = self._water[first_r:last_r, first_q:last_q]
-        # The land starts at the level of the water. The water lies flat.
-        land = np.clip(heights - self._level, 0.0, None) / max(1.0 - self._level, 1e-3)
-        deep = np.clip(1.0 - heights / max(self._level, 1e-3), 0.0, 1.0)
-        raised = _smooth(np.where(water, 0.0, land), SMOOTHING)
-        raised = np.where(water, 0.0, raised).astype(np.float32)
+        raised = self._raised[first_r:last_r, first_q:last_q]
+        deep = self._deep[first_r:last_r, first_q:last_q]
 
-        take, held = self._turn(window, width, height)
+        stood = self.projection(window, width, height)
+        take, held = self._turn(stood)
         ground.held = held
         plan = np.where(held, raised.ravel()[take], 0.0).astype(np.float32)
         wet = held & (water.ravel()[take])
         depth = np.where(held, deep.ravel()[take], 0.0).astype(np.float32)
 
-        cols = plan.shape[1]
-        rise = max(int(cols * self._relief), 1)
+        rise = stood.rise
         drawn, cliff, lifted = self._lift(plan, held, rise)
         ground.take = np.where(drawn, take.ravel()[lifted], -1)
         ground.drawn = drawn
@@ -635,7 +731,7 @@ class Sketch:
         ground.held_height = held_height
         ground.depth = depth_here
         ground.rise = rise
-        ground.box = _box(drawn)
+        ground.box = self.box_of(stood)
         if not self._marks:
             # A renderer that draws its own marks takes the page here. The
             # tone, the hatch, the silhouette and the sheet are every point of
@@ -664,19 +760,82 @@ class Sketch:
         ground.sheet = self._paper(page_rows, page_cols)
         return ground
 
-    def _turn(
+    def projection(
         self, window: tuple[int, int, int, int], width: int, height: int
-    ) -> tuple[np.ndarray, np.ndarray]:
-        """Turn the window about the up direction and lean it away from the page.
-
-        A world seen square to the page reads as a flat map however far the
-        ground is lifted, so the page turns before it lifts.
+    ) -> Projection:
+        """Give back where each tile of the window falls on the page.
 
         **The two angles come from the view.** The turn is how far the ground
         is rotated about the up direction, and the lean is how far the page
         tips away from the watcher. The view opens at an eighth of a circle
-        and a lean of one half, which is the isometric drawing this page was
-        first written as.
+        and a lean of one half, which is an isometric drawing.
+        """
+        return Projection(
+            window, width, height, self.view.turn, self.view.lean, self._relief
+        )
+
+    def box_of(self, stood: Projection) -> tuple[int, int, int, int]:
+        """Give back the part of the page that holds the ground, with a margin.
+
+        The turn spreads the world across a rectangle, and the world fills a
+        slanted band inside it. The corners hold nothing, so a page that kept
+        them would show the world small in the middle of the frame.
+
+        **The projection sets the edge, and not the marks.** Both renderers
+        take the box from here. A box read off the marks of one renderer would
+        put the two pages at two scales, and every pixel would then differ
+        because the two cut the paper differently.
+
+        The sky reaches past the ground, and a page cut to the sky would show
+        the land small. A sketch lets the sky run off the sheet.
+        """
+        first_q, first_r, last_q, last_r = stood.window
+        # The ground covers one square of the grid for each tile, so the whole
+        # window covers the rectangle between the outer edges of those squares.
+        corner_q = np.array(
+            [first_q - 0.5, last_q - 0.5, first_q - 0.5, last_q - 0.5],
+            dtype=np.float64,
+        )
+        corner_r = np.array(
+            [first_r - 0.5, first_r - 0.5, last_r - 0.5, last_r - 0.5],
+            dtype=np.float64,
+        )
+        columns, rows = stood.to_page(corner_q, corner_r)
+        # The lift moves the top of the ground up the page by the height under
+        # it, and the face below reaches down to where the ground stood. The
+        # foot is therefore the flat row, and the top is the flat row of the
+        # tallest ground less its own rise.
+        tile_q, tile_r = self._corners(stood)
+        _, top_rows = stood.to_page(tile_q, tile_r)
+        raised = self._raised[first_r:last_r, first_q:last_q].ravel()[None, :]
+        lifted = top_rows - raised * stood.rise
+        first_row = math.floor(float(lifted.min())) + stood.rise + LIFT_MARGIN
+        last_row = math.ceil(float(rows.max())) + stood.rise + LIFT_MARGIN
+        return (
+            max(first_row - MARGIN, 0),
+            min(last_row + MARGIN + 1, stood.rows),
+            max(math.floor(float(columns.min())) - MARGIN, 0),
+            min(math.ceil(float(columns.max())) + MARGIN + 1, stood.cols),
+        )
+
+    @staticmethod
+    def _corners(stood: Projection) -> tuple[np.ndarray, np.ndarray]:
+        """Give back the four corners of the square of every tile of a window.
+
+        The answer is two arrays of four rows. One row holds one corner of
+        every tile, in the order the window numbers the tiles.
+        """
+        first_q, first_r, last_q, last_r = stood.window
+        columns = np.arange(first_q, last_q, dtype=np.float64)
+        rows = np.arange(first_r, last_r, dtype=np.float64)
+        grid_q, grid_r = np.meshgrid(columns, rows)
+        steps = np.array([[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5]])
+        tile_q = grid_q.ravel()[None, :] + steps[:, 0:1]
+        tile_r = grid_r.ravel()[None, :] + steps[:, 1:2]
+        return tile_q, tile_r
+
+    def _turn(self, stood: Projection) -> tuple[np.ndarray, np.ndarray]:
+        """Name the tile of the window that stands at each point of the page.
 
         **The pass reads backwards, one tile for each point of the page.** A
         pass that scattered the tiles forward would leave a hole between two
@@ -686,34 +845,20 @@ class Sketch:
         page, as an index into the window, and the mask of the points that
         hold one.
         """
-        first_q, first_r, last_q, last_r = window
+        first_q, first_r, last_q, last_r = stood.window
         across = last_q - first_q
         down = last_r - first_r
-        # The window in the plan of the world, before the turn. A row of a hex
-        # grid steps half a column across and less than a row down.
-        plan_wide = across + down * 0.5
-        plan_tall = down * ROW_PITCH
-        lean = self.view.lean
-        turn_x, turn_y = math.cos(self.view.turn), math.sin(self.view.turn)
-        # How far the turned plan reaches across the page and down it. A
-        # rectangle turned through an angle covers this much of each
-        # direction, and the page is cut to fit it.
-        span_x = plan_wide * abs(turn_x) + plan_tall * abs(turn_y)
-        span_y = plan_wide * abs(turn_y) + plan_tall * abs(turn_x)
-        scale = min(
-            width / max(span_x, 1e-3),
-            height / max(span_y * lean, 1e-3),
-        )
-        page_cols = max(int(span_x * scale) + 2, 2)
-        page_rows = max(int(span_y * scale * lean) + 2, 2)
-        column = (np.arange(page_cols, dtype=np.float32) - page_cols / 2.0)[None, :]
-        row = ((np.arange(page_rows, dtype=np.float32) - page_rows / 2.0) / lean)[
-            :, None
-        ]
+        lean = stood.lean
+        turn_x, turn_y = math.cos(stood.turn), math.sin(stood.turn)
+        column = (np.arange(stood.cols, dtype=np.float32) - stood.cols / 2.0)[None, :]
+        row = (
+            (np.arange(stood.flat_rows, dtype=np.float32) - stood.flat_rows / 2.0)
+            / lean
+        )[:, None]
         # Turn the point of the page back into the plan of the world. The lean
         # is already taken out of the row above, so this is a plain rotation.
-        plan_x = (column * turn_x + row * turn_y) / scale + plan_wide / 2.0
-        plan_y = (row * turn_x - column * turn_y) / scale + plan_tall / 2.0
+        plan_x = (column * turn_x + row * turn_y) / stood.scale + stood.plan_wide / 2.0
+        plan_y = (row * turn_x - column * turn_y) / stood.scale + stood.plan_tall / 2.0
         tile_r = plan_y / ROW_PITCH
         tile_q = plan_x - tile_r * 0.5
         take_r = np.rint(tile_r).astype(np.int32)
@@ -741,8 +886,8 @@ class Sketch:
         its numbers from.
         """
         rows, cols = plan.shape
-        page_rows = rows + rise + 8
-        landing = np.arange(rows, dtype=np.int32)[:, None] + rise + 4
+        page_rows = rows + rise + LIFT_MARGIN * 2
+        landing = np.arange(rows, dtype=np.int32)[:, None] + rise + LIFT_MARGIN
         landing = np.clip(landing - (plan * rise).astype(np.int32), 0, page_rows - 1)
         column = np.broadcast_to(np.arange(cols, dtype=np.int32), plan.shape)
         owner = np.full((page_rows, cols), -1, dtype=np.int32)
@@ -755,7 +900,7 @@ class Sketch:
         highest = np.maximum.accumulate(marked, axis=0)
         page_column = np.broadcast_to(np.arange(cols, dtype=np.int32), owner.shape)
         take = np.where(highest >= 0, owner[np.clip(highest, 0, None), page_column], -1)
-        foot = np.clip(take, 0, None) // cols + rise + 4
+        foot = np.clip(take, 0, None) // cols + rise + LIFT_MARGIN
         take = np.where(page_row <= foot, take, -1)
         drawn = take >= 0
         cliff = drawn & (highest != page_row)

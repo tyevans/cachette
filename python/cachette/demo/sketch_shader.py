@@ -54,16 +54,23 @@ float lines(float phase, float spacing, float weight) {
 # The flags are one byte with one bit for each of the three questions, because
 # three separate textures would be three fetches for three bits.
 PAGE = """
-uniform sampler2D page_held;
-uniform sampler2D page_depth;
-uniform usampler2D page_flags;
-uniform isampler2D page_take;
+uniform sampler2D page;
 uniform sampler2D page_grain;
 uniform ivec2 page_size;
 
 const uint DRAWN = 1u;
 const uint CLIFF = 2u;
 const uint WATER = 4u;
+
+// What the geometry pass wrote at one point of the page.
+//
+// **One texture holds the whole page.** The mesh pass writes the height of
+// the ground, the depth of the water, the flags and the tile in one target,
+// because a target for each of them would be four attachments and four
+// fetches for numbers that are always read together.
+vec4 page_at(ivec2 at) {
+    return texelFetch(page, clamp(at, ivec2(0), page_size - 1), 0);
+}
 
 // Bring a point back inside the page, the way the array renderer rolls a
 // field: a point off one edge comes back on the other.
@@ -83,12 +90,8 @@ ivec2 wrapped(ivec2 at) {
     return ivec2(wrap_one(at.x, page_size.x), wrap_one(at.y, page_size.y));
 }
 
-ivec2 held_in(ivec2 at) {
-    return clamp(at, ivec2(0), page_size - 1);
-}
-
 uint flags_at(ivec2 at) {
-    return texelFetch(page_flags, at, 0).r;
+    return uint(page_at(at).b + 0.5);
 }
 
 bool drawn_at(ivec2 at) {
@@ -96,7 +99,18 @@ bool drawn_at(ivec2 at) {
 }
 
 float height_at(ivec2 at) {
-    return texelFetch(page_held, held_in(at), 0).r;
+    return page_at(at).r;
+}
+
+float depth_at(ivec2 at) {
+    return page_at(at).g;
+}
+
+// The tile the point shows, or a number below nought where the ground does
+// not reach. The mesh pass clears the target to that number, so a point no
+// triangle covered says so.
+int take_at(ivec2 at) {
+    return int(floor(page_at(at).a + 0.5));
 }
 """
 
@@ -155,7 +169,7 @@ float coverage_at(ivec2 at) {
     bool is_water = (mark & WATER) != 0u;
     bool is_land = is_drawn && !is_water;
     float held = height_at(at);
-    float depth = texelFetch(page_depth, at, 0).r;
+    float depth = depth_at(at);
     float tone = tone_at(at);
     float page_x = float(at.x);
     float page_y = float(at.y);
@@ -200,7 +214,7 @@ uniform sampler2D tile_flow;
 
 void main() {
     ivec2 at = ivec2(gl_FragCoord.xy);
-    int take = texelFetch(page_take, at, 0).r;
+    int take = take_at(at);
     float flow = (take >= 0) ? texelFetch(tile_flow, tile_of(take), 0).r : 0.0;
     float grain = texelFetch(page_grain, at, 0).r;
     result = vec4(flow * (1.0 - GRANULATION + GRANULATION * 2.0 * grain), 0, 0, 1);
@@ -270,12 +284,12 @@ uniform isampler2D fit_x;
 uniform isampler2D fit_y;
 
 float share_at(ivec2 at) {
-    int take = texelFetch(page_take, at, 0).r;
+    int take = take_at(at);
     return (take >= 0) ? texelFetch(tile_cloud, tile_of(take), 0).r : 0.0;
 }
 
 vec2 across_at(ivec2 at) {
-    int take = texelFetch(page_take, at, 0).r;
+    int take = take_at(at);
     if (take < 0) { return vec2(0.0); }
     ivec2 tile = tile_of(take);
     return vec2(
@@ -305,7 +319,7 @@ vec3 sky_over(vec3 page, ivec2 at) {
 vec3 shade(ivec2 at) {
     uint mark = flags_at(at);
     bool is_drawn = (mark & DRAWN) != 0u;
-    int take = texelFetch(page_take, at, 0).r;
+    int take = take_at(at);
 
     // The paper, with its grain.
     float grain = texelFetch(page_grain, at, 0).r;
@@ -369,5 +383,106 @@ void main() {
     // byte for each band rounds, and a whole number over 255 rounds to
     // itself, so the two renderers pack the same byte.
     result = vec4(floor(out_colour) / 255.0, 1.0);
+}
+"""
+
+
+# The vertex shader that draws the terrain as a mesh.
+#
+# **The tile heights never change, so they cross to the device once.** The
+# transform below is what a turn, a lean or a move of the camera changes, and
+# it is a handful of uniforms. A page rebuilt for each angle would send the
+# whole terrain again for a change that costs nine numbers.
+#
+# One tile carries twelve vertices. Four of them are the top face, which is
+# the square of the tile lifted by the height of the ground on it. Four more
+# are the same square, un-lifted, which is where the face below the tile
+# reaches down to. The last four repeat the top face for the sides, because a
+# vertex carries the flag that says whether it belongs to a face and one
+# vertex cannot carry two answers.
+#
+# **The depth of a vertex is the row of the flat page.** That row grows
+# towards the watcher, so the depth test keeps the nearest ground and hides
+# what stands behind it.
+GEOMETRY_VERTEX = """#version 330 core
+in vec2 tile;
+in vec2 corner;
+in float raised;
+in float deep;
+in float wet;
+in float skirt;
+
+uniform vec2 first_tile;
+uniform vec2 plan_half;
+uniform vec2 turn_by;
+uniform float scale;
+uniform float lean;
+uniform vec2 page_middle;
+uniform vec2 page_span;
+uniform float rise;
+uniform float lift_margin;
+uniform float row_pitch;
+uniform vec4 window;
+uniform int world_wide;
+
+flat out vec4 held;
+flat out float keep;
+
+void main() {
+    vec2 place = tile - first_tile + corner;
+    float plan_x = place.x + place.y * 0.5;
+    float plan_y = place.y * row_pitch;
+    float across = (plan_x - plan_half.x) * scale;
+    float down = (plan_y - plan_half.y) * scale;
+    float column = across * turn_by.x - down * turn_by.y + page_middle.x;
+    float flat_row =
+        (across * turn_by.y + down * turn_by.x) * lean + page_middle.y;
+    // The lift moves the top face up the page by the height of the ground.
+    // The face below it stays where the ground stood, so the two differ by
+    // the rise alone.
+    //
+    // **The lift is a whole count of rows.** The array renderer moves a point
+    // by a whole number of rows, so a tile stands on one plateau rather than
+    // on a slope. A lift of a fraction of a row would put every mark on the
+    // page half a row from where the other renderer draws it.
+    float lift = floor(raised * rise) * (1.0 - skirt);
+    float row = flat_row + rise + lift_margin - lift;
+
+    // The flat value comes from the last vertex of a triangle, and every
+    // triangle below the top face ends on the lower square. The answer to
+    // whether this vertex stands where the ground stood is therefore also
+    // the answer to whether the triangle is a face.
+    float flags = 1.0 + skirt * 2.0 + wet * 4.0;
+    float take = tile.y * float(world_wide) + tile.x;
+    held = vec4(raised, deep, flags, take);
+    keep = (tile.x >= window.x && tile.x < window.z
+            && tile.y >= window.y && tile.y < window.w) ? 1.0 : 0.0;
+
+    // The page numbers its rows from the bottom, and the fragment stage reads
+    // the row it wrote at the same number, so the two already agree.
+    float clip_x = (column + 0.5) / page_span.x * 2.0 - 1.0;
+    float clip_y = (row + 0.5) / page_span.y * 2.0 - 1.0;
+    // The nearest ground carries the smallest depth. The row of the flat page
+    // grows towards the watcher, so the depth runs the other way. The span is
+    // widened so that a corner outside the page keeps its order.
+    float clip_z = 1.0 - 2.0 * (flat_row + page_span.y) / (3.0 * page_span.y);
+    gl_Position = vec4(clip_x, clip_y, clip_z, 1.0);
+}
+"""
+
+# The fragment shader that writes one point of the page.
+#
+# **The hardware resolves the occlusion.** A fragment that reaches here won
+# the depth test, so it is the nearest ground at this point of the page. The
+# page therefore holds the height, the depth of the water, the flags and the
+# tile of that ground, and nothing had to sort anything.
+GEOMETRY_FRAGMENT = """#version 330 core
+flat in vec4 held;
+flat in float keep;
+out vec4 result;
+
+void main() {
+    if (keep < 0.5) { discard; }
+    result = held;
 }
 """

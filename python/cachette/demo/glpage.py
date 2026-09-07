@@ -104,6 +104,8 @@ class Device:
         "_borrowed",
         "_buffers",
         "_colour",
+        "_depth",
+        "_depth_size",
         "_frame",
         "_programs",
         "_size",
@@ -111,6 +113,7 @@ class Device:
         "_vertices",
         "_window",
         "gl",
+        "meshes_built",
         "renderer",
     )
 
@@ -141,10 +144,15 @@ class Device:
         self._size = (0, 0)
         self._frame = gl.GLuint(0)
         self._colour = gl.GLuint(0)
+        self._depth = gl.GLuint(0)
+        self._depth_size = (0, 0)
         self._textures: dict[str, tuple[Any, int, int, str]] = {}
         self._programs: dict[str, Any] = {}
         self._buffers: dict[str, Any] = {}
         self._vertices = None
+        # How many meshes this device built. **The terrain crosses once**, so
+        # a test reads this over several angles and holds it at one.
+        self.meshes_built = 0
 
     @staticmethod
     def _open(pyglet: Any) -> Any:
@@ -183,15 +191,20 @@ class Device:
     # ------------------------------------------------------------------
     # Programs
 
-    def program(self, name: str, fragment: str) -> Any:
-        """Build the program for this fragment shader, once for each name."""
+    def program(self, name: str, fragment: str, vertex: str = "") -> Any:
+        """Build the program for these shaders, once for each name.
+
+        A caller that names no vertex shader gets the one that spreads a
+        rectangle over the whole target. A pass that draws real geometry gives
+        its own.
+        """
         held = self._programs.get(name)
         if held is not None:
             return held
         from pyglet.graphics.shader import Shader, ShaderProgram
 
         built = ShaderProgram(
-            Shader(VERTEX_SOURCE, "vertex"),
+            Shader(vertex or VERTEX_SOURCE, "vertex"),
             Shader(fragment, "fragment"),
         )
         self._programs[name] = built
@@ -326,7 +339,29 @@ class Device:
     # ------------------------------------------------------------------
     # Targets
 
-    def _target(self, width: int, height: int, layout: str) -> None:
+    def _depth_buffer(self, width: int, height: int) -> Any:
+        """Give back the depth buffer at this size, rebuilding it on a change.
+
+        **The depth buffer is what replaces a rasteriser written by hand.** A
+        pass that draws the terrain as a mesh lets the hardware keep the
+        nearest surface at each point, so nothing sorts and nothing scans.
+        """
+        gl = self.gl
+        if self._depth_size != (width, height):
+            if self._depth.value:
+                gl.glDeleteRenderbuffers(1, ctypes.byref(self._depth))
+                self._depth = gl.GLuint(0)
+            gl.glGenRenderbuffers(1, ctypes.byref(self._depth))
+            gl.glBindRenderbuffer(gl.GL_RENDERBUFFER, self._depth)
+            gl.glRenderbufferStorage(
+                gl.GL_RENDERBUFFER, gl.GL_DEPTH_COMPONENT24, width, height
+            )
+            self._depth_size = (width, height)
+        return self._depth
+
+    def _target(
+        self, width: int, height: int, layout: str, depth: bool = False
+    ) -> None:
         """Point the frame buffer at a colour texture of this size."""
         gl = self.gl
         if not self._frame.value:
@@ -339,6 +374,15 @@ class Device:
             gl.GL_TEXTURE_2D,
             handle,
             0,
+        )
+        # A pass that draws a rectangle over the target needs no depth, and a
+        # depth buffer left attached would test every later pass against
+        # whatever the mesh pass wrote.
+        gl.glFramebufferRenderbuffer(
+            gl.GL_FRAMEBUFFER,
+            gl.GL_DEPTH_ATTACHMENT,
+            gl.GL_RENDERBUFFER,
+            self._depth_buffer(width, height) if depth else gl.GLuint(0),
         )
         state = gl.glCheckFramebufferStatus(gl.GL_FRAMEBUFFER)
         if state != gl.GL_FRAMEBUFFER_COMPLETE:
@@ -361,6 +405,65 @@ class Device:
         program.use()
         self._screen(program).draw(gl.GL_TRIANGLES)
         program.stop()
+
+    def mesh(
+        self, name: str, program: Any, count: int, indices: Any, **data: Any
+    ) -> Any:
+        """Give back the mesh of this name, building it on the first ask.
+
+        **A mesh is built once and drawn many times.** The terrain never
+        moves, so the vertices cross to the device once and a turn of the view
+        costs a uniform.
+        """
+        held = self._buffers.get(name)
+        if held is None:
+            if not count:
+                message = f"no mesh named {name!r} is on the device"
+                raise DeviceGap(message)
+            held = program.vertex_list_indexed(
+                count, self.gl.GL_TRIANGLES, list(indices), **data
+            )
+            self._buffers[name] = held
+            self.meshes_built += 1
+        return held
+
+    def has_mesh(self, name: str) -> bool:
+        """Say whether a mesh of this name is already on the device."""
+        return name in self._buffers
+
+    def draw_mesh(
+        self,
+        program: Any,
+        mesh: Any,
+        width: int,
+        height: int,
+        layout: str,
+        clear: tuple[float, float, float, float],
+    ) -> None:
+        """Draw one mesh into a target of this size, with the depth test on.
+
+        The target is cleared to the value the caller names, so a point that
+        no triangle covers says that it holds no ground.
+        """
+        gl = self.gl
+        self._target(width, height, layout, depth=True)
+        gl.glViewport(0, 0, width, height)
+        gl.glDisable(gl.GL_BLEND)
+        gl.glEnable(gl.GL_DEPTH_TEST)
+        gl.glDepthMask(gl.GL_TRUE)
+        # **The first surface at a depth wins, and the top face is first.**
+        # A tile whose ground lies at the water level has no rise, so its top
+        # face and the face below it fall on one another. A test that let the
+        # later fragment through would then call every flat tile a cliff and
+        # would rule the whole plain.
+        gl.glDepthFunc(gl.GL_LESS)
+        gl.glClearColor(*clear)
+        gl.glClearDepth(1.0)
+        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+        program.use()
+        mesh.draw(gl.GL_TRIANGLES)
+        program.stop()
+        gl.glDisable(gl.GL_DEPTH_TEST)
 
     def keep(self, name: str, layout: str) -> None:
         """Keep the last target under this name, so a later pass reads it.
@@ -442,6 +545,7 @@ def _layouts() -> tuple[
         "r32f": (gl.GL_R32F, gl.GL_RED, gl.GL_FLOAT),
         "rg32f": (gl.GL_RG32F, gl.GL_RG, gl.GL_FLOAT),
         "rgb32f": (gl.GL_RGB32F, gl.GL_RGB, gl.GL_FLOAT),
+        "rgba32f": (gl.GL_RGBA32F, gl.GL_RGBA, gl.GL_FLOAT),
         "r32i": (gl.GL_R32I, gl.GL_RED_INTEGER, gl.GL_INT),
         "r8ui": (gl.GL_R8UI, gl.GL_RED_INTEGER, gl.GL_UNSIGNED_BYTE),
         "rgba8": (gl.GL_RGBA8, gl.GL_RGBA, gl.GL_UNSIGNED_BYTE),
@@ -450,11 +554,20 @@ def _layouts() -> tuple[
         "r32f": np.float32,
         "rg32f": np.float32,
         "rgb32f": np.float32,
+        "rgba32f": np.float32,
         "r32i": np.int32,
         "r8ui": np.uint8,
         "rgba8": np.uint8,
     }
-    bands = {"r32f": 1, "rg32f": 2, "rgb32f": 3, "r32i": 1, "r8ui": 1, "rgba8": 4}
+    bands = {
+        "r32f": 1,
+        "rg32f": 2,
+        "rgb32f": 3,
+        "rgba32f": 4,
+        "r32i": 1,
+        "r8ui": 1,
+        "rgba8": 4,
+    }
     return forms, types, bands
 
 

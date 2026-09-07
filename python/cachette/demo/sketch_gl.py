@@ -11,18 +11,25 @@ cost hundreds of megabytes of memory traffic for one frame. The device runs
 the whole chain for one pixel at a time, many pixels at once, and writes the
 result once.
 
-What stays on the processor
----------------------------
+How the terrain reaches the page
+--------------------------------
 
-**The geometry stays.** The turn of the world and the lift of the ground are a
-scatter and a running maximum down each column of the page, and neither is a
-function of one pixel. They cost a small part of the build, they run when the
-camera moves, and they are not the reason a frame is slow.
+**The terrain is a mesh, and the hardware draws it.** The height of every tile
+crosses to the device once, as vertex data, because the ground never moves. A
+turn of the view, a lean, a zoom or a move of the camera then costs a handful
+of uniform values rather than a new page.
 
-**The marks move.** The tone of the light, every set of hatching, the
-silhouette, the grain of the paper, the wash of a faction, the cloud, the wash
-of an overlay and the fit of the page into the frame are all functions of one
-pixel. They are the whole cost, and they are what a fragment shader is for.
+**The depth test resolves the occlusion.** Each tile carries a top face at its
+own height and a face below it that reaches down to where the ground stood.
+The depth of a vertex is the row of the flat page, which grows towards the
+watcher, so the nearest ground wins and what stands behind a ridge stays
+hidden. Nothing sorts, nothing scans a column, and no array holds a page.
+
+**The marks are one pass over the pixels.** The tone of the light, every set
+of hatching, the silhouette, the grain of the paper, the wash of a faction,
+the cloud, the wash of an overlay and the fit of the page into the frame are
+all functions of one point. They are the whole of the rest of the cost, and
+they are what a fragment shader is for.
 
 What this renderer promises
 ---------------------------
@@ -56,7 +63,7 @@ import numpy as np
 from cachette.demo import sketch as ink
 from cachette.demo import sketch_shader as source
 from cachette.demo.glpage import Device, DeviceGap
-from cachette.demo.sketch import Ground, Sketch
+from cachette.demo.sketch import Projection, Sketch
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -129,6 +136,100 @@ def _defines() -> str:
     return "\n".join(lines) + "\n"
 
 
+# The four corners of the square of one tile, in tiles.
+#
+# **The square is what the array renderer draws.** That renderer names the
+# tile nearest to each point of the page, so one tile covers the square around
+# its own place. The mesh draws that square, and the two therefore cover the
+# same points.
+SQUARE = np.array(
+    [[-0.5, -0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]], dtype=np.float32
+)
+
+# How many blocks of four corners one tile carries, and how many vertices
+# that makes.
+#
+# The first block is the top face, at the height of the ground. The second is
+# the square where the ground stood, which is where the face below the tile
+# reaches down to.
+BLOCK_COUNT = 2
+VERTEX_COUNT = BLOCK_COUNT * 4
+
+# Whether each vertex of a tile stands where the ground stood.
+#
+# **This answer also says whether a triangle is a face below the top.** The
+# shading language takes a flat value from the last vertex of a triangle, and
+# every triangle below the top face ends on a vertex of the lower square. One
+# attribute therefore carries both answers, and the mesh holds eight vertices
+# for a tile rather than twelve.
+SKIRT = np.array([0.0] * 4 + [1.0] * 4, dtype=np.float32)
+
+
+def _triangles() -> np.ndarray:
+    """Give back the triangles of one tile, as places in its own vertices.
+
+    The tile draws its top face, the square where the ground stood, and the
+    four faces between the two. Together they cover every point of the paper
+    that the array renderer fills from this tile.
+
+    **Every triangle below the top face ends on the lower square.** The
+    shading language takes a flat value from the last vertex, so that ending
+    is what tells the fragment stage that the point is a face and not a top.
+    """
+    made = [[0, 1, 2], [0, 2, 3], [4, 5, 6], [4, 6, 7]]
+    for edge in range(4):
+        near = edge
+        far = (edge + 1) % 4
+        made.append([near, far, 4 + far])
+        made.append([near, 4 + far, 4 + near])
+    return np.array(made, dtype=np.int32).ravel()
+
+
+TRIANGLES = _triangles()
+
+# The name the device holds the terrain under.
+TERRAIN = "terrain"
+
+
+class Page:
+    """The paper one camera and one pair of angles ask for.
+
+    **This holds no picture.** The terrain is on the device, and the mesh pass
+    draws it against the projection below. This says where the window of tiles
+    falls on the paper, how large the paper is, and which part of it holds the
+    ground.
+    """
+
+    __slots__ = ("box", "sample", "shape", "stand", "stood")
+
+    stood: Projection
+    shape: tuple[int, int]
+    stand: tuple[float, float]
+    box: tuple[int, int, int, int]
+    sample: tuple[np.ndarray, np.ndarray] | None
+
+    def __init__(
+        self,
+        stood: Projection,
+        shape: tuple[int, int],
+        stand: tuple[float, float],
+        box: tuple[int, int, int, int],
+    ) -> None:
+        """Record the projection, the frame, the angles and the part in use."""
+        self.stood = stood
+        self.shape = shape
+        self.stand = stand
+        self.box = box
+        # Where the engine drew each tile on its own flat map. It is built
+        # only when a wash needs it.
+        self.sample = None
+
+    @property
+    def window(self) -> tuple[int, int, int, int]:
+        """Give back the window of tiles this paper covers."""
+        return self.stood.window
+
+
 class GlSketch(Sketch):
     """The sketchbook renderer, composited on the graphics device.
 
@@ -145,10 +246,12 @@ class GlSketch(Sketch):
     while everyone believed the device was drawing.
     """
 
-    # The build stops at the geometry. This renderer draws every mark itself.
+    # **The build of the array renderer never runs here.** This renderer draws
+    # the terrain as a mesh and it draws every mark itself, so it needs
+    # neither the turn nor the lift that the array renderer works out.
     _marks = False
 
-    __slots__ = ("_device", "_pages", "_palette", "_stamp")
+    __slots__ = ("_device", "_held", "_pages", "_palette", "_stamp")
 
     def __init__(
         self,
@@ -166,10 +269,12 @@ class GlSketch(Sketch):
         """
         super().__init__(world, view=view, relief=relief, sky=sky)
         self._device: Device | None = None
-        # The page last sent to the device, held so that a frame which reuses
-        # a page does not send it again. Holding it also keeps it alive, so no
-        # later page can take its place in memory and pass the test above.
-        self._stamp: Ground | None = None
+        # The paper the last frame drew on, held so that a frame which asks
+        # for the same one gets it back rather than a second copy.
+        self._held: Page | None = None
+        # The paper the device last drew the terrain onto. Holding it lets a
+        # frame that reuses one paper draw the mesh again for nothing.
+        self._stamp: Page | None = None
         self._pages: dict[str, Any] = {}
         self._palette: np.ndarray | None = None
 
@@ -189,6 +294,7 @@ class GlSketch(Sketch):
             self._device.close()
             self._device = None
             self._stamp = None
+            self._held = None
 
     def _program(self, name: str, body: str) -> Any:
         """Build one program from the shared head and this body."""
@@ -196,47 +302,146 @@ class GlSketch(Sketch):
             name, source.HEAD + _defines() + source.PAGE + source.TILES + body
         )
 
+    def _geometry(self) -> Any:
+        """Build the program that draws the terrain, once."""
+        return self.device.program(
+            "geometry", source.GEOMETRY_FRAGMENT, vertex=source.GEOMETRY_VERTEX
+        )
+
+    # ------------------------------------------------------------------
+    # The page
+
+    def _page_for(self, camera: Camera, width: int, height: int) -> Page:
+        """Give back the paper the camera and the two angles ask for.
+
+        **Nothing is built here.** The paper is a handful of numbers: where
+        the window of tiles falls on it, how large it is, and which part of it
+        holds the ground. The terrain is already on the device, and the mesh
+        pass draws it against these numbers.
+        """
+        window = self._window(camera, width, height)
+        stand = (self.view.turn, self.view.lean)
+        held = self._held
+        if (
+            held is not None
+            and held.window == window
+            and held.shape == (height, width)
+            and held.stand == stand
+        ):
+            return held
+        stood = self.projection(window, width, height)
+        built = Page(stood, (height, width), stand, self.box_of(stood))
+        self._held = built
+        return built
+
+    def window(self) -> tuple[int, int, int, int] | None:
+        """Give back the window of tiles the last frame drew, or nothing."""
+        return None if self._held is None else self._held.window
+
     # ------------------------------------------------------------------
     # What crosses to the device
 
-    def _send_page(self, ground: Ground) -> None:
-        """Put the page the build made on the device, when it is a new page.
+    def _send_mesh(self) -> Any:
+        """Put the terrain on the device, as a mesh, on the first frame.
 
-        The turn and the lift are a function of the camera and the size of the
-        frame, so this runs when the camera moves and not on every frame.
+        **The tile heights never change, so they cross once.** One tile gives
+        twelve vertices: the square of the tile at the height of the ground,
+        the same square again for the faces below it, and the square where the
+        ground stood. A turn of the view then costs a uniform value.
         """
-        # **The test is the page itself, not a description of it.** The build
-        # gives back a new page whenever the window, the frame or either angle
-        # moves, so holding the last page and comparing it by identity cannot
-        # miss a change that a list of its properties would forget to name.
-        if self._stamp is ground:
+        # **The device holds the mesh, and it is the only thing that holds
+        # it.** A second cache here would be a second declaration of one fact,
+        # and a frame would take the older of the two without anything
+        # failing.
+        program = self._geometry()
+        if self.device.has_mesh(TERRAIN):
+            return self.device.mesh(TERRAIN, program, 0, ())
+        rows, columns = self._world.height, self._world.width
+        grid_q, grid_r = np.meshgrid(
+            np.arange(columns, dtype=np.float32), np.arange(rows, dtype=np.float32)
+        )
+        tiles = rows * columns
+        spread = np.repeat(
+            np.stack([grid_q.ravel(), grid_r.ravel()], axis=-1), VERTEX_COUNT, axis=0
+        )
+        corners = np.tile(SQUARE, (tiles * BLOCK_COUNT, 1))
+        step = np.arange(tiles, dtype=np.int32)[:, None] * VERTEX_COUNT
+        indices = (TRIANGLES[None, :] + step).ravel()
+        return self.device.mesh(
+            TERRAIN,
+            program,
+            tiles * VERTEX_COUNT,
+            indices.tolist(),
+            tile=("f", spread.ravel().tolist()),
+            corner=("f", corners.ravel().tolist()),
+            raised=("f", np.repeat(self._raised.ravel(), VERTEX_COUNT).tolist()),
+            deep=("f", np.repeat(self._deep.ravel(), VERTEX_COUNT).tolist()),
+            wet=(
+                "f",
+                np.repeat(
+                    self._water.ravel().astype(np.float32), VERTEX_COUNT
+                ).tolist(),
+            ),
+            skirt=("f", np.tile(SKIRT, tiles).tolist()),
+        )
+
+    def _draw_page(self, page: Page) -> None:
+        """Draw the terrain onto the paper, and let the depth test resolve it.
+
+        **This is the whole of the geometry.** The vertex stage turns the
+        world, leans it, and lifts every tile by the height of the ground on
+        it. The depth test keeps the nearest surface at each point of the
+        paper. The result is one texture that holds the height, the depth of
+        the water, the flags and the tile of the ground a watcher sees.
+        """
+        # **The test is the paper itself, not a description of it.** A new
+        # paper comes back whenever the window, the frame or either angle
+        # moves, so holding the last one and comparing it by identity cannot
+        # miss a change that a list of properties would forget to name.
+        if self._stamp is page:
             return
         device = self.device
-        drawn = ground.drawn
-        flags = (
-            drawn.astype(np.uint8) * DRAWN_BIT
-            + (ground.cliff & drawn).astype(np.uint8) * CLIFF_BIT
-            + ground.water.astype(np.uint8) * WATER_BIT
+        mesh = self._send_mesh()
+        program = self._geometry()
+        stood = page.stood
+        first_q, first_r, last_q, last_r = stood.window
+        program.use()
+        device.put(program, "first_tile", (float(first_q), float(first_r)))
+        device.put(program, "plan_half", (stood.plan_wide / 2.0, stood.plan_tall / 2.0))
+        device.put(program, "turn_by", (math.cos(stood.turn), math.sin(stood.turn)))
+        device.put(program, "scale", float(stood.scale))
+        device.put(program, "lean", float(stood.lean))
+        device.put(program, "page_middle", (stood.cols / 2.0, stood.flat_rows / 2.0))
+        device.put(program, "page_span", (float(stood.cols), float(stood.rows)))
+        device.put(program, "rise", float(stood.rise))
+        device.put(program, "lift_margin", float(ink.LIFT_MARGIN))
+        device.put(program, "row_pitch", float(ink.ROW_PITCH))
+        device.put(
+            program,
+            "window",
+            (float(first_q), float(first_r), float(last_q), float(last_r)),
         )
-        device.upload("page_held", ground.held_height, "r32f")
-        device.upload("page_depth", ground.depth, "r32f")
-        device.upload("page_flags", flags, "r8ui")
-        device.upload("page_take", ground.take.astype(np.int32), "r32i")
-        rows, columns = drawn.shape
-        device.upload("page_grain", self._paper_grain(rows, columns), "r32f")
-        self._stamp = ground
+        device.put(program, "world_wide", int(self._world.width))
+        program.stop()
+        # A point that no triangle covers holds no ground. The tile it shows
+        # is below nought, and the shader reads that as nothing.
+        device.draw_mesh(
+            program, mesh, stood.cols, stood.rows, "rgba32f", (0.0, 0.0, 0.0, -1.0)
+        )
+        device.keep("page", "rgba32f")
+        device.upload("page_grain", self._paper_grain(stood.rows, stood.cols), "r32f")
+        self._stamp = page
 
-    def _send_tiles(self, ground: Ground) -> None:
+    def _send_tiles(self) -> None:
         """Put the fields that change with the world on the device.
 
-        **These cross at the size of the window of tiles, not of the page.** A
-        tile covers many points of the page, so the page reads a tile many
-        times and the tile crosses once.
+        **These cross at the size of the world, not of the paper.** A tile
+        covers many points of the paper, so the paper reads a tile many times
+        and the tile crosses once for each frame.
         """
         from cachette import faction_colours
 
         device = self.device
-        first_q, first_r, last_q, last_r = ground.window
         rows, columns = self._world.height, self._world.width
 
         if self._palette is None:
@@ -256,11 +461,7 @@ class GlSketch(Sketch):
             device.upload("palette", self._palette[None, :, :], "rgb32f")
 
         holders = self._world.tile_holders().reshape(rows, columns)
-        device.upload(
-            "tile_holder",
-            holders[first_r:last_r, first_q:last_q].astype(np.int32),
-            "r32i",
-        )
+        device.upload("tile_holder", holders.astype(np.int32), "r32i")
 
         if self._sky:
             cloud = self._world.cloud_shares().reshape(rows, columns).astype(
@@ -282,10 +483,9 @@ class GlSketch(Sketch):
             moving = length > 0.0
             page_dx = np.where(moving, page_dx / np.where(moving, length, 1.0), 1.0)
             page_dy = np.where(moving, page_dy / np.where(moving, length, 1.0), 0.0)
-            cut = (slice(first_r, last_r), slice(first_q, last_q))
-            device.upload("tile_cloud", cloud[cut], "r32f")
-            device.upload("tile_across_x", page_dy[cut].astype(np.float32), "r32f")
-            device.upload("tile_across_y", (-page_dx)[cut].astype(np.float32), "r32f")
+            device.upload("tile_cloud", cloud, "r32f")
+            device.upload("tile_across_x", page_dy.astype(np.float32), "r32f")
+            device.upload("tile_across_y", (-page_dx).astype(np.float32), "r32f")
         else:
             # The shader binds these whether it reads them or not.
             for name in ("tile_cloud", "tile_across_x", "tile_across_y"):
@@ -293,7 +493,7 @@ class GlSketch(Sketch):
 
     def _send_wash(
         self,
-        ground: Ground,
+        page: Page,
         overlay: str | None,
         camera: Camera,
         width: int,
@@ -302,10 +502,10 @@ class GlSketch(Sketch):
         """Put the pigment a named overlay laid down on the device.
 
         **The colours are the engine's own.** This asks the engine for the
-        frame with the overlay and for the frame without it, and the difference
-        between the two is the pigment. It then reads that difference at the
-        place the engine drew each tile, so the wash follows the ground the
-        page shows rather than the flat map the engine drew.
+        frame with the overlay and for the frame without it, and the
+        difference between the two is the pigment. It then reads that
+        difference at the place the engine drew each tile, so the wash follows
+        the ground the paper shows rather than the flat map the engine drew.
 
         Gives back whether there is any pigment at all.
         """
@@ -321,13 +521,13 @@ class GlSketch(Sketch):
         plain = ink._channels(bare, width, height)
         painted = ink._channels(tinted, width, height)
         flow = self._sampled(
-            ground, np.abs(painted - plain).max(axis=-1) / 255.0, camera, width, height
+            page, np.abs(painted - plain).max(axis=-1) / 255.0, camera, width, height
         )
         if not flow.any():
             return False
         hue = np.stack(
             [
-                self._sampled(ground, painted[..., band], camera, width, height)
+                self._sampled(page, painted[..., band], camera, width, height)
                 for band in range(3)
             ],
             axis=-1,
@@ -337,40 +537,38 @@ class GlSketch(Sketch):
         return True
 
     def _sampled(
-        self, ground: Ground, frame: np.ndarray, camera: Camera, width: int, height: int
+        self, page: Page, frame: np.ndarray, camera: Camera, width: int, height: int
     ) -> np.ndarray:
         """Read a field the engine painted on the flat map, tile by tile.
 
-        This is the reading the array renderer makes, stopped one step earlier.
-        The array renderer goes on to spread the reading over the page. The
-        shader spreads it instead, so this gives back the window of tiles.
+        The engine paints an overlay on its own map. The paper shows the same
+        tiles in another place, so the reading finds where the engine drew
+        each tile and then gives that value for that tile.
+
+        **The engine answers where a tile is.** The pass asks it over a coarse
+        grid of pixels and takes the middle of the pixels that named each
+        tile, so this module holds no layout of its own for the flat map.
         """
-        first_q, first_r, last_q, last_r = ground.window
-        across = last_q - first_q
-        down = last_r - first_r
-        if ground.sample is None:
-            columns = np.arange(0, width, ink.SAMPLE_STEP)
-            rows = np.arange(0, height, ink.SAMPLE_STEP)
-            found_q = np.zeros((down, across), dtype=np.int64)
-            found_y = np.zeros((down, across), dtype=np.int64)
-            counted = np.zeros((down, across), dtype=np.int64)
-            for y in rows:
-                for x in columns:
+        rows, columns = self._world.height, self._world.width
+        if page.sample is None:
+            found_x = np.zeros((rows, columns), dtype=np.int64)
+            found_y = np.zeros((rows, columns), dtype=np.int64)
+            counted = np.zeros((rows, columns), dtype=np.int64)
+            for y in range(0, height, ink.SAMPLE_STEP):
+                for x in range(0, width, ink.SAMPLE_STEP):
                     tile_q, tile_r = camera.tile_at(float(x), float(y))
-                    at_q = tile_q - first_q
-                    at_r = tile_r - first_r
-                    if 0 <= at_q < across and 0 <= at_r < down:
-                        found_q[at_r, at_q] += x
-                        found_y[at_r, at_q] += y
-                        counted[at_r, at_q] += 1
+                    if 0 <= tile_q < columns and 0 <= tile_r < rows:
+                        found_x[tile_r, tile_q] += x
+                        found_y[tile_r, tile_q] += y
+                        counted[tile_r, tile_q] += 1
             safe = np.clip(counted, 1, None)
-            ground.sample = (
-                np.clip(found_q // safe, 0, width - 1).astype(np.int32),
+            page.sample = (
+                np.clip(found_x // safe, 0, width - 1).astype(np.int32),
                 np.clip(found_y // safe, 0, height - 1).astype(np.int32),
             )
-        at_x, at_y = ground.sample
-        window: np.ndarray = frame[at_y, at_x]
-        return window
+        at_x, at_y = page.sample
+        whole: np.ndarray = frame[at_y, at_x]
+        return whole
 
     # ------------------------------------------------------------------
     # The frame
@@ -407,66 +605,61 @@ class GlSketch(Sketch):
             phase=phase,
             speed_milli=speed_milli,
         )
-        ground = self._for(camera, width, height)
+        page = self._page_for(camera, width, height)
         kept = self._panels(pixels, camera, width, height, overlay, phase)
-        drawn = self._composite(ground, overlay, camera, width, height)
+        drawn = self._composite(page, overlay, camera, width, height)
         frame = pixels.reshape(height, width)
         frame[...] = np.where(kept, frame, drawn)
         return reading
 
     def _composite(
         self,
-        ground: Ground,
+        page: Page,
         overlay: str | None,
         camera: Camera,
         width: int,
         height: int,
     ) -> npt.NDArray[np.uint32]:
-        """Run the page through the device, and give back the packed frame."""
+        """Run the paper through the device, and give back the packed frame."""
         device = self.device
         device.make_current()
-        self._send_page(ground)
-        self._send_tiles(ground)
-        washes = self._send_wash(ground, overlay, camera, width, height)
-        page_rows, page_cols = ground.drawn.shape
+        self._draw_page(page)
+        self._send_tiles()
+        washes = self._send_wash(page, overlay, camera, width, height)
+        stood = page.stood
+        page_cols, page_rows = stood.cols, stood.rows
         if washes:
-            self._blur_wash(ground, page_cols, page_rows)
+            self._blur_wash(page_cols, page_rows)
         device.ensure("wash_settled", "r32f")
         device.ensure("wash_blurred", "rg32f", bands=2)
 
-        fit_w, fit_h = self._send_fit(ground, width, height)
+        fit_w, fit_h = self._send_fit(page, width, height)
         program = self._program(
             "composite", source.TONE + source.HATCH + source.COMPOSITE
         )
         program.use()
         units = [
-            ("page_held", 0),
-            ("page_depth", 1),
-            ("page_flags", 2),
-            ("page_take", 3),
-            ("page_grain", 4),
-            ("tile_holder", 5),
-            ("tile_cloud", 6),
-            ("tile_across_x", 7),
-            ("tile_across_y", 8),
-            ("tile_hue", 9),
-            ("wash_settled", 10),
-            ("wash_blurred", 11),
-            ("palette", 12),
-            ("fit_x", 13),
-            ("fit_y", 14),
+            ("page", 0),
+            ("page_grain", 1),
+            ("tile_holder", 2),
+            ("tile_cloud", 3),
+            ("tile_across_x", 4),
+            ("tile_across_y", 5),
+            ("tile_hue", 6),
+            ("wash_settled", 7),
+            ("wash_blurred", 8),
+            ("palette", 9),
+            ("fit_x", 10),
+            ("fit_y", 11),
         ]
         for name, unit in units:
             device.bind(program, name, unit)
 
-        rise = max(int(page_cols * self._relief), 1)
-
         program["page_size"] = (page_cols, page_rows)
-        program["window_size"] = (
-            ground.window[2] - ground.window[0],
-            ground.window[3] - ground.window[1],
-        )
-        program["rise"] = float(rise)
+        # The paper names a tile by its number in the whole world, because the
+        # mesh holds the whole world and the fields that change cross whole.
+        program["window_size"] = (self._world.width, self._world.height)
+        program["rise"] = float(stood.rise)
         program["light"] = tuple(float(band) for band in ink.LIGHT)
         # The pass that sends the tiles reads the palette from the engine and
         # sends it, and it ran above, so the palette is here.
@@ -479,7 +672,7 @@ class GlSketch(Sketch):
         program["draws_sky"] = 1 if self._sky else 0
         program["draws_wash"] = 1 if washes else 0
         program["cloud_step"] = max(int(page_cols * ink.CLOUD_SHADOW_STEP), 1)
-        program["cloud_lift"] = int(rise * ink.CLOUD_HEIGHT)
+        program["cloud_lift"] = int(stood.rise * ink.CLOUD_HEIGHT)
         program["fit_size"] = (fit_w, fit_h)
         program["fit_at"] = ((width - fit_w) // 2, (height - fit_h) // 2)
         program.stop()
@@ -496,23 +689,20 @@ class GlSketch(Sketch):
         ).astype(np.uint32)
         return result
 
-    def _send_fit(self, ground: Ground, width: int, height: int) -> tuple[int, int]:
-        """Say which point of the page each pixel of the frame shows.
+    def _send_fit(self, page: Page, width: int, height: int) -> tuple[int, int]:
+        """Say which point of the paper each pixel of the frame shows.
 
-        The page is wider and shorter than the frame, because the turn spreads
-        the world across the paper. It is scaled to fit rather than cut, so a
+        The paper is wider and shorter than the frame, because the turn
+        spreads the world across it. It is scaled to fit rather than cut, so a
         watcher sees the whole world the camera covers.
 
-        **The array renderer works this mapping out, and this takes it from
-        there.** A shader that worked it out again would divide the same whole
-        number by the same scale at a different width. Near a boundary the two
-        land on neighbouring points of the page, and on a hatched page two
-        neighbouring points are far apart in colour. The mapping is two short
-        lists, so it crosses to the device whole.
+        **Both renderers take this mapping from one rule.** The mapping is two
+        short lists, so it crosses to the device whole rather than being
+        worked out again for each pixel.
 
-        Gives back the size of the fitted page in pixels.
+        Gives back the size of the fitted paper in pixels.
         """
-        first_row, last_row, first_col, last_col = ground.box
+        first_row, last_row, first_col, last_col = page.box
         rows = last_row - first_row
         cols = last_col - first_col
         scale = min(width / cols, height / rows)
@@ -525,8 +715,8 @@ class GlSketch(Sketch):
         device.upload("fit_y", (take_y + first_row)[None, :], "r32i")
         return fit_w, fit_h
 
-    def _blur_wash(self, ground: Ground, page_cols: int, page_rows: int) -> None:
-        """Blur the settled pigment at both reaches, down the page and across.
+    def _blur_wash(self, page_cols: int, page_rows: int) -> None:
+        """Blur the settled pigment at both reaches, down the paper and across.
 
         A box mean is the same in either order, so the two axes run as two
         passes and each pass costs the reach and not the square of it. The two
@@ -534,14 +724,11 @@ class GlSketch(Sketch):
         the far one.
         """
         device = self.device
-        window = (
-            ground.window[2] - ground.window[0],
-            ground.window[3] - ground.window[1],
-        )
+        window = (self._world.width, self._world.height)
 
         settle = self._program("wash_settled", source.WASH_SETTLED)
         settle.use()
-        device.bind(settle, "page_take", 0)
+        device.bind(settle, "page", 0)
         device.bind(settle, "page_grain", 1)
         device.bind(settle, "tile_flow", 2)
         device.put(settle, "page_size", (page_cols, page_rows))
