@@ -907,8 +907,8 @@ impl Wind {
         }
         let mut best = 0usize;
         let mut most = i32::MIN;
-        for direction in 0..NEIGHBOUR_COUNT {
-            let along = self.along(NEIGHBOURS[direction]);
+        for (direction, neighbour) in NEIGHBOURS.iter().enumerate() {
+            let along = self.along(*neighbour);
             if along > most {
                 most = along;
                 best = direction;
@@ -1012,7 +1012,7 @@ fn bleed(part: i32) -> i32 {
             Accum(DRAG_DENOMINATOR),
         )
         .map_or(0, |taken| taken.0);
-    (kept - i64::from(kept.signum())) as i32
+    (kept - kept.signum()) as i32
 }
 
 /// Returns what drag leaves of one wind.
@@ -1185,19 +1185,6 @@ const _: () = assert!(
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
 pub const HEAT_CEILING: i32 = 256;
 
-/// What open water adds to the heat of a cell, at the top of its range.
-///
-/// **The term is graded by depth, and the shallowest water takes all of it.**
-/// Shallow water takes up heat and gives it up over a small column, so it is
-/// a strong source. Deep water spreads the same heat through a large one, so
-/// it takes almost none of this term.
-///
-/// **Water biases the ground warm, and it does not dominate it.** What water
-/// mostly does to the weather is to hold its temperature rather than to raise
-/// it, and the temperature pass states that separately by moving a deep cell
-/// more slowly than a shallow one.
-const HEAT_FROM_WATER: i32 = 64;
-
 /// The height below which a tile holds water, read and not restated.
 ///
 /// The terrain declares the mark, and the shallowness of a cell is its mean
@@ -1209,27 +1196,6 @@ const HEAT_FROM_WATER: i32 = 64;
 ///
 /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 use crate::terrain::{Terrain, TerrainTile, HEIGHT_WATER};
-
-/// What low ground adds to the heat of a cell, at the bottom of the height
-/// range.
-///
-/// **The term reads the height of the land of the cell, and never the height
-/// of its water.** A mean over both put the sea at the bottom of the height
-/// range and therefore at the top of this term, which made every sea hotter
-/// than every coast.
-const HEAT_FROM_LOW_GROUND: i32 = 192;
-
-/// What the ground term is divided by before it drives the temperature.
-///
-/// **The ground still biases the temperature, and it must not dominate it.**
-/// The two ground terms above span the whole scale between them. A driver
-/// that took them whole would leave no room for the season and the cloud, and
-/// the field would return to the fixed heat that the season replaces.[^1]
-///
-/// # References
-///
-/// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const GROUND_DIVISOR: i64 = 4;
 
 /// The degrees that the sun adds at the warmest place and the warmest moment.
 ///
@@ -2043,44 +2009,6 @@ fn part_of(whole: i32, fraction: Fix32) -> i32 {
     ))
 }
 
-/// Returns what the relief of a cell takes off the balance temperature, in
-/// hundredths of a degree.
-///
-/// **The answer is never positive.** Air cools as it rises, so high ground
-/// stands below the temperature that the energy balance settles at and no
-/// ground stands above it. Open water sits at the sea mark, which is the
-/// bottom of the range, so it cools nothing.[^4]
-///
-/// **The water of a cell does not appear here, and that is deliberate.** The
-/// sea moderates a coast by holding its heat, not by sitting at a different
-/// mean, and the field already carries that as a lag on how fast a cell
-/// follows its driver. A second term for it would be one fact in two
-/// places.[^5]
-///
-/// The ground comes from the ground array over the weather lattice, which the
-/// world folds from the terrain once. **It does not come from the level 1
-/// summary**, because that summary describes a block thirty-two tiles a side
-/// and is the wrong source at any other weather pitch.[^1]
-///
-/// The heat has three readers in one solve: the pressure that drives the
-/// wind, the evaporation, and the fall. It is one derived value, computed
-/// once for each solve into a buffer that never crosses a tick boundary, and
-/// storing it in one of the three would put a second declaration of it in the
-/// tree.[^2] [^3]
-///
-/// A cell that covers no tile is cold.
-///
-/// **This is public so that a test can move one input and watch the answer
-/// move.**
-///
-/// # References
-///
-/// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
-/// [^4]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
-/// [^5]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-/// [^2]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
-/// [^3]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
-#[must_use]
 /// Returns the mean height of the land of a world, weighted by how much land
 /// each cell holds.
 ///
@@ -2128,6 +2056,45 @@ pub fn mean_land_height_over(ground: &[CellGround]) -> Fix32 {
     Fix32(clamp_to_fix(total / counted))
 }
 
+/// Returns what the relief of a cell takes off the balance temperature, in
+/// hundredths of a degree.
+///
+/// **The answer is signed, and its zero is the mean land height of the
+/// world.** Air cools as it rises, so ground above that mean stands below the
+/// temperature the energy balance settles at, and ground below it stands
+/// above. Open water carries no height, so it takes the whole of the
+/// reference as a warming.[^4]
+///
+/// **The water of a cell does not appear here, and that is deliberate.** The
+/// sea moderates a coast by holding its heat, not by sitting at a different
+/// mean, and the field already carries that as a lag on how fast a cell
+/// follows its driver. A second term for it would be one fact in two
+/// places.[^5]
+///
+/// The ground comes from the ground array over the weather lattice, which the
+/// world folds from the terrain once. **It does not come from the level 1
+/// summary**, because that summary describes a block thirty-two tiles a side
+/// and is the wrong source at any other weather pitch.[^1]
+///
+/// The heat has three readers in one solve: the pressure that drives the
+/// wind, the evaporation, and the fall. It is one derived value, computed
+/// once for each solve into a buffer that never crosses a tick boundary, and
+/// storing it in one of the three would put a second declaration of it in the
+/// tree.[^2] [^3]
+///
+/// A cell that covers no tile is cold.
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+///
+/// # References
+///
+/// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+/// [^4]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+/// [^5]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
+/// [^2]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
+/// [^3]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[must_use]
 pub fn relief_cooling_of(ground: CellGround, relief: HeightRange, reference: Fix32) -> i32 {
     if ground.tiles() <= 0 {
         return 0;
@@ -2336,18 +2303,9 @@ struct Insolation {
     daily: Vec<i16>,
     /// The annual mean insolation at each latitude band.
     mean: Vec<i16>,
-    /// The annual mean at the equator.
-    top: i16,
-    /// The annual mean at a pole.
-    floor: i16,
     /// The daily value at the solstice against the annual mean, at the middle
     /// latitude. It is the normaliser of the season part.
     reference: i16,
-    /// The highest sum of the belt and the season that the geometry holds,
-    /// over every latitude and every declination.
-    reach_top: i32,
-    /// The lowest such sum.
-    reach_floor: i32,
     /// The degrees that a saturated sky takes away from a cell.
     cloud_swing: i32,
 }
@@ -2638,13 +2596,6 @@ const LAPSE_RATE_FINE: i64 = 650;
 /// The metres in one kilometre.
 const METRES_IN_KILOMETRE: i64 = 1000;
 
-/// The middle latitude, in hundredths of a degree.
-///
-/// The season normaliser is read here. A season that reached its whole swing
-/// at the pole would leave the middle latitudes with almost no season at all,
-/// because the polar swing is twice the swing at forty-five degrees.
-const MIDDLE_LATITUDE: i32 = 45 * LATITUDE_FINE;
-
 /// The degrees that the belt of a latitude adds at the equator.
 const LATITUDE_SWING: i32 = 40;
 
@@ -2692,8 +2643,6 @@ impl Insolation {
             }
             mean[band] = clamp_to_watts(total / DECLINATION_STEPS as i64);
         }
-        let top = mean[INSOLATION_BANDS / 2];
-        let floor = mean[0];
         // **The normaliser is the largest anomaly the geometry holds
         // anywhere, and it stands at a pole.** A normaliser read at a chosen
         // latitude makes every latitude beyond it clamp, which replaces the
@@ -2714,35 +2663,11 @@ impl Insolation {
         let mut table = Self {
             daily,
             mean,
-            top,
-            floor,
             reference: clamp_to_watts(reference),
-            // The scan below needs a table to read, and it reads only the
-            // three normalisers above. These are what the scan writes.
-            reach_top: 0,
-            reach_floor: 0,
+            // The derivation below needs a table to read. This is what it
+            // writes.
             cloud_swing: 0,
         };
-        // **The walk over the geometry that gives the reach of the sun
-        // term.** It reads every latitude band and every declination step,
-        // which are the whole domain of the term, and it records the highest
-        // and the lowest sum it finds. The interpolation between two samples
-        // is monotone and each clamp is monotone, so no latitude and no tick
-        // between two samples passes either end.
-        let mut reach_top = i32::MIN;
-        let mut reach_floor = i32::MAX;
-        for band in 0..INSOLATION_BANDS {
-            let mean = i64::from(table.mean[band]);
-            for step in 0..=DECLINATION_STEPS {
-                let daily = i64::from(table.daily[band * (DECLINATION_STEPS + 1) + step]);
-                let shape = table.shape_of(daily, mean);
-                reach_top = reach_top.max(shape);
-                reach_floor = reach_floor.min(shape);
-            }
-        }
-        table.reach_top = reach_top;
-        table.reach_floor = reach_floor;
-
         // **What a whole sky takes away, derived and not written down.** The
         // sun term already states what one watt of insolation is worth in
         // degrees of warmth: the belt maps the annual mean range of the globe
@@ -2825,31 +2750,6 @@ impl Insolation {
             Accum(i64::from(self.reference).max(1)),
         ));
         annual + season
-    }
-
-    /// Returns the degrees the sun adds, from one sum of the two parts.
-    ///
-    /// **The map is affine and both of its ends come from the geometry.** The
-    /// lowest sum the geometry holds takes the whole swing away, and the
-    /// highest sum it holds adds the whole swing. So the sun term spans
-    /// exactly what the heat scale reserves for it, whatever the geometry, the
-    /// obliquity, the amplitudes or the size of the table are. Nothing here is
-    /// written down against a reading.[^1]
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D5. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-    fn normalise(&self, shape: i32) -> i32 {
-        let span = i64::from(self.reach_top) - i64::from(self.reach_floor);
-        if span <= 0 {
-            return 0;
-        }
-        let lifted = narrow(sim_math::share(
-            Accum(2 * i64::from(SEASON_SWING)),
-            Accum(i64::from(shape) - i64::from(self.reach_floor)),
-            Accum(span),
-        ));
-        (lifted - SEASON_SWING).clamp(-SEASON_SWING, SEASON_SWING)
     }
 
     /// Returns the latitude of one band, in hundredths of a degree.
@@ -3064,38 +2964,6 @@ pub fn asked_warmth(relief: i32, season: i32, cloud: i32, held: i32) -> i32 {
     let ice = (ice_forcing_of(held) / i64::from(WARMTH_FINE)) as i32;
     (season + relief + ice - cloud).clamp(0, HEAT_CEILING)
 }
-
-/// The degrees a cell holds before any of the three terms moves it.
-///
-/// **The base is what the top of the scale leaves for it, and it is not a
-/// figure that anyone chose.** The warmest cell of the world is low ground
-/// under the strongest sun with a clear sky, and it stands at the top of the
-/// scale. So the base is the top of the scale, less the whole ground term,
-/// less the swing the sun reserves. The sun term now reaches that swing at
-/// both ends, because it is normalised against what its two parts can
-/// actually reach together.[^1]
-///
-/// **The base did not move when this was repaired, and that is the point.**
-/// A base that rose would warm a pole as much as it warmed the equator, and
-/// it would flatten the latitude gradient. What was wrong was the shape of
-/// the sun term and the size of the cloud term, and both are now derived.[^2]
-///
-/// A clamp would put a flat region into the temperature field, the pressure
-/// gradient would read the edge of that region as a step, and the wind would
-/// hold a straight line across the map. The build checks that neither end
-/// clamps.
-///
-/// **The scale carries headroom at its cold end.** The cloud term is a
-/// published quantity and not a free lever, and it is smaller than the room
-/// the base leaves under it. So the coldest cell the field can express stands
-/// above the bottom of the scale, and nothing clamps there.
-///
-/// # References
-///
-/// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D5. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-/// [^2]: Findings register, FND-586. `docs/FINDINGS.md`
-const HEAT_BASE: i32 =
-    HEAT_CEILING - (HEAT_FROM_WATER + HEAT_FROM_LOW_GROUND) / GROUND_DIVISOR as i32 - SEASON_SWING;
 
 /// Returns the numerator of the share of the air that falls on one cell.
 ///
@@ -4696,7 +4564,7 @@ impl WindPass<'_> {
             // points toward the hotter neighbours.
             let mut asked_q = 0i64;
             let mut asked_r = 0i64;
-            for direction in 0..NEIGHBOUR_COUNT {
+            for (direction, step) in NEIGHBOURS.iter().enumerate() {
                 let Some(neighbour) = self.cells.neighbour(address, direction) else {
                     continue;
                 };
@@ -4705,8 +4573,8 @@ impl WindPass<'_> {
                 };
                 let there = self.drive(at.0 as usize, neighbour);
                 let pull = i64::from(there - here);
-                asked_q += i64::from(NEIGHBOURS[direction].q) * pull;
-                asked_r += i64::from(NEIGHBOURS[direction].r) * pull;
+                asked_q += i64::from(step.q) * pull;
+                asked_r += i64::from(step.r) * pull;
             }
             let step = cap(
                 Wind {

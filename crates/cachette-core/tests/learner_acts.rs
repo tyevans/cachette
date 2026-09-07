@@ -222,7 +222,7 @@ fn the_no_op_is_always_legal_and_changes_nothing() {
             .legal_actions(FactionId(number))
             .expect("the faction is of this world");
         assert_eq!(answer[0], 1, "the no-op is always legal");
-        assert!(answer.iter().any(|byte| *byte == 1));
+        assert!(answer.contains(&1));
     }
     let hash = world.state_hash();
     assert!(world.act(FactionId(0), 0), "the no-op is taken");

@@ -13026,6 +13026,8 @@ struct Steering<'a> {
     /// and no further**, and a delivery reads the tile. This one resolves
     /// that last cell at the pitch of one tile. It is the same mechanism as
     /// the approach field above, keyed on the faction.[^4]
+    ///
+    /// [^4]: Findings register, FND-315. `docs/FINDINGS.md`
     home_approaches: &'a ApproachField,
     /// One direction for each resource kind plane and each tile of a block
     /// that a gatherer stands in.

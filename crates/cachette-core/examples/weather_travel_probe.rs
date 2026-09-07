@@ -99,9 +99,9 @@ fn main() {
     for tick in 1..=ticks {
         world.step(1).expect("the step runs");
         let field = world.weather();
-        for cell in 0..count {
+        for (cell, ticks) in wet_ticks.iter_mut().enumerate().take(count) {
             if field.cell_is_wet(cell as u32) {
-                wet_ticks[cell] += 1;
+                *ticks += 1;
             }
         }
         if tick % every != 0 {

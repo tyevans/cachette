@@ -354,16 +354,18 @@ fn main() {
             let whole_mm = rain(&all);
             let middle = (band * high / bands + (band + 1) * high / bands) / 2;
             let latitude = i64::from(latitudes.of_row(middle, high)) / i64::from(LATITUDE_FINE);
+            // The ratio is in hundredths, because this crate holds no
+            // floating point number anywhere, probe or engine.[^1]
+            //
+            // [^1]: ADR-0002, simulated and aggregated state holds no floating point number. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+            let ratio = land_mm * 100 / whole_mm.max(1);
             println!(
-                "  {band:4}  {latitude:8}  {:5}  {:5}  {:5}%  {land_mm:8}  {whole_mm:9}  {:14.2}",
+                "  {band:4}  {latitude:8}  {:5}  {:5}  {:5}%  {land_mm:8}  {whole_mm:9}                   {:11}.{:02}",
                 members.len(),
                 dry.len(),
                 dry.len() * 100 / members.len().max(1),
-                if whole_mm > 0 {
-                    land_mm as f64 / whole_mm as f64
-                } else {
-                    0.0
-                }
+                ratio / 100,
+                ratio % 100
             );
         }
     }
@@ -424,8 +426,8 @@ fn main() {
         // The share of each class in this band, in whole percent, in the
         // order of `Group::ALL`. A dominant class hides where a band splits.
         let mut spread = String::new();
-        for at in 0..7 {
-            spread.push_str(&format!("{:>4}", counts[at] * 100 / members.len()));
+        for count in counts {
+            spread.push_str(&format!("{:>4}", count * 100 / members.len()));
         }
         println!(
             "  {band:>4}  {latitude:>8}  {count:>5}  {mean:>7}  {coldest:>9}  {warmest:>9}  \

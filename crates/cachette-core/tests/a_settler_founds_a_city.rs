@@ -27,6 +27,14 @@
 use cachette_core::founding::{SettleError, MINIMUM_FOUNDING_DISTANCE};
 use cachette_core::holding::{Holder, ReachRules};
 use cachette_core::unit_type::{SETTLER, SETTLER_ROW, SOLDIER, SOLDIER_ROW, WORKER};
+
+// **Which unit type may found a city is a property of the shared table, so
+// the check belongs at compile time and not inside one test.** A runtime
+// assertion on two constants passes for every input the test could supply,
+// so it measured nothing and the test read as though it had covered the
+// rule.
+const _: () = assert!(SOLDIER_ROW.settle_group == 0);
+const _: () = assert!(SETTLER_ROW.settle_group > 0);
 use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
 
 /// The extent of the worlds below.
@@ -171,8 +179,6 @@ fn a_unit_whose_settle_column_is_zero_is_refused() {
         .spawn_soldier(place, FactionId(1))
         .expect("the ground admits a unit");
     assert!(field.set_unit_type(soldier, SOLDIER));
-    assert_eq!(SOLDIER_ROW.settle_group, 0);
-    assert!(SETTLER_ROW.settle_group > 0);
     let before = field.settlements().len();
 
     let outcomes = field.settle_set(&[worker, soldier]);

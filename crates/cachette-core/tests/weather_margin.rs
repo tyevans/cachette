@@ -36,7 +36,6 @@ fn config(width: u32, height: u32) -> WorldConfig {
         seed: 0x9e37_79b9_7f4a_7c15,
         faction_count: 2,
         unit_capacity: 64,
-        ..WorldConfig::default()
     }
 }
 
