@@ -68,7 +68,7 @@ import numpy as np
 
 from cachette._core import Batch, World
 
-from .env import EnvConfig, SeatWorld
+from .env import EnvConfig
 from .reward import Reward, Weighting
 
 if TYPE_CHECKING:
@@ -151,7 +151,7 @@ class SeatedGame:
         self._config = config
         self._weighting = weighting
         self._seats = list(seats)
-        self._world: SeatWorld | None = None
+        self._world: World | None = None
         self._rewards: dict[int, Reward] = {}
         self._decisions = 0
         self._done = False
@@ -166,7 +166,7 @@ class SeatedGame:
         """Whether the game has ended."""
         return self._done
 
-    def reset(self, seed: int) -> SeatWorld:
+    def reset(self, seed: int) -> World:
         """Build a world, take every learner seat, and return the world."""
         config = self._config
         world = World(
@@ -191,16 +191,20 @@ class SeatedGame:
         return world
 
     @property
-    def world(self) -> SeatWorld:
+    def world(self) -> World:
         """The world of the game.
 
         **A caller that reads this holds the whole truth of the world.** The
         game itself calls only the readers that answer for one faction. This
         exists so a batch can hold the world, and for a test.
+
+        A batch steps a world and a reward reads one, and neither takes the
+        narrower door that one faction sees through. The game builds its own
+        world and never adopts one, so it holds the world itself.
         """
         return self._require()
 
-    def _require(self) -> SeatWorld:
+    def _require(self) -> World:
         """Return the world of the game, or refuse."""
         if self._world is None:
             message = "the game has no world. Call reset first."

@@ -135,10 +135,16 @@ def test_each_seat_reads_its_own_observation() -> None:
 class WatchedWorld:
     """A world that refuses any reader outside the faction-scoped set."""
 
+    # The class declares both attributes, so a reader of ``seen`` gets the
+    # set rather than whatever the fallback reader would give back. Only a
+    # name that normal lookup misses reaches that reader.
+    _world: World
+    seen: set[str]
+
     def __init__(self, world: World) -> None:
         """Wrap one world."""
-        object.__setattr__(self, "_world", world)
-        object.__setattr__(self, "seen", set())
+        self._world = world
+        self.seen = set()
 
     def __getattr__(self, name: str) -> object:
         """Return the attribute, or refuse when it is not allowed."""
@@ -161,7 +167,7 @@ def test_a_seated_game_reads_no_unfogged_reader() -> None:
     seed = viable_seeds(WORLD, 1, 900)[0]
     game = SeatedGame(WORLD, WEIGHTING, seats=[0, 1])
     real = game.reset(seed)
-    watched = WatchedWorld(real)  # type: ignore[arg-type]
+    watched = WatchedWorld(real)
     object.__setattr__(game, "_world", watched)
 
     for _ in range(4):

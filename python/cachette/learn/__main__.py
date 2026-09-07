@@ -302,7 +302,7 @@ def main() -> int:
             validation=validation,
             validate_every=arguments.validate_every,
         )
-        trained, _ = load_policy(Path(str(result["weights"])))
+        trained, _ = load_policy(Path(result["weights"]))
         untrained = no_op(kind)
         measured = {
             "trained": evaluate(
