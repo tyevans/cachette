@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-591**
+**Next number: FND-594**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -11136,6 +11136,102 @@ no controller and fails in every world that has one.
 sites and no check that fails when they disagree. The comment states the rule
 the code does not keep, which is worse than no comment.[^F590A]
 
+### FND-591 — A field over stock must state a fact about the ground, not about the order a unit holds now
+
+**Believed.** A field that steers a unit to stock is keyed on the resource
+kind, so the seed set takes the kind from the gather order of each unit. A
+block seeds only the kind that the units standing in it were told to gather,
+which is the cheapest set that answers the question.
+
+**True.** That set is stale before any unit reads it. The engine derives the
+field at the barrier of one step, and two passes write the gather order after
+that barrier. The controller of a faction writes the order of every unit of
+that faction at the last stage of the step.[^F591A] A unit therefore reads the
+field on the plane of an order that the field was not seeded for, finds no
+entry, and takes the coarse answer it took before the field existed.
+
+**Evidence.** The first build keyed the seed set that way. Measured in the
+demonstration world, 256 by 256, four factions, seed 0x0123456789abcdef, 300
+ticks, two threads, on ty001-ubuntu (x86-64): the food ever taken rose from 83
+to 136 of 53694, which is the rise that the frames between two order writes
+give. A build that seeds every kind in each occupied block reached 160 in the
+same run, and the field then answers on every plane a unit can read.
+
+**What follows.** A derived field that a later pass can invalidate is a stale
+read that nothing fails on.[^F591B] Seed such a field from the state that no
+later pass writes. Here that state is the ground: a block seeds every resource
+kind it holds, and the order of a unit only selects which plane the unit reads.
+The field then holds no fact that any pass of the step can contradict.
+
+**The cheap set is still the block set.** The seeds follow the blocks that hold
+a unit, and a block that holds none seeds nothing, so the derivation follows
+the population and never the tile count.[^F591C]
+
+### FND-592 — The relaxation reach of an approach field follows what the frame needs, not the block edge
+
+**Believed.** An approach field relaxes over twice the block edge, so its reach
+covers a whole block by a straight route and admits a detour of the same
+length. That count is a property of the instrument.
+
+**True.** It is a property of the question. A destination plane must lead a
+sent unit from anywhere in a block to one named tile, so its reach must cover
+the block. A field over stock must not: a block holds many stocked tiles, the
+engine derives the field again at every frame, and a unit takes one step in a
+frame. A reach beyond the step the unit takes now is derived again before the
+unit walks it.
+
+**Evidence.** Measured in the demonstration world named in the finding above.
+At the block reach the food ever taken reached 131, and one step cost 25.5
+milliseconds more than a step with no field at all. At a reach of two the food
+ever taken reached 160, which is more, and the step cost 6.6 milliseconds more
+than a step with no field. **Part of that 6.6 is not the field.** A population
+that walks moves more units and gathers more often, so the step does more of
+its own work, and the two runs are not the same simulation. A unit whose stock
+lies further reads no offset and takes the direction of its level 1 cell, which
+is the answer every unit read before the field existed.
+
+**A second measurement came out of the same work.** The derivation asked the
+terrain for the ground of one block once for each plane of that block. The
+terrain is generated and never stored, so each question costs a noise
+evaluation.[^F299A] The ground of a block depends on the block and on the
+water crossing of the plane, and never on the plane itself. A walk in block
+order that holds the ground while the block repeats cut the whole demonstration
+step from 34.9 to 30.0 milliseconds, before the new field was added at all.
+
+**What follows.** State the reach a field needs beside the field, not beside
+the instrument. The two figures above are derived on a development machine and
+not on the target platform, and the blocker that says which cost figures are
+measured stays open.[^28]
+
+### FND-593 — Two tests held that a store fills from production alone, and a unit that reaches food makes both false
+
+**Believed.** A site store fills from the production rate of the site and from
+nothing else. A conservation test over the store therefore names four terms:
+what production put in, what upkeep spent, what the cohorts drew, and what a
+birth cost. A starvation test therefore holds that a group whose site has no
+production rate loses every person.
+
+**True.** A fifth thing fills a store, and it always could. A unit that gathers
+from the ground and walks home moves its load into the store of its home site.
+Neither test was wrong when it was written, because no unit ever reached ground
+that carried the kind it was ordered to gather.[^F593A] Both went false on the
+frame that one did.
+
+**Evidence.** Both tests pass on the parent commit and fail on the commit that
+lets a gatherer reach stock. The conservation test misses by three whole loads,
+which is what the delivery ledger reports for the same run. The starvation test
+finds 30 of 120 seated people alive where it asserted none.
+
+**What follows.** A test that lists the terms of a balance states a count, and
+a count decays.[^F483G] Read a listed balance as a claim about what the engine
+can do, not as arithmetic. When a capability that was inert starts working, the
+tests that passed because it was inert are the ones to look at first.[^F498G]
+
+**The starvation test now claims the negation of the test it defends**, and no
+more. The test above it asserts that every seated person lives. This one takes
+the rate away and asserts that they do not. A survivor count would be the same
+decaying figure again.
+
 ## References
 
 [^F443A]: Review of backlog item 0390, section 5. `docs/reviews/0390-the-fallen-log.md`
@@ -11145,6 +11241,10 @@ the code does not keep, which is worse than no comment.[^F590A]
 [^F470B]: PRD-0016, somebody is in charge. `docs/product/accepted/prd-0016-somebody-is-in-charge.md`
 [^F589A]: Findings register, FND-576, the release of a sent unit that arrives, in this document.
 [^F590A]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+[^F591A]: Findings register, FND-590, in this document.
+[^F593A]: Findings register, FND-589, in this document.
+[^F591B]: Findings register, FND-029, in this document.
+[^F591C]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
 [^F470D]: Findings register, FND-360, in this document.
 [^F471A]: Backlog item 0461, tell a caller which arena an identity belongs to. `docs/backlog/proposed/0461-tell-a-caller-which-arena-an-identity-belongs-to.md`
 [^F471B]: Decisions register, DEC-265. `docs/DECISIONS.md`

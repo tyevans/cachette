@@ -76,7 +76,7 @@ use crate::production::{
 };
 use crate::promotion::{self, PromotionError, UnitPromoted};
 use crate::pyramid::{
-    ApproachField, CellSummary, ExitField, Pyramid, ReturnField, SeededField, AT_SEED,
+    ApproachField, CellSummary, ExitField, Pyramid, ReturnField, SeededField, AT_SEED, STOCK_PASSES,
 };
 use crate::rates::{RateError, RateLedger, RateSchedule, RateTable, SiteShortfall};
 use crate::relation::{RelationCrossed, RelationError, RelationMatrix, RelationRules};
@@ -859,6 +859,29 @@ pub struct World {
     /// [^1]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
     /// [^2]: Findings register, FND-315. `docs/FINDINGS.md`
     home_approaches: ApproachField,
+    /// The direction of the nearest tile that holds stock, for each tile of a
+    /// seeded block and each resource kind.
+    ///
+    /// **The exit field answers at the pitch of a level 1 cell, and the stock
+    /// of a tile is a level 0 property.** A unit that stands on barren ground
+    /// inside the cell with the most food reads that its own cell is the best
+    /// one, and nothing tells it to step two tiles sideways. It then strips
+    /// the ground it stands on and stands there.[^1]
+    ///
+    /// This field resolves the cell at the pitch of one tile. It is the same
+    /// mechanism the home approach above uses, keyed on the resource kind
+    /// instead of the faction.[^2]
+    ///
+    /// **The engine seeds it only over the blocks that a gatherer stands
+    /// in.** The set of gatherers is the whole set the field serves, so the
+    /// derivation follows that set and never the world.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-589. `docs/FINDINGS.md`
+    /// [^2]: Findings register, FND-315. `docs/FINDINGS.md`
+    /// [^3]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    stock_approaches: ApproachField,
     /// The direction of the nearest tile of a named destination, for each
     /// level 1 cell and each destination plane.
     ///
@@ -1755,6 +1778,7 @@ impl World {
             exits: ExitField::new(cell_lattice),
             returns: ReturnField::new(cell_lattice, config.faction_count),
             home_approaches: ApproachField::new(layout),
+            stock_approaches: ApproachField::new(layout),
             destinations: SeededField::new(cell_lattice, config.destination_plane_count()),
             approaches: ApproachField::new(layout),
             destination_seeds: vec![Vec::new(); config.destination_plane_count() as usize],
@@ -6199,6 +6223,7 @@ impl World {
                     exits: &self.exits,
                     approaches: &self.approaches,
                     home_approaches: &self.home_approaches,
+                    stock_approaches: &self.stock_approaches,
                     site_tiles: self.settlements.tile_column(),
                     returns: &self.returns,
                     destinations: &self.destinations,
@@ -8244,6 +8269,26 @@ impl World {
     ///
     /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
     /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// Returns the direction of the nearest tile that holds stock of one
+    /// kind, from one address.
+    ///
+    /// The answer is the seed offset when the address itself holds stock, a
+    /// direction when the block that holds the address holds stock
+    /// elsewhere, and nothing when the block holds none. A unit that reads
+    /// nothing takes the direction of its level 1 cell instead.[^1]
+    ///
+    /// The engine seeds the field only over the blocks that hold a unit, so
+    /// this reports nothing for an empty quarter of the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-589. `docs/FINDINGS.md`
+    #[must_use]
+    pub fn stock_direction(&self, address: Axial, kind: ResourceKind) -> Option<u8> {
+        let tile = self.grid.index_of(address)?;
+        self.stock_approaches.offset(u16::from(kind.to_u8()), tile)
+    }
+
     #[must_use]
     pub fn exit_direction(&self, address: Axial, option: u8) -> Option<Option<u8>> {
         let tile = self.grid.index_of(address)?;
@@ -8383,8 +8428,97 @@ impl World {
         )?;
         self.exits.derive(&self.pyramid);
         self.derive_return_fields();
+        self.derive_stock_field();
         self.derive_destination_fields();
         Ok(())
+    }
+
+    /// Derives the fine field that steers a gatherer to stock.
+    ///
+    /// **This is the one place that derives it.** The field comes from the
+    /// gather orders and the ground, and a path that rebuilt level 1 without
+    /// it would leave a stale value that nothing fails on.[^1]
+    ///
+    /// **No stock plane conducts across water**, so every plane takes the
+    /// land crossing. The empty slice is how the approach field states
+    /// that.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-029. `docs/FINDINGS.md`
+    /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    fn derive_stock_field(&mut self) {
+        let seeds = self.stock_seed_tiles();
+        self.stock_approaches
+            .derive_within(self.terrain, &seeds, &[], STOCK_PASSES);
+    }
+
+    /// Returns one seed for each tile that holds stock, in a block that a
+    /// unit stands in, as a resource kind plane and the tile.
+    ///
+    /// **The seed set follows the units, not the world.** A block that holds
+    /// no unit seeds nothing, so the derivation costs an empty quarter of the
+    /// world nothing at all. This is the cheaper algorithm that a set-valued
+    /// question permits, and the set is the whole population.[^1]
+    ///
+    /// **Each occupied block seeds every kind, and the set reads no order
+    /// column.** The field then states a fact about the ground alone: from
+    /// this tile, this is the way to the nearest food, wood or stone inside
+    /// the block. A set keyed on the order a unit holds now would go stale
+    /// the moment anything wrote that column, and two passes of one step
+    /// write it.[^2]
+    ///
+    /// A block that holds no stock of a kind seeds that kind nowhere, so the
+    /// derivation builds no entry for it and the unit there reads the coarse
+    /// field.
+    ///
+    /// The walk is over the arena in ascending identity order, and then over
+    /// the tiles of each occupied block in ascending offset. It runs on the
+    /// calling thread and it names no thread count.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    /// [^2]: Findings register, FND-590. `docs/FINDINGS.md`
+    /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn stock_seed_tiles(&self) -> Vec<(u16, TileIdx)> {
+        let layout = self.pyramid.layout();
+        let mut occupied: Vec<u32> = Vec::new();
+        for unit in self.soldiers.iter() {
+            let Some(tile) = self.soldiers.tile(unit) else {
+                continue;
+            };
+            let Some(key) = layout.key_of(tile) else {
+                continue;
+            };
+            occupied.push(layout.block_of_key(key));
+        }
+        occupied.sort_unstable();
+        occupied.dedup();
+        let edge = layout.block_edge();
+        let mut seeds: Vec<(u16, TileIdx)> = Vec::new();
+        for kind in ResourceKind::ALL {
+            let plane = u16::from(kind.to_u8());
+            for block in &occupied {
+                let first_column = (block % layout.blocks_wide()) * edge;
+                let first_row = (block / layout.blocks_wide()) * edge;
+                for row in first_row..first_row + edge {
+                    for column in first_column..first_column + edge {
+                        let address = Axial::new(column as i32, row as i32);
+                        let Some(tile) = self.grid.index_of(address) else {
+                            continue;
+                        };
+                        if self
+                            .tile_stock(address, kind)
+                            .is_some_and(|amount| amount.0 > 0)
+                        {
+                            seeds.push((plane, tile));
+                        }
+                    }
+                }
+            }
+        }
+        seeds
     }
 
     /// Derives the coarse and the fine field that steer a unit home.
@@ -12581,6 +12715,17 @@ struct Steering<'a> {
     /// that last cell at the pitch of one tile. It is the same mechanism as
     /// the approach field above, keyed on the faction.[^4]
     home_approaches: &'a ApproachField,
+    /// One direction for each resource kind plane and each tile of a block
+    /// that a gatherer stands in.
+    ///
+    /// **The exit field steers a unit to the cell that holds the most stock
+    /// and no further**, and a gather resolve reads the tile. A unit that
+    /// reached the cell stood on barren ground and took nothing, which is the
+    /// defect the sent unit and the carrier both had.[^6] [^7]
+    ///
+    /// [^6]: Findings register, FND-315. `docs/FINDINGS.md`
+    /// [^7]: Findings register, FND-589. `docs/FINDINGS.md`
+    stock_approaches: &'a ApproachField,
     /// The tile of every settlement slot.
     ///
     /// **A unit stops on the tile of its own home and on no other.** The
@@ -12694,6 +12839,7 @@ fn soldier_moves(
         destinations,
         approaches,
         home_approaches,
+        stock_approaches,
         site_tiles,
     } = *steering;
     // **The walk is in cell order, not in slot order.** The two hold the same
@@ -12895,6 +13041,45 @@ fn soldier_moves(
                                 return None;
                             }
                         }
+                        // **The gathering leg reads the same mechanism, keyed
+                        // on the resource kind the unit was ordered to
+                        // gather.** The exit field holds one direction for a
+                        // block of tiles, and the stock of a tile is a level 0
+                        // property. A unit inside the cell with the most food
+                        // read that its own cell was the best one, stripped
+                        // the ground under it, and stood there while the world
+                        // still held food two tiles away.[^27]
+                        //
+                        // The plane is the order column, because the gather
+                        // resolve reads that column. A field keyed on the
+                        // option row instead would walk a unit to food and let
+                        // it take stone.[^28]
+                        //
+                        // A unit that a caller sent somewhere reads its
+                        // destination plane instead, and a laden unit reads
+                        // the home field above, so this answers only for a
+                        // unit that is steering itself by the ground.
+                        //
+                        // [^27]: Findings register, FND-589. `docs/FINDINGS.md`
+                        // [^28]: Findings register, FND-590. `docs/FINDINGS.md`
+                        let toward_stock = match (sent, option) {
+                            (None, Some(option))
+                                if matches!(OPTIONS[option as usize].ranked, Ranked::Cell(_)) =>
+                            {
+                                soldiers.gather_order(*soldier).flatten().and_then(|kind| {
+                                    stock_approaches
+                                        .offset(u16::from(kind.to_u8()), soldiers.tile(*soldier)?)
+                                })
+                            }
+                            _ => None,
+                        };
+                        // **A unit that stands on stock of the kind it wants
+                        // takes no step.** The seed offset is how the field
+                        // says so. A unit that stepped away would strip one
+                        // tile of one unit each frame and walk on.
+                        if toward_stock == Some(AT_SEED) {
+                            return None;
+                        }
                         let steer = match (steered, option) {
                             // **The destination plane wins over the option
                             // row.** A caller that sends a unit somewhere has
@@ -12904,7 +13089,19 @@ fn soldier_moves(
                             // fine field wins over the coarse one there.[^25]
                             (Some(direction), _) => Some(Some(direction)),
                             (None, Some(option)) => match OPTIONS[option as usize].ranked {
-                                Ranked::Cell(_) => exits.exit(cell, option),
+                                // **The fine field wins over the coarse
+                                // one**, in the way it does for a sent unit
+                                // and for a laden one. A unit whose block
+                                // holds no stock of its kind reads no fine
+                                // entry and takes the coarse answer, which is
+                                // the answer it read before this field
+                                // existed. The seed offset never reaches
+                                // here, because a unit that stands on stock
+                                // already left the walk.[^27]
+                                Ranked::Cell(_) => match toward_stock {
+                                    Some(direction) => Some(Some(direction)),
+                                    None => exits.exit(cell, option),
+                                },
                                 // **The fine field wins over the coarse
                                 // one**, in the way it does for a sent unit.
                                 // A unit outside every seeded block reads no

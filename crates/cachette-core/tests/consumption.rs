@@ -306,11 +306,20 @@ fn the_store_falls_by_exactly_what_the_cohorts_received() {
     // to make a person, and neither the rate ledger nor the draw ledger holds
     // that. A statement that left it out would fail the moment a site grew.
     let born = world.growth_ledger()[0].0;
+    // Delivery is a fifth term. A unit that gathers from the ground and walks
+    // home puts its load into the store, and no ledger above holds that. The
+    // statement held four terms while no unit ever reached ground that carried
+    // what it was ordered to gather, and it went false on the frame that one
+    // did.[^1] The delivery counts whole loads, and the store holds a
+    // fixed-point quantity, so the term is the count raised to that scale.
+    //
+    // [^1]: Findings register, FND-593. `docs/FINDINGS.md`
+    let delivered = (world.delivered_carry()[0] as i64) << 16;
     assert!(taken > 0, "the fixture must reach a draw");
     assert!(born > 0, "the fixture must reach a birth");
     assert_eq!(
         closing.0 - opening.0,
-        produced - spent - taken - born,
+        produced - spent - taken - born + delivered,
         "the world must balance to zero"
     );
     assert!(

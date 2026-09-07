@@ -25,11 +25,38 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-153**
+**Next number: BLK-154**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
 ## Open
+
+### BLK-153 — Nobody has said whether a unit sent to a project may feed itself on the way
+
+**Owner:** the project owner. **Blocks:** the throughput of the economy. It
+does not block any named item.
+
+A destination wins over the option a unit scored for itself. A unit that a
+caller sent somewhere reads its destination plane, and it reads no field that
+its own option would have read. That rule is correct for a caller who said
+where a unit goes.
+
+The faction controller sends the idle units of a faction to the projects its
+plan zones, through the same verb.[^BLK153A] Measured in the demonstration
+world, 256 by 256, four factions, seed 0x0123456789abcdef, 300 ticks, on
+ty001-ubuntu (x86-64): 131 of 174 live units hold a destination at tick 300.
+Those units hold a gather order every tick, and they never read the field that
+would carry them to the ground that holds it.[^BLK153B]
+
+The question is what a sent unit does when it is also told to gather. Three
+answers are open. It ignores the order until it arrives. It gathers from the
+tile it stands on and never steps aside for stock. It steers to stock while it
+is more than some distance from its destination.
+
+The third answer needs a distance, and the register that holds a distance is
+the balance register. The first two need no figure. Nothing should invent one
+of the three, because the answer decides how much of the population the
+economy ever reaches.
 
 ### BLK-122 — Nobody has said what belief costs a god
 
@@ -796,6 +823,8 @@ normally.
 [^BLK120A]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D1. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
 [^BLK121A]: ADR-0126, a trade negotiation is engine state, and the words are not, decision D5. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
 
+[^BLK153A]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+[^BLK153B]: Findings register, FND-589. `docs/FINDINGS.md`
 [^BLK122A]: ADR-0133, a unit converts to the faction that leads the influence field at its cell, decisions D1 and D4. `docs/adrs/draft/adr-0133-a-unit-converts-to-the-faction-that-leads-the-field.md`
 [^BLK123A]: ADR-0132, conversion changes the faction of a unit and adds no second allegiance, decision D2. `docs/adrs/draft/adr-0132-conversion-changes-the-faction-of-a-unit.md`
 [^BLK130A]: ADR-0142, a god inflicts weather only on ground its own faction holds, decisions D2 and D4. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
