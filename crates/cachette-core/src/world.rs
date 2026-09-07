@@ -111,7 +111,8 @@ use crate::upgrade::{
     UpgradeTableError,
 };
 use crate::weather::{
-    ground_over_lattice, CellGround, Ground, Storm, WeatherError, WeatherField, WeatherScale, Wind,
+    ground_over_lattice, CellGround, Ground, Latitudes, Storm, WeatherError, WeatherField,
+    WeatherScale, Wind,
 };
 
 /// The reason that a value did not name a live entity.
@@ -1586,6 +1587,36 @@ impl World {
         weather_scale: WeatherScale,
         weather_margin: u32,
     ) -> Result<Self, WorldError> {
+        Self::with_weather_latitudes(config, weather_scale, weather_margin, Latitudes::DEFAULT)
+    }
+
+    /// Builds a world at a stated weather resolution, margin and latitude
+    /// span.
+    ///
+    /// **The span says what the row axis of the world means.** A span from
+    /// pole to pole makes the world a planet: it has poles, a banded
+    /// circulation, subtropical deserts and an equatorial rain belt. A narrow
+    /// span makes the world one region of a planet, and the latitude term
+    /// then goes flat and the climate comes from the ground and the sea
+    /// alone.[^1]
+    ///
+    /// A world that states no span is a planet.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the configured extent does not describe a grid,
+    /// when the scale does not describe a lattice over that extent, and when
+    /// the margin makes the lattice too large to index.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    pub fn with_weather_latitudes(
+        config: WorldConfig,
+        weather_scale: WeatherScale,
+        weather_margin: u32,
+        latitudes: Latitudes,
+    ) -> Result<Self, WorldError> {
         if config.faction_count > FACTION_CEILING {
             return Err(WorldError::FactionCountAboveCeiling(config.faction_count));
         }
@@ -1666,7 +1697,12 @@ impl World {
             variety: VarietyLevel::derive(layout, &LuxuryField::new()),
             luxuries_seeded: false,
             influence: InfluenceField::new(cell_lattice, config.faction_count)?,
-            weather: WeatherField::new(weather_lattice, weather_scale, config.faction_count)?,
+            weather: WeatherField::with_latitudes(
+                weather_lattice,
+                weather_scale,
+                latitudes,
+                config.faction_count,
+            )?,
             weather_layout,
             weather_lattice,
             weather_ground: ground_over_lattice(weather_lattice, weather_layout, terrain),
@@ -6200,6 +6236,28 @@ impl World {
     pub fn air_at(&self, address: Axial) -> Option<i64> {
         let tile = self.grid.index_of(address)?;
         Some(self.weather.air_at(self.weather_cell_of(tile)?).0)
+    }
+
+    /// Returns the share of the sky over one tile that a watcher sees as
+    /// cloud.
+    ///
+    /// **Cloud is the air held against what the air of that cell can hold**,
+    /// and not the air held against a mark that every cell shares. The
+    /// published saturation curve puts the capacity of a tropical cell about
+    /// thirty times above the capacity of a polar one, so a ramp against one
+    /// mark paints a cold sky black. Every reader that paints cloud takes
+    /// this one, so the rule has one declaration site.[^1]
+    ///
+    /// The share runs from none to a whole sky. Returns `None` when the
+    /// address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn cloud_share_at(&self, address: Axial) -> Option<i64> {
+        let tile = self.grid.index_of(address)?;
+        Some(self.weather.cloud_share_at(self.weather_cell_of(tile)?))
     }
 
     /// Returns the water on the ground of the cell that covers one tile.

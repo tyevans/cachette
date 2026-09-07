@@ -363,3 +363,74 @@ pub const fn sine(phase: i64, period: i64) -> Option<Fix32> {
     let high = sine_at_step(step + 1) as i64;
     Some(Fix32(saturate_i32(low + (high - low) * part / fine)))
 }
+
+/// Returns the angle whose cosine is the value, as a phase in table steps.
+///
+/// The answer is a position in a turn of [`SINE_STEPS`] steps, held in the
+/// same fixed-point form as every other value here. So an answer of zero is
+/// a cosine of one, and an answer of half a turn is a cosine of minus one.
+/// The answer never leaves the first half turn, which is the range over
+/// which the cosine falls once and takes each value once.
+///
+/// **The answer comes from the same table the sine reads.** The cosine of a
+/// step is the sine of that step a quarter turn later, and that quarter turn
+/// of the table falls from one to minus one over the half turn. So a search
+/// over the table inverts the cosine without a second table and without a
+/// polynomial, and the same value gives the same answer on every target.[^1]
+///
+/// A value outside the range from minus one to one saturates at the end of
+/// the range it passes.
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decisions D1 and D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[must_use]
+pub const fn arc_cosine_steps(value: Fix32) -> i64 {
+    let one = 1i64 << FIX_FRACTIONAL_BITS;
+    let target = value.0 as i64;
+    if target >= one {
+        return 0;
+    }
+    let half = 2 * SINE_QUARTER;
+    if target <= -one {
+        return half << FIX_FRACTIONAL_BITS;
+    }
+    // The cosine of a whole step, read as the sine a quarter turn later. It
+    // falls over the half turn, so a bisection brackets the answer between
+    // two neighbouring steps.
+    let mut low = 0i64;
+    let mut high = half;
+    while high - low > 1 {
+        let middle = (low + high) / 2;
+        if (sine_at_step(middle + SINE_QUARTER) as i64) > target {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    let above = sine_at_step(low + SINE_QUARTER) as i64;
+    let below = sine_at_step(high + SINE_QUARTER) as i64;
+    if above == below {
+        return low << FIX_FRACTIONAL_BITS;
+    }
+    // The part of the way from the step above the target to the step below
+    // it. Both ends come from the table, so the interpolation is the same
+    // one the sine itself uses.
+    let part = ((above - target) << FIX_FRACTIONAL_BITS) / (above - below);
+    (low << FIX_FRACTIONAL_BITS) + part
+}
+
+/// Returns the sine of a phase held in table steps.
+///
+/// The phase is a position in a turn of [`SINE_STEPS`] steps, in the same
+/// fixed-point form that [`arc_cosine_steps`] returns. So the two are
+/// inverses of one another, up to the accuracy of the table.
+#[must_use]
+pub const fn sine_of_steps(phase: i64) -> Fix32 {
+    let fine = 1i64 << FIX_FRACTIONAL_BITS;
+    let step = phase >> FIX_FRACTIONAL_BITS;
+    let part = phase - (step << FIX_FRACTIONAL_BITS);
+    let low = sine_at_step(step) as i64;
+    let high = sine_at_step(step + 1) as i64;
+    Fix32(saturate_i32(low + (high - low) * part / fine))
+}

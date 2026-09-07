@@ -158,12 +158,15 @@ const AIR_COLOUR: u32 = 0x00d8_e8f8;
 
 /// The drops of water in the air at which the overlay stops deepening.
 ///
-/// **This is the engine's own ceiling of the air, read and not restated.**
-/// The engine rains out whatever stands above the mark, so the mark is the
-/// most the plane ever holds and a shade that saturated anywhere else would
-/// either clip the wettest cells together or never reach full shade at all.
-/// A second number here would be a second declaration of one value, and
-/// nothing would fail when the two disagreed.[^1] [^2]
+/// **This is the engine's own whole sky, read and not restated.** The engine
+/// reports the air of a cell against what the air of that cell can hold, so a
+/// cold sky and a warm sky both reach a whole sky at their own mark. A ramp
+/// against the ceiling of the plane instead would draw almost nothing, because
+/// the published saturation curve puts the capacity of the hottest cell about
+/// thirty times above the capacity of a temperate one, and the engine pours out
+/// whatever stands above the capacity of a cell within the same step.[^3] A
+/// second number here would be a second declaration of one value, and nothing
+/// would fail when the two disagreed.[^1] [^2]
 ///
 /// The viewer still only reads. Nothing here writes back into the engine.[^2]
 ///
@@ -171,7 +174,8 @@ const AIR_COLOUR: u32 = 0x00d8_e8f8;
 ///
 /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 /// [^2]: ADR-0067, the viewer reads the world and never writes to it, decision D2. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-const AIR_AT_FULL_SHADE: i64 = cachette_core::weather::AIR_SATURATION.0;
+/// [^3]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+const AIR_AT_FULL_SHADE: i64 = cachette_core::weather::CLOUD_SHARE_WHOLE;
 
 /// How much of the air colour covers a tile at the full shade.
 const AIR_WEIGHT_CEILING: i64 = 150;
@@ -201,14 +205,23 @@ const AIR_LEAST_TILE: f32 = 8.0;
 
 /// The smallest weight at which the viewer draws the air overlay.
 ///
-/// The air over a cell at rest gives a weight of a few parts in 255. A cell
-/// at rest that still tinted its tiles put an edge on the cell lattice that
-/// followed nothing in the world.[^1]
+/// A cell at rest that still tinted its tiles put an edge on the cell lattice
+/// that followed nothing in the world.[^1]
+///
+/// **The floor rose with the quantity the overlay reads.** It once read the
+/// drops over a cell against the ceiling of the whole plane, and a cell at
+/// rest then gave a few parts in 255. It now reads the share of the sky that
+/// a watcher sees as cloud, because the engine pours out whatever stands above
+/// the capacity of a cell and that capacity follows the temperature.[^2] An
+/// ordinary sky stands between a fifth and nine tenths of its own mark, so a
+/// floor of a few parts drew every cell of the map. The floor now marks a sky
+/// at half its own mark or more.
 ///
 /// # References
 ///
 /// [^1]: Research report 24, defect 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
-const AIR_LEAST_WEIGHT: u8 = 8;
+/// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+const AIR_LEAST_WEIGHT: u8 = (AIR_WEIGHT_CEILING / 2) as u8;
 
 /// The stride the luxury hue turns by, for each step of the kind ordinal.
 ///
@@ -515,6 +528,20 @@ pub const fn unit_rim_colour() -> u32 {
 #[must_use]
 pub const fn air_least_weight() -> u8 {
     AIR_LEAST_WEIGHT
+}
+
+/// Returns the smallest tile width at which the viewer draws the air overlay,
+/// in pixels.
+///
+/// A test reads this rather than a literal, so the width has one declaration
+/// site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[must_use]
+pub const fn air_least_tile() -> f32 {
+    AIR_LEAST_TILE
 }
 
 /// Returns the colour the viewer mixes over a tile for the water in the air.
@@ -2097,7 +2124,7 @@ pub fn draw_paced(
                     ground_colour = mix(ground_colour, layer.colour(value), strength);
                 }
             } else if !dry && camera.tile_width >= AIR_LEAST_TILE {
-                let weight = air_weight(world.air_at(address).unwrap_or(0));
+                let weight = air_weight(world.cloud_share_at(address).unwrap_or(0));
                 if weight >= AIR_LEAST_WEIGHT {
                     ground_colour = mix(ground_colour, AIR_COLOUR, weight);
                 }
@@ -2362,10 +2389,11 @@ fn upgrade_weight(site: UpgradeSite, asked: i64) -> u8 {
     u8::try_from(weight.clamp(0, 255)).unwrap_or(u8::MAX)
 }
 
-/// Returns how much of the air colour covers a tile, from the drops over it.
+/// Returns how much of the air colour covers a tile, from the share of the sky
+/// over it that a watcher sees as cloud.
 ///
-/// The shade saturates at the drops the viewer chose, so a storm above that
-/// draws the same as a storm at it.
+/// The shade saturates at a whole sky, so a sky at its own mark draws the same
+/// wherever it stands.
 ///
 /// A test reads this rather than repeating the arithmetic, so the weight has
 /// one declaration site.[^1]
@@ -2374,8 +2402,8 @@ fn upgrade_weight(site: UpgradeSite, asked: i64) -> u8 {
 ///
 /// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 #[must_use]
-pub fn air_weight(drops: i64) -> u8 {
-    let held = drops.clamp(0, AIR_AT_FULL_SHADE);
+pub fn air_weight(share: i64) -> u8 {
+    let held = share.clamp(0, AIR_AT_FULL_SHADE);
     u8::try_from(held * AIR_WEIGHT_CEILING / AIR_AT_FULL_SHADE).unwrap_or(u8::MAX)
 }
 

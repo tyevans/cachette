@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-578**
+**Next number: FND-579**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -873,6 +873,45 @@ switch moves two things, it names neither.
 **Measure a claim about a band with an instrument that reads that band.** The
 probe and the test shared the defect, so the probe could not have caught it.
 Repair the instrument before you trust what it says about the subject.
+
+
+### FND-578 — The cloud over a polar interior came from a capacity floor of two drops, and not from water that reached it
+
+**Believed.** An earlier repair made the capacity of the air fall with the
+temperature, and an acceptance test then found cloud over the polar land of a
+landlocked world. The reading was that water now reaches a high latitude and
+stands there as cloud, and that the poles are no longer structurally
+cloudless.[^F570A]
+
+**True.** The cloud a watcher saw was a ratio with a floor of two drops under
+it. Cloud is the air of a cell against what the air of that cell can hold, and
+the earlier curve gave the coldest cell a capacity of two drops. One drop
+standing over a polar cell therefore painted half a sky. The published
+saturation curve gives the same cell about fifty drops, and the same water then
+covers a fiftieth of the sky.[^F570B]
+
+**Evidence.** The published curve was fitted at eight temperatures the report
+states, and it matches every one of them. On the landlocked fixture the polar
+land then held a mean of 4 parts of a sky in 255 against a bar of 16, and the
+air plane held nothing at all over the first band of rows. On a world whose
+polar rows hold open sea, the same code held 114 parts over all cells and 46
+over the inland cells. So the water supply decided the answer, and the curve
+did not. The commit body holds both probe tables and the commands.
+
+**Follows.** Three things.
+
+**A ratio with a small denominator is not a measurement of the numerator.** The
+test read a share and took it for a quantity. A share against a floor says
+almost nothing about how much water arrived.
+
+**A polar continental interior is a desert, and that is the published
+behaviour.** The air of a cold cell holds very little, so the poleward
+transport rains out most of what it carries. The driest place on the Earth is
+the interior of a polar continent.
+
+**A fixture must supply the input the assertion needs.** A test that asks
+whether a model destroys the water reaching a pole must give the pole water.
+The landlocked fixture supplied none, so it measured the fixture.[^F487C]
 
 
 ## C. Defects found in specified rules
@@ -14278,6 +14317,8 @@ way.[^F572E]
 [^F561A]: Findings register, FND-543 and FND-550. `docs/FINDINGS.md`
 [^F561B]: ADR-0173, the wealth or wonder path has no reader. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
 [^F562A]: Recurring defect shapes, shape 5. `.agents/rules/recurring-defects.md`
+[^F570A]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D2. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
+[^F570B]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
 
 [^F546A]: The founding survey and the eligibility of a candidate. `crates/cachette-core/src/founding.rs`
 [^F546C]: Balance register, the founding group. `docs/reference/balance.md`

@@ -49,30 +49,42 @@ fn hash_after(world: &mut World, frames: u32) -> u64 {
 
 /// The hash of a world at margin zero, after the stated frames.
 ///
-/// **The value comes from a run of the engine before the margin existed.** It
-/// was taken at the commit this branch left, with the same extent, the same
-/// seed and the same frame count, and with the constructor that took no
-/// margin. The commit body holds the command that produced it.
+/// **The value no longer comes from the engine that had no margin, and it
+/// cannot.** It was taken from a run of that engine, at the commit this branch
+/// left, with the same extent, the same seed and the same frame count. The
+/// weather model has since changed: the row axis of a world became a latitude,
+/// the sun term became the published insolation geometry, and the capacity of
+/// the air became the published saturation curve.[^2] Every world therefore
+/// holds a different state, and the old value can never be reached again.
 ///
-/// A test must read a golden value rather than compute it, or it compares a
+/// **So this constant is now a pin on the current engine and not a proof of
+/// the equivalence it was written for.** It still fails when a change moves
+/// the field at margin zero, which is what a regression pin does. It no longer
+/// says that a margin of zero reproduces an engine that had none, because that
+/// engine is gone. The other tests in this file carry the properties of the
+/// margin that are still checkable. The commit body holds the command that
+/// produced the value.
+///
+/// A test must read a stored value rather than compute it, or it compares a
 /// run against itself and proves nothing.[^1]
 ///
 /// # References
 ///
 /// [^1]: Testing rules, section 1. `.agents/rules/testing.md`
-const BARE_HASH_AFTER_24_FRAMES: u64 = 17_990_617_795_266_647_092;
+/// [^2]: ADR-0177, the row axis of a world is a latitude that the world states. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+const BARE_HASH_AFTER_24_FRAMES: u64 = 2_287_978_085_891_004_685;
 
 /// The frames that the bare hash was taken after.
 const BARE_HASH_FRAMES: u32 = 24;
 
-/// A margin of zero reproduces the engine that had no margin.
+/// A margin of zero widens no lattice, and the field it gives is pinned.
 ///
 /// The whole lattice is then the lattice of the world, the index of a cell is
 /// its own index, the key of a draw is its own index, and the ground fold
 /// gives the fold of the world alone. Nothing the margin adds reaches the
 /// field.
 #[test]
-fn a_margin_of_zero_reproduces_the_engine_that_had_no_margin() {
+fn a_margin_of_zero_widens_no_lattice_and_holds_its_pinned_field() {
     let scale = WeatherScale::LEVEL_1;
     let mut bare = World::with_weather_margin(config(48, 48), scale, 0).expect("it builds");
     assert_eq!(
@@ -83,7 +95,7 @@ fn a_margin_of_zero_reproduces_the_engine_that_had_no_margin() {
     assert_eq!(
         hash_after(&mut bare, BARE_HASH_FRAMES),
         BARE_HASH_AFTER_24_FRAMES,
-        "a world at margin zero parted from the engine that had no margin"
+        "a world at margin zero moved away from the field this branch pinned"
     );
 }
 

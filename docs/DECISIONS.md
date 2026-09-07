@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-277**
+**Next number: DEC-278**
 
 ## Open
 
@@ -1946,6 +1946,44 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-277 — Is the map a region of a planet, or a planet?
+
+**Closed. Option B. The map is a planet, the tile edge is a game unit, and a
+world states its own latitude span.**
+
+The project held two readings of its own map. The scale register fixes the tile
+edge and the world extent, which make the world about three degrees of
+latitude.[^SCALE] The weather read the row axis as a latitude that runs from
+one pole to the other. A research report found both readings, judged both
+defensible, and said the project must choose.[^DEC277B]
+
+**The two readings demand opposite models.** Across three degrees the annual
+mean energy from the sun changes by about four percent, which produces no
+climate zones, so the climate comes from the ground and the sea alone. Across a
+globe the same geometry produces poles, a banded circulation, a desert belt and
+an equatorial rain belt.[^DEC277B]
+
+**Option A. The map is a region.** Delete the latitude term and the banded
+circulation, and keep the season as a whole-map swing.
+
+**Option B. The map is a planet.** Keep the latitude, and read the tile edge as
+a game unit rather than a measurement.
+
+**Why B.** The project owner ruled on 6 September 2026. A world with real
+poles, trade winds, subtropical deserts and an equatorial rain belt is the
+interesting world, and that is the rule the owner asked the work to follow.
+
+**How it is held.** The report recommended a third form, and the engine takes
+it: a world states a centre latitude and a span, and a world that states
+neither spans the globe. The two readings then differ by one constant rather
+than by a model, and a narrow span flattens every latitude term at no
+cost.[^DEC277B] A record holds the constraint.[^DEC277C]
+
+**What it costs.** Every crossing time, dwell and march figure in the scale
+register still derives from the tile edge, and each is still consistent with
+the others. The edge no longer says how far apart two climates stand. The scale
+register says so in place.[^SCALE]
 
 ### DEC-273 — Does the world seeder always give a playable world, or may it refuse a seed?
 
@@ -4609,3 +4647,5 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC276D]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 [^DEC276F]: ADR-0059, fog storage grows with observed area, not with world area, decision D5. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^DEC276G]: Backlog item 0516, give a faction one flat observation array, and declare its layout in a schema. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
+[^DEC277B]: Research report 30, the published atmospheric math, section 9. `docs/research/reports/30-the-published-atmospheric-math.md`
+[^DEC277C]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
