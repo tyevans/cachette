@@ -19,7 +19,7 @@
 //! [^1]: Findings register, FND-124. `docs/FINDINGS.md`
 //! [^2]: Testing rules, section 6. `.claude/rules/testing.md`
 //! [^3]: Findings register, FND-054. `docs/FINDINGS.md`
-//! [^4]: Findings register, FND-593. `docs/FINDINGS.md`
+//! [^4]: Findings register, FND-598. `docs/FINDINGS.md`
 
 use cachette_core::{sim_math, CommodityId, Fix32, NeedCondition, World, WorldConfig};
 
@@ -175,7 +175,7 @@ fn the_same_group_loses_people_when_the_rate_is_taken_away() {
     // longer an empty store.[^4] A count of the survivors would state a
     // figure that the next change to the ground makes false.
     //
-    // [^4]: Findings register, FND-593. `docs/FINDINGS.md`
+    // [^4]: Findings register, FND-598. `docs/FINDINGS.md`
     assert!(
         alive < people.len(),
         "a group with no rate kept every person, so the rate decides nothing"

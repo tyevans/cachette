@@ -31,6 +31,7 @@
 //! [^3]: Testing rules, section 2a. `.agents/rules/testing.md`
 //! [^4]: Backlog item 0505, keep a builder on the tile it builds until the work is done. `docs/backlog/complete/0505-keep-a-builder-on-the-tile-it-builds-until-the-work-is-done.md`
 
+use cachette_core::cohort::NeedRule;
 use cachette_core::effective::{SCALE_CEILING, SCALE_FLOOR, WET_WEIGHT};
 use cachette_core::founding::{disc, SURVEY_RADIUS};
 use cachette_core::hex::Axial;
@@ -342,6 +343,30 @@ fn production_rises_when_a_terrace_completes() {
     world
         .zone_project(faction, chosen, UpgradeCategory::TERRACE)
         .expect("a terrace fits a tile the faction holds");
+
+    // **The builder is fed for as long as the terrace takes.** A unit this
+    // test places has no home, so nothing feeds it. Its need falls on every
+    // tick, its deficit reaches the bound, and it ends after a fixed number of
+    // ticks. The work of a terrace is a balance value, and it now asks for
+    // more ticks than an unfed unit lives for.[^5] The builder died partway,
+    // the loop below re-ordered a dead unit for the whole of its patience, and
+    // the assertion after it measured the hunger and not the terrace.
+    //
+    // The fixture answers by holding the need where it is, through the verb a
+    // caller has. No assertion below is weaker for it.
+    //
+    // [^5]: Balance register, the work of an upgrade level. `docs/reference/balance.md`
+    let rule = world.need_rule();
+    world.set_need_rule(
+        NeedRule::new(
+            Fix32::ZERO,
+            rule.ration(),
+            rule.threshold(),
+            rule.recovery(),
+            rule.bound(),
+        )
+        .expect("a rule of no decay is legal"),
+    );
 
     // A soldier builds the tile it stands on, so the fixture puts one there.
     let builder = world
