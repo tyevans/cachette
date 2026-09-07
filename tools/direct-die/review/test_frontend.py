@@ -37,9 +37,11 @@ if str(HERE.parent) not in sys.path:
 
 import exemplars as exemplar_module  # noqa: E402
 import packs as pack_module  # noqa: E402
+import app as app_module  # noqa: E402
 from app import create_app  # noqa: E402
 from make_fixtures import build_workspace  # noqa: E402
-from store import SessionStore  # noqa: E402
+from runs import RunManager  # noqa: E402
+from store import SessionStore, write_json_atomically  # noqa: E402
 
 # The sessions of the fixture workspace that the front end tests read.
 CHOSEN = "cartoon/20260904-090000-forest"
@@ -198,7 +200,7 @@ def test_a_new_choice_moves_the_pick(
     assert pack_module.pick_for(store, "cartoon", "forest").letter == "b"
     client.post(
         f"/s/{CHOSEN}/round-01/feedback",
-        data={"choice": "d", "text": "d after all"},
+        data={"mark-d": "like", "text": "d after all"},
         follow_redirects=False,
     )
     assert pack_module.pick_for(store, "cartoon", "forest").letter == "d"
@@ -681,3 +683,340 @@ def test_a_broken_job_record_drops_out_of_the_list(
     response = client.get("/runs")
     assert response.status_code == 200
     assert "Traceback" not in response.text
+
+
+# -- which drawing stands for an asset ---------------------------------------
+
+
+def _one_session_tree(tmp_path: Path, scores: dict, feedback: dict | None) -> Path:
+    """Write one style, one session and one round, and give the sessions root.
+
+    The fixture takes a score for each variant, so a test can put the highest
+    score on the drawing that the person refused. A fixture that scores every
+    variant the same cannot prove that the refusal changed the answer.
+    """
+    root = tmp_path / "sessions"
+    directory = root / "cartoon" / "forest-20260901-1000" / "round-00"
+    directory.mkdir(parents=True)
+    write_json_atomically(
+        root / "cartoon" / "forest-20260901-1000" / "session.json",
+        {
+            "asset": "forest",
+            "created": "2026-09-01T10:00:00Z",
+            "model": "m",
+            "guide_version": "v",
+        },
+    )
+    write_json_atomically(
+        directory / "meta.json",
+        {"round": 0, "prompt_summary": "a forest", "parents": {}},
+    )
+    for letter, score in scores.items():
+        (directory / f"variant-{letter}.svg").write_text(
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"/>',
+            encoding="utf-8",
+        )
+        (directory / f"variant-{letter}.png").write_bytes(b"\x89PNG\r\n\x1a\n")
+        write_json_atomically(
+            directory / f"variant-{letter}.critique.json",
+            {"verdict": "x", "faults": [], "score": score},
+        )
+    if feedback is not None:
+        write_json_atomically(directory / "feedback.json", feedback)
+    return root
+
+
+def test_the_first_of_the_order_stands_for_the_asset(tmp_path: Path) -> None:
+    root = _one_session_tree(
+        tmp_path,
+        scores={"b": 30, "d": 90},
+        feedback={
+            "round": 0,
+            "likes": ["b", "d"],
+            "denies": [],
+            "order": ["b", "d"],
+            "note": "",
+            "text": "",
+        },
+    )
+    store = SessionStore(root)
+    pick = pack_module.pick_for(store, "cartoon", "forest")
+    assert pick is not None
+    assert pick.letter == "b"
+    assert pick.source == "human"
+
+
+def test_a_refused_drawing_never_wins_on_score(tmp_path: Path) -> None:
+    root = _one_session_tree(
+        tmp_path,
+        scores={"a": 95, "c": 30},
+        feedback={
+            "round": 0,
+            "likes": [],
+            "denies": ["a"],
+            "order": [],
+            "note": "",
+            "text": "",
+        },
+    )
+    store = SessionStore(root)
+    pick = pack_module.pick_for(store, "cartoon", "forest")
+    assert pick is not None
+    assert pick.letter == "c"
+    assert pick.source == "score"
+
+
+def test_the_highest_score_still_wins_when_nobody_said_anything(tmp_path: Path) -> None:
+    root = _one_session_tree(tmp_path, scores={"a": 40, "c": 80}, feedback=None)
+    store = SessionStore(root)
+    pick = pack_module.pick_for(store, "cartoon", "forest")
+    assert pick is not None
+    assert pick.letter == "c"
+    assert pick.source == "score"
+
+
+# -- the analysis ------------------------------------------------------------
+
+
+def test_the_panel_says_so_when_no_analysis_exists(client: TestClient) -> None:
+    response = client.get(f"/s/{CHOSEN}/round-00")
+    assert response.status_code == 200
+    assert "No analysis" in response.text
+
+
+def test_the_panel_shows_the_preference_the_order_and_the_rule(
+    client: TestClient,
+) -> None:
+    response = client.get(f"/s/{CHOSEN}/round-01")
+    assert "three shapes and one flat fill" in response.text
+    assert "Use three shapes or fewer inside the hexagon." in response.text
+    assert 'value="d,b"' in response.text
+
+
+def test_the_analysis_command_is_the_tool_command_line() -> None:
+    found = app_module.analysis_command("python3", "cartoon", "forest-1", 2)
+    assert found == [
+        "python3", "-m", "direct_die", "analyse",
+        "--asset", "cartoon", "--session", "forest-1", "--round", "2",
+    ]
+
+
+def test_the_analyse_route_runs_the_command(monkeypatch, client: TestClient) -> None:
+    seen = {}
+
+    class Done:
+        returncode = 0
+        stdout = "the analysis ranks d, b"
+        stderr = ""
+
+    def fake_run(command, **rest):
+        seen["command"] = command
+        seen["cwd"] = rest.get("cwd")
+        return Done()
+
+    monkeypatch.setattr(app_module.subprocess, "run", fake_run)
+    response = client.post(f"/s/{CHOSEN}/round-01/analyse", follow_redirects=False)
+    assert response.status_code == 303
+    assert seen["command"][3] == "analyse"
+    assert "--round" in seen["command"]
+
+
+def test_the_analyse_route_shows_the_error_the_tool_printed(
+    monkeypatch, client: TestClient
+) -> None:
+    class Failed:
+        returncode = 4
+        stdout = ""
+        stderr = "analysis error: the analysis needs at least one liked drawing"
+
+    monkeypatch.setattr(app_module.subprocess, "run", lambda command, **rest: Failed())
+    response = client.post(f"/s/{CHOSEN}/round-01/analyse", follow_redirects=True)
+    assert "at least one liked drawing" in response.text
+
+
+def test_accepting_a_rule_appends_it_to_the_style(
+    client: TestClient, paths: dict[str, Path]
+) -> None:
+    response = client.post(
+        "/rules/cartoon/append",
+        data={
+            "rule": "Use three shapes or fewer inside the hexagon.",
+            "back": f"/s/{CHOSEN}/round-01",
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    text = (paths["styleguide"] / "cartoon.md").read_text(encoding="utf-8")
+    assert "- Use three shapes or fewer inside the hexagon." in text
+
+
+def test_accepting_an_empty_rule_shows_an_error(client: TestClient) -> None:
+    response = client.post(
+        "/rules/cartoon/append",
+        data={"rule": "   ", "back": f"/s/{CHOSEN}/round-01"},
+        follow_redirects=True,
+    )
+    assert "empty" in response.text.lower()
+
+
+def test_accepting_a_rule_for_a_style_with_no_file_shows_an_error(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/rules/nosuchstyle/append",
+        data={"rule": "Use three shapes or fewer.", "back": "/"},
+        follow_redirects=True,
+    )
+    assert "no rules file" in response.text.lower()
+
+
+# -- adding rounds to an existing session ------------------------------------
+
+
+def test_start_job_with_an_existing_session_makes_one_item(
+    paths: dict[str, Path],
+) -> None:
+    (paths["sessions"] / "cartoon" / "20260904-090000-forest").mkdir(
+        parents=True, exist_ok=True
+    )
+    runner = RunManager(
+        runs_root=paths["runs"],
+        sessions_root=paths["sessions"],
+        tool_directory=HERE,
+        command=fake_tool_command,
+    )
+    job = runner.start_job(
+        "cartoon",
+        [(None, "a dense stand of trees")],
+        rounds=1,
+        variants=1,
+        session_id="20260904-090000-forest",
+    )
+    assert len(job.items) == 1
+    assert job.items[0].session_id == "20260904-090000-forest"
+
+
+def test_start_job_rejects_a_session_that_does_not_exist(
+    paths: dict[str, Path],
+) -> None:
+    runner = RunManager(
+        runs_root=paths["runs"],
+        sessions_root=paths["sessions"],
+        tool_directory=HERE,
+        command=fake_tool_command,
+    )
+    with pytest.raises(ValueError):
+        runner.start_job(
+            "cartoon",
+            [(None, "a subject")],
+            rounds=1,
+            variants=1,
+            session_id="no-such-session",
+        )
+
+
+def test_add_rounds_reuses_the_existing_session_identifier(
+    running_client: TestClient, paths: dict[str, Path]
+) -> None:
+    response = running_client.post(
+        f"/s/{CHOSEN}/rounds",
+        data={"rounds": 1, "variants": 1},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    job_id = response.headers["location"].removeprefix("/runs/")
+    record = json.loads((paths["runs"] / job_id / "job.json").read_text())
+    assert len(record["items"]) == 1
+    assert record["items"][0]["session"] == CHOSEN.split("/")[1]
+
+
+def test_add_rounds_reads_the_subject_from_the_round_metadata(
+    running_client: TestClient, paths: dict[str, Path]
+) -> None:
+    # The water session subject in the round metadata is "open water", which
+    # differs from the slug table default "open water, deep and still". The
+    # test would pass on either text if the two agreed, so the fixture picks
+    # a session where they differ.
+    response = running_client.post(
+        f"/s/{LIVE}/rounds",
+        data={"rounds": 1, "variants": 1},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    job_id = response.headers["location"].removeprefix("/runs/")
+    record = json.loads((paths["runs"] / job_id / "job.json").read_text())
+    assert record["items"][0]["subject"] == "open water"
+
+
+def test_add_rounds_to_a_session_that_does_not_exist_starts_nothing(
+    client: TestClient, paths: dict[str, Path]
+) -> None:
+    before = list((paths["runs"]).glob("*"))
+    response = client.post(
+        "/s/cartoon/no-such-session/rounds",
+        data={"rounds": 1, "variants": 1},
+        follow_redirects=True,
+    )
+    assert "no such session" in response.text.lower()
+    assert list((paths["runs"]).glob("*")) == before
+
+
+def test_add_rounds_while_a_run_is_in_flight_starts_nothing(
+    paths: dict[str, Path],
+) -> None:
+    gate = paths["runs"] / "gate"
+    script = (
+        "import pathlib, sys, time\n"
+        "target = pathlib.Path(sys.argv[1])\n"
+        "while not target.exists():\n"
+        "    time.sleep(0.05)\n"
+    )
+
+    def command(
+        python: str,
+        style: str,
+        subject: str,
+        session_id: str,
+        rounds: int,
+        variants: int,
+    ) -> list[str]:
+        return [python, "-c", script, str(gate)]
+
+    client = TestClient(
+        create_app(
+            paths["sessions"],
+            paths["styleguide"],
+            paths["packs"],
+            paths["runs"],
+            run_command=command,
+        )
+    )
+    first = client.post(
+        f"/s/{CHOSEN}/rounds",
+        data={"rounds": 1, "variants": 1},
+        follow_redirects=False,
+    )
+    first_job_id = first.headers["location"].removeprefix("/runs/")
+    assert wait_until(lambda: "running" in client.get(f"/runs/{first_job_id}").text)
+
+    jobs_before = list((paths["runs"]).glob("*"))
+    second = client.post(
+        f"/s/{CHOSEN}/rounds",
+        data={"rounds": 1, "variants": 1},
+        follow_redirects=True,
+    )
+    assert "already" in second.text.lower() or "in flight" in second.text.lower()
+    assert list((paths["runs"]).glob("*")) == jobs_before
+
+    gate.parent.mkdir(parents=True, exist_ok=True)
+    gate.write_text("go", encoding="utf-8")
+    assert wait_until(lambda: "done" in client.get(f"/runs/{first_job_id}").text)
+
+
+def test_the_round_page_and_the_session_page_render_the_add_rounds_control(
+    client: TestClient,
+) -> None:
+    round_page = client.get(f"/s/{CHOSEN}/round-01")
+    assert f"/s/{CHOSEN}/rounds" in round_page.text
+    session_page = client.get(f"/s/{CHOSEN}")
+    assert f"/s/{CHOSEN}/rounds" in session_page.text

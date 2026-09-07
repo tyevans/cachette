@@ -33,6 +33,7 @@
 //! [^4]: Testing rules, section 2a. `.claude/rules/testing.md`
 
 use cachette_core::choose::{self, ChoiceSchedule};
+use cachette_core::cohort::NeedRule;
 use cachette_core::holding::ReachRules;
 use cachette_core::resource::{Amount, ResourceKind};
 use cachette_core::terrain::TileKind;
@@ -40,7 +41,7 @@ use cachette_core::upgrade::{
     capacity_with, gather_rate_with, UpgradeCategory, UpgradeRow, DEFAULT_UPGRADE_TABLE,
     UPGRADE_CATEGORY_COUNT,
 };
-use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
 use proptest::prelude::*;
 
 /// The extent that most tests read.
@@ -97,8 +98,45 @@ fn world(seed: u64, width: u32, height: u32) -> World {
     world
         .found_settlement(seat, FactionId(0))
         .expect("the ground admits a city");
+    hold_the_hunger(&mut world);
     world.step(1).expect("the step must run");
     world
+}
+
+/// Stops the need of a unit from falling, so that hunger bounds no run here.
+///
+/// **A builder this suite places has no home, so nothing feeds it.** The need
+/// of such a unit falls by a fixed part of the full need on every tick, the
+/// deficit then rises to the bound, and the unit ends. That gives an unfed
+/// unit a life of a fixed number of ticks, and the number is a balance value
+/// that no test here reads.
+///
+/// The work that one level of one category asks for is a balance value
+/// too.[^1] The two moved apart: several levels now ask for more work than an
+/// unfed unit lives for, so a builder died partway and the assertion that
+/// followed measured the hunger and not the build. The fixture answers that by
+/// holding the need where it is, through the verb a caller has.
+///
+/// **This is a fixture setting and not a weaker assertion.** A test of the
+/// need itself lives in another file, and every assertion in this file stays
+/// exactly as strong. A run that reads a work count from the table now takes
+/// that many ticks whatever the table holds.
+///
+/// # References
+///
+/// [^1]: Balance register, the work of an upgrade level. `docs/reference/balance.md`
+fn hold_the_hunger(world: &mut World) {
+    let rule = world.need_rule();
+    world.set_need_rule(
+        NeedRule::new(
+            Fix32::ZERO,
+            rule.ration(),
+            rule.threshold(),
+            rule.recovery(),
+            rule.bound(),
+        )
+        .expect("a rule of no decay is legal"),
+    );
 }
 
 /// Puts the choice far enough apart that it does not replace a gather order.
@@ -743,10 +781,36 @@ fn crowd(threads: usize) -> World {
             continue;
         }
     }
-    for _ in 0..40 {
+    for _ in 0..crowd_ticks() {
         field.step(threads).expect("the step must run");
     }
     field
+}
+
+/// Returns the ticks the crowd runs for.
+///
+/// **The count comes from the table and never from a number written here.** A
+/// build finishes after the work its row asks for, and that work is a balance
+/// value.[^1] A fixed count went stale the first time the work rose: the run
+/// ended before the cheapest level of any category could finish, no build
+/// finished, and the test that asks for a finished build said so.
+///
+/// The count is twice the cheapest first level of the categories the crowd
+/// builds. A unit wanders off the tile it builds, so it takes more ticks than
+/// the work alone, and doubling gives it the room. The dearer categories stay
+/// partway at this count, which is the other case the crowd must reach.
+///
+/// # References
+///
+/// [^1]: Balance register, the work of an upgrade level. `docs/reference/balance.md`
+fn crowd_ticks() -> u64 {
+    let cheapest = UpgradeCategory::ALL[..UPGRADE_CATEGORY_COUNT - 1]
+        .iter()
+        .filter_map(|category| DEFAULT_UPGRADE_TABLE.row(*category, 1))
+        .map(|row| u64::from(row.work))
+        .min()
+        .expect("the default table holds a first level somewhere");
+    cheapest * 2
 }
 
 #[test]

@@ -285,8 +285,11 @@ The rule changes in three ways.
 
 1. A human choice is now the first entry of `order`. When `order` is empty and
    `likes` holds one letter, that letter is the choice.
-2. When `likes` holds more than one letter and `order` is empty, the rule
-   takes the highest scoring of the liked letters.
+2. `order` is never empty when `likes` is not. The reader appends every liked
+   letter that the order leaves out, so the first entry is the first like in
+   the order of the page when a person ranks nothing. An earlier draft of this
+   section said the highest scoring like wins in that case. The code cannot
+   reach that state, and the page tells a person the rule it does follow.
 3. A denied letter never wins, whatever it scored, and whatever the score rule
    would say.
 

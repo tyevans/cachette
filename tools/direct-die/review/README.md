@@ -13,8 +13,11 @@ nothing under `python/cachette/`. No engine gate runs it.
 1. **Start.** Choose a style and an asset, or the whole set of eleven assets,
    and start a run. The page returns at once. The work runs in the background.
 2. **Steer.** Read the four variants of a round side by side, read the
-   critique the model wrote for each one, pick one, and type feedback. The
-   server writes `feedback.json`, and the loop reads it on its next round.
+   critique the model wrote for each one, and mark each drawing as liked,
+   refused, or neither. Order the liked ones. Type a standing note for the
+   session and a note for the next round. Ask for an analysis of what the
+   liked drawings share. The server writes `feedback.json`, and the loop
+   reads it on its next round.
 3. **Promote.** Make a drawing an exemplar of its style. The critic judges
    against pictures, and an exemplar directory starts empty. This is the step
    that makes the next run better.
@@ -54,9 +57,10 @@ later consumer of a pack therefore needs no mapping table.
 ## Which drawing stands for an asset
 
 The person outranks the model. The rule reads the sessions of one style and
-one asset, newest session first, and takes the first human choice it finds.
-When no person chose, it takes the highest score of every round of every
-session, and a later round wins a tie.
+one asset, newest session first, and takes the drawing that a person put
+first in the order of a round. When no person ordered anything, it takes the
+highest score of every round of every session, and a later round wins a tie.
+A refused drawing never stands for an asset, whatever the model scored it.
 
 The tool records no asset name in the session manifest. The server names a
 session after the asset when it starts a run, so the directory name carries
@@ -148,18 +152,23 @@ Another agent owns the generation loop. It writes every file below except
 tools/direct-die/sessions/<style>/<session-id>/
   session.json                  {asset, created, model, guide_version}
   round-00/
-    meta.json                   {round, prompt_summary, parent}
+    meta.json                   {round, prompt_summary, parents}
     variant-a.svg
     variant-a.png               the display-size render
     variant-a.large.png         the inspection-size render
     variant-a.critique.json     {verdict, faults, score}
     variant-b.*  variant-c.*  variant-d.*
     feedback.json               this server writes this file
+    analysis.json                this tool writes this file
   round-01/ ...
 ```
 
-The `choice` field of the feedback holds `"a"`, `"b"`, `"c"`, `"d"`, or
-`null`. The `at` field holds an ISO 8601 time in UTC.
+`meta.json` names the parent of each variant letter in a `parents` object,
+one entry for each of `"a"`, `"b"`, `"c"` and `"d"`.
+
+The feedback holds `likes`, `denies` and `order`, each a list of variant
+letters, and a `note` and a `text` field for the two kinds of feedback text.
+The `at` field holds an ISO 8601 time in UTC.
 
 ## What this server writes
 
@@ -167,9 +176,23 @@ The `choice` field of the feedback holds `"a"`, `"b"`, `"c"`, `"d"`, or
 - A job record and its logs under the runs directory.
 - An exemplar SVG under `styleguide/exemplars/<style>/`, when a person
   promotes a drawing.
+- One rule appended to `styleguide/<style>.md`, when a person accepts a rule
+  that the analysis proposed. It goes under one heading at the end of the
+  file, which the server creates once.
 - A pack under the packs directory.
 
-It writes nothing else. It changes no drawing, and it changes no rules file.
+It writes nothing else. It changes no drawing, and it writes no
+`analysis.json`. The tool writes that file.
+
+## The analysis waits, and a run does not
+
+A run draws up to eleven subjects at about seventy seconds each, so no page
+waits for it. A job record holds its state.
+
+The analysis is one model call. A person clicks the button and looks at the
+page until the answer arrives, so the request waits for the child and shows
+the answer. A job record for a call this short would be a second state
+machine for no gain. The request gives up after 180 seconds and says so.
 
 Every write is atomic. It writes a temporary file in the same directory, then
 renames it, so a reader never sees half a file.
@@ -227,11 +250,14 @@ the child running.
 | `runs.py` | The background run manager and the job record |
 | `packs.py` | Which drawing wins, and the pack export |
 | `exemplars.py` | The promotion into the style guide |
+| `rules.py` | The one write into a style rules file |
 | `matrix.py` | The state of one cell, and the words for a wait |
 | `slugs.py` | The engine asset names, and a subject for each |
 | `make_fixtures.py` | The fixture script |
 | `fake_tool.py` | The stand-in tool that the run tests call |
 | `test_review.py` | The tests of the round pages and the feedback write |
 | `test_frontend.py` | The tests of the grid, the promotion, the export and a run |
+| `test_readers_agree.py` | The check that the tool and the server read one feedback shape |
+| `test_rules.py` | The tests of the style rules write |
 | `templates/` | The server-rendered pages |
 | `static/review.css` | One stylesheet, with no build step |

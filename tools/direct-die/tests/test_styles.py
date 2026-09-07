@@ -79,12 +79,12 @@ def test_resolve_refuses_a_subject_that_the_set_does_not_hold():
 def test_best_of_takes_the_highest_score_of_every_round():
     from direct_die import loop
 
-    first = loop.RoundResult(index=0, parent=None)
+    first = loop.RoundResult(index=0)
     first.variants = [
         loop.VariantResult(letter="a", critique={"score": 71}),
         loop.VariantResult(letter="b", critique={"score": 55}),
     ]
-    second = loop.RoundResult(index=1, parent="round-00/variant-a")
+    second = loop.RoundResult(index=1)
     second.variants = [loop.VariantResult(letter="a", critique={"score": 60})]
     score, where = setrun.best_of([first, second])
     assert score == 71
@@ -94,9 +94,9 @@ def test_best_of_takes_the_highest_score_of_every_round():
 def test_best_of_lets_a_later_round_win_a_tie():
     from direct_die import loop
 
-    first = loop.RoundResult(index=0, parent=None)
+    first = loop.RoundResult(index=0)
     first.variants = [loop.VariantResult(letter="a", critique={"score": 70})]
-    second = loop.RoundResult(index=1, parent="round-00/variant-a")
+    second = loop.RoundResult(index=1)
     second.variants = [loop.VariantResult(letter="c", critique={"score": 70})]
     score, where = setrun.best_of([first, second])
     assert score == 70
@@ -106,7 +106,7 @@ def test_best_of_lets_a_later_round_win_a_tie():
 def test_best_of_gives_nothing_when_no_variant_scored():
     from direct_die import loop
 
-    empty = loop.RoundResult(index=0, parent=None)
+    empty = loop.RoundResult(index=0)
     empty.variants = [loop.VariantResult(letter="a", error="draw: failed")]
     assert setrun.best_of([empty]) == (None, None)
 

@@ -201,8 +201,8 @@ that lag is untouched here.[^1]
 
 [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decisions D1 and D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decisions D1, D3 and D5. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-[^3]: Findings register, FND-601. `docs/FINDINGS.md`
-[^4]: Findings register, FND-602. `docs/FINDINGS.md`
+[^3]: Findings register, FND-604. `docs/FINDINGS.md`
+[^4]: Findings register, FND-605. `docs/FINDINGS.md`
 [^5]: Research report 30, the published atmospheric math, sections 4.4 and 5.3. `docs/research/reports/30-the-published-atmospheric-math.md`
 [^6]: Research report 30, the published atmospheric math, section 5.3, on the eddy-driven cell. `docs/research/reports/30-the-published-atmospheric-math.md`
 [^7]: Balance register, the energy balance constants. `docs/reference/balance.md`

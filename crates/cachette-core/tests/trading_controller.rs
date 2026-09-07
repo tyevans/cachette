@@ -131,25 +131,83 @@ fn set_store(world: &mut World, faction: FactionId, quantity: Fix32) {
 /// unit of the speaker stands in the territory of the listener. The holding
 /// rule takes such a tile for the speaker on the next step, so the fixture
 /// renews the presence before every step.
+///
+/// **The unit never stands on the site tile of the listener.** A unit of one
+/// faction on the site tile of another besieges that site, and the site
+/// changes hands after the capture work.[^1] The two sites of this fixture sit
+/// a few tiles apart, so the site tile of the listener is the first tile the
+/// listener holds in index order. A fixture that took it walked an enemy onto
+/// the rival capital, the capital fell inside ten ticks, and every test here
+/// then failed in its own setup on the reader that asks for the site of a
+/// faction. The suite measures the trade, and a siege is not the trade.
+///
+/// # References
+///
+/// [^1]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
 fn renew_presence(world: &mut World, one: FactionId, other: FactionId) {
+    garrison(world);
     for (speaker, listener) in [(one, other), (other, one)] {
         if world.stands_in_territory_of(speaker, listener) {
             continue;
         }
         let grid = world.grid();
+        let seats = world.standing_places();
         let mut place = None;
         for index in 0..grid.tile_count() {
             let address = Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32);
             if world.tile_holder(address) == Some(cachette_core::holding::Holder::of(listener))
                 && world.admits_a_unit(address)
+                && !seats.contains(&address)
             {
                 place = Some(address);
                 break;
             }
         }
-        if let Some(place) = place {
-            let _ = world.spawn_soldier(place, speaker);
+        let place = place.expect(
+            "the listener holds no tile outside its own sites, so the fixture \
+             cannot put a guest in its territory without besieging it",
+        );
+        let _ = world.spawn_soldier(place, speaker);
+    }
+}
+
+/// Puts one unit of the owning faction on the tile of each site.
+///
+/// **A unit of the owner on the site tile ends a siege and takes its work
+/// away.**[^1] The two sites of this fixture sit a few tiles apart, and the
+/// guests this file places walk. Over a long run a guest reaches the rival
+/// site tile and besieges it, the site changes hands, and every test then
+/// fails in its own setup on the reader that asks for the site of a faction.
+/// A garrison keeps both sites standing, so the run measures the trade.
+///
+/// The garrison is renewed rather than placed once, because a garrison unit
+/// walks away in the same way a guest does.
+///
+/// # References
+///
+/// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D10. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+fn garrison(world: &mut World) {
+    let sites: Vec<(Axial, FactionId)> = world
+        .settlements()
+        .iter()
+        .filter_map(|site| {
+            Some((
+                world.settlements().address(site)?,
+                world.settlements().faction(site)?,
+            ))
+        })
+        .collect();
+    for (address, owner) in sites {
+        let held = world
+            .soldiers()
+            .iter_faction(owner)
+            .any(|unit| world.soldiers().address(unit) == Some(address));
+        if held {
+            continue;
         }
+        world
+            .spawn_soldier(address, owner)
+            .expect("the site tile admits a unit of its own faction");
     }
 }
 

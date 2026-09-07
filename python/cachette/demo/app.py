@@ -48,6 +48,11 @@ from cachette.names import Names
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    # How a caller fills one frame: a camera, a size, the pixels and the
+    # settings of the frame. The drawing method of the world has this shape,
+    # and so does every other renderer.
+    Renderer = Callable[..., "FrameReading"]
+
     # How a caller builds one picture: a width, a height, a byte layout, the
     # bytes and a pitch.
     MakePicture = Callable[[int, int, str, bytes, int], "Picture"]
@@ -57,9 +62,14 @@ if TYPE_CHECKING:
     # importing them at run time would fail.
     from cachette._core import FoundingReport, FrameReading, GameEnd
 from cachette.demo.clock import SPEEDS, Clock, says
+from cachette.demo.minimap import Minimap
+from cachette.demo.mouse import Controls
 from cachette.demo.settings import Settings, load_video, save_video
+from cachette.demo.sketch import RELIEF, BoundaryGap, Sketch
+from cachette.demo.sketch_gl import DeviceGap, GlSketch
 from cachette.demo.surface import Surface
 from cachette.demo.toasts import Announcer
+from cachette.demo.view import View
 
 # The size of the window in pixels.
 WINDOW_WIDTH = 960
@@ -219,19 +229,36 @@ class Demo:
     __slots__ = (
         "announced_end",
         "announcer",
-        "camera",
         "clock",
+        "minimap",
         "names",
         "overlay",
         "panels",
         "pointer",
         "reference",
+        "renderer",
         "seconds",
         "settings",
         "surface",
         "threads",
+        "view",
         "world",
     )
+
+    @property
+    def camera(self) -> Camera:
+        """The engine camera the frame is drawn with.
+
+        **The view holds it, and the view is the one source of truth for where
+        the watcher stands.** This reads through to the view, so a caller that
+        held the camera before still holds the same camera.
+        """
+        return self.view.camera
+
+    @camera.setter
+    def camera(self, camera: Camera) -> None:
+        """Put another camera on the view, keeping the angles it stands at."""
+        self.view.camera = camera
 
     def __init__(
         self,
@@ -250,13 +277,22 @@ class Demo:
         """
         self.world = world
         self.names = names
+        # **The renderer fills one frame and reports what it read.** The
+        # engine is the one a watcher opens on, and a flag replaces it with
+        # another that takes the same arguments. Nothing else in the loop
+        # knows which one is here.
+        self.renderer: Renderer = world.draw
         self.surface = Surface(width, height)
         self.threads = threads if threads > 0 else min(os.cpu_count() or 1, 12)
         # The reference layer names the colours while a key is held. It holds
         # no state between frames: the keyboard says what the watcher wants,
         # and the answer lives for one frame.
         self.reference = False
-        self.camera = Camera()
+        # **The view is the one place the position of the watcher is held.**
+        # It carries the engine camera, which says where the flat map sits,
+        # and the two angles a page that stands over the ground needs. The
+        # mouse writes here and every renderer reads here.
+        self.view = View()
         # The engine tick and the wall clock are separate. The window draws at
         # its own rate and this says how far the world moves between two
         # drawings.
@@ -275,6 +311,10 @@ class Demo:
         # Whether the game end was printed. The record is written once, and
         # the line is printed once.
         self.announced_end = False
+        # The round wide view in the top right corner. It reads the summary
+        # level of the engine and paints over the frame, and it holds its own
+        # reading between frames.
+        self.minimap = Minimap()
         # The lines that appear over the map, and the reader that makes them.
         self.announcer = Announcer(names)
         # Where the deck reads the wall clock. **A toast lives for a number of
@@ -534,7 +574,11 @@ class Demo:
         #
         # The ticks above ran first, so the phase belongs to the tick the
         # world is now part way through.
-        reading = self.world.draw(
+        #
+        # **The renderer is a choice, and the frame is one call.** The engine
+        # is the renderer a watcher opens on. A flag puts another one here,
+        # and everything around this line stays as it was.
+        reading = self.renderer(
             self.camera,
             self.surface.width,
             self.surface.height,
@@ -555,6 +599,12 @@ class Demo:
         # are chrome and not the world: nothing here reads a tile or an
         # entity, so the two drawing paths cannot disagree about the world.
         self.announcer.toasts.paint(self.surface, now)
+        # **The minimap goes on last, and it stands down for the key.** The
+        # engine puts a card in the top right corner while the reference key
+        # is held, and two things in one corner means a watcher reads
+        # neither.
+        if not self.reference:
+            self.minimap.paint(self.world, self.camera, self.surface)
         return reading
 
 
@@ -817,6 +867,40 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--sketch",
+        action="store_true",
+        help=(
+            "draw the world as a pencil study in ink on paper, lifted by the "
+            "height of the ground, instead of as a flat map; it opens at an "
+            "isometric angle, and a drag with the right button turns and "
+            "leans it; it composites on the graphics device"
+        ),
+    )
+    parser.add_argument(
+        "--sketch-on-processor",
+        action="store_true",
+        help=(
+            "composite the sketch on the processor instead of on the graphics "
+            "device; this is the reference the device path is tested against, "
+            "and it costs about ten times as much for each frame"
+        ),
+    )
+    parser.add_argument(
+        "--sketch-relief",
+        type=float,
+        default=0.0,
+        help=(
+            "how far the tallest ground rises in the sketch, as a share of "
+            "the width of the page; zero takes the share the sketch chooses"
+        ),
+    )
+    parser.add_argument(
+        "--sketch-sky",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="draw the cloud layer over the ground in the sketch",
+    )
+    parser.add_argument(
         "--seed",
         type=lambda given: int(given, 0),
         default=0,
@@ -918,6 +1002,44 @@ def main(argv: list[str] | None = None) -> int:
         demo.camera = Camera(tile_size=arguments.tile)
         demo.open_on(opening_place(foundings))
 
+    if arguments.sketch:
+        # **The sketch is a renderer, not a second demonstration.** It takes
+        # the place of the engine at the one call that fills a frame, and the
+        # clock, the panels, the keys and the window memory stay shared.
+        #
+        # **The device path is the one a watcher gets.** The processor path
+        # stays because it is the reference the device path is tested against,
+        # and a flag asks for it. It is not a fallback: a run that asked for
+        # the device and quietly got the processor would report the speed of
+        # the processor while everyone believed the device was drawing.
+        make: type[Sketch] = Sketch if arguments.sketch_on_processor else GlSketch
+        if arguments.sketch_on_processor:
+            print(
+                "the sketch draws on the processor, so one frame costs "
+                "hundreds of milliseconds and the window will feel slow"
+            )
+        try:
+            demo.renderer = make(
+                demo.world,
+                view=demo.view,
+                relief=arguments.sketch_relief or RELIEF,
+                sky=arguments.sketch_sky,
+            )
+            # **A run that opens no window asks for the device here.** The
+            # renderer opens it on its first frame, because a window run must
+            # draw in the context that the window opens later. A picture and a
+            # run to the end open no window, so nothing else would ask, and
+            # the machine that gives no context must say so before the run.
+            if isinstance(demo.renderer, GlSketch) and not opens_window:
+                demo.renderer.device  # noqa: B018
+        except BoundaryGap as gap:
+            print(f"the sketch renderer cannot run: {gap}")
+            return 2
+        except DeviceGap as gap:
+            print(f"the graphics device cannot draw the sketch: {gap}")
+            print("run again with --sketch-on-processor to draw it slowly")
+            return 2
+
     if arguments.overlay:
         demo.choose_overlay(arguments.overlay)
 
@@ -935,7 +1057,10 @@ def main(argv: list[str] | None = None) -> int:
         f"{demo.world.soldier_count} people, {demo.threads} threads"
     )
     print("arrow keys or WASD scroll, minus and equals zoom")
+    print("drag with the left button to move the map, the wheel zooms")
+    print("drag with the right or middle button to turn and lean the sketch")
     print("hold tab to name the colours")
+    print("m shows and hides the minimap")
     print("space pauses, full stop steps one tick, brackets change the speed")
     print(f"the speeds are {', '.join(says(speed) for speed in SPEEDS)}")
     print(
@@ -1355,12 +1480,10 @@ def _run_window(demo: Demo, frame_limit: int, restore_size: bool = True) -> int:
         window.clear()
         picture.image.blit(0, 0)
 
-    def on_mouse_press(x: int, y: int, _button: int, _modifiers: int) -> None:
-        # The window numbers its rows from the bottom and the engine numbers
-        # them from the top, so the height turns one into the other.
-        demo.point_at(float(x), float(demo.surface.height - y))
-        q, r = demo.pointer if demo.pointer is not None else (0, 0)
-        print(f"pointing at tile ({q}, {r})")
+    # **The mouse is its own layer.** It writes to the view and it draws
+    # nothing, so the window pushes it as a handler and the loop above never
+    # names a button. The methods carry the names the library calls.
+    controls = Controls(demo, print)
 
     def on_key_press(symbol: int, _modifiers: int) -> None:
         key = pyglet.window.key
@@ -1382,6 +1505,10 @@ def _run_window(demo: Demo, frame_limit: int, restore_size: bool = True) -> int:
             demo.clock.faster()
             print(f"speed {demo.clock.says()}")
             return
+        if symbol == key.M:
+            shown = demo.minimap.toggle()
+            print(f"the minimap is {'on' if shown else 'off'}")
+            return
         if symbol == key.F10:
             demo.settings.toggle()
             _show_settings(demo, window)
@@ -1400,11 +1527,8 @@ def _run_window(demo: Demo, frame_limit: int, restore_size: bool = True) -> int:
     # The handlers are registered by name rather than by decorator. The
     # library ships no type information, so a decorator from it would make
     # every function it wraps untyped.
-    window.push_handlers(
-        on_draw=on_draw,
-        on_key_press=on_key_press,
-        on_mouse_press=on_mouse_press,
-    )
+    window.push_handlers(controls)
+    window.push_handlers(on_draw=on_draw, on_key_press=on_key_press)
 
     pyglet.clock.schedule_interval(frame, 1.0 / FRAMES_EACH_SECOND)
     pyglet.app.run()

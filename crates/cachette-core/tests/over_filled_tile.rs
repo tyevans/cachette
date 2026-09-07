@@ -49,6 +49,14 @@
 //! suite asserts that over every frame. The prediction cannot drift from the
 //! engine without a red test.
 //!
+//! **The prediction repeats the whole order of the movement rule, and not the
+//! draw alone.** A unit reads the fine stock field of the kind its order names
+//! first, then the exit of its level 1 cell, then the keyed draw, then the
+//! fall-back draw.[^9] The fine field was added after this file was written,
+//! the prediction did not hold it, and the check above went red with a unit
+//! that moved somewhere the file did not expect. That is the check working:
+//! the engine gained a source of the direction and the second site said so.
+//!
 //! Every test drives the public interface of the core crate.
 //!
 //! # References
@@ -61,12 +69,16 @@
 //! [^6]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
 //! [^7]: Findings register, FND-110. `docs/FINDINGS.md`
 //! [^8]: Findings register, FND-315. `docs/FINDINGS.md`
+//! [^9]: Findings register, FND-589. `docs/FINDINGS.md`
 
 use std::collections::BTreeMap;
 
+use cachette_core::choose::Ranked;
+use cachette_core::pyramid::AT_SEED;
+use cachette_core::resource::ResourceKind;
 use cachette_core::rng;
 use cachette_core::terrain::TileKind;
-use cachette_core::{Axial, Entity, FactionId, World, WorldConfig, OPTION_COUNT};
+use cachette_core::{Axial, Entity, FactionId, World, WorldConfig, OPTIONS, OPTION_COUNT};
 
 /// The extent of the fixture world.
 const EXTENT: u32 = 96;
@@ -260,6 +272,13 @@ struct Frame {
     left_the_over_full_tile: u32,
     /// The number of units that moved, and whose target this file predicted.
     predicted: u32,
+    /// The number of units that the fine stock field steered.
+    ///
+    /// **Without this count the fine branch above is a guard and not
+    /// evidence.** A run in which no unit ever read the stock field would
+    /// exercise only the coarse exit, and the branch that reads the fine field
+    /// could then be wrong without any test saying so.
+    steered_by_the_stock: u32,
 }
 
 /// Runs one frame and checks the prediction of the direction against the
@@ -302,6 +321,23 @@ fn run_frame(world: &mut World, threads: usize, over: Axial) -> Frame {
             .collect()
     };
     let layout = world.pyramid().layout();
+    // **The fine stock field as the last barrier left it.** A unit that scored
+    // a cell option and holds a gather order reads this field first, keyed on
+    // its own tile and on the kind its order names, and it takes the coarse
+    // exit of its cell only where this field holds no entry.[^9] The snapshot
+    // is taken before the step, in the way the coarse field above is, because
+    // the step derives both again at its own barrier.
+    //
+    // [^9]: Findings register, FND-589. `docs/FINDINGS.md`
+    let stock: BTreeMap<(Axial, u8), Option<u8>> = before
+        .iter()
+        .flat_map(|(_, was)| {
+            ResourceKind::ALL
+                .iter()
+                .map(|kind| ((*was, kind.to_u8()), world.stock_direction(*was, *kind)))
+                .collect::<Vec<_>>()
+        })
+        .collect();
 
     world.step(threads).expect("the step must run");
     let frame = world.tick().0;
@@ -310,6 +346,7 @@ fn run_frame(world: &mut World, threads: usize, over: Axial) -> Frame {
     let mut arrived = 0;
     let mut left = 0;
     let mut predicted = 0;
+    let mut by_the_stock = 0;
     for (soldier, was) in before {
         let Some(now) = world.soldiers().address(soldier) else {
             continue;
@@ -317,7 +354,36 @@ fn run_frame(world: &mut World, threads: usize, over: Axial) -> Frame {
         // A unit with no intent never asked for anything.
         let option = world.soldier_intent(soldier).flatten();
         let holds_an_intent = option.is_some();
+        // **The fine field wins over the coarse one.** A unit that scored a
+        // cell option and holds a gather order reads the stock field of the
+        // kind its order names. The seed offset says the unit already stands
+        // on stock of that kind, and such a unit takes no step at all. A unit
+        // whose block holds no stock of its kind reads nothing here and takes
+        // the exit of its cell, which is the answer every unit read before the
+        // fine field existed.
+        let toward_stock = option.and_then(|option| {
+            if !matches!(OPTIONS[option as usize].ranked, Ranked::Cell(_)) {
+                return None;
+            }
+            let kind = world.gather_order(soldier).flatten()?;
+            *stock.get(&(was, kind.to_u8()))?
+        });
+        if toward_stock.is_some() {
+            by_the_stock += 1;
+        }
+        if toward_stock == Some(AT_SEED) {
+            assert_eq!(
+                now, was,
+                "the unit stands on the stock it was ordered and it stepped \
+                 to {now:?}, so the rule that holds it still no longer matches \
+                 the engine",
+            );
+            continue;
+        }
         let steered = option.and_then(|option| {
+            if toward_stock.is_some() {
+                return toward_stock;
+            }
             let tile = grid.index_of(was)?;
             let cell = layout.block_of_key(layout.key_of(tile)?);
             field[cell as usize * OPTION_COUNT + option as usize]
@@ -386,6 +452,7 @@ fn run_frame(world: &mut World, threads: usize, over: Axial) -> Frame {
         arrived_at_the_over_full_tile: arrived,
         left_the_over_full_tile: left,
         predicted,
+        steered_by_the_stock: by_the_stock,
     }
 }
 
@@ -419,6 +486,7 @@ fn an_over_full_tile_admits_nobody_while_its_units_depart() {
     let mut asked = 0;
     let mut left = 0;
     let mut predicted = 0;
+    let mut by_the_stock = 0;
     for frame in 0..16 {
         // The tile drains, so the case must be restored before each frame.
         refill(&mut world, over);
@@ -433,6 +501,7 @@ fn an_over_full_tile_admits_nobody_while_its_units_depart() {
         asked += report.asked_for_the_over_full_tile;
         left += report.left_the_over_full_tile;
         predicted += report.predicted;
+        by_the_stock += report.steered_by_the_stock;
 
         let after = occupancy(&world).get(&over).copied().unwrap_or(0);
         // Admission counts the arrivals of a tile against its occupancy after
@@ -469,6 +538,11 @@ fn an_over_full_tile_admits_nobody_while_its_units_depart() {
     assert!(
         left > 0,
         "no unit left the over-full tile, so the drain is untested",
+    );
+    assert!(
+        by_the_stock > 0,
+        "no unit read the fine stock field over sixteen frames, so the branch \
+         of the prediction that reads it ran on nothing",
     );
 }
 

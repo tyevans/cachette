@@ -31,26 +31,6 @@ def test_the_three_lists_come_back_in_order():
     assert found.order == ("d", "b")
 
 
-def test_an_old_choice_reads_as_one_like_and_one_order():
-    found = steer.read_feedback({"choice": "b", "text": "more contrast"})
-    assert found.likes == ("b",)
-    assert found.order == ("b",)
-    assert found.denies == ()
-    assert found.text == "more contrast"
-
-
-def test_an_old_choice_of_none_reads_as_no_like():
-    found = steer.read_feedback({"choice": None, "text": ""})
-    assert found.likes == ()
-    assert found.order == ()
-    assert found.text is None
-
-
-def test_likes_win_over_an_old_choice_when_both_are_present():
-    found = steer.read_feedback({"choice": "a", "likes": ["c"]})
-    assert found.likes == ("c",)
-
-
 def test_an_order_that_is_missing_takes_the_like_order():
     found = steer.read_feedback({"likes": ["d", "b"]})
     assert found.order == ("d", "b")

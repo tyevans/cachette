@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-609**
+**Next number: FND-610**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -3651,8 +3651,104 @@ already works, which is one fact in two places.[^F526A]
 **An item is not done until it moves.** A directory is a status, and a status
 that nobody sets is a register that decays.
 
+### FND-594 — The camera was believed to say where every renderer stands, and the sketch fits its own page instead
+
+**Believed.** The engine camera says where the view sits. It holds the size of
+a tile in pixels and the pixel offset of the tile at the origin, and every
+renderer draws the view that camera names. A control that moves the camera
+therefore moves what both renderers show, by the same amount.
+
+**True.** That holds for the flat map alone. The sketch renderer reads the
+camera only to name the window of tiles it must cover. It then fits that window
+to the frame with a scale of its own. The size of a tile on the camera reaches
+the picture through which tiles fall inside the frame, and through nothing
+else.
+
+Two things follow from that, and both are visible to a person.
+
+The window changes in whole tiles, because it comes from the address the camera
+gives nine corner pixels, widened by a margin. A pan of a few pixels therefore
+changes the sketch by nothing, and then by a whole tile.
+
+The fit is recomputed for each window, so a pan that changes the window by one
+tile also changes the scale of the page. Grab-and-move is exact on the flat map
+and approximate in the sketch, and no arithmetic in the control layer can
+change that.
+
+**Evidence.** The build pass takes the window and the frame size, derives its
+own scale from the two, and never reads the tile size of the camera. A drag of
+nine pixels for each frame at a tile size of twenty-four rebuilds the page on
+three frames out of six, and holds the page on the other three.
+
+**Follows.** Three things.
+
+**The camera is the one source of truth for where the view stands, and a
+renderer may still choose its own scale.** The two statements are not in
+conflict, and a reader who takes the first for a promise about pixels will be
+wrong about the second.
+
+**Do not make the sketch follow the camera scale in order to fix the drag.** A
+page keyed on a continuous camera rebuilds on every pixel of a pan. The whole
+tile window is what makes the page cacheable at all.
+
+**A renderer that composites on the graphics card can honour the camera
+exactly.** It has no page to cache and no rebuild to avoid, so the limit above
+belongs to the processor path and not to the design.
+
 
 ## F. Sourcing
+
+### FND-595 — A test that names a handler cannot see that the window refuses to hold it
+
+**Believed.** The mouse controls were checked against the window library
+without a display. The check read the handler method names and compared them
+against the event names the library declares. That was called the strongest
+check a machine with no display can make.
+
+**True.** The library does not only call those methods. It holds the handler
+object by weak reference. A class that declares its attribute slots and names
+no weak reference slot cannot be referred to weakly, so the push raises
+`TypeError` before any name is read. The names were right and the push failed.
+
+**Evidence.** The demonstration raised `cannot create weak reference to
+'Controls' object` at the first window it opened. Adding the weak reference
+slot to the declared slots fixes it. Removing the slot again makes the new
+test fail with the same message the owner saw.
+
+**What follows.** A test that reads names is a test about names. When a
+library takes an object rather than calling a function, drive the real call:
+build the library's own dispatcher, push the handler onto it, and send one
+event. That needs no display and it catches what the name check cannot.
+
+### FND-596 — Every graphics test read a texture back, so none of them looked at the screen
+
+**Believed.** The device draws into a frame buffer of its own and reads the
+result back, so one path serves a window, a picture on a disk and a test with
+no display. The tests read the pixels back and compared them against the
+processor path, and they agreed. The graphics path was therefore held to work
+in a window.
+
+**True.** The device takes the application's context when the application has
+a window, because a second context would hold a second copy of every texture.
+Each pass points the frame buffer at a texture the device owns and leaves it
+pointed there. The window then presented into that texture instead of onto the
+screen, and the screen stayed black. The pixels the tests read were correct
+the whole time, because they came from the texture.
+
+**Evidence.** The demonstration drew a black window under the sketch flag on a
+machine with a display. Binding the frame buffer back to the window after the
+read fixes it. Removing that line again makes the new test fail, and the test
+reports the binding as 1 where it must be 0.
+
+**What follows.** A test that reads a target back proves the drawing is
+right. It cannot prove the screen shows it. When a module borrows a caller's
+state, test that the state is handed back, not only that the work was done.
+This is the second finding in one day where a test checked the work and not
+the hand-over.[^FND596A]
+
+**References**
+
+[^FND596A]: Findings register, FND-595. `docs/FINDINGS.md`
 
 ### FND-026 — Games do not document their implementations
 
@@ -11224,7 +11320,7 @@ The field then holds no fact that any pass of the step can contradict.
 a unit, and a block that holds none seeds nothing, so the derivation follows
 the population and never the tile count.[^F591C]
 
-### FND-592 — The relaxation reach of an approach field follows what the frame needs, not the block edge
+### FND-597 — The relaxation reach of an approach field follows what the frame needs, not the block edge
 
 **Believed.** An approach field relaxes over twice the block edge, so its reach
 covers a whole block by a straight route and admits a detour of the same
@@ -11260,7 +11356,7 @@ the instrument. The two figures above are derived on a development machine and
 not on the target platform, and the blocker that says which cost figures are
 measured stays open.[^28]
 
-### FND-593 — Two tests held that a store fills from production alone, and a unit that reaches food makes both false
+### FND-598 — Two tests held that a store fills from production alone, and a unit that reaches food makes both false
 
 **Believed.** A site store fills from the production rate of the site and from
 nothing else. A conservation test over the store therefore names four terms:
@@ -14767,7 +14863,7 @@ reader may not depend on held ground.
 **A put-back experiment answers a question a passing test cannot.** Both guards
 read as tested until the experiment ran.[^F492B]
 
-### FND-591 — Giving the engine a raze rule made a seeded run burn far more cities than it keeps
+### FND-599 — Giving the engine a raze rule made a seeded run burn far more cities than it keeps
 
 **Believed.** A rule that keeps a city the taker can supply and burns one it
 cannot gives conquest two shapes. A near conquest grows the taker and a far one
@@ -14799,12 +14895,158 @@ apart the seeder places cities. Both are balance values that one blocker
 governs, and the project owner has said he intends to tune from reinforcement
 learning runs rather than ahead of them.[^F494F] [^DEC278]
 
+**The sentence above is history. The project owner gave authority to tune
+these two values on 6 September 2026, and a later finding records what the
+measurement said.**[^F591C]
+
 **Measure the branch that a rule does not take.** A test proved each branch
 works, and a run showed that one of them almost never happens. Neither answer
 is available from the other.
 
+### FND-600 — A siege that asks an army to stand still cannot be done, because the armies of this engine do not stand still
+
+**Believed.** A conquest that costs work over ticks prices the act. The
+besieger holds the site tile, the work rises on each tick it holds, and a
+defender that returns takes the work away.
+
+**True.** The engine has nothing that makes an army stay. A campaign releases
+its cohort when the cohort reaches its objective, and the choice pass then
+moves each unit every tick. A siege that ended whenever the besieger stepped
+off the tile therefore never accumulated. **A run of 8 seeds took no city at
+all and burned one.** The rule was not expensive. It was unreachable.
+
+**Evidence.** Two sweeps of the demonstration world over eight seeds, at three
+factions, at an extent of 48, to a tick limit of 4000, on 6 September 2026 on
+one development machine (x86-64). Two counters were added to the census for
+the measurement: the site ticks a siege pressed, and the sieges that ended
+before the site fell. The sieges pressed for 1167 site ticks in one seed and
+ended 680 times, so a siege lasted under two ticks on average. A second run
+split the ending by cause. **Of 680 endings only 47 were a unit of the owning
+faction. The other 633 were the besieger leaving.** The commit body holds both
+tables and the command.
+
+**What follows.** **A rule that asks a unit to do the same thing for many
+ticks needs something in the engine that keeps it there.** The siege now waits
+when the besieger leaves and ends only when a unit of the owning faction
+stands on the site tile. The defence the project owner asked for is unchanged,
+and the rule is reachable.
+
+**Measure the mechanism before you tune its value.** The first work value was
+refuted for the wrong reason. It looked too expensive, and the value was
+lowered by two thirds with no effect at all, because the cost was never what
+stopped the conquest.
+
+**A counter that reports why a rule did not fire is worth more than one that
+reports how often it did.** The site count of the sweep rose when conquest
+stopped, and it rose again when conquest worked, so it could not tell the two
+apart.[^F592A]
+
+### FND-601 — The reach and the founding distance decide which branch of the raze rule fires, and both had to move
+
+**Believed.** The reach of a city or the distance the seeder places cities
+apart is the lever on whether a taker keeps a city or burns it, and one of the
+two would be enough.[^F593A]
+
+**True.** Both had to move. The base reach decides whether an undeveloped
+faction keeps what it takes, and the reach bound decides whether a developed
+one does. The founding distance must stand between the two. With the distance
+above the bound the keeping branch cannot fire at all, and with the distance
+below the base the burning branch cannot fire between two founded capitals.
+
+**Evidence.** Four sweeps of the demonstration world over eight seeds, at
+three factions, at an extent of 48, to a tick limit of 4000, on 6 September
+2026 on one development machine (x86-64). At a base reach of 4, a bound of 8
+and a founding distance of 16 the eight runs captured nothing. At a base of 8
+and a bound of 16, with the distance still at 16, the runs burned in six seeds
+and still captured nothing. At a founding distance of 12 the runs captured in
+one seed and burned in two, and domination ended seven of the eight. The
+commit body holds every table and the command. The figures stay derived until
+the target platform measures them.[^28]
+
+**What follows.** **A rule that reads two derived quantities inherits the gap
+between them.** The rule states no distance of its own, which is what the
+project wanted, and the values it reads must then be chosen against each
+other. The balance register now states that relation in all three rows.
+
+**A lowered founding distance moves a fixture that has nothing to do with
+conquest.** One seeding test asserts that a small world seats three of four
+factions, and a shorter distance let the same world seat four. The fixture
+seed moved, and the assertion did not.
+
+
+
+### FND-602 — Four fixture families measured a balance value and not the rule they name
+
+**Believed.** A test suite whose assertions read a work count, a distance or a
+tick budget from the table it is about is safe against a balance change,
+because it reads the value rather than repeating it.
+
+**True.** Reading the value is not enough. Each of these fixtures also depends
+on a second balance value that it never reads, and a change to either one moves
+the two apart. Four families failed on that shape at once.
+
+An unfed unit lives a fixed number of ticks, because its need falls at a fixed
+rate and its deficit then reaches a fixed bound. The work of one upgrade level
+is a separate value. Six suites placed a builder that no site feeds and gave it
+work that now takes more ticks than it lives for. The builder died partway and
+the assertion measured the hunger.
+
+The destination field of a campaign relaxes a fixed number of passes over level
+1 cells, so it steers a unit toward a seed a bounded number of cells away.[^F594A]
+One fixture chose the far corner of the world as an unreachable objective. The
+unit read no direction, the engine released it, the cohort was empty, and the
+campaign closed as lost rather than as expired.
+
+A unit of one faction on the site tile of another besieges that site.[^F594B]
+One fixture renewed a guest presence by placing an enemy on the first tile the
+listener held in index order, which is the site tile itself. The capital fell
+inside ten ticks and every test in the file failed in its own setup.
+
+**Evidence.** Eight suites of the core crate, run on 7 September 2026 on one
+development machine (x86-64), at the tip of the integration branch. Each cause
+was proved by putting the defect back and watching the suite go red again.
+
+**What follows.** **A fixture must read every balance value its run depends on,
+or it must remove the dependency.** The upgrade suites now hold the need where
+it is, through the verb a caller has, so that hunger bounds no run in a file
+about builds. The crowd counts and the raised-world counts are derived from the
+table rather than written. The campaign objective sits inside a stated window.
+
+**A fixture that cannot reach its case must say which reason it stopped for.**
+One guard already read that way and it fired correctly. The others did not:
+they reported that a level did not stand, or that a campaign did not expire,
+without saying that the builder starved or that the cohort dissolved. Both now
+name the reason.
+
+### FND-603 — A state hash pinned inside a suite is a second golden file
+
+**Believed.** A test may pin the whole state hash of a world to a constant it
+holds, as a regression pin over the subsystem the suite is about.
+
+**True.** The state hash of a world covers every arena and every rule the world
+holds. A pin on it fails when any rule moves, whether or not the subsystem
+reads that rule. The weather margin suite pinned the state hash of a world with
+no unit and no site, and a siege rule added to the world moved it. The message
+then accused the weather of a move the weather did not make.
+
+That is one fact in two declaration sites, with nothing that says which to
+regenerate when they disagree.[^F595A] The golden state hash already pins the
+state of a world, it is a stored file, and it has an owner.
+
+**Evidence.** The suite failed at the tip of the integration branch with no
+change to any weather pass. The fold of the weather field alone is stable
+across the same commits.
+
+**What follows.** A pin inside a suite must cover the subsystem the suite
+names. The weather pin now folds the weather field and not the world. Its value
+was taken on 7 September 2026 on one development machine (x86-64).
+
+
 ## References
 
+[^F591C]: Findings register, FND-601. `docs/FINDINGS.md`
+[^F592A]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
+[^F593A]: Findings register, FND-599. `docs/FINDINGS.md`
 [^F494F]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^DEC278]: Decisions register, DEC-278. `docs/DECISIONS.md`
 
@@ -14935,8 +15177,11 @@ is available from the other.
 [^F588B]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 [^F588C]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F585B]: Findings register, FND-572. `docs/FINDINGS.md`
+[^F594A]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+[^F594B]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+[^F595A]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 
-### FND-601 — The season is twice the published swing, and the oversized swing hides a cold pole
+### FND-604 — The season is twice the published swing, and the oversized swing hides a cold pole
 
 **Believed.** The temperate band was missing because the world holds too little
 seasonal swing. A world with a correct annual mean and too small a swing grades
@@ -15004,7 +15249,7 @@ immediately before this work.
 [^F601C]: Research report 30, the published atmospheric math, section 4.4. `docs/research/reports/30-the-published-atmospheric-math.md`
 
 
-### FND-602 — A diffusion on the carried temperature cannot flatten the profile, because the driver pins it
+### FND-605 — A diffusion on the carried temperature cannot flatten the profile, because the driver pins it
 
 **Believed.** The mid-latitudes and the poles stand too cold because the
 temperature follows the insolation with no transport term. A published energy
@@ -15061,7 +15306,7 @@ accessible source. The next attempt needs that data before it starts.
 [^F602C]: Research report 30, the published atmospheric math, section 5.3. `docs/research/reports/30-the-published-atmospheric-math.md`
 
 
-### FND-603 — The published energy balance produces the classes, and the ground term has no unit to meet it in
+### FND-606 — The published energy balance produces the classes, and the ground term has no unit to meet it in
 
 **Believed.** The belt of a latitude and the season are locked together, so
 neither can be corrected alone, and correcting both against a published energy
@@ -15117,12 +15362,12 @@ missing rather than mis-set.
 
 ## References
 
-[^F603A]: Findings register, FND-601. `docs/FINDINGS.md`
+[^F603A]: Findings register, FND-604. `docs/FINDINGS.md`
 [^F603B]: Blockers register, BLK-156. `docs/BLOCKERS.md`
 [^F603D]: ADR-0182, the temperature a cell is driven toward is a published energy balance, the consequences. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
 
 
-### FND-604 — The lapse rate is right and the terrain stands too high for it
+### FND-607 — The lapse rate is right and the terrain stands too high for it
 
 **Believed.** Giving the terrain a height in metres would let the ground term
 read the published lapse rate, which would give it a unit and a zero, and the
@@ -15159,7 +15404,7 @@ reaches the lapse rate, and only their product is wrong.
 is not the free variable. The free variables are the relief and the terrain,
 and both are choices that belong to the project owner.
 
-### FND-605 — Two terms had no zero, and both were found by the same question
+### FND-608 — Two terms had no zero, and both were found by the same question
 
 **Believed.** Restating the temperature driver in degrees was a change of unit.
 The terms that fed it would carry over unchanged.
@@ -15202,7 +15447,7 @@ term that is not needed**, and only an absurd input separated them.
 [^F605A]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
 
 
-### FND-606 — The field is not over-blended, and the plane that looks smoothest is the one carrying a gradient
+### FND-609 — The field is not over-blended, and the plane that looks smoothest is the one carrying a gradient
 
 **Believed.** The weather reads as one colour, so the field mixes more than it
 needs and it should keep more local contrast.

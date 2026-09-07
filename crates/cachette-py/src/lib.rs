@@ -32,11 +32,12 @@ use cachette_core::rates::RateSchedule;
 use cachette_core::site::COMMODITY_COUNT;
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow};
 use cachette_core::upgrade::{UpgradeCategory, UpgradeRow};
+use cachette_core::weather::CLOUD_SHARE_WHOLE;
 use cachette_core::TileIdx;
 use cachette_core::{Advert, Consideration, KIND_LAND, KIND_RELATION, KIND_RESOURCE};
 use cachette_core::{
     Axial, CommodityId, Entity, FactionId, FactionWeights, Fix32, Holder, Influence, ResourceKind,
-    WeatherScale, World as CoreWorld, WorldConfig, WEIGHT_HIGH, WEIGHT_LOW,
+    TileKind, WeatherScale, Wind, World as CoreWorld, WorldConfig, WEIGHT_HIGH, WEIGHT_LOW,
 };
 use cachette_view::panel::Set as PanelSet;
 use cachette_view::{
@@ -1058,6 +1059,180 @@ impl PyWorld {
             .map(|holder| holder.to_bits())
             .collect();
         raw.to_pyarray(python)
+    }
+
+    /// Copies the tile height column into a new NumPy array.
+    ///
+    /// Returns a one-dimensional array of `numpy.int32`, one entry for each
+    /// tile, in row-major order. Entry `r * width + q` is the tile at the
+    /// address `(q, r)`. The order is the order that `tile_holders` uses, so
+    /// the two arrays index alike.
+    ///
+    /// **Each entry is a Q16.16 fixed-point height as its raw integer.**
+    /// Divide by 65536 to read it as a quantity. The boundary carries the raw
+    /// integer, because a float crossing would give a caller a value the
+    /// engine never held.[^1]
+    ///
+    /// **The height of a tile is a pure function of the seed and the
+    /// address**, so this answer never changes over the life of a world.[^2]
+    /// The climate leaves the height alone, so this column is the column that
+    /// the level 1 summary sums into `height_total`.
+    ///
+    /// This method copies, and it also generates. The world stores no array
+    /// of heights, so the call visits every tile.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^2]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    fn tile_heights<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i32>> {
+        let raw: Vec<i32> = python.detach(|| {
+            let world = self.lock();
+            let grid = world.grid();
+            (0..grid.tile_count())
+                .map(|index| {
+                    grid.address_of(TileIdx(index))
+                        .and_then(|address| world.tile_terrain(address))
+                        .map_or(0, |tile| tile.height.0)
+                })
+                .collect()
+        });
+        raw.to_pyarray(python)
+    }
+
+    /// Copies the terrain kind of every tile into a new NumPy array.
+    ///
+    /// Returns a one-dimensional array of `numpy.uint8`, one entry for each
+    /// tile, in row-major order. Entry `r * width + q` is the tile at the
+    /// address `(q, r)`. The order is the order that `tile_holders` uses.
+    ///
+    /// **Each entry is the same number that the `kind` key of `tile_report`
+    /// carries**, so a caller reads one tile and the whole world through one
+    /// set of numbers. The kinds are water, plain, forest, hill and mountain,
+    /// and the engine numbers them.
+    ///
+    /// The climate over a tile reaches the answer, so a cold cell reports the
+    /// kind that the classifier gives under that climate.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    fn tile_kinds<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<u8>> {
+        let raw: Vec<u8> = python.detach(|| {
+            let world = self.lock();
+            let grid = world.grid();
+            (0..grid.tile_count())
+                .map(|index| {
+                    grid.address_of(TileIdx(index))
+                        .and_then(|address| world.tile_kind(address))
+                        .map_or(0, TileKind::to_u8)
+                })
+                .collect()
+        });
+        raw.to_pyarray(python)
+    }
+
+    /// Copies the cloud share over every tile into a new NumPy array.
+    ///
+    /// Returns a one-dimensional array of `numpy.int32`, one entry for each
+    /// tile, in row-major order. Entry `r * width + q` is the tile at the
+    /// address `(q, r)`. The order is the order that `tile_holders` uses.
+    ///
+    /// **Each entry is the share of the sky that a watcher sees as cloud**,
+    /// from none to `cloud_share_whole`. It is the air held over the cell
+    /// against what that air can hold, and not the air against a mark that
+    /// every cell shares.
+    ///
+    /// **The array stands at tile resolution and the weather stands on the
+    /// level 1 cell**, so every tile of one cell reports the same share. Each
+    /// entry is the number that `air_at` answers for that tile, put through
+    /// the same share. **The engine owns the map from a tile to its weather
+    /// cell.** The weather lattice carries a margin around the world, so a
+    /// caller that indexed a weather plane by a world address would read the
+    /// wrong cell. This reader therefore takes an address and never a cell,
+    /// and it publishes no map.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-569. `docs/FINDINGS.md`
+    fn cloud_shares<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i32>> {
+        let raw: Vec<i32> = python.detach(|| {
+            let world = self.lock();
+            let grid = world.grid();
+            (0..grid.tile_count())
+                .map(|index| {
+                    grid.address_of(TileIdx(index))
+                        .and_then(|address| world.cloud_share_at(address))
+                        .and_then(|share| i32::try_from(share).ok())
+                        .unwrap_or(0)
+                })
+                .collect()
+        });
+        raw.to_pyarray(python)
+    }
+
+    /// The largest cloud share, as an integer.
+    ///
+    /// A `cloud_shares` entry runs from zero to this number. The engine
+    /// declares it, so a caller that scales the share holds no second copy of
+    /// the ceiling.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[getter]
+    fn cloud_share_whole(&self) -> i64 {
+        CLOUD_SHARE_WHOLE
+    }
+
+    /// Copies the wind over every tile into two NumPy arrays.
+    ///
+    /// Returns a `dict` with the keys `q` and `r`. Each holds a
+    /// one-dimensional array of `numpy.int32`, one entry for each tile, in
+    /// row-major order. Entry `r * width + q` is the tile at the address
+    /// `(q, r)`. The order is the order that `tile_holders` uses.
+    ///
+    /// **The wind is an integer vector over the two axes of the cell
+    /// lattice.** The lattice has three axes and two of them are free, so the
+    /// third part is `-(q + r)` and the engine stores it nowhere. The parts
+    /// are whole lattice steps and not a fixed-point value.
+    ///
+    /// **This is the wind itself and not a drawing of it.** A caller that
+    /// wants a heading or a speed derives it from the two parts. The map
+    /// overlay paints the same wind as one of six hues, and that palette is a
+    /// choice of the renderer. A second copy of it here would be one fact in
+    /// two places.[^2]
+    ///
+    /// **The array stands at tile resolution and the wind stands on the level
+    /// 1 cell**, so every tile of one cell reports the same vector. The
+    /// engine owns the map from a tile to its weather cell, in the way the
+    /// cloud reader describes.
+    ///
+    /// The wind is carried state, so a watcher who reads it reads what the
+    /// next step will read.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+    /// [^2]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    fn tile_winds<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let (along_q, along_r): (Vec<i32>, Vec<i32>) = python.detach(|| {
+            let world = self.lock();
+            let grid = world.grid();
+            (0..grid.tile_count())
+                .map(|index| {
+                    let wind = grid
+                        .address_of(TileIdx(index))
+                        .and_then(|address| world.wind_at(address))
+                        .unwrap_or(Wind::STILL);
+                    (wind.q, wind.r)
+                })
+                .unzip()
+        });
+        let axes = PyDict::new(python);
+        axes.set_item("q", along_q.to_pyarray(python))?;
+        axes.set_item("r", along_r.to_pyarray(python))?;
+        Ok(axes)
     }
 
     /// Returns the name of every panel the viewer can draw.

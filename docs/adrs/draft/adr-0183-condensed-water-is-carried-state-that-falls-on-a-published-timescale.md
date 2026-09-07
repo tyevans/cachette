@@ -120,7 +120,7 @@ water the field carries.[^6]
 [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D2. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 [^2]: Research report 29, the field pattern worked through the weather, section 3.3. `docs/research/reports/29-the-field-pattern-worked-through-the-weather.md`
 [^3]: Research report 30, the published atmospheric math, section 3. `docs/research/reports/30-the-published-atmospheric-math.md`
-[^4]: Findings register, FND-604. `docs/FINDINGS.md`
+[^4]: Findings register, FND-607. `docs/FINDINGS.md`
 [^5]: Blockers register, BLK-155. `docs/BLOCKERS.md`
 [^6]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^7]: ADR-0161, water rides the wind, and every transfer is an exact integer move, decision D2. `docs/adrs/accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`

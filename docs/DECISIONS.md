@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-279**
+**Next number: DEC-280**
 
 ## Open
 
@@ -1946,6 +1946,97 @@ figure is 168 MB. The storage argument for vectors is stronger than the report
 concluded, and it called that argument its weakest.
 
 ## Closed
+
+### DEC-279 — What does it cost a faction to take a city, and what does it cost to burn one?
+
+**Closed. Option C. A site falls to a siege, and a raze costs a multiple of a
+capture.**
+
+A capture and a raze both fired the instant one unit stood on an undefended
+site tile.[^DEC278A] Razing a foreign city therefore cost a faction one unit
+and one step. The project owner ruled on 6 September 2026 that the damage and
+the time a raze costs must be far larger, and asked for a mechanism rather than
+naming one.
+
+**Option A. A raze waits a stated number of ticks.** One value and one counter.
+Rejected because a delay is not a defence. A besieged city could do nothing
+about a timer, and a garrison and a relief force would change nothing.
+
+**Option B. A raze costs the razing faction units.** Rejected because it is a
+second combat rule beside the one the contest already holds, and it prices the
+act rather than the holding of the ground.
+
+**Option C. A site falls to a siege, and a siege is work.** The engine already
+holds a project that costs work over ticks, and a builder does one work a
+tick.[^DEC279B] A besieging unit does the same. The site resists by the
+residents it holds. A capture takes the work a capture costs, and a raze takes
+a multiple of it.
+
+**Why C.** It reuses a mechanism the project already has, so it adds two
+balance rows and no new scale. It answers the interruption directly: the
+trigger is read again on every tick, so a garrison or a relief force ends the
+siege and its work. **The damage the owner asked for is the contest, and it
+arrives for free.** A besieger that must stand on an enemy city for many ticks
+stands in contact with every relief force those ticks bring, and the contest
+already resolves that. A rule that removed units at the siege would have priced
+the same thing twice.
+
+**A capture costs a siege too, and it costs less than a raze.** The owner named
+razing alone. A capture that stayed instant would leave the act he called too
+easy in place, and it would make every taker capture and never besiege. The
+ratio between the two is where the ruling lives, and the balance register holds
+it.[^DEC279C]
+
+**The two values are balance rows and this decision states neither.** One
+blocker holds every value of the downstream game.[^DEC278C]
+### DEC-280 — Which mouse gesture moves which axis of the view?
+
+**Closed. The conventions a person arrives with, and not a scheme of our own.**
+
+The demonstration had no mouse control except a press that named a tile. It
+scrolled and zoomed on the keyboard alone. A person who opens a map expects to
+drag it and to zoom on the wheel, and a person who opens a view of a scene
+expects a second button to turn it.
+
+**The left button drags the ground, and the ground stays under the cursor.**
+The other reading is push-the-camera, where the ground runs away from the hand.
+Every map a person has used takes hold of the ground, so the other reading is
+not a real option. The engine offers a pan verb in pixels, so this costs one
+call with the sign turned round.
+
+**The wheel zooms about the cursor, and not about the middle of the frame.**
+The engine zoom verb holds the middle of the frame, which is the wrong anchor
+for a mouse and the right one for a key. The control layer therefore reads the
+address under the cursor, changes the scale, and puts that address back. A
+zoom about the middle throws away the one thing the person was pointing at, and
+it is the failure a reader does not see and a person feels at once. Two tests
+name it.
+
+**One wheel notch is worth three zoom presses.** A press is small because a
+person holds a key down. A notch is one act. Three notches then about double
+the size of a tile, which is the range a map gives. The factor comes from the
+engine, so the wheel and the keys cannot part company.
+
+**The right button and the middle button both turn and lean.** Two buttons
+carry one gesture on purpose. A trackpad has no middle button, and a mouse with
+a wheel has no comfortable middle drag, so a person reaches for whichever one
+their hardware gives them. Neither button had a meaning before this, so nothing
+was repurposed.
+
+**A drag down leans the view towards a plan, in the same sense as the left
+drag.** The hand takes hold of the ground and the ground follows it. A drag
+down pulls the near edge towards the watcher and lays the ground flat. The
+opposite sense is also in use in the field, and this one was chosen because it
+agrees with the left drag rather than because it is more common.
+
+**The lean stops at both ends, and the turn wraps.** A lean over a plan turns
+the picture over, and a lean of nothing puts the watcher in the ground. A turn
+that has gone all the way round stands where it started, so it needs no bound.
+
+**The camera holds no angle, so the turn and the lean live beside it.** The
+engine camera is a flat map camera. A view object holds it together with the
+two angles, and that object is the one source of truth for where the watcher
+stands. The mouse writes there, and a renderer reads there.
 
 ### DEC-278 — When does the engine keep a city it takes, and when does it burn it?
 
@@ -4394,6 +4485,8 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 
 ## References
 
+[^DEC279B]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+[^DEC279C]: Balance register, the siege. `docs/reference/balance.md`
 [^DEC278A]: ADR-0180, a site changes hands or the taker destroys it, decision D3. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
 [^DEC278B]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^DEC278C]: Blockers register, BLK-050. `docs/BLOCKERS.md`

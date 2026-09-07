@@ -8,9 +8,10 @@ the chosen ones to disk in a layout that something else can load.
 
 The person outranks the model, as the tool guide states.[^1] The rule
 therefore reads the sessions of one style and one asset, newest session
-first, and takes the first human choice that it finds. When no person chose,
-it takes the highest score of every round of every session. A later round
-wins a tie, so the pack follows the work.
+first, and takes the drawing that the person put first. When no person
+chose, it takes the highest score of every round of every session. A refused
+drawing never wins, whatever the model scored it. A later round wins a tie,
+so the pack follows the work.
 
 ## Which session draws which asset
 
@@ -140,7 +141,7 @@ def pick_for(
     found = sessions_for(store, style, slug, sessions)
     for session in reversed(found):
         for entry in reversed(session.rounds):
-            letter = entry.choice
+            letter = entry.winner
             if letter is None:
                 continue
             variant = _variant(entry, letter)
@@ -164,6 +165,10 @@ def pick_for(
         for entry in session.rounds:
             for variant in entry.present_variants:
                 if variant.svg is None:
+                    continue
+                if variant.letter in entry.denies:
+                    # A person refused this drawing. It never stands for the
+                    # asset, whatever the model scored it.
                     continue
                 # A drawing with no critique still counts. The critique
                 # arrives after the picture, and a person may want the

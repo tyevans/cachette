@@ -326,28 +326,45 @@ class RunManager:
         requests: list[tuple[str | None, str]],
         rounds: int,
         variants: int,
+        *,
+        session_id: str | None = None,
     ) -> Job:
         """Record a job, put it in the queue, and give the record.
 
         The call returns as soon as the record is on disk. The work starts
         on the worker thread, which may already carry another job.
+
+        `session_id`, when given, names a session that already exists under
+        `style`. The job then reuses that identifier instead of minting one,
+        and it must hold exactly one subject. This is how a person adds
+        rounds to a session from the browser.
         """
         safe_name(style)
         if not requests:
             raise ValueError("a job needs at least one subject")
+        if session_id is not None:
+            if len(requests) != 1:
+                raise ValueError("a job that reuses a session holds one subject")
+            safe_name(session_id)
+            if not (self.sessions_root / style / session_id).is_dir():
+                raise ValueError(f"no such session: {style}/{session_id}")
         with self._lock:
             job_id = self._free_job_id(style)
             directory = self.runs_root / job_id
             directory.mkdir(parents=True, exist_ok=True)
             items = []
             for index, (slug, subject) in enumerate(requests):
-                session_id = self._free_session_id(style, slug, index)
+                item_session_id = (
+                    session_id
+                    if session_id is not None
+                    else self._free_session_id(style, slug, index)
+                )
                 items.append(
                     Item(
                         slug=slug,
                         subject=subject,
-                        session_id=session_id,
-                        log=f"{session_id}.log",
+                        session_id=item_session_id,
+                        log=f"{item_session_id}.log",
                     )
                 )
             job = Job(

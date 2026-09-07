@@ -313,7 +313,7 @@ fn the_store_falls_by_exactly_what_the_cohorts_received() {
     // did.[^1] The delivery counts whole loads, and the store holds a
     // fixed-point quantity, so the term is the count raised to that scale.
     //
-    // [^1]: Findings register, FND-593. `docs/FINDINGS.md`
+    // [^1]: Findings register, FND-598. `docs/FINDINGS.md`
     let delivered = (world.delivered_carry()[0] as i64) << 16;
     assert!(taken > 0, "the fixture must reach a draw");
     assert!(born > 0, "the fixture must reach a birth");
