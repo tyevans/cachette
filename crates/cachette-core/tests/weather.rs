@@ -563,20 +563,13 @@ fn cold_ground_holds_less_air_than_warm_ground() {
         if ground.tiles() == 0 {
             continue;
         }
-        // **The ground supplies a cooling and not a heat.** It is a signed
-        // number of hundredths of a degree below the balance, so the test
-        // reads it directly rather than through the capacity of a warmth it
-        // no longer produces.[^1]
-        //
-        // [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
-        let cooling =
-            i64::from(weather::relief_cooling_of(ground, weather::HeightRange::DEFAULT));
-        lowest = lowest.min(cooling);
-        highest = highest.max(cooling);
+        let capacity = weather::capacity_at(weather::heat_of(ground)).0;
+        lowest = lowest.min(capacity);
+        highest = highest.max(capacity);
     }
     assert!(
         highest > lowest,
-        "every cell stands at one height, so the ground does nothing"
+        "every cell holds the same air, so the ground does nothing"
     );
 }
 
@@ -1274,7 +1267,7 @@ fn the_air_never_stands_above_the_saturation_mark() {
 /// past that mark carries no depth, so nothing else in the field can tell a
 /// shelf from an abyss.
 #[test]
-fn shallow_water_lags_less_than_deep_water() {
+fn shallow_water_is_warmer_than_deep_water_and_lags_less() {
     let mark = i64::from(cachette_core::terrain::HEIGHT_WATER.0);
     let sea = |height: i64| weather::CellGround {
         height_total: height * 1024,
@@ -1284,13 +1277,10 @@ fn shallow_water_lags_less_than_deep_water() {
     };
     let shelf = sea(mark - mark / 8);
     let abyss = sea(mark / 8);
-    // **This test held a second clause and a record removed it.** It asserted
-    // that a shelf stands warmer than an abyss in the mean. The sea moderates
-    // a coast by holding its heat rather than by sitting at a different mean,
-    // and the field carries that as the lag below. A second term for it would
-    // be one fact in two places, so the driver no longer holds one.[^1]
-    //
-    // [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+    assert!(
+        weather::heat_of(shelf) > weather::heat_of(abyss),
+        "a shelf and an abyss hold the same heat, so depth does nothing"
+    );
     assert!(
         weather::lag_of(abyss) > weather::lag_of(shelf),
         "an abyss tracks the season as fast as a shelf does"
