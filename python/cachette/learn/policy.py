@@ -30,10 +30,14 @@ schema-declared bounded tables, decision D5.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
+
+if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
+    from collections.abc import Mapping
 
 # The divisor that brings the signed logarithm into roughly one unit. A store
 # total of a raw Q16.16 quantity reaches about twenty in the logarithm, so
@@ -58,6 +62,166 @@ def encode_many(observations: np.ndarray) -> np.ndarray:
     squashed = np.sign(values) * np.log1p(np.abs(values)) / FEATURE_SCALE
     ones = np.ones((values.shape[0], 1))
     return np.concatenate([squashed, ones], axis=1)
+
+
+class PolicyFitError(ValueError):
+    """A stored policy does not fit the world a caller asked it to play.
+
+    A weight file is a function of one observation layout and one action
+    layout. Both layouts are functions of the world parameters, so a file
+    written against one world states nothing about another.[^1]
+
+    **The lengths alone do not separate two worlds.** The observation length
+    counts the cells of the block lattice, and a block is a fixed number of
+    tiles on a side. Every world from one block to two blocks on each axis
+    therefore holds the same cell count and the same observation length. A
+    policy trained on the smallest of those loads on the largest, reads an
+    array of the length it expects, and plays a world it never saw. Nothing
+    raises, because nothing has a shape to disagree about.
+
+    The fit therefore carries the world extent and the faction count beside
+    the two lengths and the two versions.
+
+    References
+    ----------
+    [^1]: ADR-0154, the observation and the action of a faction are
+    schema-declared bounded tables, decision D2.
+    ``docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md``
+    """
+
+
+@dataclass(frozen=True)
+class PolicyFit:
+    """What one weight file was trained against.
+
+    Every entry is a function of the world parameters and never of the
+    population.[^1] A file states its fit, and a caller that plays the file
+    states the fit of its own world. The two must agree.
+
+    The two version entries come from the engine schemas and never from a
+    constant in this package. A version written by hand is a second
+    declaration of a number the engine owns, and nothing fails when the two
+    disagree.[^2]
+
+    References
+    ----------
+    [^1]: ADR-0154, the observation and the action of a faction are
+    schema-declared bounded tables, decision D2.
+    ``docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md``
+
+    [^2]: Recurring defect shapes, shape 1.
+    ``.agents/rules/recurring-defects.md``
+    """
+
+    observation_version: int
+    action_version: int
+    observation_length: int
+    action_length: int
+    width: int
+    height: int
+    faction_count: int
+
+    # The keys a weight file stores the fit under. The names are the ones
+    # the trainer already wrote, so a file written before this type existed
+    # still reads back as a fit.
+    KEYS = (
+        "observation_version",
+        "action_version",
+        "observation_length",
+        "action_length",
+        "width",
+        "height",
+        "faction_count",
+    )
+
+    @classmethod
+    def of_env(cls, env: EnvLike) -> PolicyFit:
+        """Return the fit of the world one environment builds."""
+        config = env.config
+        return cls(
+            observation_version=int(env.observation_version),
+            action_version=int(env.action_version),
+            observation_length=int(env.observation_length),
+            action_length=int(env.action_length),
+            width=int(config.width),
+            height=int(config.height),
+            faction_count=int(config.faction_count),
+        )
+
+    @classmethod
+    def read(cls, meta: Mapping[str, object]) -> PolicyFit | None:
+        """Return the fit a weight file states, or nothing when it states none.
+
+        A file written before this package stored a fit names some of the
+        keys and not others. Such a file cannot be placed, so this returns
+        nothing and the caller refuses it.
+        """
+        values: dict[str, int] = {}
+        for key in cls.KEYS:
+            value = meta.get(key)
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                return None
+            values[key] = int(value)
+        return cls(**values)
+
+    def as_meta(self) -> dict[str, int]:
+        """Return the fit as the entries a weight file stores."""
+        return {key: int(getattr(self, key)) for key in self.KEYS}
+
+    def describe(self) -> str:
+        """Return one line that names every entry of the fit."""
+        return ", ".join(f"{key}={getattr(self, key)}" for key in self.KEYS)
+
+    def check(self, wanted: PolicyFit, path: Path | None = None) -> None:
+        """Refuse when this fit is not the fit a caller asked for.
+
+        Raises ``PolicyFitError`` naming both sides, so a reader sees which
+        entry differs without opening the file.
+        """
+        if self == wanted:
+            return
+        differ = [
+            f"{key}: the file says {getattr(self, key)} "
+            f"and the world says {getattr(wanted, key)}"
+            for key in self.KEYS
+            if getattr(self, key) != getattr(wanted, key)
+        ]
+        where = f" at {path}" if path is not None else ""
+        message = (
+            f"the stored policy{where} does not fit this world. "
+            + "; ".join(differ)
+            + f". The file states {self.describe()}. "
+            f"The world states {wanted.describe()}. "
+            "Train a policy against this world, or play the policy on the "
+            "world it was trained against."
+        )
+        raise PolicyFitError(message)
+
+
+class EnvLike(Protocol):
+    """What a fit reads from an environment.
+
+    The fit needs the two schema versions, the two lengths and the world
+    parameters. Naming them here keeps this module free of an import from
+    the environment, which imports this one.
+    """
+
+    observation_version: int
+    action_version: int
+    observation_length: int
+    action_length: int
+
+    @property
+    def config(self) -> ConfigLike:
+        """The configuration the environment runs."""
+
+
+class ConfigLike(Protocol):
+    """The world parameters a fit reads from an environment configuration."""
+
+    width: int
+    height: int
+    faction_count: int
 
 
 class Policy(Protocol):
@@ -233,17 +397,39 @@ class MLPPolicy:
         )
 
 
-def load_policy(path: Path) -> tuple[LinearPolicy | MLPPolicy, dict[str, object]]:
+def load_policy(
+    path: Path, wanted: PolicyFit | None = None
+) -> tuple[LinearPolicy | MLPPolicy, dict[str, object]]:
     """Read a weight file, and return the policy it holds and what it names.
 
     The file states its own kind. A file written before this module held two
     kinds names none, and it holds a linear policy.
+
+    **Pass the fit of the world the policy will play.** The reader then
+    refuses a file that was trained against another world, and it names both
+    sides in the message. A caller that passes nothing takes whatever the
+    file holds, which is correct for a reader that only reports what a file
+    says.
+
+    Raises ``PolicyFitError`` when a fit is asked for and the file does not
+    match it, and when a fit is asked for and the file states none.
     """
     stored = np.load(path, allow_pickle=False)
     kind = str(stored["kind"]) if "kind" in stored.files else "linear"
     skip = {"weights", "first", "second", "kind"}
     meta = {key: stored[key].tolist() for key in stored.files if key not in skip}
     meta["kind"] = kind
+    if wanted is not None:
+        held = PolicyFit.read(meta)
+        if held is None:
+            message = (
+                f"the stored policy at {path} states no fit, so nothing can "
+                "place it. The file must name every one of "
+                f"{', '.join(PolicyFit.KEYS)}. The world states "
+                f"{wanted.describe()}. Train a policy against this world."
+            )
+            raise PolicyFitError(message)
+        held.check(wanted, path)
     if kind == "mlp":
         return MLPPolicy(stored["first"], stored["second"]), meta
     return LinearPolicy(stored["weights"]), meta

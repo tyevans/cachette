@@ -30,7 +30,7 @@ import pytest
 if TYPE_CHECKING:
     from pathlib import Path
 
-from cachette.learn.env import EnvConfig, viable_seeds
+from cachette.learn.env import Env, EnvConfig, viable_seeds
 from cachette.learn.policy import load_policy
 from cachette.learn.reward import Weighting
 from cachette.learn.train import TrainConfig, train
@@ -96,8 +96,13 @@ def test_the_latest_file_names_the_generation_and_the_spread(
     assert np.isfinite(spread)
     # The versions still travel, so a stale file fails loudly rather than
     # acting on the wrong columns.
-    assert meta["action_version"] == 1
-    assert meta["observation_version"] == 1
+    #
+    # **The two numbers come from the engine and not from a literal here.** A
+    # test that names the number is a second declaration of it, and it fails
+    # for the wrong reason on the tick the engine moves.
+    probe = Env(WORLD, WEIGHTING)
+    assert meta["action_version"] == probe.action_version
+    assert meta["observation_version"] == probe.observation_version
 
 
 def test_a_resumed_run_continues_rather_than_restarting(

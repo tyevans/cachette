@@ -275,6 +275,54 @@ impl<'a> BlockMask<'a> {
     }
 }
 
+/// The four counts that one cell contributes relative to one faction.
+///
+/// **Every count here is relative to the faction that reads, and none of
+/// them is indexed by a faction.** A plane with one entry for each faction
+/// multiplies the world by the faction count, and the record refuses
+/// one.[^1] Two counts therefore stand for every rival together.
+///
+/// # References
+///
+/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+#[derive(Clone, Copy, Debug, Default)]
+struct FactionSplit {
+    own_units: i64,
+    other_units: i64,
+    own_held_tiles: i64,
+    other_held_tiles: i64,
+}
+
+impl FactionSplit {
+    /// Adds what one tile contributes, for a tile the faction sees now.
+    ///
+    /// The unit walk reads the derived unit structure for the tile and the
+    /// faction column of each identity on it. It is bounded by the units
+    /// that stand on the observed tiles, and never by the population of the
+    /// world.
+    ///
+    /// The walk visits the units in the order the structure holds them,
+    /// which is a property of storage. Nothing here reads a thread.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn take(&mut self, world: &World, faction: FactionId, address: Axial, tile: TileIdx) {
+        for unit in world.bridge().on_tile_unguarded(tile) {
+            match world.soldiers().faction(*unit) {
+                Some(owner) if owner == faction => self.own_units += 1,
+                Some(_) => self.other_units += 1,
+                None => {}
+            }
+        }
+        match world.tile_holder(address).and_then(Holder::faction) {
+            Some(holder) if holder == faction => self.own_held_tiles += 1,
+            Some(_) => self.other_held_tiles += 1,
+            None => {}
+        }
+    }
+}
+
 /// The summary of one cell, over the tiles one faction may read.
 ///
 /// The summary field holds the same fields the whole-world summary holds, so
@@ -294,6 +342,10 @@ pub struct MaskedSummary {
     admitted: i64,
     withheld: i64,
     summary: CellSummary,
+    own_units: i64,
+    other_units: i64,
+    own_held_tiles: i64,
+    other_held_tiles: i64,
 }
 
 impl MaskedSummary {
@@ -323,6 +375,53 @@ impl MaskedSummary {
     #[must_use]
     pub const fn summary(self) -> CellSummary {
         self.summary
+    }
+
+    /// Returns the units of the reading faction that stand on the admitted
+    /// tiles it sees now.
+    ///
+    /// **The count is relative to the faction that read, and it is not one
+    /// count for each faction.** A field indexed by the faction multiplies
+    /// the world by the faction count, and the record refuses one.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    #[must_use]
+    pub const fn own_units(self) -> i64 {
+        self.own_units
+    }
+
+    /// Returns the units of every other faction that stand on the admitted
+    /// tiles the reading faction sees now.
+    ///
+    /// An ally and an invader both count here. The relation that separates
+    /// the two is a quantity of its own, and it is not a property of a
+    /// tile.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D1. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    #[must_use]
+    pub const fn other_units(self) -> i64 {
+        self.other_units
+    }
+
+    /// Returns the admitted tiles the reading faction holds, over the tiles
+    /// it sees now.
+    #[must_use]
+    pub const fn own_held_tiles(self) -> i64 {
+        self.own_held_tiles
+    }
+
+    /// Returns the admitted tiles another faction holds, over the tiles the
+    /// reading faction sees now.
+    ///
+    /// A tile that nobody holds counts in neither this nor the own count, so
+    /// the two do not sum to the admitted tile count.
+    #[must_use]
+    pub const fn other_held_tiles(self) -> i64 {
+        self.other_held_tiles
     }
 }
 
@@ -382,7 +481,7 @@ impl World {
         let layout = self.observation().layout();
         let key = layout.key_of(self.grid().index_of(address)?)?;
         let block = layout.block_of_key(key);
-        self.masked_block(&BlockMask::of(self, faction, block), block, admit)
+        self.masked_block(&BlockMask::of(self, faction, block), faction, block, admit)
     }
 
     /// Returns the summary of one cell of the lattice, over the tiles one
@@ -410,6 +509,7 @@ impl World {
     pub(crate) fn masked_block(
         &self,
         mask: &BlockMask<'_>,
+        faction: FactionId,
         block: u32,
         admit: Admit,
     ) -> Option<MaskedSummary> {
@@ -427,6 +527,10 @@ impl World {
                 admitted: 0,
                 withheld: tiles,
                 summary: CellSummary::IDENTITY,
+                own_units: 0,
+                other_units: 0,
+                own_held_tiles: 0,
+                other_held_tiles: 0,
             });
         }
 
@@ -439,6 +543,11 @@ impl World {
         let mut summary = CellSummary::IDENTITY;
         let mut admitted = 0i64;
         let mut withheld = 0i64;
+        // **The four faction-relative counts are accumulated in this walk
+        // and not in a second one.** This is the one place that applies the
+        // sight rule to a cell, so a count taken anywhere else could state
+        // that a faction sees ground it does not.
+        let mut split = FactionSplit::default();
         for row in first_row..last_row {
             for column in first_column..last_column {
                 let here = Axial::new(column as i32, row as i32);
@@ -461,6 +570,12 @@ impl World {
                 }
                 admitted += 1;
                 summary = summary.combine(self.tile_summary(here, tile, sees_now)?);
+                // A tile the faction only remembers contributes no unit and
+                // no holder, in the way the summary of it contributes none.
+                // Both are facts of the present frame.
+                if sees_now {
+                    split.take(self, faction, here, tile);
+                }
             }
         }
         Some(MaskedSummary {
@@ -468,6 +583,10 @@ impl World {
             admitted,
             withheld,
             summary,
+            own_units: split.own_units,
+            other_units: split.other_units,
+            own_held_tiles: split.own_held_tiles,
+            other_held_tiles: split.other_held_tiles,
         })
     }
 

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-634**
+**Next number: FND-637**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -16436,6 +16436,118 @@ nothing failed at run time because Python does not read an annotation.
 at several correct callers, the fault is upstream of all of them.
 
 
+### FND-634 — One encoding was read as one rate, and the learner acts about ten times less often than the controller it is measured against
+
+**Believed.** A learner action and a built-in controller choice reach one
+encoding. The action table holds the controller's choice enumeration plus the
+no-op, and the world runs both through one set of verbs.[^F630A] [^F630B] A
+reader takes from this that a learner and a controller reach the world alike,
+so a contest between the two measures policy.
+
+**False for the rate.** The encoding is shared. The rate is not.
+
+The controller emits several commands for one faction on one tick. It makes a
+fixed number of evaluations, each of which emits one order, and it then emits
+up to nine further commands that its own draws and schedules gate.[^F630A]
+
+The learner emits one action for one decision. The environment then runs the
+world for the decision interval, and the shipped interval is five ticks.[^F630C]
+
+**Evidence.** One world 48 tiles on a side, with three factions and the learner
+seat under external control, ran 300 ticks. The engine counted 1227 controller
+commands over the two remaining factions. That is 2.045 commands for one
+faction on one tick, against 0.200 for the learner at the shipped interval. A
+research report holds the measurement and the command that produced it.[^F630D]
+
+**What follows.** **A result measured against the built-in controller measures
+the rate before it measures the policy.** The strongest baseline the project
+states runs the controller in the learner's own seat, and that baseline acts at
+the controller rate.[^F630C] No policy class recovers a factor of ten in
+decision count.
+
+**Compare a rate before you compare a policy.** When two actors share an
+interface, check how often each one uses it.
+
+
+### FND-635 — A policy loaded on the wrong world was believed to always fail, and it fails only across a lattice band
+
+**Believed.** The observation length is a function of the cell count, and the
+cell count is a function of the world size. A research report took from this
+that a policy trained on one world size loads on another, succeeds, and
+computes the wrong answer.[^F631A]
+
+**Half false.** The failure depends on which pair of worlds a caller names.
+
+The observation lattice divides the world into blocks of a fixed edge, and the
+edge is 32 tiles. Every world from 33 to 64 tiles on each axis therefore holds
+four cells. At three factions each of those worlds holds an observation length
+of 176 and an action length of 29.
+
+A policy trained on a world 48 tiles on a side loads on one 64 tiles on a side,
+reads an array of the length it expects, and plays a world with 78 per cent
+more tiles. **Nothing raises, because no array has a shape to disagree about.**
+
+A world of another band holds another length. The matrix product then refuses
+it, and the message names a core dimension and neither world.
+
+**Evidence.** One measurement built worlds of six shapes at three factions and
+read the two schema lengths of each. Worlds 48, 64 and 33 tiles on a side, and
+one 40 by 56, all gave 176 and 29. A world 96 tiles on a side gave 221. A
+policy stored against the smallest played the largest of the four with no
+error, and raised on the world of the other band. A test file holds the
+case.[^F631B]
+
+**What follows.** **A length is not an identity.** Two tables of one length may
+hold two layouts, so a check that compares lengths passes the case it exists
+for.
+
+A weight file now states the world extent, the faction count and both schema
+versions beside the two lengths. A reader refuses a file whose statement is not
+the world it is asked to play.[^F631C]
+
+**A version that a caller writes by hand is not the engine's version.** The
+trainer wrote both schema versions as the literal one. A version bump would
+have left every new file stating the old number, and the check would have
+passed against a layout that had moved. The fit now reads both versions from
+the schemas of the world.[^F631D]
+
+
+### FND-636 — A cell count that named no faction was read as a count of the reader's own
+
+**Believed.** The observation array told a faction what stood in each cell of
+the map lattice. Two of its fields counted the units on the tiles of a cell and
+the tiles of a cell that somebody held.
+
+**False.** Neither field said whose. The unit count summed every faction that
+stood on the observed tiles, and the held count summed every holder. A faction
+could not tell its own army from an invading one, and it could not tell its own
+ground from a rival's.
+
+**Evidence.** One world 48 tiles on a side, three factions, 300 ticks. The
+faction in seat zero read a held count of 44 tiles in the first cell and 184 in
+the second, against an own total of 165 held tiles over the whole world. The
+two cell numbers sum to 228, so most of what the faction read was somebody
+else's ground and nothing said so. A report holds the measurement.[^F632A]
+
+The split now reads, for the same world and the same tick, an own count of 0
+and 118 and an other count of 44 and 66. **The first cell is entirely a
+rival's, and the old field could not say it.**
+
+**What follows.** **A count that names no faction is not a count of nothing in
+particular. It is a sum a reader will take for its own.** The four fields are
+relative to the faction that reads, and none of them is indexed by a faction,
+because a field with one position for each faction multiplies the world by the
+faction count.[^F632B]
+
+**An ally and an invader still count together.** The relation field separates
+the two, and a relation is not a property of a tile. A reader that needs the
+distinction inside one cell does not have it.
+
+The layout version moved, because the field set moved. A weight file written
+under the old set means something else under the new one, and the reader that
+refuses such a file is what makes the move safe.[^F632C]
+
+
 ## References
 
 [^F628A]: The trainer, the resume path. `python/cachette/learn/train.py`
@@ -16447,3 +16559,14 @@ at several correct callers, the fault is upstream of all of them.
 [^F626B]: The one derivation of a way, and which categories draw as one. `crates/cachette-view/src/ways.rs`
 [^F627A]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D2. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
 [^F628A]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+[^F630A]: The controller module, the plan of one tick. `crates/cachette-core/src/controller.rs`
+[^F630B]: ADR-0176, an action integer is a mixed radix over the positions a verb declares, decision D4. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+[^F630C]: The learner environment, the decision interval and the baselines. `python/cachette/learn/env.py`
+[^F630D]: Report 33, what a learner can see, say and be scored on, section 3. `docs/research/reports/33-what-a-learner-can-see-and-say.md`
+[^F631A]: Report 33, what a learner can see, say and be scored on, section 5. `docs/research/reports/33-what-a-learner-can-see-and-say.md`
+[^F631B]: The policy fit tests. `tests/test_learner_policy_fit.py`
+[^F631C]: The policy module, the fit and the reader. `python/cachette/learn/policy.py`
+[^F631D]: The trainer, the centre it writes. `python/cachette/learn/train.py`
+[^F632A]: Report 33, what a learner can see, say and be scored on, section 4.2. `docs/research/reports/33-what-a-learner-can-see-and-say.md`
+[^F632B]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+[^F632C]: Findings register, FND-631. `docs/FINDINGS.md`

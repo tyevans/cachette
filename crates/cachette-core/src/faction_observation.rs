@@ -122,7 +122,7 @@ use crate::world::World;
 /// # References
 ///
 /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-pub const OBSERVATION_VERSION: u32 = 1;
+pub const OBSERVATION_VERSION: u32 = 2;
 
 /// One field of the observation array.
 ///
@@ -189,10 +189,33 @@ pub enum ObsField {
     CellTiles,
     /// The observed tiles of each cell whose ground admits a unit.
     CellOpenTiles,
-    /// The units that stand on the tiles of each cell the faction sees now.
-    CellUnits,
-    /// The tiles of each cell that somebody holds, over the tiles seen now.
-    CellHeldTiles,
+    /// The units of the faction on the tiles of each cell it sees now.
+    ///
+    /// **The pair of unit counts is relative to the faction that reads.** A
+    /// field with one position for each faction multiplies the world by the
+    /// faction count, and the record refuses one.[^1] A reader that wants
+    /// the units of a named rival cannot have them, and a reader that wants
+    /// to tell its own army from an invading one reads this pair.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^2]: Findings register, FND-636. `docs/FINDINGS.md`
+    CellOwnUnits,
+    /// The units of every other faction on the tiles of each cell the
+    /// faction sees now.
+    ///
+    /// An ally and an invader both count here. The relation field separates
+    /// the two, and a relation is not a property of a tile.
+    CellOtherUnits,
+    /// The tiles of each cell the faction holds, over the tiles seen now.
+    CellOwnHeldTiles,
+    /// The tiles of each cell another faction holds, over the tiles seen
+    /// now.
+    ///
+    /// A tile that nobody holds counts in neither this field nor the own
+    /// field, so the two do not sum to the observed tile count.
+    CellOtherHeldTiles,
     /// The value of the observed tiles of each cell, as raw Q16.16.
     CellValueTotal,
     /// The height of the observed tiles of each cell, as raw Q16.16.
@@ -203,7 +226,7 @@ pub enum ObsField {
 
 impl ObsField {
     /// Every field, in the order the array holds them.
-    pub const ALL: [Self; 28] = [
+    pub const ALL: [Self; 30] = [
         Self::Tick,
         Self::TickLimit,
         Self::Faction,
@@ -227,8 +250,10 @@ impl ObsField {
         Self::CellSeenEver,
         Self::CellTiles,
         Self::CellOpenTiles,
-        Self::CellUnits,
-        Self::CellHeldTiles,
+        Self::CellOwnUnits,
+        Self::CellOtherUnits,
+        Self::CellOwnHeldTiles,
+        Self::CellOtherHeldTiles,
         Self::CellValueTotal,
         Self::CellHeightTotal,
         Self::CellFoodTotal,
@@ -261,8 +286,10 @@ impl ObsField {
             Self::CellSeenEver => "cell_seen_ever",
             Self::CellTiles => "cell_tiles",
             Self::CellOpenTiles => "cell_open_tiles",
-            Self::CellUnits => "cell_units",
-            Self::CellHeldTiles => "cell_held_tiles",
+            Self::CellOwnUnits => "cell_own_units",
+            Self::CellOtherUnits => "cell_other_units",
+            Self::CellOwnHeldTiles => "cell_own_held_tiles",
+            Self::CellOtherHeldTiles => "cell_other_held_tiles",
             Self::CellValueTotal => "cell_value_total",
             Self::CellHeightTotal => "cell_height_total",
             Self::CellFoodTotal => "cell_food_total",
@@ -295,8 +322,10 @@ impl ObsField {
             | Self::CellSeenEver
             | Self::CellTiles
             | Self::CellOpenTiles
-            | Self::CellUnits
-            | Self::CellHeldTiles
+            | Self::CellOwnUnits
+            | Self::CellOtherUnits
+            | Self::CellOwnHeldTiles
+            | Self::CellOtherHeldTiles
             | Self::CellValueTotal
             | Self::CellHeightTotal
             | Self::CellFoodTotal => shape.cell_count,
@@ -313,7 +342,10 @@ impl ObsField {
             Self::GameOver | Self::WonderClaim => (0, 1),
             Self::HeldTiles => (0, shape.tile_count as i64),
             Self::SeatsHeld => (0, shape.faction_count as i64),
-            Self::LiveUnits | Self::Population | Self::CellUnits => (0, shape.unit_capacity as i64),
+            Self::LiveUnits
+            | Self::Population
+            | Self::CellOwnUnits
+            | Self::CellOtherUnits => (0, shape.unit_capacity as i64),
             Self::StoreTotal => (0, i64::MAX),
             Self::BestRenown => (0, Fix32::MAX.0 as i64),
             Self::Relation => (i32::MIN as i64, i32::MAX as i64),
@@ -323,7 +355,8 @@ impl ObsField {
             | Self::CellSeenEver
             | Self::CellTiles
             | Self::CellOpenTiles
-            | Self::CellHeldTiles => (0, shape.cell_tiles as i64),
+            | Self::CellOwnHeldTiles
+            | Self::CellOtherHeldTiles => (0, shape.cell_tiles as i64),
             Self::CellValueTotal | Self::CellFoodTotal => {
                 (-shape.cell_accumulator(), shape.cell_accumulator())
             }
@@ -460,8 +493,10 @@ struct CellRow {
     seen_ever: i64,
     tiles: i64,
     open_tiles: i64,
-    units: i64,
-    held_tiles: i64,
+    own_units: i64,
+    other_units: i64,
+    own_held_tiles: i64,
+    other_held_tiles: i64,
     value_total: i64,
     height_total: i64,
     food_total: i64,
@@ -599,8 +634,14 @@ impl World {
                 ObsField::CellSeenEver => scatter(span, &cells, |cell| cell.seen_ever),
                 ObsField::CellTiles => scatter(span, &cells, |cell| cell.tiles),
                 ObsField::CellOpenTiles => scatter(span, &cells, |cell| cell.open_tiles),
-                ObsField::CellUnits => scatter(span, &cells, |cell| cell.units),
-                ObsField::CellHeldTiles => scatter(span, &cells, |cell| cell.held_tiles),
+                ObsField::CellOwnUnits => scatter(span, &cells, |cell| cell.own_units),
+                ObsField::CellOtherUnits => scatter(span, &cells, |cell| cell.other_units),
+                ObsField::CellOwnHeldTiles => {
+                    scatter(span, &cells, |cell| cell.own_held_tiles);
+                }
+                ObsField::CellOtherHeldTiles => {
+                    scatter(span, &cells, |cell| cell.other_held_tiles);
+                }
                 ObsField::CellValueTotal => scatter(span, &cells, |cell| cell.value_total),
                 ObsField::CellHeightTotal => scatter(span, &cells, |cell| cell.height_total),
                 ObsField::CellFoodTotal => scatter(span, &cells, |cell| cell.food_total),
@@ -642,7 +683,7 @@ impl World {
                 visible.and_then(|layer| layer.block(block)),
                 remembered.and_then(|layer| layer.block(block)),
             );
-            let masked = self.masked_block(&mask, block, Admit::SeenEver)?;
+            let masked = self.masked_block(&mask, faction, block, Admit::SeenEver)?;
             let summary = masked.summary();
             let Some(cell) = cells.get_mut(block as usize) else {
                 continue;
@@ -650,8 +691,10 @@ impl World {
             cell.seen_now = i64::from(visible.map_or(0, |layer| layer.block_population(block)));
             cell.seen_ever = masked.admitted();
             cell.open_tiles = summary.open_tiles();
-            cell.units = summary.units();
-            cell.held_tiles = summary.held_tiles();
+            cell.own_units = masked.own_units();
+            cell.other_units = masked.other_units();
+            cell.own_held_tiles = masked.own_held_tiles();
+            cell.other_held_tiles = masked.other_held_tiles();
             cell.value_total = summary.value_total().0;
             cell.height_total = summary.height_total().0;
             cell.food_total = summary.food_total().0;
