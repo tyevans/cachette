@@ -137,6 +137,17 @@ class EnvConfig:
     The decision interval is how many ticks the world runs between two
     decisions. A learner that decides on every tick spends its whole sample
     budget on ticks that changed nothing.
+
+    The controlled entry says whether the learner takes the seat. It is true
+    for a learner and for the two acting baselines. It is false for the one
+    baseline that measures the built-in controller in the learner's own
+    seat, which is the strongest baseline this project can state.
+
+    **The tick limit is a rule of the game, not a truncation.** The engine
+    compares held ground at the limit and records a winner, so every episode
+    that reaches the limit still ends won or lost. A horizon shorter than
+    the tick limit truncates instead, and a truncated episode can report no
+    outcome at all.
     """
 
     width: int = 48
@@ -147,6 +158,7 @@ class EnvConfig:
     horizon: int = 120
     decision_interval: int = 5
     threads: int = 1
+    controlled: bool = True
 
 
 @dataclass(frozen=True)
@@ -214,8 +226,11 @@ class Env:
         world.set_win_readers_enabled(True)
         world.set_tick_limit(config.tick_limit)
         # The built-in controller drives every other faction, and it leaves
-        # the learner's seat alone.
-        world.set_externally_controlled(config.seat, True)
+        # the learner's seat alone. A configuration that is not controlled
+        # leaves the seat to the built-in controller as well, which is the
+        # baseline that measures the controller against itself.
+        if config.controlled:
+            world.set_externally_controlled(config.seat, True)
         return world
 
     def reset(self, seed: int) -> np.ndarray:
@@ -303,7 +318,11 @@ class Env:
             message = "the episode has ended. Call reset before stepping again."
             raise RuntimeError(message)
 
-        applied = world.act(self._config.seat, int(action))
+        applied = (
+            world.act(self._config.seat, int(action))
+            if self._config.controlled
+            else None
+        )
         for _ in range(self._config.decision_interval):
             world.step(self._config.threads)
         self._decisions += 1
@@ -405,6 +424,7 @@ class VectorEnv:
         self._workers = max(1, workers)
         self._envs = [Env(config, weighting) for _ in range(count)]
         self._batch: Batch | None = None
+        self._live: list[int] = []
         self.observation_length = self._envs[0].observation_length
         self.action_length = self._envs[0].action_length
 
@@ -431,6 +451,7 @@ class VectorEnv:
         rows = [
             env.reset(int(seed)) for env, seed in zip(self._envs, seeds, strict=True)
         ]
+        self._live = list(range(self._count))
         self._batch = Batch([env._require_world() for env in self._envs])
         return np.stack(rows)
 
@@ -457,18 +478,29 @@ class VectorEnv:
             raise ValueError(message)
 
         live = [index for index, env in enumerate(self._envs) if not env.done]
-        for index in live:
-            env = self._envs[index]
-            env._require_world().act(env.seat, int(actions[index]))
+        if self._config.controlled:
+            for index in live:
+                env = self._envs[index]
+                env._require_world().act(env.seat, int(actions[index]))
 
-        # One crossing for every world of the vector. The worlds that have
-        # finished step too, and their environments ignore the result, which
-        # keeps the batch one shape for the whole episode.
+        # One crossing for every world that is still running. **A world whose
+        # episode has ended leaves the batch**, because a game resolves after
+        # anything from two hundred to several thousand ticks, and a batch
+        # that carried the finished worlds would spend most of a generation
+        # stepping games that were already decided.
+        #
+        # The live list is ascending, so the batch keeps the index order of
+        # the vector. The order of a result never comes from which worker
+        # finished.
+        if live != self._live:
+            self._batch = Batch([self._envs[index]._require_world() for index in live])
+            self._live = live
         for _ in range(self._config.decision_interval):
             rows = self._batch.step(self._workers, self._config.threads)
             for row in rows:
                 if row.error is not None:
-                    message = f"the world at index {row.index} refused: {row.error}"
+                    failed = live[row.index]
+                    message = f"the world at index {failed} refused: {row.error}"
                     raise RuntimeError(message)
 
         results: list[StepResult] = []

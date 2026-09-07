@@ -1,0 +1,281 @@
+{
+  "holdout": [
+    50000,
+    50001,
+    50002,
+    50003,
+    50004,
+    50005,
+    50007,
+    50008,
+    50009,
+    50010,
+    50011,
+    50012,
+    50013,
+    50014,
+    50015,
+    50016,
+    50017,
+    50018,
+    50019,
+    50020,
+    50021,
+    50022,
+    50023,
+    50024
+  ],
+  "generations": 18,
+  "population": 16,
+  "seeds_per_generation": 4,
+  "tick_limit": 2500,
+  "horizon": 250,
+  "decision_interval": 10,
+  "world": {
+    "width": 48,
+    "height": 48,
+    "faction_count": 3,
+    "seat": 0,
+    "tick_limit": 2500,
+    "horizon": 250,
+    "decision_interval": 10,
+    "threads": 1,
+    "controlled": true
+  },
+  "strategies": {
+    "conquer": {
+      "name": "conquer",
+      "kind": "linear",
+      "history": [
+        {
+          "generation": 0,
+          "best": 36.474999999999966,
+          "mean": -1548.5281249999998,
+          "worst": -1996.125,
+          "won": 0.109375,
+          "seconds": 316.9
+        },
+        {
+          "generation": 1,
+          "best": -981.65,
+          "mean": -1859.1265624999999,
+          "worst": -1995.375,
+          "won": 0.03125,
+          "seconds": 597.6
+        },
+        {
+          "generation": 2,
+          "best": -980.8499999999999,
+          "mean": -1734.9109374999998,
+          "worst": -1991.8,
+          "won": 0.0625,
+          "seconds": 870.9
+        },
+        {
+          "generation": 3,
+          "best": 28.950000000000102,
+          "mean": -1604.2171875,
+          "worst": -1988.15,
+          "won": 0.09375,
+          "seconds": 1178.4
+        },
+        {
+          "generation": 4,
+          "best": -1978.775,
+          "mean": -1983.8234375000002,
+          "worst": -1990.825,
+          "won": 0.0,
+          "seconds": 1414.0
+        },
+        {
+          "generation": 5,
+          "best": -963.525,
+          "mean": -1723.7546875,
+          "worst": -1986.025,
+          "won": 0.0625,
+          "seconds": 1756.4
+        },
+        {
+          "generation": 6,
+          "best": 13.174999999999955,
+          "mean": -985.015625,
+          "worst": -1986.725,
+          "won": 0.25,
+          "seconds": 2084.9
+        },
+        {
+          "generation": 7,
+          "best": 1028.025,
+          "mean": -726.8703125,
+          "worst": -1992.95,
+          "won": 0.3125,
+          "seconds": 2552.2
+        },
+        {
+          "generation": 8,
+          "best": 10.875,
+          "mean": -1362.1703125000001,
+          "worst": -1992.3,
+          "won": 0.15625,
+          "seconds": 2788.4
+        },
+        {
+          "generation": 9,
+          "best": -983.8499999999999,
+          "mean": -1861.1390625,
+          "worst": -1987.5249999999999,
+          "won": 0.03125,
+          "seconds": 3105.0
+        },
+        {
+          "generation": 10,
+          "best": 1010.3499999999999,
+          "mean": 198.7609375,
+          "worst": 5.875,
+          "won": 0.546875,
+          "seconds": 3300.0
+        },
+        {
+          "generation": 11,
+          "best": -985.7,
+          "mean": -1299.5890625,
+          "worst": -1995.725,
+          "won": 0.171875,
+          "seconds": 3503.0
+        },
+        {
+          "generation": 12,
+          "best": -990.7,
+          "mean": -1675.9015625,
+          "worst": -1991.425,
+          "won": 0.078125,
+          "seconds": 3750.4
+        },
+        {
+          "generation": 13,
+          "best": 6.5,
+          "mean": -494.9078125,
+          "worst": -996.275,
+          "won": 0.375,
+          "seconds": 3996.1
+        },
+        {
+          "generation": 14,
+          "best": -992.7500000000001,
+          "mean": -1930.609375,
+          "worst": -1995.775,
+          "won": 0.015625,
+          "seconds": 4158.6
+        },
+        {
+          "generation": 15,
+          "best": -1995.825,
+          "mean": -1995.825,
+          "worst": -1995.825,
+          "won": 0.0,
+          "seconds": 4254.4
+        },
+        {
+          "generation": 16,
+          "best": -1984.275,
+          "mean": -1984.2843750000002,
+          "worst": -1984.3250000000003,
+          "won": 0.0,
+          "seconds": 4649.6
+        },
+        {
+          "generation": 17,
+          "best": -1988.3249999999998,
+          "mean": -1988.3249999999998,
+          "worst": -1988.3249999999998,
+          "won": 0.0,
+          "seconds": 4924.3
+        }
+      ],
+      "weights": "runs/learn/night2/conquer.npz",
+      "parameters": 5133,
+      "holdout": {
+        "trained": {
+          "return": -1153.0625,
+          "episodes": 24.0,
+          "held_tiles": 136.04166666666666,
+          "seats_held": 0.7083333333333334,
+          "live_units": 3.7083333333333335,
+          "population": 3.7083333333333335,
+          "store_total": 10700292.666666666,
+          "best_renown": 0.0,
+          "wonder_progress": 6739.708333333333,
+          "won": 0.20833333333333334,
+          "lost": 0.7916666666666666,
+          "drawn": 0.0,
+          "unresolved": 0.0,
+          "end_tick": 1733.75
+        },
+        "untrained": {
+          "return": -1817.425,
+          "episodes": 24.0,
+          "held_tiles": 159.08333333333334,
+          "seats_held": 0.5416666666666666,
+          "live_units": 5.125,
+          "population": 5.125,
+          "store_total": 12475401.25,
+          "best_renown": 0.0,
+          "wonder_progress": 0.0,
+          "won": 0.041666666666666664,
+          "lost": 0.9583333333333334,
+          "drawn": 0.0,
+          "unresolved": 0.0,
+          "end_tick": 1817.5
+        },
+        "random": {
+          "return": -1248.523611111111,
+          "episodes": 72.0,
+          "held_tiles": 292.5416666666667,
+          "seats_held": 0.7083333333333334,
+          "live_units": 5.972222222222222,
+          "population": 5.972222222222222,
+          "store_total": 9856498.638888888,
+          "best_renown": 164750.22222222222,
+          "wonder_progress": 936.5138888888889,
+          "won": 0.18055555555555555,
+          "lost": 0.8194444444444444,
+          "drawn": 0.0,
+          "unresolved": 0.0,
+          "end_tick": 1918.4722222222222
+        },
+        "controller": {
+          "return": -475.7458333333332,
+          "episodes": 24.0,
+          "held_tiles": 242.54166666666666,
+          "seats_held": 1.0,
+          "live_units": 5.583333333333333,
+          "population": 5.583333333333333,
+          "store_total": 7564212.583333333,
+          "best_renown": 473088.0,
+          "wonder_progress": 357.5,
+          "won": 0.375,
+          "lost": 0.625,
+          "drawn": 0.0,
+          "unresolved": 0.0,
+          "end_tick": 1263.3333333333333
+        }
+      }
+    }
+  },
+  "controller": {
+    "return": -475.7458333333332,
+    "episodes": 24.0,
+    "held_tiles": 242.54166666666666,
+    "seats_held": 1.0,
+    "live_units": 5.583333333333333,
+    "population": 5.583333333333333,
+    "store_total": 7564212.583333333,
+    "best_renown": 473088.0,
+    "wonder_progress": 357.5,
+    "won": 0.375,
+    "lost": 0.625,
+    "drawn": 0.0,
+    "unresolved": 0.0,
+    "end_tick": 1263.3333333333333
+  }
+}
