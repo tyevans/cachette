@@ -148,6 +148,52 @@ STRATEGIES: dict[str, tuple[EnvConfig, Weighting, str]] = {
 }
 
 
+def report_behaviour(names: list[str], out: Path, holdout: int, workers: int) -> int:
+    """Say what each stored policy does, verb by verb, and write it out.
+
+    A score says that a policy is better. It does not say what the policy
+    does. This pass plays each stored policy on the held-out seeds and counts
+    which verb it chose, so a reader sees the behaviour beside the number.
+
+    The two acting baselines run through the same counter, so a reader
+    compares the verb mix of a trained policy against the verb mix of a
+    faction that acts at random.
+    """
+    from .inspect import behaviour
+
+    seeds = viable_seeds(WORLD, holdout, 50_000)
+    probe = Env(WORLD, STRATEGIES[names[0]][1])
+    rows: dict[str, object] = {}
+
+    for index, name in enumerate(names):
+        env_config, weighting, kind = STRATEGIES[name]
+        path = out / f"{name}.npz"
+        if not path.exists():
+            print(f"  {name}: no stored policy at {path}", flush=True)
+            continue
+        policy, meta = load_policy(path)
+        rows[name] = {
+            "kind": meta["kind"],
+            **behaviour(env_config, weighting, policy, seeds, workers),
+        }
+        print(f"  {name}: {rows[name]['verbs']}", flush=True)
+        del index, kind
+
+    weighting = STRATEGIES[names[0]][1]
+    rows["random"] = behaviour(WORLD, weighting, RandomPolicy(seed=0), seeds, workers)
+    print(f"  random: {rows['random']['verbs']}", flush=True)
+    rows["untrained"] = behaviour(
+        WORLD,
+        weighting,
+        LinearPolicy.zeros(probe.action_length, probe.observation_length),
+        seeds,
+        workers,
+    )
+    write_report(out / "behaviour.json", rows)
+    print(f"wrote {out / 'behaviour.json'}", flush=True)
+    return 0
+
+
 def main() -> int:
     """Train each named strategy, measure it against the baselines, report."""
     parser = argparse.ArgumentParser(description="Train the learner seat.")
@@ -161,11 +207,18 @@ def main() -> int:
     parser.add_argument("--sigma", type=float, default=0.08)
     parser.add_argument("--learning-rate", type=float, default=0.06)
     parser.add_argument("--only", type=str, default="")
+    parser.add_argument(
+        "--behaviour",
+        action="store_true",
+        help="read the stored policies and report what they do, and train nothing",
+    )
     arguments = parser.parse_args()
 
     names = [name for name in arguments.only.split(",") if name] or list(STRATEGIES)
     out = arguments.out
     out.mkdir(parents=True, exist_ok=True)
+    if arguments.behaviour:
+        return report_behaviour(names, out, arguments.holdout, arguments.workers)
 
     # The training pool and the holdout share no seed, so a reported figure
     # comes from a world the policy never trained on.
