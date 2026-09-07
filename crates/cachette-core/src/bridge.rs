@@ -273,6 +273,17 @@ impl BlockLayout {
         (key >> (2 * self.block_bits)) as u32
     }
 
+    /// Returns the offset of a tile inside its own block.
+    ///
+    /// The offset is the low part of the key, and the block is the high
+    /// part. This is the one place that takes the low part, so a reader that
+    /// walks a block never repeats the shift.
+    #[must_use]
+    pub const fn offset_of_key(self, key: u64) -> u32 {
+        let bits = 2 * self.block_bits;
+        (key & ((1u64 << bits) - 1)) as u32
+    }
+
     /// Returns the largest key that any tile of this world can carry.
     ///
     /// The ceiling comes from the partition, never from the units. The order

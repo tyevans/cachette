@@ -23,9 +23,57 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-276**
+**Next number: DEC-277**
 
 ## Open
+
+### DEC-276 — What does a remembered place answer about what was built there?
+
+**Open. The project owner owns it.**
+
+An accepted record says that a faction reads a place it saw once and receives
+the ground of that place as the faction last saw it.[^DEC276A] The remembered
+layer stores membership alone. It records that a faction saw a tile, and it
+stores no value.[^DEC276B]
+
+Most of the ground is recoverable without a stored snapshot. The kind, the
+height and the stock a tile started with are pure functions of the seed and the
+address, so a reader derives them at any tick.[^DEC68B] [^DEC276D] **An upgrade
+is not one of them.** An upgrade is the difference between the generated world
+and the built world, so a rival that builds on a tile after the watcher marched
+away leaves that watcher with no stored answer.[^DEC201C] The holder of a tile
+has the same shape.
+
+The reader answers no upgrade and no holder for a remembered place today. That
+understates the memory and never overstates it, so the reader leaks nothing
+while this row is open.
+
+**Option A. A memory is the generated ground, and nothing that was built.**
+Costs nothing. The reader is built this way now. A faction that watched a rival
+raise a city, and then marched away, forgets the city at once. That reads as
+wrong to a player.
+
+**Option B. The remembered layer stores what the faction last saw.** The layer
+stops being a set of tiles and becomes a map from a tile to a value. The cost
+follows the observed area rather than the world, so the shape the record chose
+survives. Every stored byte enters the state hash and every golden file, and
+the state that a faction carries grows with what it has walked past.[^DEC276F]
+
+**Option C. A second sparse layer stores the built difference alone.** The
+membership layer stays as it is. A faction remembers an upgrade only where the
+world holds one, and the upgrade store is already sparse for the same
+reason.[^DEC201C] This costs the upgrades a faction has seen, which is far below
+the tiles it has seen. It adds a second thing the rebuild must write.
+
+**A recommendation.** Option C, if the answer to option A reads as wrong. It
+keeps the cost on the observed area and it reuses the shape the upgrade store
+already has. Option B pays for every tile to fix a case that only upgrades and
+holders raise.
+
+**Nothing is stopped.** The reader states option A in its own documentation, and
+a test holds it. A change to option B or option C changes the layer, the state
+hash and every golden file, so it is cheaper to settle before the learner reads
+the memory.
 
 ### DEC-275 — Does the territory reader compare a share of the tiles?
 
@@ -4546,3 +4594,7 @@ exactly so that a caller cannot build a wrong one.[^DEC120C]
 [^DEC273SD]: ADR-0075, the founding choice reads a bounded sample of the world, decision D1. `docs/adrs/accepted/adr-0075-the-founding-choice-reads-a-bounded-sample-of-the-world.md`
 [^DEC273SF]: Findings register, FND-544. `docs/FINDINGS.md`
 [^DEC049TICKS]: ADR-0170, a recovery period is a base for the kind that the ground and the improvement scale, decision D2. `docs/adrs/draft/adr-0170-a-recovery-period-is-a-base-that-the-ground-and-the-improvement-scale.md`
+[^DEC276A]: ADR-0059, fog storage grows with observed area, not with world area, decision D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+[^DEC276B]: ADR-0059, fog storage grows with observed area, not with world area, decision D2. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+[^DEC276D]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+[^DEC276F]: ADR-0059, fog storage grows with observed area, not with world area, decision D5. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`

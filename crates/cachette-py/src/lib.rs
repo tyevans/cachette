@@ -22,6 +22,7 @@ use cachette_core::census::{census, CensusError};
 use cachette_core::character::CharacterArena;
 use cachette_core::descent::{DescentId, DESCENT_CEILING};
 use cachette_core::event_layout::declared_event_layouts;
+use cachette_core::faction_view::{Admit, FactionTile};
 use cachette_core::founding::FoundingOutcome;
 use cachette_core::hex::NEIGHBOURS;
 use cachette_core::luxury::{LuxuryId, LUXURY_CEILING};
@@ -3119,6 +3120,224 @@ impl PyWorld {
         Ok(fields)
     }
 
+    /// Returns what one faction may read about one tile, as a `dict`.
+    ///
+    /// **No argument asks for the truth.** The engine applies the sight rule
+    /// inside the reader, so a caller cannot ask past the fog.[^1] A caller
+    /// that wants the truth of the world calls `tile_report`, which names no
+    /// faction and serves a developer who watches the engine.[^2]
+    ///
+    /// - `q` and `r`, integers. The address the call took.
+    /// - `faction`, an integer. The faction the call took.
+    /// - `sighting`, a string. One of `never`, `remembered` and `seen`.
+    ///
+    /// A `never` answer carries no other value. Every ground key is `None`,
+    /// so a caller tells that answer from a place that holds nothing.
+    ///
+    /// A `remembered` answer carries the ground of the place and no more.
+    /// The `kind`, `passable`, `height` and `generated` keys hold values, and
+    /// every other key is `None` or zero. **The reader answers no unit, no
+    /// holder and no upgrade**, because each of those is a fact of the
+    /// present frame.[^3]
+    ///
+    /// A `seen` answer carries the present frame as well.
+    ///
+    /// - `value`, an integer. The value of the tile. **A raw Q16.16 value.**
+    /// - `capacity`, an integer. How many units the tile admits.
+    /// - `stock`, a list of integers. What each resource kind holds now.
+    /// - `holder`, an integer or `None`. Who holds the tile now.
+    /// - `upgrade`, an integer or `None`. The category that stands there.
+    /// - `upgrade_level`, an integer. The level that stands there.
+    /// - `units`, an integer. How many units stand on the tile.
+    ///
+    /// The `height` and `generated` keys hold the ground that the seed and
+    /// the address fix, so a remembered answer and a seen answer agree on
+    /// them.[^4]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    /// Raises `ViewError` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D3. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: ADR-0059, fog storage grows with observed area, not with world area, decision D6. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    /// [^3]: ADR-0059, fog storage grows with observed area, not with world area, decision D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    /// [^4]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    fn faction_tile_report<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+        q: i32,
+        r: i32,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        if faction >= world.faction_count() {
+            return Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
+        }
+        let read = world
+            .faction_tile(FactionId(faction), Axial::new(q, r))
+            .ok_or_else(|| ViewError::new_err(format!("({q}, {r}) lies outside this world")))?;
+
+        let report = PyDict::new(python);
+        report.set_item("q", q)?;
+        report.set_item("r", r)?;
+        report.set_item("faction", faction)?;
+        report.set_item(
+            "sighting",
+            match read {
+                FactionTile::Never => "never",
+                FactionTile::Remembered(_) => "remembered",
+                FactionTile::Seen(_) => "seen",
+            },
+        )?;
+        match read.ground() {
+            Some(ground) => {
+                report.set_item("kind", ground.kind.to_u8())?;
+                report.set_item("passable", ground.kind.is_passable())?;
+                report.set_item("height", ground.height.0)?;
+                report.set_item(
+                    "generated",
+                    ground
+                        .generated
+                        .iter()
+                        .map(|amount| amount.0)
+                        .collect::<Vec<u32>>(),
+                )?;
+            }
+            None => {
+                report.set_item("kind", python.None())?;
+                report.set_item("passable", python.None())?;
+                report.set_item("height", python.None())?;
+                report.set_item("generated", python.None())?;
+            }
+        }
+        match read {
+            FactionTile::Seen(seen) => {
+                report.set_item("value", seen.value.0)?;
+                report.set_item("capacity", seen.capacity)?;
+                report.set_item(
+                    "stock",
+                    seen.stock
+                        .iter()
+                        .map(|amount| amount.0)
+                        .collect::<Vec<u32>>(),
+                )?;
+                match seen.holder {
+                    Some(holder) => report.set_item("holder", holder.0)?,
+                    None => report.set_item("holder", python.None())?,
+                }
+                match seen.upgrade {
+                    Some(site) => {
+                        report.set_item("upgrade", site.category.to_u8())?;
+                        report.set_item("upgrade_level", site.level)?;
+                    }
+                    None => {
+                        report.set_item("upgrade", python.None())?;
+                        report.set_item("upgrade_level", 0u8)?;
+                    }
+                }
+                report.set_item("units", seen.units)?;
+            }
+            FactionTile::Never | FactionTile::Remembered(_) => {
+                report.set_item("value", python.None())?;
+                report.set_item("capacity", python.None())?;
+                report.set_item("stock", python.None())?;
+                report.set_item("holder", python.None())?;
+                report.set_item("upgrade", python.None())?;
+                report.set_item("upgrade_level", 0u8)?;
+                report.set_item("units", 0u32)?;
+            }
+        }
+        Ok(report)
+    }
+
+    /// Returns the summary of one cell, over the tiles one faction may read.
+    ///
+    /// The cell is the cell that covers the address, and it is the cell that
+    /// `region_summary` reads. **This reader combines only the tiles the
+    /// sight rule admits**, so a cell cannot state what its tiles hide.[^1]
+    ///
+    /// The `admit` argument names which of the two rules the call took, and
+    /// neither one widens the answer past the fog.[^2] It takes `now` for
+    /// the tiles the faction sees this frame, and `ever` for the tiles it
+    /// has ever seen. It defaults to `now`.
+    ///
+    /// - `q`, `r`, `faction` and `admit`. The arguments the call took.
+    /// - `admitted`, an integer. How many tiles of the cell the rule
+    ///   admitted.
+    /// - `withheld`, an integer. How many tiles of the cell the rule
+    ///   withheld. A zero here means that the faction reads the whole cell.
+    /// - `tiles`, `open_tiles`, `units`, `held_tiles`, `value_total`,
+    ///   `height_total` and `food_total`. The fields `region_summary`
+    ///   reports, over the admitted tiles alone.
+    ///
+    /// **A tile the faction saw once and does not see now adds the ground
+    /// alone.** It adds no unit, no held tile and no value, because each of
+    /// those is a fact of the present frame.[^1]
+    ///
+    /// **The call walks the tiles of the cell.** The rebuilt cell counts
+    /// tiles the faction has not seen, so the reader cannot use it. The cost
+    /// follows the tiles of one cell and never the world.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world, or
+    /// when the `admit` argument names neither rule. Raises `ViewError` when
+    /// the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    /// [^2]: ADR-0059, fog storage grows with observed area, not with world area, decision D6. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    #[pyo3(signature = (faction, q, r, admit = "now"))]
+    fn faction_region_summary<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+        q: i32,
+        r: i32,
+        admit: &str,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let rule = match admit {
+            "now" => Admit::SeenNow,
+            "ever" => Admit::SeenEver,
+            other => {
+                return Err(VerbError::new_err(format!(
+                    "{other} names no admission rule of this reader"
+                )))
+            }
+        };
+        let world = self.lock();
+        if faction >= world.faction_count() {
+            return Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
+        }
+        let masked = world
+            .faction_summary_covering(FactionId(faction), Axial::new(q, r), rule)
+            .ok_or_else(|| ViewError::new_err(format!("({q}, {r}) names no cell of this world")))?;
+        let summary = masked.summary();
+        let fields = PyDict::new(python);
+        fields.set_item("q", q)?;
+        fields.set_item("r", r)?;
+        fields.set_item("faction", faction)?;
+        fields.set_item("admit", admit)?;
+        fields.set_item("admitted", masked.admitted())?;
+        fields.set_item("withheld", masked.withheld())?;
+        fields.set_item("tiles", summary.tiles())?;
+        fields.set_item("open_tiles", summary.open_tiles())?;
+        fields.set_item("units", summary.units())?;
+        fields.set_item("held_tiles", summary.held_tiles())?;
+        fields.set_item("value_total", summary.value_total().0)?;
+        fields.set_item("height_total", summary.height_total().0)?;
+        fields.set_item("food_total", summary.food_total().0)?;
+        Ok(fields)
+    }
+
     /// Returns what one site earns, holds and owes, as a `dict`.
     ///
     /// The site is one settlement identity, as a Python integer. The
@@ -5482,6 +5701,65 @@ impl PyWorld {
         let columns = PyDict::new(python);
         columns.set_item("unit", unit.to_pyarray(python))?;
         columns.set_item("tile", tile.to_pyarray(python))?;
+        Ok(columns)
+    }
+
+    /// Returns every unit one faction sees now, as a `dict` of arrays.
+    ///
+    /// A faction sees a unit when it sees the tile that unit stands on. It
+    /// therefore reads its own units on the ground its own units watch, and
+    /// it reads a rival that walks into that ground.[^1]
+    ///
+    /// **No argument asks for the truth.** A caller that wants every unit of
+    /// one faction, seen or not, calls `faction_units`, which reports the
+    /// units of the faction it names and nothing else.
+    ///
+    /// The three arrays hold one entry for each unit, at one index.
+    ///
+    /// - `unit`, `numpy.uint64`. The identity of the unit.
+    /// - `tile`, `numpy.uint32`. The tile the unit stands on.
+    /// - `faction`, `numpy.uint16`. The faction the unit belongs to.
+    ///
+    /// **The order is fixed.** The walk runs over the factions in faction
+    /// order, and over the units of each faction in slot order, so two runs
+    /// return one answer.[^2]
+    ///
+    /// **This answers the present frame and never a memory.** A remembered
+    /// place reports no unit, so a unit that walked out of sight leaves this
+    /// array.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn faction_visible_units<'py>(
+        &self,
+        python: Python<'py>,
+        faction: u16,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        if faction >= world.faction_count() {
+            return Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )));
+        }
+        let seen = world.units_seen_by(FactionId(faction));
+        let mut unit: Vec<u64> = Vec::with_capacity(seen.len());
+        let mut tile: Vec<u32> = Vec::with_capacity(seen.len());
+        let mut owner: Vec<u16> = Vec::with_capacity(seen.len());
+        for row in seen {
+            unit.push(row.unit.to_bits());
+            tile.push(row.tile.0);
+            owner.push(row.faction.0);
+        }
+        let columns = PyDict::new(python);
+        columns.set_item("unit", unit.to_pyarray(python))?;
+        columns.set_item("tile", tile.to_pyarray(python))?;
+        columns.set_item("faction", owner.to_pyarray(python))?;
         Ok(columns)
     }
 
