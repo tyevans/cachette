@@ -1307,28 +1307,30 @@ const WARMTH_NUMERATOR: i64 = 1;
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D1. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 const WARMTH_DENOMINATOR: i64 = 8;
 
-/// What the whole of the part is multiplied by over the deepest water.
+/// What the temperature divisor of the deepest water is multiplied by.
 ///
-/// **Deep water warms slowly and cools slowly. Land does neither.** A large
-/// column of water takes up the same heat over a greater depth, so its
-/// temperature moves a small part of the way in the time that a field or a
-/// shallow lake moves the whole of it. Shallow water sits between the two,
-/// because the grading runs with the depth and not with the tile count.
+/// **This is the thermal inertia of the sea, and it is derived from a
+/// published seasonal lag.** The warmest month over the ocean falls about two
+/// months after the solstice, where over land it falls about one. A first
+/// order lag driven by a yearly cycle lags its driver by the arc tangent of
+/// two pi times the time constant over the period, so a two month lag on a
+/// twelve month year gives a time constant near a quarter of the year. On the
+/// season period this module carries, that is this multiple of the land
+/// figure.
 ///
-/// **This is what makes a coast interesting.** Two neighbouring cells that
-/// track one driver at one rate hold one temperature, and no wind blows
-/// between them. A land cell that tracks the season while the sea beside it
-/// lags gives a heat difference across the coast, and that difference changes
-/// sign as the season turns. So the coastal wind blows one way in the warm
-/// half of the year and the other way in the cold half.
-///
-/// The doc of the water heat term claimed this behaviour before anything did
-/// it. One share moved every cell at one rate, whatever it held.[^1]
+/// **The old value was eight and it did almost nothing.** At eight the sea
+/// damps its own seasonal swing by about two percent, so a sea tracked the
+/// season as closely as the land beside it and the two never parted. That was
+/// harmless while a second term in the driver gave the sea a mean of its own,
+/// and it stopped being harmless when a record removed that term and named
+/// this lag as the thing that carries the sea.[^2] **A mechanism nominated to
+/// carry an effect must be measured against the effect**, and this one was
+/// not.
 ///
 /// # References
 ///
-/// [^1]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
-const DEEP_WATER_LAG: i64 = 8;
+/// [^2]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D4. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+const DEEP_WATER_LAG: i64 = 64;
 
 /// The share of a temperature difference that one step of wind carries.
 const CARRY_FOR_EACH_WIND_STEP: i64 = 1;
