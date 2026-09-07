@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-595**
+**Next number: FND-604**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -11320,7 +11320,7 @@ The field then holds no fact that any pass of the step can contradict.
 a unit, and a block that holds none seeds nothing, so the derivation follows
 the population and never the tile count.[^F591C]
 
-### FND-592 — The relaxation reach of an approach field follows what the frame needs, not the block edge
+### FND-597 — The relaxation reach of an approach field follows what the frame needs, not the block edge
 
 **Believed.** An approach field relaxes over twice the block edge, so its reach
 covers a whole block by a straight route and admits a detour of the same
@@ -11356,7 +11356,7 @@ the instrument. The two figures above are derived on a development machine and
 not on the target platform, and the blocker that says which cost figures are
 measured stays open.[^28]
 
-### FND-593 — Two tests held that a store fills from production alone, and a unit that reaches food makes both false
+### FND-598 — Two tests held that a store fills from production alone, and a unit that reaches food makes both false
 
 **Believed.** A site store fills from the production rate of the site and from
 nothing else. A conservation test over the store therefore names four terms:
@@ -14863,7 +14863,7 @@ reader may not depend on held ground.
 **A put-back experiment answers a question a passing test cannot.** Both guards
 read as tested until the experiment ran.[^F492B]
 
-### FND-591 — Giving the engine a raze rule made a seeded run burn far more cities than it keeps
+### FND-599 — Giving the engine a raze rule made a seeded run burn far more cities than it keeps
 
 **Believed.** A rule that keeps a city the taker can supply and burns one it
 cannot gives conquest two shapes. A near conquest grows the taker and a far one
@@ -14903,7 +14903,7 @@ measurement said.**[^F591C]
 works, and a run showed that one of them almost never happens. Neither answer
 is available from the other.
 
-### FND-592 — A siege that asks an army to stand still cannot be done, because the armies of this engine do not stand still
+### FND-600 — A siege that asks an army to stand still cannot be done, because the armies of this engine do not stand still
 
 **Believed.** A conquest that costs work over ticks prices the act. The
 besieger holds the site tile, the work rises on each tick it holds, and a
@@ -14941,7 +14941,7 @@ reports how often it did.** The site count of the sweep rose when conquest
 stopped, and it rose again when conquest worked, so it could not tell the two
 apart.[^F592A]
 
-### FND-593 — The reach and the founding distance decide which branch of the raze rule fires, and both had to move
+### FND-601 — The reach and the founding distance decide which branch of the raze rule fires, and both had to move
 
 **Believed.** The reach of a city or the distance the seeder places cities
 apart is the lever on whether a taker keeps a city or burns it, and one of the
@@ -14974,11 +14974,79 @@ factions, and a shorter distance let the same world seat four. The fixture
 seed moved, and the assertion did not.
 
 
+
+### FND-602 — Four fixture families measured a balance value and not the rule they name
+
+**Believed.** A test suite whose assertions read a work count, a distance or a
+tick budget from the table it is about is safe against a balance change,
+because it reads the value rather than repeating it.
+
+**True.** Reading the value is not enough. Each of these fixtures also depends
+on a second balance value that it never reads, and a change to either one moves
+the two apart. Four families failed on that shape at once.
+
+An unfed unit lives a fixed number of ticks, because its need falls at a fixed
+rate and its deficit then reaches a fixed bound. The work of one upgrade level
+is a separate value. Six suites placed a builder that no site feeds and gave it
+work that now takes more ticks than it lives for. The builder died partway and
+the assertion measured the hunger.
+
+The destination field of a campaign relaxes a fixed number of passes over level
+1 cells, so it steers a unit toward a seed a bounded number of cells away.[^F594A]
+One fixture chose the far corner of the world as an unreachable objective. The
+unit read no direction, the engine released it, the cohort was empty, and the
+campaign closed as lost rather than as expired.
+
+A unit of one faction on the site tile of another besieges that site.[^F594B]
+One fixture renewed a guest presence by placing an enemy on the first tile the
+listener held in index order, which is the site tile itself. The capital fell
+inside ten ticks and every test in the file failed in its own setup.
+
+**Evidence.** Eight suites of the core crate, run on 7 September 2026 on one
+development machine (x86-64), at the tip of the integration branch. Each cause
+was proved by putting the defect back and watching the suite go red again.
+
+**What follows.** **A fixture must read every balance value its run depends on,
+or it must remove the dependency.** The upgrade suites now hold the need where
+it is, through the verb a caller has, so that hunger bounds no run in a file
+about builds. The crowd counts and the raised-world counts are derived from the
+table rather than written. The campaign objective sits inside a stated window.
+
+**A fixture that cannot reach its case must say which reason it stopped for.**
+One guard already read that way and it fired correctly. The others did not:
+they reported that a level did not stand, or that a campaign did not expire,
+without saying that the builder starved or that the cohort dissolved. Both now
+name the reason.
+
+### FND-603 — A state hash pinned inside a suite is a second golden file
+
+**Believed.** A test may pin the whole state hash of a world to a constant it
+holds, as a regression pin over the subsystem the suite is about.
+
+**True.** The state hash of a world covers every arena and every rule the world
+holds. A pin on it fails when any rule moves, whether or not the subsystem
+reads that rule. The weather margin suite pinned the state hash of a world with
+no unit and no site, and a siege rule added to the world moved it. The message
+then accused the weather of a move the weather did not make.
+
+That is one fact in two declaration sites, with nothing that says which to
+regenerate when they disagree.[^F595A] The golden state hash already pins the
+state of a world, it is a stored file, and it has an owner.
+
+**Evidence.** The suite failed at the tip of the integration branch with no
+change to any weather pass. The fold of the weather field alone is stable
+across the same commits.
+
+**What follows.** A pin inside a suite must cover the subsystem the suite
+names. The weather pin now folds the weather field and not the world. Its value
+was taken on 7 September 2026 on one development machine (x86-64).
+
+
 ## References
 
-[^F591C]: Findings register, FND-593. `docs/FINDINGS.md`
+[^F591C]: Findings register, FND-601. `docs/FINDINGS.md`
 [^F592A]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
-[^F593A]: Findings register, FND-591. `docs/FINDINGS.md`
+[^F593A]: Findings register, FND-599. `docs/FINDINGS.md`
 [^F494F]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^DEC278]: Decisions register, DEC-278. `docs/DECISIONS.md`
 
@@ -15109,3 +15177,6 @@ seed moved, and the assertion did not.
 [^F588B]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 [^F588C]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F585B]: Findings register, FND-572. `docs/FINDINGS.md`
+[^F594A]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+[^F594B]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+[^F595A]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`

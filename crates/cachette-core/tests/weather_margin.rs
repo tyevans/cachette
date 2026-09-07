@@ -16,6 +16,7 @@
 //! [^1]: ADR-0140, weather is a field over the level 1 cell lattice. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
 
 use cachette_core::bridge::BlockLayout;
+use cachette_core::hash::StateHash;
 use cachette_core::hex::{Axial, Grid, NEIGHBOUR_COUNT};
 use cachette_core::padded::PaddedLattice;
 use cachette_core::terrain::Terrain;
@@ -47,7 +48,26 @@ fn hash_after(world: &mut World, frames: u32) -> u64 {
     world.state_hash().finish()
 }
 
-/// The hash of a world at margin zero, after the stated frames.
+/// Runs a world for a stated number of frames and returns its weather hash.
+///
+/// **The fold covers the weather field and nothing else.** The state hash of a
+/// world covers every arena and every rule the world holds, so a change to a
+/// rule that no weather pass reads moves it. A pin on the state hash is
+/// therefore a second copy of the golden state hash, kept in a suite that is
+/// about the weather, with nothing that says which of the two to regenerate
+/// when they disagree.[^3]
+///
+/// # References
+///
+/// [^3]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+fn weather_hash_after(world: &mut World, frames: u32) -> u64 {
+    for _ in 0..frames {
+        world.step(4).expect("the step runs");
+    }
+    world.weather().hash_into(StateHash::new()).finish()
+}
+
+/// The weather hash of a world at margin zero, after the stated frames.
 ///
 /// **The value no longer comes from the engine that had no margin, and it
 /// cannot.** It was taken from a run of that engine, at the commit this branch
@@ -55,7 +75,7 @@ fn hash_after(world: &mut World, frames: u32) -> u64 {
 /// weather model has since changed: the row axis of a world became a latitude,
 /// the sun term became the published insolation geometry, and the capacity of
 /// the air became the published saturation curve.[^2] Every world therefore
-/// holds a different state, and the old value can never be reached again.
+/// holds a different field, and the old value can never be reached again.
 ///
 /// **So this constant is now a pin on the current engine and not a proof of
 /// the equivalence it was written for.** It still fails when a change moves
@@ -65,6 +85,14 @@ fn hash_after(world: &mut World, frames: u32) -> u64 {
 /// margin that are still checkable. The commit body holds the command that
 /// produced the value.
 ///
+/// **The pin covers the weather field and not the whole world.** It covered
+/// the world state once, and it then failed on every change to any rule the
+/// world holds, whether or not a weather pass read that rule. A siege rule
+/// added to the world moved it, and the message accused the weather of a move
+/// the weather did not make. A pin on the state of a whole world already
+/// exists as the golden state hash, and a second copy of it is one fact in two
+/// places.[^3]
+///
 /// A test must read a stored value rather than compute it, or it compares a
 /// run against itself and proves nothing.[^1]
 ///
@@ -72,7 +100,8 @@ fn hash_after(world: &mut World, frames: u32) -> u64 {
 ///
 /// [^1]: Testing rules, section 1. `.agents/rules/testing.md`
 /// [^2]: ADR-0177, the row axis of a world is a latitude that the world states. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-const BARE_HASH_AFTER_24_FRAMES: u64 = 2_287_978_085_891_004_685;
+/// [^3]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+const BARE_HASH_AFTER_24_FRAMES: u64 = 13_874_570_617_531_493_441;
 
 /// The frames that the bare hash was taken after.
 const BARE_HASH_FRAMES: u32 = 24;
@@ -93,9 +122,10 @@ fn a_margin_of_zero_widens_no_lattice_and_holds_its_pinned_field() {
         "a margin of zero widens the lattice"
     );
     assert_eq!(
-        hash_after(&mut bare, BARE_HASH_FRAMES),
+        weather_hash_after(&mut bare, BARE_HASH_FRAMES),
         BARE_HASH_AFTER_24_FRAMES,
-        "a world at margin zero moved away from the field this branch pinned"
+        "the weather field at margin zero moved away from the value this \
+         branch pinned"
     );
 }
 
