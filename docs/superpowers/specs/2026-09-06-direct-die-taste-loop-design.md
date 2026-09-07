@@ -54,7 +54,7 @@ is its only reader. The shape changes.
 
 ```json
 {
-  "round": "round-01",
+  "round": 1,
   "likes": ["b", "d"],
   "denies": ["a"],
   "order": ["d", "b"],
@@ -66,8 +66,11 @@ is its only reader. The shape changes.
 
 ### 3.1 The fields
 
-- **`round`** names the round directory. The loop refuses the file when the
-  name disagrees with the directory. This rule does not change.
+- **`round`** holds the index of the round as an integer. The loop refuses
+  the file when the index disagrees with the directory. The front end does
+  not write this field today, and the loop accepts a file without it. The
+  front end now writes it, because a file that names its round is safe to
+  copy and a file that does not is not.
 - **`likes`** holds the variant letters that the person accepts. Order does
   not matter here.
 - **`denies`** holds the variant letters that the person refuses.
@@ -184,9 +187,15 @@ second piece of this work makes it a setting.
 A person ranks, then reads an analysis, then tunes the prompt, then generates.
 The analysis therefore runs before a round, not inside one.
 
-It is a command of the tool, and the front end starts it the same way it
-starts a run. The front end calls the tool through its command line and never
-imports the tool package.[^2]
+It is a command of the tool. The front end calls the tool through its command
+line and never imports the tool package.[^2]
+
+**The analysis waits, and a run does not.** A run draws up to eleven subjects
+at about seventy seconds each, so a job record holds its state and no page
+waits for it. The analysis is one model call. A person clicks the button and
+looks at the page until the answer arrives. A job record for a call this short
+would be a second state machine for no gain. The request runs the child with a
+timeout and shows an error page when it fails.
 
 ```
 python -m direct_die analyse --asset <style> --session <id> --round <n>
@@ -211,7 +220,7 @@ only writer of that file.
 
 ```json
 {
-  "round": "round-01",
+  "round": 1,
   "preference": "What the liked drawings share and the refused ones lack.",
   "order": ["d", "b"],
   "reasons": {"d": "why d beats b", "b": ""},
