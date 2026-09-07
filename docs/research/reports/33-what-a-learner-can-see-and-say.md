@@ -463,9 +463,21 @@ a place finer than one cell cannot direct movement within one.
 The goal is a general playability model that plays from any seat. The
 observation length is a function of the cell count. The cell count is a
 function of the world size. A weight matrix has the shape actions by
-features.[^29] **A policy trained on a 48-tile world cannot be loaded on a
-world of any other size.** The observation version does not change, so nothing
-fails: the load succeeds and the arithmetic is wrong.
+features.[^29] A policy trained on one world therefore states nothing about
+another.
+
+**This paragraph first said that such a load succeeds and computes the wrong
+answer. That was true of some world pairs and not of others.** A measurement
+separated the two cases, and a findings row holds it.[^30] A block is 32 tiles
+on a side, so every world from 33 to 64 tiles on each axis holds four cells and
+an observation length of 176 at three factions. A policy trained on a world 48
+tiles on a side loads on one 64 tiles on a side and plays it, and nothing
+raises. A world of another band holds another length, and the matrix product
+refuses it with a message that names neither world.
+
+The engine now refuses both. A weight file states the world it was trained
+against, and a reader refuses a file whose statement is not the world it is
+asked to play.
 
 ### 5.3 The verdict asked for
 
@@ -487,7 +499,7 @@ Two fixes exist and both are cheap to state.
    is the stronger fix and the more expensive one. It contradicts the record
    that says the observation shares the fog and summary lattice, so it needs a
    record.[^4] A findings row already warns that a second address space over
-   the same world samples the wrong cells and fails nowhere.[^30]
+   the same world samples the wrong cells and fails nowhere.[^31]
 
 The author recommends the first fix now. Take the second as a deliberate
 decision. It buys resolution at the price of a second address space.
@@ -563,7 +575,7 @@ The lead allocates the numbers.
    section 3 is a decision nobody has recorded. Either the learner acts at the
    controller rate, or the baseline is handicapped to the learner's rate, or
    the project accepts the asymmetry and says why. The record that says a
-   controller acts only through the caller's verbs is the one this joins.[^31]
+   controller acts only through the caller's verbs is the one this joins.[^32]
 2. **Whether a verb may name a subset of the units.** This is the largest
    design question in the report. It touches the principle that a set-valued
    command permits a cheaper algorithm, and it touches the action table
@@ -578,7 +590,7 @@ The lead allocates the numbers.
    is entitled to know.
 
 One existing blocker governs several rows above. The rules of the downstream
-game are not written down, and every reward weight is unset under it.[^32] A
+game are not written down, and every reward weight is unset under it.[^33] A
 reward that cannot weigh a term is one problem. An observation that cannot
 carry a term is another. Section 4 is about the second.
 
@@ -597,7 +609,7 @@ These are marked unverified. The author did not confirm them.
   reasoning in section 4 is from the code. Nobody has measured how often a
   board is stale.
 - **Whether an eliminated faction is legible to a policy.** A faction that
-  holds no site and no unit leaves the game under a draft record.[^33] The
+  holds no site and no unit leaves the game under a draft record.[^34] The
   author did not check whether the observation reports the departure.
 
 One minor defect surfaced during the reading, and it is reported rather than
@@ -636,7 +648,8 @@ reader.[^16] A wonder reader now exists and fires.[^11] The comment is false.
 [^27]: The fire module. `crates/cachette-core/src/fire.rs`
 [^28]: The block layout. `crates/cachette-core/src/bridge.rs`
 [^29]: The policy module. `python/cachette/learn/policy.py`
-[^30]: Findings register, FND-569. `docs/FINDINGS.md`
-[^31]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-[^32]: Blockers register, BLK-050. `docs/BLOCKERS.md`
-[^33]: ADR-0181, a faction that holds no site and no unit leaves the game. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
+[^30]: Findings register, FND-631. `docs/FINDINGS.md`
+[^31]: Findings register, FND-569. `docs/FINDINGS.md`
+[^32]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+[^33]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+[^34]: ADR-0181, a faction that holds no site and no unit leaves the game. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`

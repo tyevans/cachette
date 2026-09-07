@@ -47,7 +47,14 @@ from dataclasses import asdict, replace
 from pathlib import Path
 
 from .env import Env, EnvConfig, viable_seeds
-from .policy import LinearPolicy, MLPPolicy, Policy, RandomPolicy, load_policy
+from .policy import (
+    LinearPolicy,
+    MLPPolicy,
+    Policy,
+    PolicyFit,
+    RandomPolicy,
+    load_policy,
+)
 from .reward import Weighting
 from .train import TrainConfig, evaluate, train, write_report
 
@@ -160,7 +167,11 @@ def report_behaviour(names: list[str], out: Path, holdout: int, workers: int) ->
         if not path.exists():
             print(f"  {name}: no stored policy at {path}", flush=True)
             continue
-        policy, meta = load_policy(path)
+        # **The stored policy must fit the world this report plays it on.**
+        # The strategy table names a world for each policy, and a table that
+        # moves after a run leaves files that read the right length and mean
+        # something else.
+        policy, meta = load_policy(path, PolicyFit.of_env(Env(env_config, weighting)))
         rows[name] = {
             "kind": str(meta["kind"]),
             **behaviour(env_config, weighting, policy, seeds, workers),

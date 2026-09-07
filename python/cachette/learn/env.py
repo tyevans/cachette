@@ -199,9 +199,18 @@ class Env:
         # The lengths come from the schemas, and both are functions of the
         # world parameters alone. A probe world answers them once, so a
         # caller sizes a network before it runs an episode.
+        #
+        # **The two versions come from the same schemas.** A stored policy
+        # states the version it was trained under, and the engine owns that
+        # number. A constant here would be a second declaration of it, and
+        # nothing would fail when the engine moved and this did not.
         probe = self._build(0)
-        self.observation_length: int = int(probe.observation_schema()["length"])
-        self.action_length: int = int(probe.action_schema()["length"])
+        observation = probe.observation_schema()
+        action = probe.action_schema()
+        self.observation_length: int = int(observation["length"])
+        self.action_length: int = int(action["length"])
+        self.observation_version: int = int(observation["version"])
+        self.action_version: int = int(action["version"])
 
     @property
     def config(self) -> EnvConfig:
@@ -432,6 +441,8 @@ class VectorEnv:
         self.world_ticks = 0
         self.observation_length = self._envs[0].observation_length
         self.action_length = self._envs[0].action_length
+        self.observation_version = self._envs[0].observation_version
+        self.action_version = self._envs[0].action_version
 
     def __len__(self) -> int:
         """Return how many environments the vector holds."""

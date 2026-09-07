@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-631**
+**Next number: FND-632**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -16208,6 +16208,49 @@ decision count.
 interface, check how often each one uses it.
 
 
+### FND-631 — A policy loaded on the wrong world was believed to always fail, and it fails only across a lattice band
+
+**Believed.** The observation length is a function of the cell count, and the
+cell count is a function of the world size. A research report took from this
+that a policy trained on one world size loads on another, succeeds, and
+computes the wrong answer.[^F631A]
+
+**Half false.** The failure depends on which pair of worlds a caller names.
+
+The observation lattice divides the world into blocks of a fixed edge, and the
+edge is 32 tiles. Every world from 33 to 64 tiles on each axis therefore holds
+four cells. At three factions each of those worlds holds an observation length
+of 176 and an action length of 29.
+
+A policy trained on a world 48 tiles on a side loads on one 64 tiles on a side,
+reads an array of the length it expects, and plays a world with 78 per cent
+more tiles. **Nothing raises, because no array has a shape to disagree about.**
+
+A world of another band holds another length. The matrix product then refuses
+it, and the message names a core dimension and neither world.
+
+**Evidence.** One measurement built worlds of six shapes at three factions and
+read the two schema lengths of each. Worlds 48, 64 and 33 tiles on a side, and
+one 40 by 56, all gave 176 and 29. A world 96 tiles on a side gave 221. A
+policy stored against the smallest played the largest of the four with no
+error, and raised on the world of the other band. A test file holds the
+case.[^F631B]
+
+**What follows.** **A length is not an identity.** Two tables of one length may
+hold two layouts, so a check that compares lengths passes the case it exists
+for.
+
+A weight file now states the world extent, the faction count and both schema
+versions beside the two lengths. A reader refuses a file whose statement is not
+the world it is asked to play.[^F631C]
+
+**A version that a caller writes by hand is not the engine's version.** The
+trainer wrote both schema versions as the literal one. A version bump would
+have left every new file stating the old number, and the check would have
+passed against a layout that had moved. The fit now reads both versions from
+the schemas of the world.[^F631D]
+
+
 ## References
 
 [^F628A]: The trainer, the resume path. `python/cachette/learn/train.py`
@@ -16219,3 +16262,7 @@ interface, check how often each one uses it.
 [^F630B]: ADR-0176, an action integer is a mixed radix over the positions a verb declares, decision D4. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^F630C]: The learner environment, the decision interval and the baselines. `python/cachette/learn/env.py`
 [^F630D]: Report 33, what a learner can see, say and be scored on, section 3. `docs/research/reports/33-what-a-learner-can-see-and-say.md`
+[^F631A]: Report 33, what a learner can see, say and be scored on, section 5. `docs/research/reports/33-what-a-learner-can-see-and-say.md`
+[^F631B]: The policy fit tests. `tests/test_learner_policy_fit.py`
+[^F631C]: The policy module, the fit and the reader. `python/cachette/learn/policy.py`
+[^F631D]: The trainer, the centre it writes. `python/cachette/learn/train.py`

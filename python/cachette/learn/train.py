@@ -39,7 +39,7 @@ from typing import NotRequired, TypedDict
 import numpy as np
 
 from .env import Env, EnvConfig, VectorEnv, viable_seeds
-from .policy import LinearPolicy, MLPPolicy, Policy, load_policy
+from .policy import LinearPolicy, MLPPolicy, Policy, PolicyFit, load_policy
 from .reward import Weighting
 
 # A policy the trainer can perturb. Both kinds answer ``flat`` and
@@ -259,13 +259,11 @@ def train(
                 "spread": spread,
                 "validation_score": validated,
                 "best_score": best,
-                "action_version": 1,
-                "observation_version": 1,
-                "observation_length": probe.observation_length,
-                "action_length": probe.action_length,
-                "width": env_config.width,
-                "height": env_config.height,
-                "faction_count": env_config.faction_count,
+                # **The fit states the world this file was trained against,
+                # and the engine owns every number in it.** A reader refuses
+                # a file whose fit is not the fit of the world it is asked
+                # to play, so a policy never plays a world it never saw.
+                **PolicyFit.of_env(probe).as_meta(),
                 "seat": env_config.seat,
                 "tick_limit": env_config.tick_limit,
                 "horizon": env_config.horizon,
@@ -292,7 +290,11 @@ def train(
         #
         # The projection of a network is a function of one fixed seed, so the
         # stored network is the network this run would build.
-        stored, meta = load_policy(latest_path)
+        # **A resumed run must refuse a checkpoint from another world.** The
+        # centre of a run is a function of one observation layout, and a
+        # world of another extent can hold the same layout length while
+        # meaning something else by every position of it.
+        stored, meta = load_policy(latest_path, PolicyFit.of_env(probe))
         policy = policy.rebuild(np.asarray(stored.flat()))
         # A weight file states what it holds, and the reader gives back what
         # the file held. A file written by an older run can therefore be
