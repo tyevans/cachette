@@ -30,13 +30,14 @@ from __future__ import annotations
 
 import json
 import time
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import numpy as np
 
 from .env import Env, EnvConfig, VectorEnv, viable_seeds
-from .policy import LinearPolicy
+from .policy import LinearPolicy, Policy
 from .reward import Weighting
 
 # The observation fields a report names. Each holds one position, and each
@@ -74,7 +75,7 @@ def field_starts(env: Env) -> dict[str, int]:
 def run_population(
     config: EnvConfig,
     weighting: Weighting,
-    policies: list[LinearPolicy],
+    policies: Sequence[Policy],
     seeds: list[int],
     workers: int,
 ) -> tuple[np.ndarray, list[dict[str, float]]]:
@@ -206,7 +207,7 @@ def train(
 def evaluate(
     env_config: EnvConfig,
     weighting: Weighting,
-    policy: LinearPolicy,
+    policy: Policy,
     seeds: list[int],
     workers: int,
 ) -> dict[str, float]:

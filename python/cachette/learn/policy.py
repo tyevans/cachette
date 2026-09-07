@@ -31,6 +31,7 @@ schema-declared bounded tables, decision D5.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Protocol
 
 import numpy as np
 
@@ -59,6 +60,19 @@ def encode_many(observations: np.ndarray) -> np.ndarray:
     return np.concatenate([squashed, ones], axis=1)
 
 
+class Policy(Protocol):
+    """What a caller needs of a policy to play it on a batch of worlds.
+
+    The training loop and the holdout measurement both score a whole batch at
+    once, so the one thing either of them asks of a policy is a choice for
+    every row. The linear policy and the two baselines all answer it, and a
+    signature that named one of them would refuse the other two.
+    """
+
+    def choose_many(self, observations: np.ndarray, masks: np.ndarray) -> list[int]:
+        """Return one action integer for each row of a stack of observations."""
+
+
 class LinearPolicy:
     """One weight matrix over the features, and one score for each action."""
 
@@ -79,7 +93,8 @@ class LinearPolicy:
     @property
     def shape(self) -> tuple[int, int]:
         """The shape of the weight matrix."""
-        return self.weights.shape  # type: ignore[return-value]
+        actions, features = self.weights.shape
+        return actions, features
 
     def choose(self, observation: np.ndarray, mask: np.ndarray) -> int:
         """Return the action integer of the highest-scoring legal row."""
@@ -101,8 +116,12 @@ class LinearPolicy:
         file written under one version means something else under the next.
         """
         path.parent.mkdir(parents=True, exist_ok=True)
+        # numpy declares ``allow_pickle`` as a keyword before its own
+        # ``**kwds``, so a mapping keyed on ``str`` can never unpack cleanly.
         np.savez(
-            path, weights=self.weights, **{k: np.array(v) for k, v in meta.items()}
+            path,
+            weights=self.weights,
+            **{k: np.array(v) for k, v in meta.items()},  # type: ignore[arg-type]
         )
 
     @classmethod
