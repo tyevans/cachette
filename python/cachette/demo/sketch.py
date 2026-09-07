@@ -407,7 +407,6 @@ class Ground:
         "page_x",
         "page_y",
         "rise",
-        "sample",
         "shape",
         "sheet",
         "stand",
@@ -423,7 +422,6 @@ class Ground:
     window: tuple[int, int, int, int]
     shape: tuple[int, int]
     stand: tuple[float, float]
-    sample: tuple[np.ndarray, np.ndarray] | None
     held: np.ndarray
     take: np.ndarray
     drawn: np.ndarray
@@ -454,9 +452,6 @@ class Ground:
         self.window = window
         self.shape = shape
         self.stand = stand
-        # Where the engine drew each tile of the window on its own flat map.
-        # It is built only when a wash needs it.
-        self.sample = None
 
 
 class Sketch:
@@ -477,6 +472,8 @@ class Sketch:
         "_level",
         "_raised",
         "_relief",
+        "_sample",
+        "_sample_at",
         "_scratch",
         "_sky",
         "_water",
@@ -562,6 +559,10 @@ class Sketch:
         self._scratch: dict[str, npt.NDArray[np.uint32]] = {}
         self._grain: np.ndarray | None = None
         self._grain_size = (0, 0)
+        # Where the engine drew each tile of the world on its own flat map,
+        # and the camera and frame that answer stands for.
+        self._sample: tuple[np.ndarray, np.ndarray, np.ndarray] | None = None
+        self._sample_at: tuple[float, float, float, float, int, int] | None = None
 
     def window(self) -> tuple[int, int, int, int] | None:
         """Give back the window of tiles the last frame drew, or nothing.
@@ -1094,6 +1095,60 @@ class Sketch:
         )
         return glazed
 
+    def tile_pixels(
+        self, camera: Camera, width: int, height: int
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Say where the engine drew each tile of the world on its flat map.
+
+        The answer is three arrays the size of the world: the column of the
+        frame, the row of the frame, and whether any pixel named that tile at
+        all. A tile the frame does not show carries a false flag, and a caller
+        must read no value for it.
+
+        **The engine answers where a tile is.** The pass asks it over a coarse
+        grid of pixels and takes the middle of the pixels that named each
+        tile, so this module holds no layout of its own for the flat map.
+
+        **The answer belongs to one camera and one frame, and nothing else.**
+        It is held against the numbers that produced it and built again when
+        one of them moves. An answer held against the window of tiles instead
+        would be reused at another camera that covers the same whole tiles,
+        and every tile would then take the colour of a neighbour.[^4]
+
+        [^4]: Findings register, FND-610. `docs/FINDINGS.md`
+        """
+        stands = (
+            camera.origin_x,
+            camera.origin_y,
+            camera.tile_width,
+            camera.tile_height,
+            width,
+            height,
+        )
+        held = self._sample
+        if held is not None and self._sample_at == stands:
+            return held
+        rows, columns = self._world.height, self._world.width
+        found_x = np.zeros((rows, columns), dtype=np.int64)
+        found_y = np.zeros((rows, columns), dtype=np.int64)
+        counted = np.zeros((rows, columns), dtype=np.int64)
+        for y in range(0, height, SAMPLE_STEP):
+            for x in range(0, width, SAMPLE_STEP):
+                tile_q, tile_r = camera.tile_at(float(x), float(y))
+                if 0 <= tile_q < columns and 0 <= tile_r < rows:
+                    found_x[tile_r, tile_q] += x
+                    found_y[tile_r, tile_q] += y
+                    counted[tile_r, tile_q] += 1
+        safe = np.clip(counted, 1, None)
+        built = (
+            np.clip(found_x // safe, 0, width - 1).astype(np.int32),
+            np.clip(found_y // safe, 0, height - 1).astype(np.int32),
+            counted > 0,
+        )
+        self._sample = built
+        self._sample_at = stands
+        return built
+
     def _by_tile(
         self, ground: Ground, frame: np.ndarray, camera: Camera, width: int, height: int
     ) -> np.ndarray:
@@ -1102,38 +1157,10 @@ class Sketch:
         The engine paints an overlay on its own map. The page shows the same
         tiles in another place, so the reading finds where the engine drew
         each tile and then puts the value where the page shows that tile.
-
-        **The engine answers where a tile is.** The pass asks it over a coarse
-        grid of pixels and takes the middle of the pixels that named each
-        tile, so this module holds no layout of its own for the flat map.
         """
-        first_q, first_r, last_q, last_r = ground.window
-        across = last_q - first_q
-        down = last_r - first_r
-        if ground.sample is None:
-            columns = np.arange(0, width, SAMPLE_STEP)
-            rows = np.arange(0, height, SAMPLE_STEP)
-            found_q = np.zeros((down, across), dtype=np.int64)
-            found_y = np.zeros((down, across), dtype=np.int64)
-            counted = np.zeros((down, across), dtype=np.int64)
-            for y in rows:
-                for x in columns:
-                    tile_q, tile_r = camera.tile_at(float(x), float(y))
-                    at_q = tile_q - first_q
-                    at_r = tile_r - first_r
-                    if 0 <= at_q < across and 0 <= at_r < down:
-                        found_q[at_r, at_q] += x
-                        found_y[at_r, at_q] += y
-                        counted[at_r, at_q] += 1
-            safe = np.clip(counted, 1, None)
-            ground.sample = (
-                np.clip(found_q // safe, 0, width - 1).astype(np.int32),
-                np.clip(found_y // safe, 0, height - 1).astype(np.int32),
-            )
-        at_x, at_y = ground.sample
-        window = frame[at_y, at_x]
-        whole = np.zeros((self._world.height, self._world.width), dtype=window.dtype)
-        whole[first_r:last_r, first_q:last_q] = window
+        at_x, at_y, seen = self.tile_pixels(camera, width, height)
+        read = frame[at_y, at_x]
+        whole = np.where(seen, read, np.zeros((), dtype=read.dtype))
         return self._gather(ground, whole)
 
     def _sky_over(self, page: np.ndarray, ground: Ground, rise: int) -> np.ndarray:

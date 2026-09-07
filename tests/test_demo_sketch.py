@@ -324,3 +324,102 @@ def test_the_lean_changes_how_far_the_page_reaches_down_the_frame() -> None:
         assert ground is not None
         heights.append(ground.drawn.shape[0])
     assert heights[0] < heights[1] < heights[2]
+
+
+# ----------------------------------------------------------------------
+# The wash of an overlay against the ground it colours.
+#
+# **The colour and the ink are one page, and a zoom must not part them.** The
+# engine paints an overlay on its own flat map. The sketch reads that paint
+# tile by tile, at the pixel the engine drew each tile on. That pixel is a
+# function of the camera and of the size of the frame, and of nothing else.
+#
+# A reading held against the window of whole tiles instead is reused at every
+# camera that covers the same whole tiles. A zoom moves the camera in small
+# steps and the window in whole tiles, so between two steps of the window each
+# tile takes the paint of a neighbour, and the colour walks across the ink.
+# The register holds what this cost.[^1]
+#
+# [^1]: Findings register, FND-610. `docs/FINDINGS.md`
+
+# The overlay these tests colour the world with. It paints a field that
+# changes from tile to tile, so a reading that slips by one tile reads a
+# different colour.
+DRIFT_OVERLAY = "height"
+
+# The zoom steps the tests run. **Two of these hold the window of whole tiles
+# still.** A test that only compared two frames at one zoom, or at two zooms
+# far enough apart to move the window, would pass while the colour slid.
+DRIFT_ZOOMS = (1.0, 1.06, 1.13, 1.9, 3.1)
+
+
+def zoomed(world: World, factor: float) -> Camera:
+    """Give back a camera at this factor of the size that fits the world."""
+    fitted = Camera.fitting(world, WIDTH, HEIGHT)
+    camera = Camera(tile_size=fitted.tile_width * factor)
+    camera.origin_x = fitted.origin_x
+    camera.origin_y = fitted.origin_y
+    camera.clamp(world, WIDTH, HEIGHT)
+    return camera
+
+
+def washed(renderer: object, camera: Camera) -> np.ndarray:
+    """Fill one frame with an overlay laid over the sketch."""
+    surface = Surface(WIDTH, HEIGHT)
+    renderer(  # type: ignore[operator]
+        camera, WIDTH, HEIGHT, surface.pixels, overlay=DRIFT_OVERLAY
+    )
+    return surface.pixels.copy()
+
+
+def test_every_tile_takes_its_wash_from_the_pixel_the_engine_drew_it_at() -> None:
+    """The reading of a tile stands on that tile, at every zoom.
+
+    **This asks the engine, and it does not repeat the engine.** The renderer
+    says which pixel it read a tile at. The engine says which tile stands at
+    that pixel. The two must name the same tile, or the tile wears the colour
+    of a neighbour.
+    """
+    world, _ = build()
+    sketch = Sketch(world, view=View())
+    for factor in DRIFT_ZOOMS:
+        camera = zoomed(world, factor)
+        washed(sketch, camera)
+        at_x, at_y, seen = sketch.tile_pixels(camera, WIDTH, HEIGHT)
+        rows, columns = np.nonzero(seen)
+        wrong = [
+            (int(q), int(r))
+            for r, q in zip(rows, columns, strict=True)
+            if camera.tile_at(float(at_x[r, q]), float(at_y[r, q])) != (int(q), int(r))
+        ]
+        assert not wrong, (
+            f"at zoom {factor} the sketch read {len(wrong)} of {len(rows)} tiles "
+            f"at a pixel that shows another tile, the first being {wrong[0]}"
+        )
+
+
+def test_a_zoom_does_not_walk_the_wash_across_the_ground() -> None:
+    """The frame follows the camera it is drawn at, not the one before it.
+
+    **A wash is a property of a tile, so the road to a camera cannot change
+    it.** One renderer goes straight to a camera. Another reaches the same
+    camera through every zoom step before it. The two frames must agree.
+
+    A reading held against the window of whole tiles fails here, because the
+    second renderer keeps the reading it made at the first zoom and every tile
+    then wears the colour of a neighbour.
+    """
+    world, _ = build()
+    travelled = Sketch(world, view=View())
+    for factor in DRIFT_ZOOMS:
+        washed(travelled, zoomed(world, factor))
+
+    for factor in DRIFT_ZOOMS:
+        camera = zoomed(world, factor)
+        direct = washed(Sketch(world, view=View()), camera)
+        after = washed(travelled, camera)
+        apart = float((direct != after).mean())
+        assert apart == 0.0, (
+            f"at zoom {factor} the frame drawn after a zoom differs from the "
+            f"frame drawn at that camera alone on {apart:.4%} of its pixels"
+        )
