@@ -93,7 +93,7 @@ pub use conversion::{ConversionError, Convert, UnitConverted};
 pub use descent::{
     Descent, DescentError, DescentId, HouseId, Parents, DESCENT_CEILING, RELATION_DEPTH,
 };
-pub use event::{ResourceTaken, TileChanged};
+pub use event::{FactionEliminated, ResourceTaken, SiteTaken, TileChanged};
 pub use faction_view::{Admit, FactionTile, Ground, MaskedSummary, SeenTile, SeenUnit, Sighting};
 pub use founding::{
     Founding, FoundingError, FoundingOutcome, Provision, SettleError, SettleOutcome, Survey,
@@ -163,6 +163,7 @@ pub use weather::{
 };
 pub use world::{
     CampaignError, CensusBasis, CensusRow, ConvertError, IdentityError, MoveRelationError,
-    SeedError, Standing, StepError, World, WorldConfig, WorldError, FOUNDING_GROUP_DEFAULT,
-    LUXURY_DEPOSITS_DEFAULT, STOCK_CEILING_OF_ONE_SETTLEMENT, SUBSYSTEM_CENSUS,
+    RazeError, SeedError, Standing, StepError, World, WorldConfig, WorldError,
+    FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, STOCK_CEILING_OF_ONE_SETTLEMENT,
+    SUBSYSTEM_CENSUS,
 };

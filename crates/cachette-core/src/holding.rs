@@ -1253,6 +1253,54 @@ impl Holding {
         self.apply(&changes, threads);
     }
 
+    /// Releases every claim one faction has on the ground, and reports how
+    /// many tiles it held.
+    ///
+    /// **A faction claims ground two ways, and a release must end both.** The
+    /// holder column says who holds a tile now. The lease column says who has
+    /// been using it, and a lease at the claim threshold outranks the reach
+    /// of every city.[^1] A release that cleared only the holder would give
+    /// the tile back on the next spread, from a lease that nobody can raise
+    /// any more.
+    ///
+    /// The tiles are written in ascending tile index, so the write names no
+    /// thread and depends on no caller order.[^2] The call runs on the
+    /// calling thread and takes the thread count only for the merge that
+    /// rebuilds the held list.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    pub fn release(&mut self, faction: FactionId, threads: usize) -> u64 {
+        let holder = Holder::of(faction);
+        let held: Vec<TileIdx> = self
+            .held
+            .iter()
+            .copied()
+            .filter(|tile| self.holders[tile.0 as usize] == holder)
+            .collect();
+        let released = held.len() as u64;
+        // The lease goes first. The holder write below rebuilds the derived
+        // parts, and a lease left behind would take the tile back on the next
+        // spread.
+        let mut leased: Vec<TileIdx> = Vec::new();
+        for tile in &self.leased {
+            let index = tile.0 as usize;
+            if self.lease_holder[index] == holder {
+                self.lease_holder[index] = Holder::NOBODY;
+                self.lease_count[index] = 0;
+            } else {
+                leased.push(*tile);
+            }
+        }
+        self.leased = leased;
+        if !held.is_empty() {
+            self.transfer(&held, Holder::NOBODY, threads);
+        }
+        released
+    }
+
     /// Writes the decided changes and repairs the three derived parts.
     ///
     /// The write is one scattered store for each change, and it runs on the

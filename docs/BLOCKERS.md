@@ -363,35 +363,6 @@ and it is prose that no test can hold, so it decays the moment this row closes.
 whether the project publishes to a public index. A search of the tree for this
 row number then repairs every place that states the install path.
 
-### BLK-036 — Does an upgrade change hands when the ground does?
-
-**Owner:** the project owner. **Blocks:** any rule that ties an existing
-upgrade to the faction that holds the tile under it.
-
-The engine stores an upgrade on a tile and asks nothing about who holds the
-tile.[^BLK34A] A holder column names who holds each tile, and that value moves
-as units move.[^BLK34B] Nothing says what happens to an upgrade on a tile whose
-holder changes.
-
-**This row is the part of BLK-034 that stayed open when the rest of it
-resolved.** It was split out on 3 September 2026, because a row that is mostly
-answered reads as open and stops work that should proceed.
-
-**The three answered questions do not answer this one.** A faction builds only
-on ground it holds. Anyone may destroy an upgrade. Destruction takes work, and
-a faction-level removal is instant. Every one of those is an act that somebody
-invokes. This question asks what happens when nobody invokes anything and the
-ground changes hands.
-
-**Two shapes the answer could take.** The upgrade goes to the new holder, or
-the upgrade stays with the faction that built it. A third shape is that the
-upgrade is destroyed. Each reaches the state hash, so the engine cannot hold
-two of them.
-
-Work continues without the answer. The engine states the storage and the
-arithmetic, and neither depends on a faction. A rule invented here would be a
-content decision made by the wrong person.
-
 ### BLK-050 — The rules of the downstream game are not written down
 
 **Owner:** the project owner. **Blocks:** the meaning of every verb the
@@ -525,6 +496,30 @@ a different game from one in which they do not, and both are playable.
 
 
 ## Resolved
+
+### BLK-036 — Does an upgrade change hands when the ground does?
+
+**Resolved on 6 September 2026. An upgrade changes hands with the ground.**
+
+The engine stores an upgrade against a tile and stores no owner beside it, so
+an upgrade already followed the ground. This answer makes that binding rather
+than incidental, and a decision record now states it.[^BLK36A]
+
+The row named three shapes the answer could take. The upgrade goes to the new
+holder, the upgrade stays with the faction that built it, or the upgrade is
+destroyed. The project owner chose the first, and asked for the rule of cool.
+
+**The answer arrived with the question that made it matter.** A settlement's
+faction was written at its founding and never again, so no city could change
+hands and the question had no case. The owner asked for both a capture and a
+raze at the same time. A faction that takes a city intact keeps its roads, its
+terraces, its lodging and its walls, and a faction that razes one destroys
+them. Taking a developed city is therefore a prize, and razing one is a real
+sacrifice.
+
+**A record and not this row is now the statement of the rule.** Two records
+hold the constraints: one for the capture and the raze, and one for the
+elimination that a raze made reachable.[^BLK36A] [^BLK36B]
 
 ### BLK-052 — Nobody has measured whether a fight at this granularity looks like a fight
 
@@ -779,6 +774,8 @@ normally.
 [^BLK40B]: Findings register, FND-341. `docs/FINDINGS.md`
 [^BLK50A]: PRD-0031, a god knows whose ground its people stand on. `docs/product/shaped/prd-0031-a-god-knows-whose-ground-its-people-stand-on.md`
 [^BLK50B]: Research report 21, what a god needs from this engine, section 8. `docs/research/reports/21-what-a-god-needs.md`
+[^BLK36A]: ADR-0180, a site changes hands or the taker destroys it. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+[^BLK36B]: ADR-0181, a faction that holds no site and no unit leaves the game. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
 [^BLK52A]: Research report 21, what a god needs from this engine, section 4. `docs/research/reports/21-what-a-god-needs.md`
 [^BLK52B]: Research report 21, what a god needs from this engine, section 4.2. `docs/research/reports/21-what-a-god-needs.md`
 [^BLK52C]: Findings register, FND-390. `docs/FINDINGS.md`

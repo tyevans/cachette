@@ -28,7 +28,8 @@ use cachette_core::cohort::{SiteRationed, UnitStarved};
 use cachette_core::contest::UnitFell;
 use cachette_core::conversion::UnitConverted;
 use cachette_core::event::{
-    ResourceTaken, SettlementFounded, TileChanged, UpgradeCollapsed, UpgradeFinished,
+    FactionEliminated, ResourceTaken, SettlementFounded, SiteTaken, TileChanged, UpgradeCollapsed,
+    UpgradeFinished,
 };
 use cachette_core::event_layout::EventLayout;
 use cachette_core::hex::Axial;
@@ -103,6 +104,8 @@ log_registry! {
     collapsed_log: UpgradeCollapsed;
     finished_log: UpgradeFinished;
     founded_log: SettlementFounded;
+    taken_log: SiteTaken;
+    eliminated_log: FactionEliminated;
 }
 
 /// Reads the campaign log, and adds the axial address of the objective.

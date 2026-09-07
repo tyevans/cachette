@@ -8506,10 +8506,6 @@ fn trade_refusal(error: cachette_core::TradeError) -> PyErr {
             "the party that owes the land does not hold tile {}",
             tile.0
         ),
-        Refusal::UpgradeOnLand(tile) => format!(
-            "tile {} carries an upgrade, and whether an upgrade changes hands with the ground is open under BLK-036, so the engine refuses the trade until it is answered",
-            tile.0
-        ),
         Refusal::TooMuchLand(count, bound) => format!(
             "a land side names {count} tiles, and the bound is {bound}"
         ),
