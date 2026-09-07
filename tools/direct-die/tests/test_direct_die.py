@@ -14,7 +14,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from direct_die import guide, loop, render, session  # noqa: E402
+from direct_die import guide, loop, render, session, steer  # noqa: E402
 
 SQUARE = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
@@ -129,12 +129,17 @@ def test_a_human_choice_beats_the_best_score(tmp_path):
     )
     session.write_json(
         store.round_path(0) / "feedback.json",
-        {"round": 0, "choice": "c", "text": "keep the dark palette", "at": "2026-09-06T00:00:00+00:00"},
+        {
+            "round": 0,
+            "likes": ["c"],
+            "note": "keep the dark palette",
+            "at": "2026-09-06T00:00:00+00:00",
+        },
     )
-    parent, faults, human = loop.choose_parent(store, 1)
-    assert parent == "round-00/variant-c"
-    assert faults == ["fault c"]
-    assert human == "keep the dark palette"
+    found = steer.collect(store, 1)
+    assert found.parents == ("round-00/variant-c",)
+    assert found.faults["round-00/variant-c"] == ["fault c"]
+    assert found.note == "keep the dark palette"
 
 
 def test_the_best_score_wins_when_no_feedback_exists(tmp_path):
@@ -147,9 +152,9 @@ def test_the_best_score_wins_when_no_feedback_exists(tmp_path):
         store.round_path(0) / "variant-d.critique.json",
         {"verdict": "x", "faults": [], "score": 65},
     )
-    parent, _, human = loop.choose_parent(store, 1)
-    assert parent == "round-00/variant-d"
-    assert human is None
+    found = steer.collect(store, 1)
+    assert found.parents == ("round-00/variant-d",)
+    assert found.note is None
 
 
 def test_the_revision_prompt_puts_the_human_above_the_model():

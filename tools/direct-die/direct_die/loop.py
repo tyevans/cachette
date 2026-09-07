@@ -25,6 +25,7 @@ from pathlib import Path
 
 from . import guide as guide_module
 from . import render, session
+from . import steer as steer_module
 from .client import ClientError, Image, ask, ask_with_images
 
 # The four variant lenses. Each one gives a different direction and a
@@ -403,60 +404,41 @@ def assign_parents(
     }
 
 
-def choose_parent(
-    store: session.Session, index: int
-) -> tuple[str | None, list[str], str | None]:
-    """Choose the parent of the next round.
+@dataclass(frozen=True)
+class RoundPlan:
+    """What one round revises, refuses, and reads as direction."""
 
-    The function gives the parent reference, the fault list of that
-    parent, and the human feedback text.
+    parents: dict[str, str] = field(default_factory=dict)
+    faults: dict[str, list[str]] = field(default_factory=dict)
+    denied_sources: tuple[str, ...] = ()
+    note: str | None = None
+    text: str | None = None
 
-    A human choice wins, because the human outranks the model. When no
-    human chose, the parent is the highest scoring variant of every
-    round so far, and not only of the last round. A critique names a
-    fault even in a good drawing, and a revision that acts on that fault
-    can make the drawing worse. The loop must not walk away from its
-    best work when that happens. A later round wins a tie, so the loop
-    still moves.
+
+def plan_round(
+    store: session.Session, index: int, letters: Sequence[str]
+) -> RoundPlan:
+    """Read the session and give the plan of one round.
+
+    The plan names the parent of each variant letter, the faults of each
+    parent, and the SVG source of each drawing that the person refused.
+
+    A refusal whose SVG is not on disk drops out. The picture is what the
+    prompt shows, and there is nothing to show.
     """
-    if index <= 0:
-        return None, [], None
-    previous = index - 1
-    feedback = store.feedback(previous)
-    human_text = None
-    chosen: tuple[int, str] | None = None
-    if feedback:
-        text = feedback.get("text")
-        if isinstance(text, str) and text.strip():
-            human_text = text.strip()
-        choice = feedback.get("choice")
-        if isinstance(choice, str) and choice in session.VARIANT_LETTERS:
-            chosen = (previous, choice)
-
-    if chosen is None:
-        best_score = -1
-        for round_index in store.existing_rounds():
-            if round_index > previous:
-                continue
-            for candidate in session.VARIANT_LETTERS:
-                critique = store.critique(round_index, candidate)
-                if not critique:
-                    continue
-                score = critique.get("score")
-                if isinstance(score, int) and score >= best_score:
-                    best_score = score
-                    chosen = (round_index, candidate)
-
-    if chosen is None:
-        return None, [], human_text
-
-    round_index, letter = chosen
-    critique = store.critique(round_index, letter) or {}
-    faults = [item for item in critique.get("faults", []) if isinstance(item, str)]
-    return (
-        f"{session.round_name(round_index)}/variant-{letter}",
-        faults,
-        human_text,
+    found = steer_module.collect(store, index)
+    sources: list[str] = []
+    for reference in found.denied:
+        number, letter = steer_module.split_reference(reference)
+        text = store.svg(number, letter)
+        if text and text.strip():
+            sources.append(text)
+    return RoundPlan(
+        parents=assign_parents(found.parents, letters),
+        faults=dict(found.faults),
+        denied_sources=tuple(sources),
+        note=found.note,
+        text=found.text,
     )
 
 
@@ -470,27 +452,41 @@ def run_round(
 ) -> RoundResult:
     """Run one round, and write every file that the round produces."""
     sizes = render.sizes_for(the_guide.asset)
-    parent, faults, human_text = choose_parent(store, index)
-    parent_svg = None
-    if parent:
-        previous_index = int(parent.split("/")[0][len("round-") :])
-        letter = parent.rsplit("-", 1)[1]
-        parent_svg = store.svg(previous_index, letter)
-
-    result = RoundResult(index=index, parent=parent)
     letters = session.VARIANT_LETTERS[:variants]
+    plan = plan_round(store, index, letters)
+    result = RoundResult(index=index, parent=plan.parents.get(letters[0]))
     round_path = store.round_path(index)
 
     for letter in letters:
         lens, temperature = VARIANT_LENSES[letter]
         variant = VariantResult(letter=letter)
         result.variants.append(variant)
+        reference = plan.parents.get(letter)
+        parent_svg = None
+        if reference:
+            number, parent_letter = steer_module.split_reference(reference)
+            parent_svg = store.svg(number, parent_letter)
         if parent_svg:
             prompt = build_revision_prompt(
-                the_guide, subject, lens, sizes, parent_svg, faults, human_text
+                the_guide,
+                subject,
+                lens,
+                sizes,
+                parent_svg,
+                plan.faults.get(reference, []),
+                plan.text,
+                standing_note=plan.note,
+                denied_sources=plan.denied_sources,
             )
         else:
-            prompt = build_creation_prompt(the_guide, subject, lens, sizes)
+            prompt = build_creation_prompt(
+                the_guide,
+                subject,
+                lens,
+                sizes,
+                denied_sources=plan.denied_sources,
+                standing_note=plan.note,
+            )
 
         try:
             source, seconds, prompt_tokens, completion_tokens = produce_svg(
@@ -534,15 +530,17 @@ def run_round(
         )
 
     result.seconds = sum(variant.seconds for variant in result.variants)
-    summary = "first drawing" if not parent else "revision"
-    if human_text:
+    summary = "first drawing" if not plan.parents else "revision"
+    if plan.note or plan.text:
         summary += "; the human gave direction"
+    if plan.denied_sources:
+        summary += f"; {len(plan.denied_sources)} refused drawings in the prompt"
     session.write_json(
         round_path / "meta.json",
         {
             "round": index,
             "prompt_summary": f"{subject}; {summary}",
-            "parent": parent,
+            "parents": dict(plan.parents),
         },
     )
     return result
