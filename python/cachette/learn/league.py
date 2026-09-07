@@ -26,6 +26,18 @@ worlds of one seed host both halves of two pairs:
 
 Pair 1 is scored twice in seat 0 and pair 2 twice in seat 1, both on seed s.
 
+**The pairing cancels the seat and the seed. It does not cancel the
+opponent.** The plus half of pair 1 meets the plus half of pair 2, and the
+minus half meets the minus half, so the difference between the two scores of
+a pair holds the other pair's perturbation as well as its own. That is a real
+confound and it is not removed here. It is noise rather than bias, because
+the other perturbation is drawn independently and its sign is as likely to
+help as to hurt, so it averages out over pairs and over generations. It does
+widen the variance of one generation.
+
+A run that cannot accept that should use one learner seat, where the opponent
+is the built-in controller in every world and does not move at all.
+
 # One seat stays with the built-in controller
 
 **The controller keeps a seat.** Filling every seat with candidates removes
