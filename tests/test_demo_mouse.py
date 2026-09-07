@@ -46,6 +46,7 @@ from cachette.demo.mouse import (
     LEAN_EACH_PIXEL,
     LEFT_BUTTON,
     MIDDLE_BUTTON,
+    MOD_CTRL,
     RIGHT_BUTTON,
     TURN_EACH_PIXEL,
     Controls,
@@ -109,6 +110,7 @@ def drag(
     button: int,
     start: tuple[int, int],
     steps: list[tuple[int, int]],
+    modifiers: int = 0,
 ) -> tuple[int, int]:
     """Press a button, move the pointer, and let go.
 
@@ -117,11 +119,11 @@ def drag(
     and gives back where the pointer ended.
     """
     x, y = start
-    controls.on_mouse_press(x, y, button, 0)
+    controls.on_mouse_press(x, y, button, modifiers)
     for dx, dy in steps:
         x, y = x + dx, y + dy
-        controls.on_mouse_drag(x, y, dx, dy, button, 0)
-    controls.on_mouse_release(x, y, button, 0)
+        controls.on_mouse_drag(x, y, dx, dy, button, modifiers)
+    controls.on_mouse_release(x, y, button, modifiers)
     return x, y
 
 
@@ -415,3 +417,63 @@ def test_a_window_can_hold_the_controls_by_weak_reference() -> None:
     surface.push_handlers(controls)
 
     surface.dispatch_event("on_mouse_scroll", 10, 10, 0, 1)
+
+
+def test_a_control_drag_of_the_left_button_turns_the_view() -> None:
+    """A trackpad reaches the turn through the control key.
+
+    **A trackpad reports the left button for every drag.** A person on one can
+    press neither the right button nor the middle button, so without this the
+    turn is out of reach for them.
+    """
+    demo = build()
+    was = demo.view.turn
+    drag(Controls(demo), LEFT_BUTTON, (GRAB_X, GRAB_Y), [(30, 0)], MOD_CTRL)
+    assert demo.view.turn == pytest.approx((was - 30 * TURN_EACH_PIXEL) % (2 * math.pi))
+
+
+def test_a_control_drag_of_the_left_button_leans_the_view() -> None:
+    """The same drag down leans the view, in the sense the other buttons use."""
+    demo = build()
+    was = demo.view.lean
+    drag(Controls(demo), LEFT_BUTTON, (GRAB_X, GRAB_Y), [(0, -20)], MOD_CTRL)
+    assert demo.view.lean == pytest.approx(was + 20 * LEAN_EACH_PIXEL)
+
+
+def test_a_control_drag_turns_the_view_and_does_not_drag_the_ground() -> None:
+    """The control key replaces the pan. It does not run beside it.
+
+    A handler that turned the view and moved the map as well would pass both
+    tests above. This states that the ground stays where it was.
+    """
+    demo = build()
+    was = demo.camera.origin_x, demo.camera.origin_y
+    drag(Controls(demo), LEFT_BUTTON, (GRAB_X, GRAB_Y), [(30, -20)], MOD_CTRL)
+    assert demo.camera.origin_x == pytest.approx(was[0])
+    assert demo.camera.origin_y == pytest.approx(was[1])
+
+
+def test_a_left_drag_with_no_control_key_still_moves_the_map() -> None:
+    """The control key is the only thing that changes the left drag.
+
+    A test of the new gesture proves nothing about the old one. This states
+    that a plain left drag reaches the pan it always did.
+    """
+    demo = build()
+    was_turn = demo.view.turn
+    was = demo.camera.origin_x, demo.camera.origin_y
+    drag(Controls(demo), LEFT_BUTTON, (GRAB_X, GRAB_Y), [(40, 25)])
+    assert demo.camera.origin_x == pytest.approx(was[0] + 40.0)
+    assert demo.camera.origin_y == pytest.approx(was[1] - 25.0)
+    assert demo.view.turn == pytest.approx(was_turn)
+
+
+def test_the_control_modifier_is_the_number_the_window_library_gives_it() -> None:
+    """This is the check that a second copy of a value needs.
+
+    The layer holds its own number for the control key, so that a caller can
+    name it without the library installed. Nothing would fail if the two
+    parted company, so this fails instead.
+    """
+    pyglet = pytest.importorskip("pyglet")
+    assert MOD_CTRL == pyglet.window.key.MOD_CTRL

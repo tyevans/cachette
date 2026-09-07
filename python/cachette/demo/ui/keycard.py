@@ -27,6 +27,7 @@ LINES: tuple[tuple[str, str], ...] = (
     ("", ""),
     ("DRAG LEFT", "MOVE THE MAP"),
     ("DRAG RIGHT", "TURN AND LEAN"),
+    ("CTRL DRAG", "TURN AND LEAN"),
     ("WHEEL", "ZOOM AT THE CURSOR"),
     ("WASD", "SCROLL"),
     ("- AND =", "ZOOM"),

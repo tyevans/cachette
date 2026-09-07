@@ -26,6 +26,11 @@ The right button and the middle button both do this. A trackpad has no middle
 button and a mouse with a wheel has no comfortable right drag, so a person
 reaches for whichever their hardware gives them.
 
+**A control drag with the left button turns and leans the view as well.** A
+trackpad gives one button and no comfortable second one, so a person on a
+trackpad can reach neither of the other two. The control key and the left
+button are the pair that every trackpad can make.
+
 Which way is up
 ---------------
 
@@ -64,6 +69,10 @@ if TYPE_CHECKING:
 LEFT_BUTTON = 1
 MIDDLE_BUTTON = 2
 RIGHT_BUTTON = 4
+
+# The number the window library gives the control key, for the same reason and
+# with the same check against the library.[^2]
+MOD_CTRL = 2
 
 # How far one pixel of a sideways drag turns the view, in radians.
 #
@@ -160,8 +169,16 @@ class Controls:
         the cursor, how far it moved, the buttons that are down as one number
         of bits, and the keys that were held.
         """
-        del x, y, modifiers
+        del x, y
         self._dragged += abs(dx) + abs(dy)
+        # **The control key is read before the button.** A trackpad reports the
+        # left button for every drag, so a person on one can reach no other
+        # button. The control key is what turns that single drag into the turn
+        # the right button gives a mouse, and it must therefore win over the
+        # left button rather than sit beside it.
+        if buttons & LEFT_BUTTON and modifiers & MOD_CTRL:
+            self._turn_and_lean(dx, dy)
+            return
         if buttons & LEFT_BUTTON:
             # The window counts the rows up and the frame counts them down,
             # so the drag down the screen is the drag up the frame.
@@ -175,8 +192,18 @@ class Controls:
             self._hold()
             return
         if buttons & (RIGHT_BUTTON | MIDDLE_BUTTON):
-            self._demo.view.orbit_by(-float(dx) * TURN_EACH_PIXEL)
-            self._demo.view.tilt_by(-float(dy) * LEAN_EACH_PIXEL)
+            self._turn_and_lean(dx, dy)
+
+    def _turn_and_lean(self, dx: int, dy: int) -> None:
+        """Turn the view about the up direction, and lean it towards a plan.
+
+        **Three gestures reach this, so the arithmetic lives here once.** The
+        right button, the middle button and a control drag of the left button
+        all turn the view. A copy of these two lines beside each of them could
+        part company from the others, and nothing would fail.
+        """
+        self._demo.view.orbit_by(-float(dx) * TURN_EACH_PIXEL)
+        self._demo.view.tilt_by(-float(dy) * LEAN_EACH_PIXEL)
 
     def on_mouse_release(self, x: int, y: int, button: int, modifiers: int) -> None:
         """Take note that the button came up, and name the tile of a click.
