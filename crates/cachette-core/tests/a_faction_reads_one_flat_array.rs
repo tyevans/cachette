@@ -20,7 +20,7 @@
 //! [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
 
 use cachette_core::faction_observation::OBSERVATION_VERSION;
-use cachette_core::{Axial, Entity, FactionId, SightRules, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, Holder, SightRules, World, WorldConfig};
 
 /// A world wide enough to hold cells that one faction never reaches.
 ///
@@ -122,13 +122,15 @@ fn observation_of(world: &World, faction: FactionId) -> Vec<i64> {
 }
 
 /// The names of the fields that carry one position for each cell.
-const CELL_FIELDS: [&str; 9] = [
+const CELL_FIELDS: [&str; 11] = [
     "cell_seen_now",
     "cell_seen_ever",
     "cell_tiles",
     "cell_open_tiles",
-    "cell_units",
-    "cell_held_tiles",
+    "cell_own_units",
+    "cell_other_units",
+    "cell_own_held_tiles",
+    "cell_other_held_tiles",
     "cell_value_total",
     "cell_height_total",
     "cell_food_total",
@@ -297,9 +299,9 @@ fn a_unit_that_walks_into_a_cell_opens_it() {
         "a cell the scout stands in states the ground it admits"
     );
     assert_eq!(
-        field(&world, &after, "cell_units")[target_cell],
+        field(&world, &after, "cell_own_units")[target_cell],
         1,
-        "the scout counts in the cell it stands in"
+        "the scout counts as a unit of its own faction in the cell it stands in"
     );
 
     // The cell the scout left keeps what the faction saw, and it loses the
@@ -315,7 +317,7 @@ fn a_unit_that_walks_into_a_cell_opens_it() {
         "a faction never forgets a place it saw"
     );
     assert_eq!(
-        field(&world, &after, "cell_units")[home_cell],
+        field(&world, &after, "cell_own_units")[home_cell],
         0,
         "a remembered cell reports no unit, whatever stands there now"
     );
@@ -443,5 +445,169 @@ fn two_thread_counts_give_one_array() {
     assert_eq!(
         one, many,
         "the array of one thread and the array of twelve threads agree"
+    );
+}
+
+/// The cell counts separate the units of the reader from every other unit.
+///
+/// **The fixture puts a rival on a tile the watcher sees, and the assertion
+/// is that the two counts differ.** A fixture with only the watcher's own
+/// units would read the same array whether the reader split the count or
+/// summed it, so it would measure nothing.[^1]
+///
+/// The counts are relative to the faction that reads. No position of the
+/// array is indexed by a faction, because a field indexed by the faction
+/// multiplies the world by the faction count.[^2]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+/// [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+#[test]
+fn the_cell_counts_tell_an_own_unit_from_another() {
+    let mut world = a_still_world();
+    let home = ground_near(&world, Axial::new(8, 8), 8);
+    let watcher_cell = cell_of(&world, home);
+
+    a_unit_at(&mut world, home, WATCHER);
+    // Two rivals stand beside the watcher, so the other count is neither the
+    // own count nor one. A count of one could come from either side.
+    let beside = ground_near(&world, Axial::new(home.q + 1, home.r), 4);
+    let also = ground_near(&world, Axial::new(home.q, home.r + 1), 4);
+    assert_ne!(beside, home, "the fixture needs a second tile");
+    assert_ne!(also, home, "the fixture needs a third tile");
+    assert_ne!(beside, also, "the two rivals must stand apart");
+    assert_eq!(
+        cell_of(&world, beside),
+        watcher_cell,
+        "the first rival must stand in the cell the watcher sees"
+    );
+    assert_eq!(
+        cell_of(&world, also),
+        watcher_cell,
+        "the second rival must stand in the cell the watcher sees"
+    );
+    a_unit_at(&mut world, beside, FactionId(1));
+    a_unit_at(&mut world, also, FactionId(2));
+
+    world.step(1).expect("the step runs");
+    let values = observation_of(&world, WATCHER);
+
+    assert_eq!(
+        field(&world, &values, "cell_own_units")[watcher_cell],
+        1,
+        "the watcher counts its own unit and no other"
+    );
+    assert_eq!(
+        field(&world, &values, "cell_other_units")[watcher_cell],
+        2,
+        "the watcher counts both rivals together and names neither"
+    );
+}
+
+/// The held counts separate the ground of the reader from the ground of
+/// another faction.
+///
+/// **The fixture asserts that both counts are above zero before it compares
+/// them.** A cell in which nobody holds anything reads zero in both, and a
+/// test over such a cell would pass whatever the reader did.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+#[test]
+fn the_held_counts_tell_own_ground_from_other_ground() {
+    let mut world = a_still_world();
+    world.set_sight_rules(SightRules::new(64, 1, 16, 0));
+    let mine = ground_near(&world, Axial::new(8, 8), 8);
+    let theirs = ground_near(&world, Axial::new(20, 8), 8);
+    let cell = cell_of(&world, mine);
+    assert_eq!(
+        cell_of(&world, theirs),
+        cell,
+        "the fixture needs both cities inside one cell"
+    );
+
+    a_unit_at(&mut world, mine, WATCHER);
+    world
+        .found_settlement(mine, WATCHER)
+        .expect("the ground admits a city of the watcher");
+    world
+        .found_settlement(theirs, FactionId(1))
+        .expect("the ground admits a city of the rival");
+    world.step(1).expect("the step runs");
+
+    let values = observation_of(&world, WATCHER);
+    let own = field(&world, &values, "cell_own_held_tiles")[cell];
+    let other = field(&world, &values, "cell_other_held_tiles")[cell];
+
+    assert!(
+        own > 0,
+        "the fixture must give the watcher held ground inside the cell"
+    );
+    assert!(
+        other > 0,
+        "the fixture must give the rival held ground inside the same cell"
+    );
+    // **The comparison is against a count taken another way.** This walk
+    // reads the holder of every tile of the cell the watcher sees now, from
+    // the truth of the world. A test that compared the array against itself
+    // would pass whatever the reader summed.
+    let (truth_own, truth_other) = held_by_hand(&world, WATCHER, cell);
+    assert_eq!(own, truth_own, "the own count is the ground the watcher holds");
+    assert_eq!(
+        other, truth_other,
+        "the other count is the ground every rival holds together"
+    );
+    assert_ne!(
+        own, other,
+        "the fixture must give the two sides different amounts of ground"
+    );
+    assert!(
+        own + other <= field(&world, &values, "cell_seen_now")[cell],
+        "the two counts never pass the tiles the watcher sees"
+    );
+}
+
+/// Counts the held tiles of one cell by walking the world, for one faction
+/// and for every other faction.
+///
+/// The walk reads the truth of the world and the sight rule of the faction,
+/// and it takes the tiles the faction sees now. It visits the addresses in
+/// ascending order, so two runs give one answer.
+fn held_by_hand(world: &World, faction: FactionId, cell: usize) -> (i64, i64) {
+    let (mut own, mut other) = (0i64, 0i64);
+    for row in 0..world.grid().height() {
+        for column in 0..world.grid().width() {
+            let here = Axial::new(column as i32, row as i32);
+            if cell_of(world, here) != cell || !world.faction_sees_now(faction, here) {
+                continue;
+            }
+            match world.tile_holder(here).and_then(Holder::faction) {
+                Some(holder) if holder == faction => own += 1,
+                Some(_) => other += 1,
+                None => {}
+            }
+        }
+    }
+    (own, other)
+}
+
+/// The layout version moves when the field set moves.
+///
+/// A stored weight file is a function of the field list, so a reader must be
+/// able to tell a file written under one field set from a file written under
+/// another.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+#[test]
+fn the_schema_reports_the_layout_version() {
+    let world = a_still_world();
+    assert_eq!(world.observation_schema().version(), OBSERVATION_VERSION);
+    assert!(
+        OBSERVATION_VERSION > 1,
+        "the field set moved, so the version moved with it"
     );
 }

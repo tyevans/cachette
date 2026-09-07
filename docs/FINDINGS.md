@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-632**
+**Next number: FND-633**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -16251,6 +16251,42 @@ passed against a layout that had moved. The fit now reads both versions from
 the schemas of the world.[^F631D]
 
 
+### FND-632 — A cell count that named no faction was read as a count of the reader's own
+
+**Believed.** The observation array told a faction what stood in each cell of
+the map lattice. Two of its fields counted the units on the tiles of a cell and
+the tiles of a cell that somebody held.
+
+**False.** Neither field said whose. The unit count summed every faction that
+stood on the observed tiles, and the held count summed every holder. A faction
+could not tell its own army from an invading one, and it could not tell its own
+ground from a rival's.
+
+**Evidence.** One world 48 tiles on a side, three factions, 300 ticks. The
+faction in seat zero read a held count of 44 tiles in the first cell and 184 in
+the second, against an own total of 165 held tiles over the whole world. The
+two cell numbers sum to 228, so most of what the faction read was somebody
+else's ground and nothing said so. A report holds the measurement.[^F632A]
+
+The split now reads, for the same world and the same tick, an own count of 0
+and 118 and an other count of 44 and 66. **The first cell is entirely a
+rival's, and the old field could not say it.**
+
+**What follows.** **A count that names no faction is not a count of nothing in
+particular. It is a sum a reader will take for its own.** The four fields are
+relative to the faction that reads, and none of them is indexed by a faction,
+because a field with one position for each faction multiplies the world by the
+faction count.[^F632B]
+
+**An ally and an invader still count together.** The relation field separates
+the two, and a relation is not a property of a tile. A reader that needs the
+distinction inside one cell does not have it.
+
+The layout version moved, because the field set moved. A weight file written
+under the old set means something else under the new one, and the reader that
+refuses such a file is what makes the move safe.[^F632C]
+
+
 ## References
 
 [^F628A]: The trainer, the resume path. `python/cachette/learn/train.py`
@@ -16266,3 +16302,6 @@ the schemas of the world.[^F631D]
 [^F631B]: The policy fit tests. `tests/test_learner_policy_fit.py`
 [^F631C]: The policy module, the fit and the reader. `python/cachette/learn/policy.py`
 [^F631D]: The trainer, the centre it writes. `python/cachette/learn/train.py`
+[^F632A]: Report 33, what a learner can see, say and be scored on, section 4.2. `docs/research/reports/33-what-a-learner-can-see-and-say.md`
+[^F632B]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+[^F632C]: Findings register, FND-631. `docs/FINDINGS.md`

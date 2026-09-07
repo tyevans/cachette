@@ -3576,6 +3576,13 @@ impl PyWorld {
         fields.set_item("open_tiles", summary.open_tiles())?;
         fields.set_item("units", summary.units())?;
         fields.set_item("held_tiles", summary.held_tiles())?;
+        // The four counts below are relative to the faction that reads, and
+        // none of them is indexed by a faction. A reader tells its own army
+        // from an invading one, and it never asks after a named rival.
+        fields.set_item("own_units", masked.own_units())?;
+        fields.set_item("other_units", masked.other_units())?;
+        fields.set_item("own_held_tiles", masked.own_held_tiles())?;
+        fields.set_item("other_held_tiles", masked.other_held_tiles())?;
         fields.set_item("value_total", summary.value_total().0)?;
         fields.set_item("height_total", summary.height_total().0)?;
         fields.set_item("food_total", summary.food_total().0)?;
