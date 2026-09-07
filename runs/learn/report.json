@@ -582,6 +582,149 @@
           "lost": 0.2
         }
       }
+    },
+    "land-long": {
+      "name": "land-long",
+      "history": [
+        {
+          "generation": 0,
+          "best": 323.25,
+          "mean": 166.609375,
+          "worst": -4.0,
+          "seconds": 324.5
+        },
+        {
+          "generation": 1,
+          "best": 233.25,
+          "mean": 145.03125,
+          "worst": 3.0,
+          "seconds": 668.8
+        },
+        {
+          "generation": 2,
+          "best": 254.25,
+          "mean": 189.9375,
+          "worst": 156.75,
+          "seconds": 991.4
+        },
+        {
+          "generation": 3,
+          "best": 280.5,
+          "mean": 231.1875,
+          "worst": 142.25,
+          "seconds": 1231.1
+        },
+        {
+          "generation": 4,
+          "best": 248.25,
+          "mean": 138.296875,
+          "worst": -17.75,
+          "seconds": 1405.0
+        },
+        {
+          "generation": 5,
+          "best": 301.25,
+          "mean": 220.359375,
+          "worst": 22.5,
+          "seconds": 1580.7
+        },
+        {
+          "generation": 6,
+          "best": 252.25,
+          "mean": 187.546875,
+          "worst": 140.75,
+          "seconds": 1691.8
+        },
+        {
+          "generation": 7,
+          "best": 383.75,
+          "mean": 312.78125,
+          "worst": 252.5,
+          "seconds": 1841.3
+        },
+        {
+          "generation": 8,
+          "best": 325.25,
+          "mean": 281.265625,
+          "worst": 77.0,
+          "seconds": 1969.4
+        },
+        {
+          "generation": 9,
+          "best": 230.5,
+          "mean": 140.609375,
+          "worst": 76.5,
+          "seconds": 2086.5
+        },
+        {
+          "generation": 10,
+          "best": 376.25,
+          "mean": 330.46875,
+          "worst": 320.25,
+          "seconds": 2191.7
+        },
+        {
+          "generation": 11,
+          "best": 273.75,
+          "mean": 171.46875,
+          "worst": 50.5,
+          "seconds": 2312.0
+        },
+        {
+          "generation": 12,
+          "best": 268.25,
+          "mean": 189.0625,
+          "worst": 65.75,
+          "seconds": 2449.1
+        },
+        {
+          "generation": 13,
+          "best": 225.25,
+          "mean": 221.34375,
+          "worst": 196.5,
+          "seconds": 2560.6
+        }
+      ],
+      "weights": "runs/learn/land-long.npz",
+      "holdout": {
+        "trained": {
+          "return": 239.8,
+          "held_tiles": 289.9,
+          "seats_held": 1.0,
+          "live_units": 5.2,
+          "population": 5.2,
+          "store_total": 11847233.2,
+          "best_renown": 0.0,
+          "wonder_progress": 0.0,
+          "won": 0.0,
+          "lost": 0.1
+        },
+        "untrained": {
+          "return": 123.8,
+          "held_tiles": 173.8,
+          "seats_held": 1.0,
+          "live_units": 6.7,
+          "population": 6.7,
+          "store_total": 12318827.0,
+          "best_renown": 0.0,
+          "wonder_progress": 0.0,
+          "won": 0.0,
+          "lost": 0.1
+        },
+        "random": {
+          "return": 214.4,
+          "held_tiles": 264.4,
+          "seats_held": 1.0,
+          "live_units": 7.7,
+          "population": 7.7,
+          "store_total": 9455280.2,
+          "best_renown": 4915.2,
+          "wonder_progress": 383.2,
+          "won": 0.0,
+          "lost": 0.1
+        }
+      }
     }
-  }
+  },
+  "seconds": 6333.5
 }

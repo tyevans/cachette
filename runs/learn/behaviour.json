@@ -415,5 +415,75 @@
       1,
       1
     ]
+  },
+  "land-long": {
+    "decisions": 1143,
+    "verbs": {
+      "build": 0.653,
+      "no_op": 0.261,
+      "gather": 0.041,
+      "queue": 0.023,
+      "relation": 0.023
+    },
+    "outcomes": [
+      "running",
+      "running",
+      "running",
+      "running",
+      "lost",
+      "running",
+      "running",
+      "running",
+      "running",
+      "running"
+    ],
+    "held_tiles": [
+      416,
+      217,
+      352,
+      383,
+      251,
+      398,
+      309,
+      153,
+      166,
+      254
+    ],
+    "population": [
+      3,
+      5,
+      8,
+      8,
+      1,
+      3,
+      8,
+      8,
+      8,
+      0
+    ],
+    "live_units": [
+      3,
+      5,
+      8,
+      8,
+      1,
+      3,
+      8,
+      8,
+      8,
+      0
+    ],
+    "seats_held": [
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1,
+      1
+    ]
   }
 }
