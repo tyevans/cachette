@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-574**
+**Next number: FND-575**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -14032,6 +14032,54 @@ founding housing of the world governs nothing in it.
 a need rule of no decay, and it says so, because a reader who found the rule
 there without the reason would take it for balance.
 
+### FND-574 — A record refused to release a sent unit for a reason its own later work removed
+
+**Believed.** The engine cannot decide that a sent unit has arrived, so the
+control plane must stop the order itself. A destination field steers by the
+reach of a level 1 cell, and a field at block pitch cannot answer one tile. The
+decision record stated this and stated the consequence: a unit that reaches its
+cell keeps the order and walks about inside the block.[^F574A]
+
+**True.** The premise stopped holding when the same record gained a second
+field. The approach field answers at the pitch of one tile, and its seed offset
+says that a unit stands on the tile the caller named.[^F574B] The engine can
+therefore decide arrival, and the record refused a release for a reason that no
+longer applied. Nothing released a sent unit, and a sent unit reads no option
+row, so it neither gathered nor delivered.[^F574C]
+
+The release now answers three states with one rule. A unit on a seed tile has
+arrived. A unit that reads no direction from either field holds a plane that
+leads nowhere, which covers an empty seed set, a seed that went away, and ground
+that cuts the unit off. Both are released. A unit that reads a direction the
+ground under it refuses stays sent and takes the keyed draw, because that
+refusal repeats and a unit that only stayed put would stay put for ever.
+
+**Evidence.** Measured on 6 September 2026 on one development machine
+(ty001-ubuntu, x86-64), in the demonstration world at 300 ticks, with a probe
+that drives the step. Before the release the heaviest load reached 14 against a
+carry mark of 32, no unit was laden, no unit held the delivery option, and 120
+units still held a destination. After the release the heaviest load reached 66,
+six units were laden, five held the delivery option, and 71 units still held a
+destination. The carrier target passed. The commit body holds the probe and the
+command.
+
+**What follows.** Three things.
+
+**A record states a constraint, and the reason for it decays separately.** The
+constraint was sound when it was written. The work that removed its reason sat
+in the same record and did not repair it, so the record went on refusing a
+release that had become cheap.
+
+**A rejected alternative decays too.** Two other records cite this decision for
+the claim that a unit inside the seeded cell reads no direction. A reader who
+takes that for the current engine plans against a field that a later commit
+replaced.
+
+**Removing a defect can expose a second one.** The approach field repaired the
+wandering, and the wandering was the only path that reached the delivery. A
+repair that makes a run worse is evidence that something downstream of it never
+ran.[^F574C]
+
 
 
 ## References
@@ -14058,6 +14106,9 @@ there without the reason would take it for balance.
 [^F548C]: The stock total of a faction, which the wealth reader compares. `crates/cachette-core/src/world.rs`
 [^F548D]: ADR-0165, the wealth bar stands above what one settlement can hold. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
 [^F548E]: Findings register, FND-542. `docs/FINDINGS.md`
+[^F574A]: ADR-0125, the control plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+[^F574B]: Findings register, FND-315. `docs/FINDINGS.md`
+[^F574C]: Findings register, FND-572. `docs/FINDINGS.md`
 [^F549B]: The sweep summary. `scripts/balance_summary.py`
 [^F564A]: ADR-0173, the wealth or wonder path has no reader, the alternatives it rejects. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
 [^F564B]: ADR-0174, a wonder is a win path and a stock total is not, decisions D1 and D2. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`

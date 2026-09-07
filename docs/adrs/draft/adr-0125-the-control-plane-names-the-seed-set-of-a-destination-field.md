@@ -92,28 +92,49 @@ holds.[^13]
 its congregation on names the same plane with new seeds, and no unit needs a
 second order.
 
-### D4. A unit that the field cannot steer takes a keyed draw, and it never freezes
+### D4. A sent unit steps where its plane says, and the engine releases it when the plane says nothing
 
-Four cases give a sent unit no direction. Its cell holds a seed, so it arrived.
-Its cell is further from every seed than the pass count reaches. Ground that
-admits nobody cuts its cell off from every seed. The field gave a direction and
-the ground under that one unit refuses it.
+Two fields answer a sent unit. The fine field holds one direction for each tile
+of a block that holds a seed. The coarse field holds one direction for each
+cell. The fine field wins over the coarse one. A unit reads one entry of each,
+keyed on its own tile and its own cell, so it still searches nothing.[^1]
 
-**Every one of the four takes the keyed draw that the movement record already
-states.** The draw is keyed on the system, the frame, the entity and the draw
-index, so a unit the draw refuses again takes a different direction on the next
-frame.[^14] [^15]
+The pair gives one of three answers. It names a neighbour, and the unit steps
+onto it. It says the unit stands on a seed tile, so the unit arrived. It says
+nothing at all, so the plane leads the unit nowhere. The last answer covers
+three cases: the plane holds no seed, the cell is further from every seed than
+the pass count reaches, and ground that admits nobody cuts the cell off.[^10]
 
-**A refusal repeats exactly, so a rule that only stayed put would stop a unit
-for ever.** The cell, the plane and the direction all hold from one frame to
-the next. A unit against a shoreline is the case that proved it, and the
-findings register holds the measurement.[^16]
+**A sent unit never draws a direction from its plane.** It steps by the field,
+or it takes no step. The draw made an arrived unit wander about the block it had
+reached, and that wandering was the only thing that carried a load home in the
+demonstration world. The findings register holds both measurements.[^16] [^19]
 
-**The order does not clear itself when a unit arrives.** A unit that reached a
-seed cell keeps the order and walks about inside the block it arrived in. A
-rule that cleared the order would need the engine to decide that a unit had
-arrived, and a field at block pitch cannot answer a tile.[^16] The control
-plane reads where the set is and stops the order itself.
+**The engine releases the unit on the second answer and on the third.** A unit
+that arrived, and a unit whose plane leads nowhere, both hold a destination that
+steers nothing. A sent unit reads no option row, so a unit that keeps such a
+destination neither gathers nor delivers for the rest of the run.[^19]
+
+**A field at block pitch cannot answer a tile, and the fine field can.** An
+earlier form of this decision left the order in place for the caller to clear,
+because the engine could not tell that a unit had arrived. The fine field
+answers at the pitch of one tile, and the seed offset is how it says that the
+unit stands on the tile the caller named.[^16]
+
+**The release clears the destination and nothing else.** The home site, the
+intent and the load of the unit all stand. The control plane may still stop an
+order itself, and stopping an order that already ended changes nothing.
+
+**The release is decided from the tile the unit stands on after the step of the
+frame.** It writes the destination of one unit for each unit, and no write is
+read by another, so the walk order decides nothing and the result is the same at
+any thread count.[^9]
+
+**A refused step is not a lost plane.** The field may name a neighbour that the
+ground under one unit refuses. That unit stays sent and takes the keyed draw
+that the movement record already states, because the refusal repeats exactly and
+a unit that only stayed put would stay put for ever. A unit against a shoreline
+is the case that proved it.[^14] [^15] [^16]
 
 ## The alternatives this rejects
 
@@ -157,10 +178,10 @@ of the two wrote it.
 one direction. A caller cannot send half a cell one way and half the other,
 because the mechanism that would do it is the search D2 forbids.[^1]
 
-**The last block is a random walk.** The reach ends at the cell that holds the
-seed, and the tile the caller named is one tile of that block. A unit that
-arrives in the right cell holds no direction, so the keyed draw carries it
-about inside the block.[^16]
+**The last block is answered at tile pitch.** The reach of the coarse field
+ends at the cell that holds the seed, and the tile the caller named is one tile
+of that block. The fine field resolves that block, so a unit reaches the tile
+and the engine then releases it.[^16] [^19]
 
 **A caller sends a set toward a place, and the engine does not promise that the
 set arrives.** A cell steers a block of tiles, and the water in front of one unit
@@ -169,10 +190,10 @@ to it and then wanders beside it. It is not frozen, and it does not get past. Th
 findings register holds the measurement, and a backlog row holds the gap.[^17]
 [^18]
 
-**An order beyond the reach does nothing until the set is nearer.** The
-relaxation runs a fixed pass count, so a cell further than that from every seed
-of its plane holds no direction.[^10] A caller who sends a set across the world
-watches it wander until it enters the reach.
+**An order beyond the reach ends at once.** The relaxation runs a fixed pass
+count, so a cell further than that from every seed of its plane holds no
+direction.[^10] The engine releases a unit there rather than making it wander,
+so a caller who sends a set across the world must send it again from nearer.
 
 **The engine gains one array, indexed by the cell and by the plane, and one
 relaxation over it.** Neither follows the population. No figure appears here,
@@ -207,3 +228,4 @@ an address.
 [^16]: Findings register, FND-315. `docs/FINDINGS.md`
 [^17]: Findings register, FND-411. `docs/FINDINGS.md`
 [^18]: Backlog item 0401, decide how a sent unit gets around a barrier the field cannot see. `docs/backlog/proposed/0401-decide-how-a-sent-unit-gets-around-a-barrier.md`
+[^19]: Findings register, FND-572. `docs/FINDINGS.md`

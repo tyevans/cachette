@@ -457,27 +457,45 @@ fn a_sent_set_walks_to_the_tile_the_caller_named() {
 }
 
 #[test]
-fn a_sent_unit_that_stands_on_its_destination_stays_there() {
-    // **A unit that arrived has nowhere further to be steered.** Before the
-    // approach field, a unit on the tile it was sent to read no direction
-    // from the coarse field and took the uniform draw, so it walked off the
-    // tile it had reached on the very next frame.[^1]
+fn a_sent_unit_that_reaches_its_destination_is_released_there() {
+    // **A unit that arrived has nowhere further to be steered, and the engine
+    // frees it.** Before the approach field, a unit on the tile it was sent
+    // to read no direction from the coarse field and took the uniform draw,
+    // so it walked off the tile it had reached on the very next frame.[^1]
+    //
+    // Nothing then released the unit that stopped there. A sent unit reads no
+    // option row, so a unit that arrived and stayed sent neither gathered nor
+    // delivered, and the carrier economy ran only on the wandering that the
+    // approach field removed.[^2]
+    //
+    // The test asserts both halves. The unit takes no step on the frame it
+    // arrives, so no draw moved it, and it holds no destination after that
+    // frame, so it reads its option row again.
     //
     // [^1]: Findings register, FND-315. `docs/FINDINGS.md`
+    // [^2]: Findings register, FND-572. `docs/FINDINGS.md`
     let mut world = world(EXTENT);
     let destination = first_open_tile(&world);
     let unit = world
         .spawn_soldier(destination, FactionId(0))
         .expect("the ground admits the unit");
     send(&mut world, &[unit], destination);
-    for frame in 0..FRAMES {
-        world.step(1).expect("the step must run");
-        assert_eq!(
-            world.soldiers().address(unit),
-            Some(destination),
-            "the unit left the tile it was sent to on frame {frame}"
-        );
-    }
+    assert_eq!(
+        world.sent_to(unit),
+        Some(Some(PLANE)),
+        "the fixture must send the unit, or the release below proves nothing"
+    );
+    world.step(1).expect("the step must run");
+    assert_eq!(
+        world.soldiers().address(unit),
+        Some(destination),
+        "the unit left the tile it was sent to on the frame it arrived"
+    );
+    assert_eq!(
+        world.sent_to(unit),
+        Some(None),
+        "the unit that reached its destination still holds it"
+    );
 }
 
 #[test]
@@ -515,12 +533,17 @@ fn a_sent_unit_the_ground_refuses_leaves_the_tile_it_started_on() {
 }
 
 #[test]
-fn a_sent_unit_beyond_the_reach_leaves_the_tile_it_started_on() {
+fn a_sent_unit_the_plane_leads_nowhere_is_released() {
     // The relaxation runs a fixed pass count, so a cell further than that
-    // from every seed holds no direction. A unit there must fall back to the
-    // keyed draw rather than stand still.[^1]
+    // from every seed holds no direction. A unit there reads no fine entry
+    // and no coarse one, so its plane leads it nowhere.
     //
-    // [^1]: ADR-0125, the control plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    // **Such a unit is released, and it is not stranded as sent.** It took the
+    // keyed draw before, and the draw made it wander. The wandering is what
+    // the carrier defect ran on, so the release replaces it rather than
+    // restores it.[^1]
+    //
+    // [^1]: Findings register, FND-572. `docs/FINDINGS.md`
     let mut world = world(WIDE_EXTENT);
     let destination = first_open_tile(&world);
     send(&mut world, &[], destination);
@@ -531,19 +554,63 @@ fn a_sent_unit_beyond_the_reach_leaves_the_tile_it_started_on() {
         .spawn_soldier(start, FactionId(0))
         .expect("the ground admits the unit");
     send(&mut world, &[unit], destination);
+    assert_eq!(
+        world.sent_to(unit),
+        Some(Some(PLANE)),
+        "the fixture must send the unit, or the release below proves nothing"
+    );
 
-    let mut moved = false;
-    for _ in 0..FRAMES {
-        world.step(1).expect("the step must run");
-        if world.soldiers().address(unit) != Some(start) {
-            moved = true;
-            break;
-        }
-    }
-    assert!(
-        moved,
-        "the sent unit at {start:?} holds no direction and held its tile for \
-         {FRAMES} frames, so a cell the field cannot steer freezes a unit"
+    world.step(1).expect("the step must run");
+    assert_eq!(
+        world.sent_to(unit),
+        Some(None),
+        "the unit at {start:?} reads no direction and stays sent for ever"
+    );
+    assert_eq!(
+        world.soldiers().address(unit),
+        Some(start),
+        "the unit at {start:?} drew a direction from its plane rather than a field"
+    );
+}
+
+#[test]
+fn a_sent_unit_whose_destination_goes_away_is_released() {
+    // A destination may stop existing after the caller named it. The plane
+    // count may drop, and the caller may clear the seed set of a plane. A
+    // unit that climbs such a plane reads no direction from either field.
+    //
+    // **A unit must not hold a destination that leads nowhere.** It would
+    // read no option row for the rest of the run, so it would neither gather
+    // nor deliver.[^1]
+    //
+    // The unit below starts a walk it can finish, so the fixture proves that
+    // the release answers the lost plane and not the ground.
+    //
+    // [^1]: Findings register, FND-572. `docs/FINDINGS.md`
+    let mut world = world(EXTENT);
+    let destination = first_open_tile(&world);
+    send(&mut world, &[], destination);
+    let seed_cell = cell_of(&world, destination);
+    let start = starts_a_few_cells_away(&world, seed_cell, 1)[0];
+    let unit = world
+        .spawn_soldier(start, FactionId(0))
+        .expect("the ground admits the unit");
+    send(&mut world, &[unit], destination);
+    world.step(1).expect("the step must run");
+    assert_eq!(
+        world.sent_to(unit),
+        Some(Some(PLANE)),
+        "the fixture must keep the unit sent while the plane still steers it"
+    );
+
+    // The call clears the seed set of every plane, so the destination the
+    // caller named is gone.
+    world.set_destination_count(world.destination_count());
+    world.step(1).expect("the step must run");
+    assert_eq!(
+        world.sent_to(unit),
+        Some(None),
+        "the unit holds a destination that no plane steers any more"
     );
 }
 
@@ -765,7 +832,8 @@ fn a_tile_whose_destination_the_ground_refuses(world: &World) -> Axial {
 ///
 /// The tile is either beyond the reach of the relaxation or cut off from every
 /// seed by ground that admits nobody. Both are cases that the field cannot
-/// steer, and a unit at either must still move.[^1]
+/// steer, and the engine releases a unit at either rather than holding it
+/// sent.[^1]
 ///
 /// # References
 ///
