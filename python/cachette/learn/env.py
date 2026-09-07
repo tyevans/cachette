@@ -425,6 +425,11 @@ class VectorEnv:
         self._envs = [Env(config, weighting) for _ in range(count)]
         self._batch: Batch | None = None
         self._live: list[int] = []
+        # How many world-ticks this vector has run. One world stepped one
+        # tick is one. **A throughput figure derived from an assumed episode
+        # length misleads on a machine nobody has measured**, and this
+        # project targets a platform the development boxes are not.
+        self.world_ticks = 0
         self.observation_length = self._envs[0].observation_length
         self.action_length = self._envs[0].action_length
 
@@ -452,6 +457,7 @@ class VectorEnv:
             env.reset(int(seed)) for env, seed in zip(self._envs, seeds, strict=True)
         ]
         self._live = list(range(self._count))
+        self.world_ticks = 0
         self._batch = Batch([env._require_world() for env in self._envs])
         return np.stack(rows)
 
@@ -495,6 +501,7 @@ class VectorEnv:
         if live != self._live:
             self._batch = Batch([self._envs[index]._require_world() for index in live])
             self._live = live
+        self.world_ticks += len(live) * self._config.decision_interval
         for _ in range(self._config.decision_interval):
             rows = self._batch.step(self._workers, self._config.threads)
             for row in rows:

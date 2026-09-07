@@ -113,6 +113,7 @@ def run_population(
         for index, result in enumerate(vector.step(actions)):
             returns[index] += result.reward
 
+    ticks = vector.world_ticks
     starts = field_starts(vector.envs[0])
     readings = []
     for env in vector.envs:
@@ -124,7 +125,7 @@ def run_population(
         row["unresolved"] = 1.0 if env.outcome == "running" else 0.0
         row["end_tick"] = float(values[starts["tick"]])
         readings.append(row)
-    return returns.reshape(len(policies), len(seeds)), readings
+    return returns.reshape(len(policies), len(seeds)), readings, ticks
 
 
 def unit(vector: np.ndarray) -> np.ndarray:
@@ -284,7 +285,7 @@ def train(
             for index in range(pairs)
             for sign in (1.0, -1.0)
         ]
-        returns, readings = run_population(
+        returns, readings, ticks = run_population(
             env_config, weighting, candidates, seeds, train_config.workers
         )
         scores = returns.mean(axis=1)
@@ -321,6 +322,7 @@ def train(
                 "mean": float(scores.mean()),
                 "worst": float(scores.min()),
                 "spread": spread,
+                "world_ticks": ticks,
                 "won": won,
                 "validation": checked,  # may be None on a generation that skips it
                 "seconds": round(time.time() - started, 1),
@@ -330,6 +332,7 @@ def train(
             f"  {name} generation {generation:2d} "
             f"mean {scores.mean():9.1f} best {scores.max():9.1f} "
             f"spread {spread:8.1f} won {won:5.2f} "
+            f"ticks {ticks} "
             f"valid {'-' if checked is None else f'{checked:9.1f}'} "
             f"[{history[-1]['seconds']:.0f}s]",
             flush=True,
@@ -373,7 +376,7 @@ def evaluate(
     rows: list[dict[str, float]] = []
     values: list[float] = []
     for _ in range(max(1, repeats)):
-        returns, readings = run_population(
+        returns, readings, _ = run_population(
             env_config, weighting, [policy], seeds, workers
         )
         values.append(float(returns.mean()))
