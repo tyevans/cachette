@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -335,6 +336,24 @@ def produce_svg(prompt: str, temperature: float) -> tuple[str, float, int, int]:
         except render.RenderError as error:
             last_error = str(error)
     raise render.RenderError(f"no usable SVG came back: {last_error}")
+
+
+def assign_parents(
+    parents: Sequence[str], letters: Sequence[str]
+) -> dict[str, str]:
+    """Give each variant letter the parent that it revises.
+
+    A person can like more than one drawing. The round cycles the liked
+    parents across the variant letters, so each parent gets a spread of
+    directions rather than one direction. One parent goes to every letter,
+    which is the behaviour of a single choice.
+    """
+    if not parents:
+        return {}
+    return {
+        letter: parents[position % len(parents)]
+        for position, letter in enumerate(letters)
+    }
 
 
 def choose_parent(
