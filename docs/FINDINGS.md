@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-568**
+**Next number: FND-569**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -13816,6 +13816,38 @@ one decision and keeps the rest.[^F565E]
 report that found this said three choices break the factorisation, then listed
 four, and neither number matches the enumeration. Read the artefact, and take
 the count from the artefact.
+
+### FND-568 — The quantity the wonder reader compares is not the quantity the standing reports
+
+**Believed.** The standing of a faction names every running value the win
+readers compare, so a caller that reads the standing each tick can tell when a
+reader will fire.
+
+**True.** The standing reports the work toward a victory claim. The wonder
+reader compares the claim itself. A resolver built on the standing fired the
+wonder path at ticks 25 to 350 on three seeds where the engine fired it at
+ticks 1551 to 2578. The two quantities are related, because a claim stands when
+the work reaches the work a wonder costs, but the engine states one and the
+standing states the other.
+
+**Evidence.** Measured on 6 September 2026 on one development machine
+(ty001-ubuntu, x86-64) over three seeds, by comparing a resolver against the
+game end record the engine wrote. The comparison of every other quantity agreed
+exactly over 265 sampled ticks, which is what made the one disagreement
+readable.
+
+**What follows.** A learner reads the standing, so the standing is an
+observation surface and not only a report. A reader that a win path compares
+must appear there, or a learner cannot see the thing that ends its game. The
+item that builds the flat observation carries this.
+
+**Two facts found beside it.** A victory claim holds a value of zero or one, so
+the wonder path has no threshold to tune, and neither has domination. Only the
+renown target and the tick limit are thresholds. Separately, the cost of one
+tick rises with the state the world holds: 32 milliseconds at tick 500, 75 at
+2500 and 120 at 5000, on a loaded development machine. That figure bounds the
+throughput of any training run and belongs in the sizing of the batch step.
+
 
 ## References
 
