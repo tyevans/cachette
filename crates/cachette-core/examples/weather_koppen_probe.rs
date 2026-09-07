@@ -224,6 +224,76 @@ fn grade(record: &Record, rain_for_each_drop: i64, whole: i64, boundary: i64) ->
     }
 }
 
+/// Prints the first-letter class table of one set of land cells, and returns
+/// the total absolute error against the published shares, in tenths of a
+/// point.
+///
+/// **The five first-letter classes gather the seven groups.** The arid class
+/// takes the desert and the steppe, and the polar class takes the tundra and
+/// the ice cap.
+///
+/// **The set normalises within itself.** So the error of a subset says what
+/// that land grades against the published shares of the whole Earth, and it is
+/// not a part of the error of a larger set. Two subsets do not add up to the
+/// whole.
+///
+/// A reader who wants the figure that the register quotes must weight each
+/// latitude band by the land Earth holds in it, and that weighting is not in
+/// this tree.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-631. `docs/FINDINGS.md`
+fn error_over(
+    name: &str,
+    members: &[&Record],
+    rain_for_each_drop: i64,
+    whole: i64,
+    boundary: i64,
+) -> i64 {
+    let count = members.len().max(1);
+    let mut totals = [0usize; 7];
+    for record in members {
+        let group = grade(record, rain_for_each_drop, whole, boundary);
+        let at = Group::ALL
+            .iter()
+            .position(|other| *other == group)
+            .unwrap_or(0);
+        totals[at] += 1;
+    }
+    let held = [
+        totals[0],
+        totals[1] + totals[2],
+        totals[3],
+        totals[4],
+        totals[5] + totals[6],
+    ];
+    let mut error = 0i64;
+    println!();
+    println!("over {name}, {} cells:", members.len());
+    println!("  class     held    published    apart");
+    for (at, published) in PUBLISHED_SHARE_FINE.iter().enumerate() {
+        let share = (held[at] * 1000 / count) as i64;
+        error += (share - published).abs();
+        println!(
+            "  {:<8} {:>4}.{:<3} {:>6}.{:<4} {:>4}.{}",
+            ["A", "B", "C", "D", "E"][at],
+            share / 10,
+            share % 10,
+            published / 10,
+            published % 10,
+            (share - published).abs() / 10,
+            (share - published).abs() % 10
+        );
+    }
+    println!(
+        "  the class error here is {}.{} points",
+        error / 10,
+        error % 10
+    );
+    error
+}
+
 fn main() {
     let extent = argument(1, 128) as u32;
     let seed = argument(2, 0x2f);
@@ -473,35 +543,57 @@ fn main() {
         // it does not compare this world with Earth.[^4]
         //
         // [^4]: Findings register, FND-616 and FND-618. `docs/FINDINGS.md`
-        let held = [
-            totals[0],
-            totals[1] + totals[2],
-            totals[3],
-            totals[4],
-            totals[5] + totals[6],
-        ];
-        let mut error = 0i64;
-        println!();
-        println!("  class     held    published    apart");
-        for (at, published) in PUBLISHED_SHARE_FINE.iter().enumerate() {
-            let share = (held[at] * 1000 / land_count) as i64;
-            error += (share - published).abs();
-            println!(
-                "  {:<8} {:>4}.{:<3} {:>6}.{:<4} {:>4}.{}",
-                ["A", "B", "C", "D", "E"][at],
-                share / 10,
-                share % 10,
-                published / 10,
-                published % 10,
-                (share - published).abs() / 10,
-                (share - published).abs() % 10
-            );
-        }
-        println!(
-            "the class error over the land of this world is {}.{} points",
-            error / 10,
-            error % 10
+        let over_all = error_over(
+            "the whole land of this world",
+            &land,
+            rain_for_each_drop,
+            whole,
+            boundary,
         );
+
+        // **The error is reported over three sets of land, because a change to
+        // one belt must not be read as a change to the model.** A term that
+        // acts only where a cell freezes changes the polar set and leaves the
+        // other one alone. A term that changes the model changes both.
+        //
+        // The three do not add up. Each set normalises within itself, so each
+        // says what the land of that set grades against the published shares
+        // and none of them is a part of another.
+        let polar: Vec<&Record> = land
+            .iter()
+            .copied()
+            .filter(|record| (latitudes.of_row(record.row, high) / LATITUDE_FINE).abs() >= 60)
+            .collect();
+        let rest: Vec<&Record> = land
+            .iter()
+            .copied()
+            .filter(|record| (latitudes.of_row(record.row, high) / LATITUDE_FINE).abs() < 60)
+            .collect();
+        let cold = error_over(
+            "the land poleward of 60 degrees",
+            &polar,
+            rain_for_each_drop,
+            whole,
+            boundary,
+        );
+        let warm = error_over(
+            "the land equatorward of 60 degrees",
+            &rest,
+            rain_for_each_drop,
+            whole,
+            boundary,
+        );
+        println!();
+        println!(
+            "class error: whole {}.{}, poleward of 60 {}.{}, equatorward of 60 {}.{}",
+            over_all / 10,
+            over_all % 10,
+            cold / 10,
+            cold % 10,
+            warm / 10,
+            warm % 10
+        );
+        let _ = land_count;
     }
     // The two headline questions, in one line each.
     let band_of = |degrees: i32| -> Vec<&Record> {
