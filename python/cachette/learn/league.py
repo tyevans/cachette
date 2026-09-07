@@ -84,8 +84,8 @@ seat that a player of it could not see.
 
 # References
 
-[^1]: Reinforcement learning parameters, the seat measurement.
-``docs/reference/rl-costs.md``
+[^1]: Findings register, FND-630, the seat measurement.
+``docs/FINDINGS.md``
 [^2]: PRD-0001, a faction sees only what it observes.
 ``docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md``
 """

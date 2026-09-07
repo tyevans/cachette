@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-630**
+**Next number: FND-631**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -16175,6 +16175,73 @@ nothing failed at run time because Python does not read an annotation.
 at several correct callers, the fault is upstream of all of them.
 
 
+
+
+### FND-630 — The objective took seven values, and a whole training run had nothing to rank
+
+**Believed.** The learner's evolution strategy ranks a population of candidate
+policies each generation and steps the centre along the ranked direction. The
+reward pays a shaped term for the ground a faction gains and a terminal term
+for the outcome, and the terminal weight was set so that the outcome would be
+the largest single term without drowning the shaping that leads to it. The
+trainer reports the spread of a generation, and a spread above zero was read
+as a population the ranking could rank.
+
+**False. The spread was above zero and it carried almost no information.** A
+sixteen-generation run on the target platform improved nothing. Every observed
+population spread was an integer multiple of about 673, within two percent, on
+sixteen generations of sixteen. That step is the outcome term divided by the
+seed count: two thousand for a win against minus two thousand for a loss, over
+six seeds, is 667. The shaped term of the conquest strategy pays a few tens
+over a whole episode, which is about two percent of one step. A candidate's
+score was therefore its win count, and a win count over six seeds takes seven
+values. An earlier run of the same shape at four seeds shows the same
+signature at a step of 1010, which is 4000 over 4.
+
+**The centre never moved.** The validation score of that run took exactly two
+values, about minus 1320 and about minus 1990, one step apart, over sixteen
+generations. The best was minus 1316.6 against a first generation of minus
+1327.4, and the fitted trend was negative.
+
+**The seat decides who wins, and the ranking could not see it.** With the same
+built-in controller in all three seats of twenty-four held-out worlds, seat 0
+won 9, seat 1 won 4 and seat 2 won 11. That is start-position luck with
+opponent quality held constant.
+
+**What the project did about it.** A candidate is now scored by its return
+minus the mean return of the other learner seats of its own world, and its
+seat turns by one position at each seed index. Two candidates in one game
+share the map, the weather and the opponents, so the difference between their
+returns holds almost none of the variance that either return holds alone. A
+decisions entry holds the formula and the four formulas rejected beside
+it.[^F630A]
+
+**A multi-seat harness for this already existed and nothing called it.** The
+module held the plan, the seated game, the vector and the runner, and it had
+its own tests. No trainer imported it. That is the inert capability shape the
+recurring defect rule names third, and its own test passed throughout because
+the test built the mechanism and drove it directly.[^F630B]
+
+**What follows.** **A spread above zero is not a population worth ranking.**
+Read the spread against the size of one step of the outcome term, which is the
+win weight less the loss weight over the seed count. When the spread is a small
+whole multiple of that step, the search is ranking a win count and the shaping
+is noise around it.
+
+**Keep an absolute instrument beside a relative one.** A relative score is zero
+on average by construction, so a population that got worse together reads the
+same as one that got better together. The trainer now plays the centre against
+the built-in controller on the validation seeds and reports that number on
+every generation.
+
+**A layout that cancels a confound inside a pair does not cancel it across a
+population.** The seated plan already put both halves of an antithetic pair in
+one seat on one seed, which makes the difference within a pair free of the
+seat. The trainer ranks every candidate of a generation together, so a pair
+that held the good seat for the whole generation still ranked above one that
+did not. The fix is the rotation, and the property that found the gap is that
+each candidate must play every seat.
+
 ## References
 
 [^F628A]: The trainer, the resume path. `python/cachette/learn/train.py`
@@ -16182,3 +16249,5 @@ at several correct callers, the fault is upstream of all of them.
 [^F628C]: Testing Rules, section 2a, on what a fixture must supply. `.agents/rules/testing.md`
 [^F629A]: The single-seat environment and the door it widens. `python/cachette/learn/env.py`
 [^F629B]: The seated league tests. `tests/test_learner_league.py`
+[^F630A]: Decisions register, DEC-281. `docs/DECISIONS.md`
+[^F630B]: Recurring Defect Shapes, section 3. `.agents/rules/recurring-defects.md`
