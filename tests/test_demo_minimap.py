@@ -24,6 +24,9 @@ import pytest
 from cachette import World, faction_colours
 from cachette.demo.app import Demo
 from cachette.demo.minimap import (
+    BEZEL_SHADOW,
+    BEZEL_SHARE,
+    BEZEL_SOFTEN,
     DIAMETER,
     MARGIN,
     OUTSIDE_COLOUR,
@@ -47,15 +50,26 @@ HEIGHT = 128
 SEED = 0x0123_4567_89AB_CDEF
 FACTIONS = 3
 
+# How many angular parts the rim is measured in.
+#
+# Each part must hold enough pixels for its mean to be steady, and there must
+# be enough parts for a jump between two of them to be visible.
+RING_PARTS = 24
+
 # The window these tests draw into.
 WINDOW_WIDTH = 480
 WINDOW_HEIGHT = 360
 
 
 def build() -> Demo:
-    """Build a demonstration on a seeded world, with a camera in the middle."""
-    world = World(width=WIDTH, height=HEIGHT, seed=SEED, faction_count=FACTIONS)
-    demo = Demo(world, Names(SEED), WINDOW_WIDTH, WINDOW_HEIGHT, threads=1)
+    """Build a demonstration on the fixture world, with a camera in the middle."""
+    return build_on(SEED)
+
+
+def build_on(seed: int) -> Demo:
+    """Build a demonstration on one seed, with a camera in the middle."""
+    world = World(width=WIDTH, height=HEIGHT, seed=seed, faction_count=FACTIONS)
+    demo = Demo(world, Names(seed), WINDOW_WIDTH, WINDOW_HEIGHT, threads=1)
     demo.seed()
     demo.open_on((WIDTH // 2, HEIGHT // 2))
     # **The clock reads the wall clock, so an unpaused world steps between two
@@ -134,18 +148,36 @@ def test_the_disc_follows_the_camera() -> None:
     assert far[1] > near[1]
 
 
-def test_the_disc_has_no_hard_edge() -> None:
-    """The disc must fade to nothing, not stop at a circle.
+def _away() -> np.ndarray:
+    """Give back the distance of each pixel from the middle, where one is the rim."""
+    rows, columns = np.mgrid[0:DIAMETER, 0:DIAMETER]
+    middle = (DIAMETER - 1) / 2.0
+    return np.asarray(np.hypot(rows - middle, columns - middle) / (DIAMETER / 2.0))
 
-    **A test that the rim differs from the frame passes for a hard cut too.**
-    The property that separates the two is how far the rim moved. A fade
-    moves the rim a little and the middle a lot. A cut moves both by the same
-    amount, because both take the whole colour.
 
-    This measures how far each channel moved from the frame the engine drew,
-    in a ring at the rim and in a ring inside it, and asserts that the rim
-    moved much less.
+def _rim() -> np.ndarray:
+    """Give back which pixels sit on the black rim.
+
+    The mask stops short of the outer edge, because the last pixel of the
+    circle softens against the frame so that the rim is not a staircase. That
+    pixel is not part of the border, and a mask that held it would measure the
+    softening rather than the border.
     """
+    away = _away()
+    soften = BEZEL_SOFTEN / (DIAMETER / 2.0)
+    return np.asarray((away > 1.0 - BEZEL_SHARE * 0.8) & (away < 1.0 - soften * 1.5))
+
+
+def _brightness(block: np.ndarray) -> np.ndarray:
+    """Give back the brightness of each pixel, summed over the three channels."""
+    total = np.zeros(block.shape, dtype=np.float64)
+    for shift in (16, 8, 0):
+        total += ((block >> shift) & 0xFF).astype(np.float64)
+    return total
+
+
+def test_the_disc_stays_inside_its_circle() -> None:
+    """The disc must paint no pixel outside its own rim."""
     demo = build()
     demo.minimap.visible = False
     demo.advance()
@@ -153,16 +185,121 @@ def test_the_disc_has_no_hard_edge() -> None:
     demo.minimap.visible = True
     demo.advance()
     disc = corner(demo)
+    away = _away()
+    assert not np.asarray(bare != disc)[away > 1.0].any(), "the disc left its circle"
+
+
+def test_the_rim_is_black_and_not_a_fade() -> None:
+    """The rim is a border, and a border does not let the frame through.
+
+    **A rim that is merely dark passes a test that reads its brightness.** The
+    property that separates a black border from a fade to transparent is that
+    the border does not depend on what lies under it. A fade takes the colour
+    of the frame below, so two frames that differ give two rims.
+
+    This paints the disc over two different worlds and asserts that the rim
+    pixels match exactly. The map inside the rim must differ, or the fixture
+    supplies one frame twice and the assertion measures nothing.
+    """
+    first = build()
+    first.advance()
+    one = corner(first)
+    second = build_on(SEED ^ 0xA5A5_A5A5)
+    second.advance()
+    other = corner(second)
+    away = _away()
+    inside = (away > 0.2) & (away < 0.6)
+    assert np.asarray(one != other)[inside].any(), (
+        "the two worlds painted the same map, so the rim test measures one frame"
+    )
+    rim = _rim()
+    assert not np.asarray(one != other)[rim].any(), (
+        "the rim differs between two worlds, so it takes the frame below it"
+    )
+    dark = float(_brightness(one)[rim].mean())
+    lit = float(_brightness(one)[inside].mean())
+    assert dark < lit * 0.6, (
+        f"the rim averages {dark:.1f} against {lit:.1f} inside it, so it is not black"
+    )
+
+
+def _ring_profile(value: np.ndarray) -> np.ndarray:
+    """Give back the mean brightness of the rim in each of its angular parts."""
     rows, columns = np.mgrid[0:DIAMETER, 0:DIAMETER]
     middle = (DIAMETER - 1) / 2.0
-    away = np.hypot(rows - middle, columns - middle) / (DIAMETER / 2.0)
-    assert not np.asarray(bare != disc)[away > 1.0].any(), "the disc left its circle"
-    moved = _moved(bare, disc)
-    inner = float(moved[(away > 0.55) & (away < 0.75)].mean())
-    rim = float(moved[(away > 0.95) & (away < 1.0)].mean())
-    assert inner > 4.0, "the disc painted almost nothing"
-    assert rim < inner * 0.35, (
-        f"the rim moved {rim:.1f} against {inner:.1f} inside it, so the edge is a cut"
+    angle = np.arctan2(rows - middle, columns - middle)
+    rim = _rim()
+    edges = np.linspace(-np.pi, np.pi, RING_PARTS + 1)
+    return np.array(
+        [
+            value[rim & (angle >= edges[at]) & (angle < edges[at + 1])].mean()
+            for at in range(RING_PARTS)
+        ]
+    )
+
+
+def test_the_rim_reads_as_polished_and_not_as_a_faded_map() -> None:
+    """The rim carries two lights, and their pattern is smooth.
+
+    **A test that the rim is brighter in one place than another passes for the
+    old fade too.** A faded map is brighter in some places than others, and
+    which places depends on the ground. The two properties that separate a lit
+    rim from a faded map are how far the ring travels between its brightest
+    part and its darkest, and how smoothly it travels. A lit ring turns
+    gradually, because the light turns gradually. A faded map jumps, because a
+    coast is a jump.
+
+    This reads the mean brightness of the rim in each angular part of the
+    ring, and asserts on the whole travel and on the largest single step. The
+    old fade gives a travel near ninety and a largest step of five sixths of
+    it. The rim gives a travel above two hundred and a largest step under a
+    third of it.
+
+    The brightest part must also sit on the upper left, which is where the key
+    light comes from.
+    """
+    demo = build()
+    demo.advance()
+    profile = _ring_profile(_brightness(corner(demo)))
+    travel = float(profile.max() - profile.min())
+    steps = np.abs(np.diff(np.concatenate([profile, profile[:1]])))
+    worst = float(steps.max())
+    assert travel > 150.0, (
+        f"the rim travels {travel:.1f} around the ring, so it reads flat"
+    )
+    assert worst < travel * 0.45, (
+        f"the rim jumps {worst:.1f} of its {travel:.1f} travel in one step, so it "
+        "follows the ground under it rather than a light"
+    )
+    # The rows grow downward, so the upper left runs from half a turn back to
+    # a quarter turn back.
+    edges = np.linspace(-np.pi, np.pi, RING_PARTS + 1)
+    peak = (edges[profile.argmax()] + edges[profile.argmax() + 1]) / 2.0
+    assert -np.pi < peak < -np.pi / 2.0, (
+        f"the rim is brightest at {peak:.2f}, and the key light is on the upper left"
+    )
+
+
+def test_the_rim_throws_a_shadow_onto_the_map() -> None:
+    """The rim sits above the map, so it darkens the map under its inner edge.
+
+    Without the shadow the rim reads as a ring painted onto the picture.
+
+    **The old fade also darkened this ring**, because it let more of the dark
+    frame through near the edge. The shadow goes much further: it keeps about
+    a third of the map where the fade kept about half. The threshold sits
+    between the two measurements.
+    """
+    demo = build()
+    demo.advance()
+    value = _brightness(corner(demo))
+    away = _away()
+    under = (away > 1.0 - BEZEL_SHARE - BEZEL_SHADOW * 0.5) & (away < 1.0 - BEZEL_SHARE)
+    clear = (away > 0.60) & (away < 0.75)
+    kept = float(value[under].mean()) / float(value[clear].mean())
+    assert kept < 0.40, (
+        f"the map under the rim keeps {kept:.3f} of its brightness, so the rim "
+        "throws no shadow of its own"
     )
 
 
@@ -279,7 +416,9 @@ def _outside_pixels(bare: np.ndarray, disc: np.ndarray) -> int:
     for shift in (16, 8, 0):
         was = ((bare >> shift) & 0xFF).astype(np.float64)
         wants = float((OUTSIDE_COLOUR >> shift) & 0xFF)
-        weight = float(np.max(_fade(*_grid())))
+        # The weight the map itself takes. The rim takes the whole pixel, and
+        # the largest weight is therefore the rim rather than the map.
+        weight = float(_fade(*_grid())[DIAMETER // 2, DIAMETER // 2])
         want = np.floor(was * (1.0 - weight) + wants * weight)
         matched &= np.abs(((disc >> shift) & 0xFF).astype(np.float64) - want) <= 1.0
     return int(matched.sum())
