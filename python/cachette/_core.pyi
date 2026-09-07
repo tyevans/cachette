@@ -60,6 +60,17 @@ Identities = Sequence[int] | npt.NDArray[np.uint64]
 # log it asked for narrows this to the typed dictionary of that event.
 EventColumns = dict[str, npt.NDArray[np.generic]]
 
+class TileWinds(TypedDict):
+    """The wind over every tile, as one column for each free lattice axis.
+
+    Both columns hold one entry for each tile, in the tile order that
+    ``tile_holders`` uses. The entries are whole lattice steps and not a
+    fixed-point value. The third cube part is ``-(q + r)``.
+    """
+
+    q: npt.NDArray[np.int32]
+    r: npt.NDArray[np.int32]
+
 class TileChangedColumns(TypedDict):
     """One column for each field of the tile change event.
 
@@ -1203,6 +1214,12 @@ class World:
     def holds(self, faction: int, q: int, r: int) -> bool: ...
     def city_reach(self, site: int) -> int: ...
     def tile_holders(self) -> npt.NDArray[np.uint16]: ...
+    def tile_heights(self) -> npt.NDArray[np.int32]: ...
+    def tile_kinds(self) -> npt.NDArray[np.uint8]: ...
+    def cloud_shares(self) -> npt.NDArray[np.int32]: ...
+    @property
+    def cloud_share_whole(self) -> int: ...
+    def tile_winds(self) -> TileWinds: ...
     @property
     def gather_count(self) -> int: ...
     @property
