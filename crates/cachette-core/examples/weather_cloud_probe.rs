@@ -13,7 +13,7 @@
 //! and a share is reported in hundredths, so no step needs a float.
 
 use cachette_core::hex::{NEIGHBOURS, NEIGHBOUR_COUNT};
-use cachette_core::weather::{Wind, AIR_SATURATION, WIND_FINE};
+use cachette_core::weather::{Wind, AIR_SATURATION, CLOUD_SHARE_WHOLE, WIND_FINE};
 use cachette_core::{WeatherScale, World, WorldConfig};
 
 fn argument(position: usize, fallback: u64) -> u64 {
@@ -134,13 +134,20 @@ fn main() {
         let mut sorted = air.clone();
         sorted.sort_unstable();
         let count = sorted.len().max(1);
-        let at_mark = air
+        // **The mark is the capacity of each cell, not one figure the whole
+        // plane shares.** Warm air holds a lot of water and cold air holds
+        // very little, so a count of drops says nothing about whether a sky
+        // is full.
+        let sky: Vec<i64> = (0..air.len())
+            .map(|cell| field.cloud_share_at(cell as u32))
+            .collect();
+        let at_mark = sky
             .iter()
-            .filter(|value| **value >= AIR_SATURATION.0)
+            .filter(|value| **value >= CLOUD_SHARE_WHOLE)
             .count();
-        let near_mark = air
+        let near_mark = sky
             .iter()
-            .filter(|value| **value * 10 >= AIR_SATURATION.0 * 9)
+            .filter(|value| **value * 10 >= CLOUD_SHARE_WHOLE * 9)
             .count();
         let total: i128 = air.iter().map(|value| i128::from(*value)).sum();
         println!("--- tick {tick}");
@@ -151,7 +158,7 @@ fn main() {
             (total / count as i128) as i64,
             sorted[count - 1]
         );
-        println!("  at the mark {at_mark} of {count} cells, within a tenth of it {near_mark}");
+        println!("  skies at their own mark {at_mark} of {count} cells, within a tenth of it {near_mark}");
         print!("  air deciles:");
         for step in 1..10 {
             print!(" {}", sorted[count * step / 10]);
@@ -160,15 +167,15 @@ fn main() {
         // What share of the saturation mark the cells hold, which is what the
         // overlay paints. A watcher sees an overcast sky where this is large
         // over a wide region.
-        let overcast = air
+        let overcast = sky
             .iter()
-            .filter(|value| **value * 2 >= AIR_SATURATION.0)
+            .filter(|value| **value * 2 >= CLOUD_SHARE_WHOLE)
             .count();
-        let thin = air
+        let thin = sky
             .iter()
-            .filter(|value| **value * 20 < AIR_SATURATION.0)
+            .filter(|value| **value * 20 < CLOUD_SHARE_WHOLE)
             .count();
-        println!("  above half the mark {overcast}, below a twentieth of it {thin}");
+        println!("  skies above half full {overcast}, below a twentieth {thin}");
         for (name, down) in [("across", false), ("down  ", true)] {
             print!("  air correlation {name} by lag, in thousandths:");
             let mut length = 0u32;

@@ -54,7 +54,7 @@ fn main() {
         world.step(1).expect("the step runs");
     }
 
-    let layer = overlay::named("air").expect("the deck registers the air overlay");
+    let layer = overlay::named("cloud").expect("the deck registers the cloud overlay");
     let span = layer.span(&world);
     println!("extent {extent} seed {seed:#x} ticks {ticks} pitch {pitch} tiles a cell");
     println!("air span low {} high {}", span.low, span.high);

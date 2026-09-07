@@ -123,6 +123,24 @@ impl Panel for Weather {
                         format!("q {}  r {}", pointer.q, pointer.r),
                     ));
                     lines.push(Line::row("in the air", drops(air)));
+                    // **The air alone does not say whether the sky is grey.**
+                    // Warm air holds a lot of water and cold air holds very
+                    // little, so a polar cell reads a small figure and still
+                    // stands overcast. The panel names the capacity of the
+                    // cell and the share of it that the air fills, which is
+                    // what the cloud overlay paints.
+                    if let Some(cell) = world
+                        .grid()
+                        .index_of(pointer)
+                        .and_then(|tile| world.weather_cell_of(tile))
+                    {
+                        let field = world.weather();
+                        lines.push(Line::row(
+                            "the sky holds",
+                            drops(field.capacity_at_cell(cell).0),
+                        ));
+                        lines.push(Line::row("cloud", sky(field.cloud_share_at(cell))));
+                    }
                     lines.push(Line::row("on the ground", drops(ground)));
                     lines.push(Line::row(
                         "wet",
@@ -177,6 +195,16 @@ fn steps(speed: i64) -> String {
 /// value so that a reader knows what the number is out of.
 fn degrees(warmth: i32) -> String {
     format!("{warmth} of {}", cachette_core::HEAT_CEILING)
+}
+
+/// Returns a share of a sky as text.
+///
+/// The unit is the 255ths that the cloud overlay paints, and the whole is
+/// named beside the value so that a reader knows what the number is out of.
+/// A cell at its own capacity reads the whole, whatever quantity of water
+/// that capacity is.
+fn sky(share: i64) -> String {
+    format!("{share} of {}", cachette_core::weather::CLOUD_SHARE_WHOLE)
 }
 
 /// Returns a count of drops as text.
@@ -285,10 +313,30 @@ mod tests {
 
         let said = says(&view(&world, None), Set::EMPTY.with("weather").unwrap());
         assert!(!said.iter().any(|line| line == DRY_NOTE), "{said:?}");
-        let raised = format!("raised: {}", grouped(storm.drops as u64));
-        assert!(said.contains(&raised), "{said:?}");
-        let air = format!("in the air: {}", grouped(storm.drops as u64));
-        assert!(said.contains(&air), "{said:?}");
+        // **The sea lifts too, so the storm is not the whole of the water.**
+        // The fixture founds a city and steps, and the coast beside it fills
+        // its own sky while it does. The panel must name a total at or above
+        // the storm, not a total equal to it.
+        let raised = world.weather().raised();
+        assert!(
+            raised >= storm.drops,
+            "{raised} raised for {} drops",
+            storm.drops
+        );
+        assert!(
+            said.contains(&format!("raised: {}", grouped(raised as u64))),
+            "{said:?}"
+        );
+        let air = world.weather().air_total().0;
+        assert!(
+            air >= storm.drops,
+            "{air} in the air for {} drops",
+            storm.drops
+        );
+        assert!(
+            said.contains(&format!("in the air: {}", grouped(air as u64))),
+            "{said:?}"
+        );
     }
 
     #[test]
@@ -306,12 +354,29 @@ mod tests {
         let tile = format!("tile: q {}  r {}", place.q, place.r);
         assert!(said.contains(&tile), "{said:?}");
         // The storm fell on one cell, and the pointed tile sits in it, so the
-        // air over the tile is the whole storm. The line appears once in the
-        // totals and once for the cell.
-        let air = format!("in the air: {}", grouped(storm.drops as u64));
-        assert_eq!(
-            said.iter().filter(|line| **line == air).count(),
-            2,
+        // air over that cell holds at least the whole storm. The panel names
+        // the air of the pointed cell as well as the total, so a reader can
+        // tell the one cell from the map.
+        let cell = world
+            .grid()
+            .index_of(place)
+            .and_then(|tile| world.weather_cell_of(tile))
+            .expect("the place lies inside the world");
+        let here = world.weather().air_at(cell).0;
+        assert!(
+            here >= storm.drops,
+            "{here} over the cell for {} drops",
+            storm.drops
+        );
+        assert!(
+            said.contains(&format!("in the air: {}", grouped(here as u64))),
+            "{said:?}"
+        );
+        // The panel names the capacity of that cell beside the air, because
+        // the air alone does not say whether the sky is grey.
+        let capacity = world.weather().capacity_at_cell(cell).0;
+        assert!(
+            said.contains(&format!("the sky holds: {}", grouped(capacity as u64))),
             "{said:?}"
         );
         assert!(said.iter().any(|line| line == "wet: no"), "{said:?}");

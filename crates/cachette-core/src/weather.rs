@@ -55,16 +55,38 @@
 //! Nothing stores the heat: the solve derives it from the level 1 summary
 //! that the step rebuilt, and three passes read it.[^12]
 //!
-//! **Water enters the air where it is hot.** The sea lifts more from a hot
-//! cell than from a cold one, and the heat of a cell also lifts water off its
-//! own ground back into its own air.[^12] The sea stops lifting when the air
-//! over a cell reaches the saturation mark, and that bound is what keeps the
-//! source from overwhelming the sink.
+//! # How much water the air of a cell holds
 //!
-//! **Rain falls where the air cools.** The share of the air that falls rises
-//! as the cell gets colder, and rises again with the cooling the air met on
-//! its way here. So the near side of a ridge is wet and the far side is
-//! dry.[^12]
+//! **Warm air holds a lot of water and cold air holds very little.** The
+//! capacity of a cell falls with its temperature, and three passes read it.
+//! The lift raises water into the room below it. The fall rains out what
+//! stands above it. The cloud term reads the air against it.
+//!
+//! That one rule is what puts weather at a high latitude. A cold region has a
+//! small capacity, so a small quantity of water fills it and the sky goes
+//! grey. A warm region has a large capacity, so the same water sits below the
+//! mark and the sky stays clear. Air that travels toward a pole loses
+//! capacity as it goes, so it turns into cloud on the way rather than being
+//! destroyed at a boundary.
+//!
+//! **The capacity never creates or destroys water.** It is a bound that the
+//! settle pass reads. The pass computes the water above the bound and moves
+//! that quantity from the air plane to the ground plane of the same cell, as
+//! an exact integer move. A cell that cools turns its vapour into cloud and
+//! then into rain. Nothing scales the air toward the capacity and nothing
+//! assigns the air to it, so the account holds through a temperature change
+//! in either direction.
+//!
+//! **Water enters the air where the air has room.** A sea lifts into the room
+//! below the capacity of its own cell, so a hot sea gives up more than a cold
+//! one and the temperature reaches the lift through the capacity. The heat of
+//! a cell also lifts water off its own ground, and what will not fit in the
+//! room is what leaves the world.[^12]
+//!
+//! **Rain falls where the air is full.** The share that falls rises with the
+//! air held against its own capacity. Cooling along the wind and a climb over
+//! rising ground both shed capacity, so the near side of a ridge is wet and
+//! the far side is dry.[^12]
 //!
 //! # Determinism
 //!
@@ -1258,41 +1280,72 @@ const DEFLECT_DENOMINATOR: i64 = 3;
 /// The denominator of the share of the air that falls in one solve.
 const FALL_DENOMINATOR: i64 = 64;
 
-/// The numerator of the share that falls whatever the air met.
+/// The numerator of the share that falls whatever the air holds.
 const FALL_NUMERATOR_FLOOR: i64 = 1;
 
-/// The most that the coldness of the cell adds to the fall numerator.
-const FALL_FOR_COLD_GROUND: i64 = 6;
-
-/// The most that cooling along the wind adds to the fall numerator.
+/// What air standing at its own capacity adds to the fall numerator.
 ///
-/// The cooling term is larger than the coldness term, because it is the one
-/// that tells the near side of a ridge from the far side. Height alone
-/// cannot.[^1]
+/// **The fall reads the fullness of the air, not the temperature.** Cold air
+/// well below its own small capacity is a clear winter sky, and it must not
+/// rain. Warm air at its own large capacity is a tropical afternoon, and it
+/// must. The old rule read the coldness of the cell directly, so any air that
+/// reached a high latitude rained out at once and the poles held no water at
+/// all.
+///
+/// **This term is what grades the sky.** A full sky drains fast and a clear
+/// one drains slowly, so a cell whose supply is small against its own
+/// capacity settles below the mark and paints as thin cloud. With a small
+/// term every cell that gets any supply at all sits at its capacity, and the
+/// cloud field is then two values and not a field.
+const FALL_FOR_FULL_AIR: i64 = 12;
+
+/// The whole of the capacity share that the cooling and the climb move.
+const CAPACITY_SHED_WHOLE: i64 = 64;
+
+/// The capacity that a cell keeps whatever the cooling and the climb ask.
+///
+/// A capacity of nothing would put the whole of the air of a cell onto its
+/// ground in one solve, which is the instant destruction the temperature rule
+/// used to do. The floor keeps the shed bounded.
+const CAPACITY_SHED_KEPT_FLOOR: i64 = 8;
+
+/// The capacity that a whole range of cooling along the wind takes away.
+///
+/// **Air that cools on its way here holds less than the cell it left.** So
+/// the cooling makes cloud out of vapour that was invisible one cell back,
+/// and the excess falls. This is the term that tells the near side of a ridge
+/// from the far side.[^1]
 ///
 /// # References
 ///
 /// [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D2. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
-const FALL_FOR_COOLING: i64 = 16;
+const CAPACITY_SHED_FOR_COOLING: i64 = 24;
 
-/// What a whole climb of the height range adds to the fall numerator.
+/// The capacity that a whole climb of the height range takes away.
 ///
-/// **Air that meets rising ground goes up, and rising is what makes cloud.**
-/// The flow is horizontal over a flat lattice, so nothing else in the field
-/// lifts a parcel. Height reached the heat term and reached nothing that
-/// moves water, and a parcel blown at a range of hills therefore passed
-/// through it. This is the one term that couples the height map to the flow.
+/// **Air that meets rising ground goes up, it cools, and it then holds
+/// less.** The flow is horizontal over a flat lattice, so nothing else in the
+/// field lifts a parcel. This is the one term that couples the height map to
+/// the flow.
 ///
-/// The term is signed. Air that descends a slope warms and holds its water,
-/// so the numerator falls and the lee of a range is dry. The floor stops it
-/// below zero.
+/// The term is signed. Air that descends a slope warms, so its capacity rises
+/// and it holds the water it carries. The lee of a range is dry for that
+/// reason and not for a separate one.
 ///
 /// **This is not a third dimension, and it does not need one.** A layered
 /// field would hold a wind and a water plane for each layer, which multiplies
 /// the whole stage by the layer count. One term against the gradient of the
 /// cell the air enters gives orographic rain on the windward slope and a rain
 /// shadow behind it, which is the behaviour a watcher recognises.
-const FALL_FOR_CLIMB: i64 = 24;
+const CAPACITY_SHED_FOR_CLIMB: i64 = 32;
+
+// A whole cooling and a whole climb together still leave the cell a capacity.
+// The check fails the build rather than a test.
+const _: () = assert!(
+    CAPACITY_SHED_FOR_COOLING + CAPACITY_SHED_FOR_CLIMB
+        <= CAPACITY_SHED_WHOLE - CAPACITY_SHED_KEPT_FLOOR
+);
+const _: () = assert!(FALL_NUMERATOR_FLOOR + FALL_FOR_FULL_AIR < FALL_DENOMINATOR);
 
 /// The share of the water on the ground that leaves the world in one solve.
 const DRY_DIVISOR: i64 = 32;
@@ -1316,29 +1369,44 @@ const DRY_FLOOR: i64 = 1;
 /// [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 const GROUND_LIFT_DENOMINATOR: i64 = 8 * HEAT_CEILING as i64;
 
-/// The drops that the sea lifts into the air over a cell of full heat.
+/// The part of the room below the capacity that the sea lifts into, when it
+/// lifts.
 ///
-/// A colder sea gives up less, in proportion to its heat.[^1]
+/// **A sea evaporates into the room its own sky has, not into a fixed number
+/// of drops.** The room is the capacity of the cell less the water already
+/// standing over it, so the temperature reaches the lift through the
+/// capacity and never on its own. A cold sea has a small sky, gives up a
+/// small quantity, and fills that sky. A hot sea has a large sky, gives up a
+/// large quantity, and fills that one.
+///
+/// **The old rule made the lift proportional to the temperature alone.** A
+/// polar sea then raised almost nothing into a sky sized for the tropics, so
+/// water could only be created near the sun and the high latitudes were
+/// cloudless whatever else the field did.[^1]
+///
+/// The share is not the whole room. A sea that filled its sky on every lift
+/// would leave every water cell painted as a whole sky, and the cloud field
+/// would carry no shape over the ocean at all.
 ///
 /// # References
 ///
 /// [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
-/// **The stored temperature sits lower than the derived heat it replaced**,
-/// because the ground term now takes half the scale and the cloud takes more
-/// away. The lift is proportional to the temperature, so the source rises to
-/// keep the same water in the world.[^2]
-///
-/// [^2]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const LIFT_DROPS: i64 = 448;
+const LIFT_OF_ROOM_NUMERATOR: i64 = 1;
 
-/// The water that the air above one cell holds.
+/// The whole of the share of the room that the sea lifts into.
+const LIFT_OF_ROOM_DENOMINATOR: i64 = 1;
+
+const _: () = assert!(LIFT_OF_ROOM_NUMERATOR > 0);
+const _: () = assert!(LIFT_OF_ROOM_NUMERATOR <= LIFT_OF_ROOM_DENOMINATOR);
+
+/// The water that the air above a cell of full heat holds.
 ///
-/// **This is the ceiling of the air plane, and every reader of the air uses
-/// it.** The lift raises water only into the room below the mark. The cloud
-/// term reads the air against the mark. The settle pass rains out whatever
-/// stands above it, so the plane holds the mark after every solve.
+/// **This is the ceiling of the air plane, and it is the capacity of the
+/// hottest cell the scale allows.** No cell holds more, whatever its
+/// temperature and whatever the wind brings it, so a viewer that paints the
+/// air reads its ramp from here.
 ///
-/// Without the mark nothing bounded what the transport delivers into a cell
+/// Without a mark nothing bounded what the transport delivers into a cell
 /// that several winds converge on. The lift alone was not enough, because it
 /// bounds the source and not the sum of what arrives. A convergence cell then
 /// climbed without a bound, and the plane held a maximum three orders of
@@ -1353,13 +1421,130 @@ const LIFT_DROPS: i64 = 448;
 /// [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D3. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 pub const AIR_SATURATION: Drops = Drops(2048);
 
+/// The water that the air above a cell of no heat holds.
+///
+/// **Cold air holds very little, and that is why a cold sky is grey.** A
+/// small quantity of water fills a small capacity, so the sky over a polar
+/// plain stands at its own mark while it holds a twentieth of what a tropical
+/// sky carries. A capacity of nothing would rain the whole of the air out in
+/// one solve, so the floor is not zero.
+///
+/// **The floor is what the transport needs.** A cell sends each neighbour a
+/// truncated share of its air, so a cell holding a few drops sends nothing
+/// and the water never leaves the coast. The floor keeps the coldest sky
+/// large enough to carry.
+const CAPACITY_FLOOR: i64 = 2;
+
+// The cold capacity sits under the hot one, so the capacity rises with the
+// temperature over the whole scale. The check fails the build.
+const _: () = assert!(CAPACITY_FLOOR > 0 && CAPACITY_FLOOR < AIR_SATURATION.0);
+
+/// A whole sky, in the unit that the cloud share counts in.
+///
+/// The unit is 255ths, because that is what an overlay paints into one byte
+/// of a channel. A reader that wants a percentage divides.
+pub const CLOUD_SHARE_WHOLE: i64 = 255;
+
+/// Returns the water that the air above one cell holds at a temperature.
+///
+/// **Warm air holds a lot of water and cold air holds very little.** That one
+/// fact is what puts cloud at a high latitude. A cold region has a small
+/// capacity, so a small quantity of water fills it and the sky goes grey. A
+/// warm region has a large capacity, so the same water sits below the mark
+/// and the sky stays clear.
+///
+/// The curve is the square of the temperature as a share of the scale, which
+/// is two truncating divisions and no wide type. A straight line left the
+/// polar capacity too near the tropical one.
+///
+/// **The floor is not small, and a steeper curve is wrong here.** A cube and
+/// a fourth power both put the polar capacity under twenty drops. The
+/// transport moves a share of the air of a cell, that share truncates, and a
+/// cell holding under about sixteen drops therefore sends its neighbours
+/// nothing at all. A capacity that small stops the water reaching any inland
+/// cell, so the pole went clear again by a new route.
+///
+/// **This never creates or destroys water.** It is a bound that the settle
+/// pass reads, and every quantity that pass moves is an exact integer move
+/// between the air plane and the ground plane. A cell that cools turns its
+/// vapour into cloud and then into rain, and the account holds through
+/// both.[^1]
+///
+/// **This is public so that a test can move the temperature and watch the
+/// answer move.**
+///
+/// # References
+///
+/// [^1]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
+#[must_use]
+pub fn capacity_at(warmth: i32) -> Drops {
+    let heat = i64::from(warmth.clamp(0, HEAT_CEILING));
+    let whole = Accum(i64::from(HEAT_CEILING));
+    let span = AIR_SATURATION.0 - CAPACITY_FLOOR;
+    let once = sim_math::share(Accum(span), Accum(heat), whole).map_or(0, |value| value.0);
+    let twice = sim_math::share(Accum(once), Accum(heat), whole).map_or(0, |value| value.0);
+    let thrice = sim_math::share(Accum(twice), Accum(heat), whole).map_or(0, |value| value.0);
+    let fourth = sim_math::share(Accum(thrice), Accum(heat), whole).map_or(0, |value| value.0);
+    Drops((CAPACITY_FLOOR + fourth).clamp(CAPACITY_FLOOR, AIR_SATURATION.0))
+}
+
+/// Returns the capacity of air that cooled and climbed on its way to a cell.
+///
+/// **Air carries its own history, and the capacity must carry it too.** The
+/// temperature of the cell alone describes air that has stood there. Air that
+/// arrived from a warmer cell, or that rose over a slope, is colder than the
+/// cell it came from and holds less than the cell it stands over. Both terms
+/// shed a share of the capacity the temperature gives.
+///
+/// The climb is signed. Air that descends a slope warms, so its capacity
+/// rises above the base and the lee of a range stays dry. The result never
+/// passes the mark of the hottest cell, and a floor keeps it above nothing.
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+#[must_use]
+pub fn travelling_capacity(base: Drops, cooling: i32, climb: i32) -> Drops {
+    let cooled = i64::from(cooling.clamp(0, HEAT_CEILING));
+    let by_cooling = sim_math::share(
+        Accum(CAPACITY_SHED_FOR_COOLING),
+        Accum(cooled),
+        Accum(i64::from(HEAT_CEILING)),
+    )
+    .map_or(0, |value| value.0);
+    let by_climb = sim_math::share(
+        Accum(CAPACITY_SHED_FOR_CLIMB),
+        Accum(i64::from(climb)),
+        Accum(i64::from(Fix32::ONE.0)),
+    )
+    .map_or(0, |value| value.0);
+    let shed = (by_cooling + by_climb).clamp(
+        -CAPACITY_SHED_WHOLE,
+        CAPACITY_SHED_WHOLE - CAPACITY_SHED_KEPT_FLOOR,
+    );
+    let kept = CAPACITY_SHED_WHOLE - shed;
+    let held = sim_math::share(Accum(base.0), Accum(kept), Accum(CAPACITY_SHED_WHOLE))
+        .map_or(0, |value| value.0);
+    Drops(held.clamp(0, AIR_SATURATION.0))
+}
+
 /// How rarely a cell of open water lifts.
 ///
 /// A cell draws once each frame. It lifts when the draw, taken below the tile
 /// count of the cell multiplied by this, falls below the number of tiles of
 /// that cell that admit no unit. A cell that is all water therefore lifts on
 /// one frame in this many, and a cell with no water never lifts.
-const LIFT_PERIOD: u64 = 8;
+///
+/// **The period must stay above one.** A sea lifts into the room below its
+/// own capacity, and the transport empties much of that room in each solve,
+/// so a long period leaves every sky far below its own mark and the map goes
+/// clear. A period of one lifts on every frame, which takes the frame out of
+/// the answer, and a draw that no longer depends on the frame is the defect
+/// the keying rule exists to stop.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+const LIFT_PERIOD: u64 = 2;
 
 /// The draw index of the lift draw within a frame.
 ///
@@ -1376,7 +1561,7 @@ const LIFT_DRAW: u32 = 0;
 /// # References
 ///
 /// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
-pub const WET_MARK: Drops = Drops(64);
+pub const WET_MARK: Drops = Drops(AIR_SATURATION.0 / 32);
 
 /// The largest strength that a god may inflict.
 ///
@@ -1390,7 +1575,7 @@ pub const WET_MARK: Drops = Drops(64);
 pub const STRENGTH_CEILING: u8 = 4;
 
 /// The drops that one point of strength puts into the air over one cell.
-const DROPS_FOR_EACH_STRENGTH: i64 = 4096;
+const DROPS_FOR_EACH_STRENGTH: i64 = 2 * AIR_SATURATION.0;
 
 /// The most places that one call may name.
 ///
@@ -1773,9 +1958,13 @@ fn sun_amplitude(height_tiles: i64) -> i64 {
 
 /// Returns the degrees the water in the air over one cell takes away.
 ///
-/// **Cloud stands between the ground and the sun.** The term rises with the
-/// air over the cell and it stops at the saturation mark, so a god who fills
-/// the sky cannot drive the temperature below the bound.[^1]
+/// **Cloud stands between the ground and the sun, and cloud is the air held
+/// against what that air can hold.** Air well below its own capacity is
+/// invisible vapour and shades nothing. Air at its own capacity is cloud,
+/// whatever quantity of water that is.[^1]
+///
+/// The term stops at the whole swing, so a god who fills the sky cannot drive
+/// the temperature below the bound.[^1]
 ///
 /// **This is public so that a test can move one input and watch the answer
 /// move.**
@@ -1784,12 +1973,15 @@ fn sun_amplitude(height_tiles: i64) -> i64 {
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
 #[must_use]
-pub fn cloud_at(air: Drops) -> i32 {
-    let held = air.0.clamp(0, AIR_SATURATION.0);
+pub fn cloud_at(air: Drops, capacity: Drops) -> i32 {
+    if capacity.0 <= 0 {
+        return CLOUD_SWING;
+    }
+    let held = air.0.clamp(0, capacity.0);
     narrow(sim_math::share(
         Accum(i64::from(CLOUD_SWING)),
         Accum(held),
-        Accum(AIR_SATURATION.0),
+        Accum(capacity.0),
     ))
 }
 
@@ -1841,17 +2033,18 @@ const _: () = assert!(
 
 /// Returns the numerator of the share of the air that falls on one cell.
 ///
-/// **Rain falls where the air cools.** Two terms say so. The first rises as
-/// the cell itself gets colder, so air over cold ground drops more than air
-/// over warm ground. The second rises with the cooling the air met on its way
-/// here, which is the heat of the cell it came from above the heat of this
-/// one.
+/// **Rain is about how full the air is, not about how cold it is.** The
+/// numerator rises with the air held against the capacity of that air. Air
+/// well below its capacity gives the floor, which is a trace that keeps the
+/// water cycling. Air at its capacity gives the whole term.
 ///
-/// That one rule gives two behaviours nobody writes down. Air crossing from
-/// warm water onto a cold ridge cools and rains, so the near side of high
-/// ground is wet. It reaches the far side carrying less, so the far side is
-/// dry. The old rule read the mean height alone, and height without the
-/// direction of travel cannot tell one side of a ridge from the other.[^1]
+/// The settle pass already poured out everything above the capacity before it
+/// asks this, so this term is the drizzle that a full sky gives and not the
+/// downpour. The two together are what rain out air that cooled.
+///
+/// The old rule read the coldness of the cell. That made any air reaching a
+/// high latitude rain out at once, so the poles were structurally
+/// cloudless.[^1]
 ///
 /// **This is public so that a test can move one input and watch the answer
 /// move.**
@@ -1860,23 +2053,14 @@ const _: () = assert!(
 ///
 /// [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D2. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
 #[must_use]
-pub fn fall_numerator(heat: i32, cooling: i32, climb: i32) -> i64 {
-    let cold = i64::from((HEAT_CEILING - heat).clamp(0, HEAT_CEILING));
-    let cooled = i64::from(cooling.clamp(0, HEAT_CEILING));
-    let whole = Accum(i64::from(HEAT_CEILING));
-    let by_cold =
-        sim_math::share(Accum(cold), Accum(FALL_FOR_COLD_GROUND), whole).map_or(0, |value| value.0);
-    let by_cooling =
-        sim_math::share(Accum(cooled), Accum(FALL_FOR_COOLING), whole).map_or(0, |value| value.0);
-    // The climb is signed and it is a share of the whole height range. Air
-    // that rose drops more, and air that descended drops less.
-    let by_climb = sim_math::share(
-        Accum(i64::from(climb)),
-        Accum(FALL_FOR_CLIMB),
-        Accum(i64::from(Fix32::ONE.0)),
-    )
-    .map_or(0, |value| value.0);
-    (FALL_NUMERATOR_FLOOR + by_cold + by_cooling + by_climb).max(FALL_NUMERATOR_FLOOR)
+pub fn fall_numerator(air: Drops, capacity: Drops) -> i64 {
+    if capacity.0 <= 0 {
+        return FALL_NUMERATOR_FLOOR + FALL_FOR_FULL_AIR;
+    }
+    let held = air.0.clamp(0, capacity.0);
+    let by_fullness = sim_math::share(Accum(FALL_FOR_FULL_AIR), Accum(held), Accum(capacity.0))
+        .map_or(0, |value| value.0);
+    FALL_NUMERATOR_FLOOR + by_fullness
 }
 
 /// What one call to the divine power did.
@@ -2207,12 +2391,16 @@ impl WeatherField {
         &self.ground
     }
 
-    /// Returns the water that the air above one cell holds when it is full.
+    /// Returns the largest quantity of water the air above any cell holds.
     ///
-    /// A viewer that paints the air reads the ceiling from here rather than
-    /// from the largest cell of a frame, so brightness means the same thing
-    /// in every frame. It reads it from here rather than repeating the
-    /// constant, so the ceiling has one declaration site.[^1]
+    /// It is the capacity of a cell at the top of the temperature scale. No
+    /// cell of any temperature stands above it, so a reader that needs one
+    /// figure for the whole plane takes this one. **A reader that paints
+    /// cloud must not take it**, because a cold cell fills its own small sky
+    /// at a small part of this, and a ramp against this figure paints that
+    /// sky black. Take the cloud share instead.
+    ///
+    /// The reader exists so that the ceiling has one declaration site.[^1]
     ///
     /// # References
     ///
@@ -2220,6 +2408,42 @@ impl WeatherField {
     #[must_use]
     pub const fn air_ceiling(&self) -> i64 {
         AIR_SATURATION.0
+    }
+
+    /// Returns the share of the sky over one cell that a watcher sees as
+    /// cloud, from none to [`CLOUD_SHARE_WHOLE`].
+    ///
+    /// **Cloud is the air held against what the air of that cell can hold**,
+    /// and not the air held against a mark that every cell shares. Every
+    /// reader that paints cloud takes this one, so the rule has one
+    /// declaration site.[^1]
+    ///
+    /// Returns none when the cell lies outside the lattice, and when the
+    /// field holds no water at all.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn cloud_share_at(&self, cell: u32) -> i64 {
+        let held = self.air_at(cell).0;
+        let capacity = self.capacity_at_cell(cell).0.max(1);
+        (held * CLOUD_SHARE_WHOLE / capacity).clamp(0, CLOUD_SHARE_WHOLE)
+    }
+
+    /// Returns the water that the air above one cell holds when it is full.
+    ///
+    /// The answer follows the temperature of that cell. Warm air holds a lot
+    /// and cold air holds very little, so a polar cell reports a small
+    /// figure. It is the figure a watcher needs beside the air of a cell,
+    /// because the air alone does not say whether the sky is grey.
+    ///
+    /// The figure is the capacity of a cell that the air has stood over. Air
+    /// that cooled or climbed on its way holds less than this, and the settle
+    /// pass rains that difference out.
+    #[must_use]
+    pub fn capacity_at_cell(&self, cell: u32) -> Drops {
+        capacity_at(self.warmth.get(cell as usize).copied().unwrap_or(0))
     }
 
     /// Returns every drop that has ever entered the air.
@@ -2567,10 +2791,15 @@ impl WeatherField {
         for (cell, under) in ground.iter().enumerate() {
             let row = self.lattice.inner_row_of(cell as u32);
             let air = self.air.get(cell).copied().unwrap_or(Drops::ZERO);
+            // **The cloud reads the air against the capacity of this cell**,
+            // and the capacity comes from the temperature the cell carried
+            // into the pass. So a cold cell holding a little water is
+            // overcast, and a warm cell holding the same water is clear.
+            let capacity = capacity_at(self.warmth.get(cell).copied().unwrap_or(0));
             let asked = asked_warmth(
                 heat_of(*under),
                 season_at(tick, row, height, self.scale),
-                cloud_at(air),
+                cloud_at(air, capacity),
             );
             let Some(held) = self.warmth.get_mut(cell) else {
                 continue;
@@ -2698,29 +2927,38 @@ impl WeatherField {
             if !cell_lifts(seed, tick, key, under.tiles(), under.open_tiles()) {
                 continue;
             }
-            // **A hot sea gives up more than a cold one.** The quantity is
-            // the heat of the cell as a share of the whole heat range.[^1]
+            let heat = self.warmth.get(cell).copied().unwrap_or(0);
+            self.prepare();
+            // **A sea evaporates into the room its own sky has.** The room is
+            // the capacity of this cell less the water already standing over
+            // it, and the capacity follows the temperature. So a hot sea
+            // still gives up more than a cold one, and the temperature
+            // reaches the lift through the capacity rather than on its
+            // own.[^1]
             //
             // [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
-            let heat = self.warmth.get(cell).copied().unwrap_or(0);
-            let wanted = sim_math::share(
-                Accum(LIFT_DROPS),
-                Accum(i64::from(heat)),
-                Accum(i64::from(HEAT_CEILING)),
-            )
-            .map_or(0, |value| value.0);
-            if wanted <= 0 {
+            //
+            // **The room is also the back pressure on the source.** Without
+            // it nothing bounds what enters the air, so the source overwhelms
+            // every sink and the total only climbs. A full cell lifts
+            // nothing. The transport carries the water away and the cell then
+            // lifts again, so a coast is a steady supply rather than a
+            // runaway one.
+            //
+            // The old rule raised a fixed quantity of drops in proportion to
+            // the heat. A polar sea then raised almost nothing, so no water
+            // was ever created at a high latitude.
+            let room = capacity_at(heat).0 - self.air[cell].0;
+            if room <= 0 {
                 continue;
             }
-            self.prepare();
-            // **The air over a cell holds only so much, and that is the back
-            // pressure on the source.** Without it nothing bounds what enters
-            // the air, so the source overwhelms every sink and the total only
-            // climbs. A saturated cell lifts nothing. The transport carries
-            // the water away and the cell then lifts again, so a coast is a
-            // steady supply rather than a runaway one.
-            let room = AIR_SATURATION.0 - self.air[cell].0;
-            let lifted = wanted.min(room);
+            let lifted = sim_math::share(
+                Accum(room),
+                Accum(LIFT_OF_ROOM_NUMERATOR),
+                Accum(LIFT_OF_ROOM_DENOMINATOR),
+            )
+            .map_or(0, |value| value.0)
+            .min(room);
             if lifted <= 0 {
                 continue;
             }
@@ -2796,81 +3034,90 @@ impl WeatherField {
         for cell in 0..ground.len() {
             let heat = self.warmth.get(cell).copied().unwrap_or(0);
 
-            // **Rain falls where the air cools.** The cooling is the heat of
-            // the cell the air came from above the heat of this one. The cell
-            // it came from is the neighbour that the wind of this cell points
-            // away from, and a still cell met no cooling on the way.[^1]
+            // **The air of a cell holds what its own temperature allows, and
+            // it rains out what it cannot hold.** Warm air holds a lot and
+            // cold air holds very little, so a parcel that travels toward a
+            // pole loses capacity as it goes and turns into cloud on the way
+            // rather than being destroyed at a boundary.[^3]
+            //
+            // Two other terms shed capacity beside the temperature. The
+            // cooling is the heat of the cell the air came from above the
+            // heat of this one, and the cell it came from is the neighbour
+            // that the wind of this cell points away from. The climb is the
+            // slope the air went up, and it is signed, so air that descends a
+            // slope warms and holds what it carries. That pair is what makes
+            // the near side of a ridge wet and the far side dry.[^1] [^5]
             //
             // [^1]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D2. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
-            // **The air over a cell holds only so much, and it rains out
-            // what it cannot hold.** Two other readers already treat the
-            // saturation mark as the ceiling of the air: the lift refuses to
-            // raise water into a saturated cell, and the cloud term clamps
-            // its reading at the same mark. The transport was the one thing
-            // that could carry a cell past it, because nothing bounded what
-            // several neighbours deliver into one convergence cell. Such a
-            // cell then climbed without a bound, and it held three orders of
-            // magnitude above the median of the plane.[^3]
+            // [^5]: ADR-0162, decision D2. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
             //
-            // The excess leaves the air and lands on the ground of the same
-            // cell. It is an exact integer move, so what the air loses the
-            // ground gains and the account holds.[^4]
+            // **The capacity is a bound, never an assignment.** The pass
+            // computes the water above the capacity and moves that quantity
+            // from the air plane to the ground plane. It is an exact integer
+            // move, so what the air loses the ground gains, and the account
+            // holds whether the cell warmed or cooled since the last
+            // solve.[^4] Nothing here scales the air toward the capacity, and
+            // nothing sets the air to it.
             //
-            // **This is also what ends a storm.** The convergence that builds
-            // one is now the same thing that empties it, so a cell that
-            // gathers water pours the difference out in the tick it gathers
-            // it.
+            // Without a bound nothing limited what the transport delivers
+            // into a cell that several winds converge on. Such a cell climbed
+            // without a bound, and it held three orders of magnitude above
+            // the median of the plane.[^3] **This is also what ends a
+            // storm.** The convergence that builds one is the same thing that
+            // empties it.
             //
             // [^3]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D3. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
             // [^4]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
+            let cooling = self.cooling_at(cell, heat);
+            let climb = self.climb_at(cell, ground);
+            let capacity = travelling_capacity(capacity_at(heat), cooling, climb);
             let held = self.air[cell];
-            let poured = Drops((held.0 - AIR_SATURATION.0).max(0));
+            let poured = Drops((held.0 - capacity.0).max(0));
             self.air[cell] = Drops(held.0 - poured.0);
             self.ground[cell] = self.ground[cell].combine(poured);
 
-            let cooling = self.cooling_at(cell, heat);
-            // **Air that meets rising ground goes up, and rising makes
-            // cloud.** The height map reached the heat term and reached
-            // nothing that moves water, so a parcel blown at a range of hills
-            // passed through it and no cloud formed over land.[^5]
-            //
-            // [^5]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D2. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
-            let climb = self.climb_at(cell, ground);
-            let numerator = fall_numerator(heat, cooling, climb);
+            // **What is left drizzles in proportion to how full it is.** A
+            // full sky gives up a share each solve and a clear one gives up
+            // the floor, which is the trace that keeps the water cycling.
             let air = self.air[cell];
+            let numerator = fall_numerator(air, capacity);
             let fallen = share_of(air, numerator, FALL_DENOMINATOR);
             self.air[cell] = Drops(air.0 - fallen.0);
             self.ground[cell] = self.ground[cell].combine(fallen);
 
-            // **The heat of a cell lifts water off its own ground.** So a
-            // place can be dried by its own heat and not only by time, and an
-            // inland cell gives water back instead of only receiving it. The
-            // water moves inside the account rather than entering it, because
-            // it was already counted when it first entered the air.[^2]
+            // **Water leaves the ground of a cell at one site, and the room
+            // above it decides where that water goes.** Two terms take it off
+            // the ground. The heat of the cell lifts a share, so a place is
+            // dried by its own sun and not only by time.[^2] Time takes a
+            // share and one whole drop more, because the share alone
+            // truncates to nothing on ground holding less than the divisor,
+            // and water then accumulated everywhere and never left.
             //
             // [^2]: ADR-0162, water enters the air where it is hot, and it falls where the air cools, decision D1. `docs/adrs/accepted/adr-0162-water-enters-the-air-where-it-is-hot-and-falls-where-the-air-cools.md`
             //
-            // The room in the air bounds it, in the same way that the room
-            // bounds what the sea lifts. Every site that adds to the air
-            // reads one ceiling, so the plane holds the mark after the pass
-            // whatever route the water took.
+            // **What fits in the room goes back into the air of the same
+            // cell, and only what will not fit leaves the world.** The room
+            // is the capacity, so it is small over a cold cell and large over
+            // a warm one. A cold inland plain therefore keeps its water
+            // cycling between its ground and its own small sky, and it stands
+            // grey. The old order ran the two terms apart and sent the whole
+            // of the second one out of the world, so a cold inland cell
+            // drained itself and held no cloud at all.
+            //
+            // Both moves are exact integer moves. What the ground loses, the
+            // air and the evaporated total gain between them, and the two
+            // shares are computed from one figure.[^6]
+            //
+            // [^6]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
             let wet = self.ground[cell];
-            let back = share_of(wet, i64::from(heat), GROUND_LIFT_DENOMINATOR);
-            let room = (AIR_SATURATION.0 - self.air[cell].0).max(0);
-            let back = Drops(back.0.min(wet.0).min(room));
-            self.ground[cell] = Drops(wet.0 - back.0);
-            self.air[cell] = self.air[cell].combine(back);
-
-            // **Drying takes a share and then one whole drop more.** The
-            // share alone truncates to nothing on ground that holds less than
-            // the divisor, so water accumulated everywhere and never left.
-            // The whole drop is what takes the last of it, and a cell holding
-            // less than one drop loses what it holds.
-            let wet = self.ground[cell];
-            let share = share_of(wet, 1, DRY_DIVISOR);
-            let leaving = (share.0 + DRY_FLOOR).min(wet.0).max(0);
+            let by_heat = share_of(wet, i64::from(heat), GROUND_LIFT_DENOMINATOR).0;
+            let by_time = share_of(wet, 1, DRY_DIVISOR).0 + DRY_FLOOR;
+            let leaving = (by_heat + by_time).clamp(0, wet.0);
             self.ground[cell] = Drops(wet.0 - leaving);
-            dried = dried.saturating_add(leaving);
+            let room = (capacity.0 - self.air[cell].0).max(0);
+            let returned = leaving.min(room);
+            self.air[cell] = self.air[cell].combine(Drops(returned));
+            dried = dried.saturating_add(leaving - returned);
         }
         self.evaporated = self.evaporated.saturating_add(dried);
     }
