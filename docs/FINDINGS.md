@@ -15708,7 +15708,43 @@ term and handed its work to a lag without asking what the lag could carry, and
 the answer was two percent. The removal was correct and the handover was not
 checked.
 
+### FND-614 — A published constant already carries the land, so a lapse rate from sea level counts it twice
+
+**What the project believed.** The ground term of the temperature driver took
+the published lapse rate on the height of a cell above sea level. The record
+stated sea level as the zero, and gave a reason: the balance is a sea-level
+temperature, so a cell at sea level receives it unchanged.[^F614A]
+
+**What is true.** The balance constants are fitted to a planet that already has
+land above the sea. The temperature they give is therefore the temperature of
+the mean land height, not the temperature of the sea mark. A term measured from
+sea level takes the whole height off every land cell, so the world pays for its
+own land twice: once inside the constants that were fitted to it, and once again
+in the term. The reference is the mean land height of the world, and the term is
+an anomaly about it.
+
+**This is the third instance of one rule.** The cloud term counted the mean
+cloud twice, because the albedo already carried it. The ground term counted the
+mean land twice, because the balance already carried it. The rule that names
+both was written after the first and did not reach the second, although the two
+sit in the same record.[^F614A]
+
+**Evidence.** The world mean replaced sea level as the reference, and the field
+was measured on 7 September 2026 on one development machine (x86-64). Both
+equatorial bands graded wholly tropical for the first time. The temperate share
+of the world did not move. The tropical share rose from nothing, and the polar
+share fell by about two thirds. The commit body holds the table.
+
+**What follows.** **A decision that states a general rule must be checked
+against every term the same record already holds.** The rule was general when it
+was written, the record that holds it holds four other terms, and no one read
+them against it. The check is mechanical and it costs one pass: for each term,
+name its zero, and name what the published constant it rides on already averages
+over.
+
+
 ## References
 
 [^F612A]: The motion probe. `crates/cachette-core/examples/weather_motion_probe.rs`
 [^F612C]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+[^F614A]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
