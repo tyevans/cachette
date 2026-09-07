@@ -15743,8 +15743,49 @@ name its zero, and name what the published constant it rides on already averages
 over.
 
 
+### FND-615 — The belt kept a share of the sun and the season kept all of it
+
+**What the project believed.** The sun term of the driver has two parts that
+come from one geometry. Nothing said that the two treat the sunlight
+differently.
+
+**What is true.** They did. The belt multiplied the annual mean insolation of a
+latitude by the share the globe keeps, which is the published albedo. The season
+took the daily value against that annual mean and multiplied it by nothing. So
+one term claimed a planet that reflects three tenths of the sun and the other
+claimed a surface that absorbs every watt, from the same table, four lines
+apart.
+
+**The cost falls at the pole, because that is where the anomaly is largest.**
+The polar day delivers the largest daily insolation anywhere on the globe, and
+the term handed all of it to a surface that is ice. The measured seasonal range
+over land peaks near sixty-five degrees and falls toward the pole; the term rose
+to the pole without turning.[^F615A]
+
+**Evidence.** Measured 7 September 2026 on one development machine (x86-64). The
+seasonal range of the polar band moved from 44 K to 38 K against a published
+35.3 K. The root mean square error of the range over six bands moved from 5.01 K
+to 4.41 K. The predicted figure, computed before the term was written, was
+4.89 K; the measurement beat the prediction because a cooler polar summer also
+carries more ice in the mean, which the driver already reads.
+
+**What follows.** **A term that reads a published quantity must apply every
+factor the published form applies to it.** The zero of a term is not the only
+thing a reviewer must ask for. The gain is the other, and it is easier to miss,
+because a term with the wrong gain still has the right shape and still moves the
+right way.
+
+**What this did not fix.** The measured range at forty-five degrees is 0.85 of
+the range at the pole, and the insolation geometry gives 0.52. The albedo moves
+this to 0.65 and no further. The remainder is not a latitude law: Earth's land
+poleward of eighty degrees is an ice plateau beside an ocean, and this world's
+is continental. **A term that reproduced the last of that ratio would be fitting
+one planet's geography into a function of latitude.**
+
+
 ## References
 
 [^F612A]: The motion probe. `crates/cachette-core/examples/weather_motion_probe.rs`
 [^F612C]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
 [^F614A]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
+[^F615A]: Research report 32, zonal mean surface temperature, section 7. `docs/research/reports/32-zonal-mean-surface-temperature.md`

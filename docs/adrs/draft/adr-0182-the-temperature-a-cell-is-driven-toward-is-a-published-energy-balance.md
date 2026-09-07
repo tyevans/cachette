@@ -173,6 +173,24 @@ published constants already average over must be an anomaly about that
 average**, and a reviewer should ask, of every new radiative term, what its zero
 is and why.
 
+### D6. Every radiative term multiplies insolation by the same albedo
+
+A term that converts sunlight into degrees must multiply by the share the globe
+keeps. **This holds for the anomaly as well as for the mean.** The belt takes
+the annual mean insolation of a latitude and keeps a share of it. The season
+takes the daily value against that annual mean, and it must keep the same share
+of that.
+
+The reviewer's test is mechanical. For each term that reads insolation, find
+where the albedo is applied. If it is not applied, the term claims a surface
+that absorbs every watt, and no surface does.
+
+**The share is read at a temperature that does not depend on the term.** The
+season reads the annual mean of its own latitude, which the belt has already
+fixed. A term that read the temperature of the moment would drive itself, and it
+would then need a stability condition in the way the ice term does. This one
+does not, and that is a property of where it reads and not of its size.
+
 ## Consequences
 
 **The project cannot tune the mean temperature profile by changing an amplitude,

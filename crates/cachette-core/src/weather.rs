@@ -2776,6 +2776,8 @@ impl Insolation {
     ///
     /// [^1]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D2 and D3. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
     /// [^2]: Research report 30, the published atmospheric math, section 4.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+    /// [^3]: Recurring Defect Shapes, redundant declaration sites. `.agents/rules/recurring-defects.md`
+    /// [^4]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decision D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
     fn shape_of(&self, daily: i64, mean: i64) -> i32 {
         // **The belt is the settled profile of the published energy balance,
         // and it is stated in degrees.** The globe keeps a share of what
@@ -2793,12 +2795,27 @@ impl Insolation {
         // from the geometry and its size is a balance value that a blocker
         // governs, because no published heat capacity this project could
         // verify fixes it.[^2]
+        //
+        // **The season is an absorbed anomaly, so the albedo scales it in the
+        // way it scales the belt.** The belt multiplies the annual mean
+        // insolation by the share the globe keeps, and the season multiplied
+        // the anomaly by nothing at all. That is one value stated in two
+        // places, and the copies disagreed: a pole reflects most of the sun
+        // its polar day delivers, and the term gave it every watt.[^3] [^4]
+        //
+        // **The share is read at the annual mean of the latitude and not at
+        // the temperature of the moment, so no loop exists.** The annual mean
+        // is the belt above, which does not depend on the season, so the term
+        // cannot drive itself. This is why it needs no stability condition,
+        // where the ice term in the driver does.[^4]
+        let annual = warmth_of_hundredths(base + belt);
+        let kept = ALBEDO_KEPT - ICE_ALBEDO_DROP_FINE * ice_share_of(annual) / 100;
         let season = narrow(sim_math::share(
-            Accum(i64::from(SEASON_ANOMALY_SWING)),
+            Accum(i64::from(SEASON_ANOMALY_SWING) * kept / ALBEDO_KEPT),
             Accum(daily - mean),
             Accum(i64::from(self.reference).max(1)),
         ));
-        warmth_of_hundredths(base + belt) + season
+        annual + season
     }
 
     /// Returns the degrees the sun adds, from one sum of the two parts.
