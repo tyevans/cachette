@@ -85,7 +85,7 @@ def test_the_sketch_answers_the_frame_when_a_caller_puts_it_there() -> None:
     demo = Demo(world, Names(SEED), width=WIDTH, height=HEIGHT, threads=1)
     demo.camera = camera
     demo.clock.pause()
-    demo.renderer = Sketch(world, seed=SEED)
+    demo.renderer = Sketch(world)
     reading = demo.advance()
     engine = frame_of(world.draw, world, camera)
     assert not np.array_equal(demo.surface.pixels, engine)
@@ -100,7 +100,7 @@ def test_the_sketch_writes_no_value_of_the_world() -> None:
     world, camera = build()
     before = world.state_hash
     tick = world.tick
-    sketch = Sketch(world, seed=SEED)
+    sketch = Sketch(world)
     frame_of(sketch, world, camera)
     assert world.state_hash == before
     assert world.tick == tick
@@ -118,7 +118,7 @@ def test_the_sketch_lifts_the_ground_off_the_flat_map() -> None:
     """
     world, camera = build()
     engine = frame_of(world.draw, world, camera).reshape(HEIGHT, WIDTH)
-    drawn = frame_of(Sketch(world, seed=SEED), world, camera).reshape(HEIGHT, WIDTH)
+    drawn = frame_of(Sketch(world), world, camera).reshape(HEIGHT, WIDTH)
 
     def top_edge(frame: np.ndarray) -> np.ndarray:
         marked = (frame & 0xFF) < MARK_LIGHT
@@ -136,7 +136,7 @@ def test_the_sketch_lifts_the_ground_off_the_flat_map() -> None:
 def test_the_sketch_paints_a_named_overlay_as_a_wash_of_its_own_colour() -> None:
     """An overlay reaches the page as colour, and no overlay leaves it grey."""
     world, camera = build()
-    sketch = Sketch(world, seed=SEED)
+    sketch = Sketch(world)
     surface = Surface(WIDTH, HEIGHT)
 
     def colour_spread(pixels: np.ndarray) -> float:
@@ -153,14 +153,49 @@ def test_the_sketch_paints_a_named_overlay_as_a_wash_of_its_own_colour() -> None
     assert washed > plain
 
 
-def test_the_sketch_refuses_an_engine_that_publishes_no_height(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The renderer reads the world through the overlays the engine names."""
-    world, _ = build()
-    monkeypatch.setattr(ink, "HEIGHT_OVERLAY", "no overlay carries this name")
+class Silent:
+    """A world that publishes none of the readers the renderer needs."""
+
+
+def test_the_sketch_refuses_an_engine_that_publishes_no_bulk_reader() -> None:
+    """The renderer reads the world through the readers the engine publishes."""
     with pytest.raises(BoundaryGap):
-        Sketch(world, seed=SEED)
+        Sketch(Silent())  # type: ignore[arg-type]
+
+
+def test_water_is_the_kind_the_renderer_takes_it_for() -> None:
+    """The page reads one kind number as water, and the engine numbers them.
+
+    **The number is a second copy of a fact the engine holds.** This is the
+    check that fails when the two disagree. Water lies under every other kind,
+    so the kind the page calls water must report the lowest ground of all.
+    """
+    world, _ = build()
+    heights = world.tile_heights().astype(np.float64)
+    kinds = world.tile_kinds()
+    present = sorted(set(kinds.tolist()))
+    means = [heights[kinds == kind].mean() for kind in present]
+    assert means[0] == min(means)
+    assert ink.WATER_KIND == present[0]
+
+
+def test_the_page_lifts_the_ground_the_engine_reports() -> None:
+    """The window the page builds holds the tallest ground of the world.
+
+    A page built from a field of its own would still draw hills, so the test
+    asks where the engine reports the tallest ground and then asks whether the
+    page covers that place.
+    """
+    world, camera = build()
+    sketch = Sketch(world)
+    frame_of(sketch, world, camera)
+    heights = world.tile_heights()
+    highest = int(np.argmax(heights))
+    window = sketch.window()
+    assert window is not None
+    first_q, first_r, last_q, last_r = window
+    assert first_r <= highest // world.width < last_r
+    assert first_q <= highest % world.width < last_q
 
 
 def test_the_flag_chooses_the_sketch_and_the_default_does_not(

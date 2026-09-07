@@ -982,7 +982,6 @@ def main(argv: list[str] | None = None) -> int:
         try:
             demo.renderer = Sketch(
                 demo.world,
-                seed=seed,
                 relief=arguments.sketch_relief or RELIEF,
                 sky=arguments.sketch_sky,
             )
