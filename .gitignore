@@ -40,3 +40,9 @@ python/cachette/*.dylib
 # The observability stack copies a benchmark run log here so that the
 # collector can read it. The run itself is the record, not the copy.
 observability/runs/*.log
+
+# The output of a training run in flight. A checkout that replaced the
+# log would leave the shell redirect writing to a deleted inode, and the
+# rest of the run would go nowhere. The finished artefacts are committed
+# once the run ends.
+runs/learn/night2/
