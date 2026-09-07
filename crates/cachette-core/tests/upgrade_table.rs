@@ -16,6 +16,7 @@
 //! [^3]: Testing rules, section 2a. `.agents/rules/testing.md`
 
 use cachette_core::choose::{self, ChoiceSchedule};
+use cachette_core::cohort::NeedRule;
 use cachette_core::holding::ReachRules;
 use cachette_core::resource::{Amount, ResourceKind};
 use cachette_core::terrain::TileKind;
@@ -23,7 +24,7 @@ use cachette_core::upgrade::{
     BuildRefusal, UpgradeCategory, UpgradeRow, CONDITION_FULL, DEFAULT_UPGRADE_TABLE,
     UPGRADE_LEVEL_COUNT,
 };
-use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
 
 /// The extent that these tests read.
 ///
@@ -71,8 +72,45 @@ fn world(seed: u64) -> World {
     world
         .found_settlement(seat, FactionId(0))
         .expect("the ground admits a city");
+    hold_the_hunger(&mut world);
     world.step(1).expect("the step must run");
     world
+}
+
+/// Stops the need of a unit from falling, so that hunger bounds no run here.
+///
+/// **A builder this suite places has no home, so nothing feeds it.** The need
+/// of such a unit falls by a fixed part of the full need on every tick, the
+/// deficit then rises to the bound, and the unit ends. That gives an unfed
+/// unit a life of a fixed number of ticks, and the number is a balance value
+/// that no test here reads.
+///
+/// The work that one level of one category asks for is a balance value
+/// too.[^1] The two moved apart: the second level of a category now asks for
+/// more work than an unfed unit lives for, so the builder died partway and the
+/// level never rose. The fixture answers that by holding the need where it is,
+/// through the verb a caller has.
+///
+/// **This is a fixture setting and not a weaker assertion.** A test of the
+/// need itself lives in another file, and every assertion in this file stays
+/// exactly as strong. A run that reads a work count from the table now takes
+/// that many ticks whatever the table holds.
+///
+/// # References
+///
+/// [^1]: Balance register, the work of an upgrade level. `docs/reference/balance.md`
+fn hold_the_hunger(world: &mut World) {
+    let rule = world.need_rule();
+    world.set_need_rule(
+        NeedRule::new(
+            Fix32::ZERO,
+            rule.ration(),
+            rule.threshold(),
+            rule.recovery(),
+            rule.bound(),
+        )
+        .expect("a rule of no decay is legal"),
+    );
 }
 
 /// Returns every address of the extent, in row-major order.
@@ -143,14 +181,49 @@ fn builder(world: &mut World, address: Axial, category: UpgradeCategory) -> Enti
 }
 
 /// Steps the world until the level on a tile rises, or the patience runs out.
+///
+/// **The panic names the builders that starved.** A build that stops because
+/// its builder died reads exactly like a build that the pass never advanced,
+/// and the two need different repairs. The count separates them, so a fixture
+/// that stopped reaching its case says which reason it stopped for.
 fn step_until_level(world: &mut World, address: Axial, level: u8, patience: u64) -> u64 {
+    step_until_level_counted(world, address, level, patience).0
+}
+
+/// Steps until the level rises, and reports the ticks that added no work.
+///
+/// **A builder on a worn site buys condition before it raises anything.** The
+/// weather wears what stands on a tile, and a builder that answers the wear
+/// spends its tick on the repair. Such a tick adds no work to the level, so a
+/// run over wet ground takes more ticks than the work of the row.
+///
+/// The second number is those ticks. A caller that wants the work of the row
+/// subtracts it, and the subtraction states the rule rather than allowing a
+/// margin: every tick either added one work or bought condition.
+fn step_until_level_counted(
+    world: &mut World,
+    address: Axial,
+    level: u8,
+    patience: u64,
+) -> (u64, u64) {
+    let mut starved = 0usize;
+    let mut repaired = 0u64;
     for taken in 1..=patience {
+        let before = world.upgrade_at(address).map(|site| site.progress.0);
         world.step(1).expect("the step must run");
+        starved += world.starved_log().len();
         if world.upgrade_level(address) >= level {
-            return taken;
+            return (taken, repaired);
+        }
+        if world.upgrade_at(address).map(|site| site.progress.0) == before {
+            repaired += 1;
         }
     }
-    panic!("the level {level} did not stand after {patience} ticks");
+    let progress = world.upgrade_at(address).map(|site| site.progress.0);
+    panic!(
+        "the level {level} did not stand after {patience} ticks: the work \
+         stands at {progress:?} and {starved} units starved over the run"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -313,11 +386,18 @@ fn a_level_rises_in_place_and_the_entry_count_does_not_grow() {
     assert_eq!(site.level, 1);
     assert_eq!(site.progress.0, 0);
 
-    let to_second = step_until_level(&mut field, address, 2, i64::from(second.work) as u64 + 4);
+    // **The ticks that bought condition are named, not allowed for.** The
+    // weather wears what stands on the tile, and a builder on a worn site
+    // spends its tick on the repair rather than on the level. The patience
+    // therefore covers the work and the wear, and the assertion subtracts the
+    // ticks that added no work. Every other tick added exactly one.
+    let patience = u64::from(second.work) * 2;
+    let (to_second, repaired) = step_until_level_counted(&mut field, address, 2, patience);
     assert_eq!(
-        to_second,
+        to_second - repaired,
         u64::from(second.work),
-        "the second level takes its own work"
+        "one builder adds one work on every tick it does not repair, and it \
+         repaired on {repaired} of {to_second} ticks"
     );
     assert_eq!(
         field.upgrade_sites().len(),
@@ -621,6 +701,33 @@ fn a_world_of_levels_is_the_same_at_every_thread_count() {
     );
 }
 
+/// The builders that stand on each tile of the raised world.
+const BUILDERS_ON_A_TILE: u64 = 4;
+
+/// Returns the ticks the raised world runs for.
+///
+/// **The count comes from the table and never from a number written here.**
+/// The world must reach a second level, so the builders of one tile must do
+/// the work of the first level and the work of the second. Both are balance
+/// values.[^1] A fixed count went stale the first time the work rose: the run
+/// ended with every tile at its first level, and the assertion that asks for a
+/// second level said so.
+///
+/// The builders wander off the tiles they build, so the count is three times
+/// the ticks the work alone would take.
+///
+/// # References
+///
+/// [^1]: Balance register, the work of an upgrade level. `docs/reference/balance.md`
+fn raised_ticks() -> u64 {
+    let work: u64 = [1u8, 2]
+        .iter()
+        .filter_map(|level| DEFAULT_UPGRADE_TABLE.row(UpgradeCategory::ROAD, *level))
+        .map(|row| u64::from(row.work))
+        .sum();
+    work.div_ceil(BUILDERS_ON_A_TILE) * 3
+}
+
 /// Builds a world in which several tiles carry a raised upgrade.
 fn raised(threads: usize) -> World {
     let mut field = world(SEED);
@@ -638,14 +745,14 @@ fn raised(threads: usize) -> World {
         let _ = field.zone_project(FactionId(0), *address, UpgradeCategory::ROAD);
     }
     for address in &open {
-        for _ in 0..4 {
+        for _ in 0..BUILDERS_ON_A_TILE {
             let unit = soldier(&mut field, *address);
             if field.order_build(unit, UpgradeCategory::ROAD).is_err() {
                 continue;
             }
         }
     }
-    for _ in 0..24 {
+    for _ in 0..raised_ticks() {
         field.step(threads).expect("the step must run");
     }
     field

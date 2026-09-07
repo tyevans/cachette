@@ -28,6 +28,8 @@
 //! [^3]: Findings register, FND-542. `docs/FINDINGS.md`
 //! [^4]: Testing rules, section 2a. `.agents/rules/testing.md`
 //! [^5]: Testing rules, section 5. `.agents/rules/testing.md`
+//! [^6]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+//! [^7]: ADR-0125, one plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-one-plane-names-the-seed-set-of-a-destination-field.md`
 
 use cachette_core::campaign;
 use cachette_core::holding::{Holder, LeaseRules, ReachRules};
@@ -304,6 +306,19 @@ fn a_holder_at_war_admits_the_guest_it_refuses_in_tension() {
     panic!("no seed below 40 walks the guest onto the ground of the holder");
 }
 
+/// The nearest an objective of the deadline test may stand.
+///
+/// The cohort walks one tile in a tick, and the deadline is eight ticks, so an
+/// objective nearer than this is one the cohort could reach.
+const OBJECTIVE_NEAREST: u32 = 16;
+
+/// The furthest an objective of the deadline test may stand.
+///
+/// The destination field steers a unit toward a seed a bounded number of level
+/// 1 cells away. A seed further off leaves the unit reading no direction, and
+/// the engine then releases it.
+const OBJECTIVE_FURTHEST: u32 = 48;
+
 /// The extent of the world that the border test uses.
 ///
 /// The test needs open ground and a walk, and it needs no island, so it takes
@@ -349,21 +364,32 @@ fn fixture_places(seed: u64) -> Option<(Axial, Axial)> {
 
 #[test]
 fn a_campaign_that_reaches_nothing_closes_and_lets_the_next_one_raise() {
-    // The extreme is an objective the cohort never reaches: a tile at the
-    // far corner of the world, with a deadline far below the ticks a
-    // crossing costs. A fixture whose objective was near would close on the
-    // holder and never reach the deadline.
+    // The extreme is a cohort that walks and arrives nowhere inside the
+    // deadline: an objective many ticks of walking away, with a deadline far
+    // below the ticks the walk costs. A fixture whose objective was one step
+    // away would arrive and never reach the deadline.
+    //
+    // **The objective sits inside the reach of the destination field.** The
+    // field runs a fixed number of relaxation passes over level 1 cells, so it
+    // steers a unit toward a seed a bounded number of cells away and no
+    // further.[^6] A unit that reads no direction from the field holds a plane
+    // that leads it nowhere, and the engine releases it.[^7] A cohort of
+    // released units is empty, and an empty cohort closes the campaign as lost
+    // rather than as expired. The far corner of this world is outside that
+    // reach, so a fixture that took it measured the release and never the
+    // deadline. The window below is wide enough to outlast the deadline and
+    // narrow enough for the field to answer.
     for seed in 0..60u64 {
         let mut field = world(seed, 2);
         field.set_campaign_deadline(Tick(8));
         let Some((home, _)) = open_pair(&field, 1) else {
             continue;
         };
-        let Some(far) = addresses(&field)
-            .into_iter()
-            .rev()
-            .find(|address| field.admits_a_unit(*address) && address.distance(home) > 16)
-        else {
+        let Some(far) = addresses(&field).into_iter().find(|address| {
+            field.admits_a_unit(*address)
+                && address.distance(home) > OBJECTIVE_NEAREST
+                && address.distance(home) < OBJECTIVE_FURTHEST
+        }) else {
             continue;
         };
         let unit = field
@@ -376,6 +402,17 @@ fn a_campaign_that_reaches_nothing_closes_and_lets_the_next_one_raise() {
             field.step(2).expect("the step must run");
         }
         let rows = field.campaigns_of(FactionId(0));
+        // **The lost state is named, so a dissolved cohort cannot read as a
+        // deadline that did not fire.** A campaign closes as lost when its
+        // cohort is empty, and that test runs before the deadline test. A
+        // fixture whose units the engine released would close every campaign
+        // as lost, and a bare assertion on the expired state would report only
+        // that the campaign did not expire.
+        assert!(
+            !rows.iter().any(|row| row.state == campaign::STATE_LOST),
+            "the campaign closed as lost, so the cohort dissolved before the \
+             deadline and this fixture measures the release and not the deadline"
+        );
         assert!(
             rows.iter().any(|row| row.state == campaign::STATE_EXPIRED),
             "the campaign did not expire"
