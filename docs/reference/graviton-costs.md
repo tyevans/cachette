@@ -1647,6 +1647,41 @@ Read this section before you cite a figure above.
 - The command that produced the figure, and the commit it was taken at.
 - A statement of what a run did not cover.
 
+## The learner batch, in simulated ticks a second
+
+**This section holds no measured row yet.** A script takes the measurement, and
+nothing has run it on the target platform.[^TPUT1] The row belongs here as soon
+as one does.
+
+The quantity is the count of simulated ticks that the learner batch runs in one
+second, over the whole batch and for each worker. One tick is one step of one
+world. The batch steps every world that is still running, so one crossing of
+the boundary advances the decision interval in each live world. The script
+counts the live worlds at every crossing and multiplies, so the count is exact
+and no part of it comes from a mean.
+
+**A tick of one world size is not a tick of another.** The learner trains on a
+world of extent 48 by 48 with three factions, which is far smaller than the
+demonstration world. Every row must name the extent, the faction count and the
+decision interval beside the figure, or the figure compares nothing.
+
+**Report the figure for each worker beside the total.** The evolution strategy
+plays one episode for each pair of a candidate and a seed, and the episodes
+share nothing, so the work should divide over the cores. A figure for each
+worker that stays flat as the worker count rises is the evidence that it does.
+A figure that falls says the batch step has a bottleneck, and that is worth
+knowing before anybody rents a larger machine.
+
+| Value | Read by | Set | Blocker | Derivation |
+|---|---|---|---|---|
+| Ticks a second, whole batch, at the core count of the instance | The cost of a training run | unset, a run of the probe on the target | BLK-007 | |
+| Ticks a second for each worker, at one, a quarter, a half and all the cores | Whether the batch step divides | unset, the same run | BLK-007 | |
+| Dollars for each million ticks, at the spot price the run paid | A comparison between two instance types | unset, the same run | BLK-007 | |
+
+The last row divides the price an hour by the throughput. Dollars an hour
+compares two prices. Dollars for each million ticks compares two machines, and
+that is the figure that says whether a larger instance is worth what it costs.
+
 ## What does not belong here
 
 - A derived figure. The other target register holds those.[^2]
@@ -1677,6 +1712,7 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^5]: The benchmark. `crates/cachette-core/benches/target_cost.rs`
 [^6]: The provisioning script. `scripts/graviton-benchmark.sh`
+[^TPUT1]: The learner throughput probe. `scripts/train_throughput.py`
 [^7]: Testing rules, section 3. `.claude/rules/testing.md`
 [^8]: ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^9]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`

@@ -1,0 +1,4 @@
+=== conquer (linear) ===
+  conquer generation 14 mean   -1930.6 best   -1930.6 spread      0.0 won  0.02 valid - [4159s]
+  conquer generation 15 mean   -1995.8 best   -1995.8 spread      0.0 won  0.00 valid - [4254s]
+  conquer generation 16 mean   -1984.3 best   -1984.3 spread      0.0 won  0.00 valid - [4650s]

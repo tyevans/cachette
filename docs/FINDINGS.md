@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-622**
+**Next number: FND-626**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -963,6 +963,39 @@ elimination. It reports one boolean beside them, which is true while the faction
 holds a unit or a person. A caller that wants to stop a run early reads it. A
 faction the seeding never seated reads the same boolean, because it holds the
 same nothing.
+
+### FND-625 — The trainer does not write its weights after every generation
+
+**Believed.** The trainer checkpoints every generation, so a run stopped part
+way keeps what it has learned. A person who wants to end a run early can do so
+and keep the weights.
+
+**False as stated, and false in two different ways.** The trainer writes the
+weights only from inside its validation pass. That pass runs every few
+generations, and it writes only when the centre scored better than the best
+centre it has seen. **A run with no validation seeds writes nothing at all
+until a whole strategy finishes.** A run with validation seeds writes nothing
+until the first validation, and after that it keeps the best centre rather than
+the newest one.
+
+**Evidence.** A probe drove the trainer directly on a small world, over three
+generations, and watched the weights file from another thread. With no
+validation seeds the file never appeared while the run was going. It appeared
+only after the loop ended. With validation seeds, and a validation every
+generation, the file appeared 2.4 seconds into a 6.8 second run. The commit
+body holds the probe. A run under way on a development machine agrees. It
+started at 07:31, its first two generations ended at 07:39 and 07:47, and it
+first wrote its weights file at 07:49, which is its first validation.
+
+**What follows.** **A launcher that offers to stop a run early must refuse a
+configuration that would make an early stop lose everything.** The training
+launcher reads the validation count out of the trainer arguments. It stops
+before it creates anything when that count is zero.[^F625A] It also states, in
+the text a person confirms, which generation the first checkpoint lands on.
+
+Keeping the best centre rather than the newest one is correct, because an
+evolution strategy walks and a walk can end downhill. The defect is the claim,
+and not the behaviour.
 
 
 ## C. Defects found in specified rules
@@ -11741,6 +11774,7 @@ index against the set of open items and never against what an item says.
 [^F218D]: ADR Registry, repairing a citation is not an amendment. `docs/adrs/REGISTRY.md`
 [^F218E]: Definition of Done, section 4. `.claude/rules/definition-of-done.md`
 [^F218F]: Findings register, FND-192, in this document.
+[^F625A]: The training launcher. `scripts/graviton-train.sh`
 [^ALLOC2]: Findings register, FND-219, in this document.
 
 [^237B]: Decision Record Scope, section 6. `.claude/rules/adr-scope.md`
