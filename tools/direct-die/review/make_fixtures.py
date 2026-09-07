@@ -256,15 +256,119 @@ def build(root: Path, clean: bool = True) -> Path:
     nameless.mkdir(parents=True, exist_ok=True)
     write_round(nameless, 0, letters=("a", "b", "c"), summary="no manifest yet")
 
+    build_style_sessions(root, created)
     return root
 
 
+# The styles that the fixture guide names. The real guide names its own.
+FIXTURE_STYLES = ("cartoon", "pencil")
+
+
+def build_style_sessions(root: Path, created: datetime) -> None:
+    """Write sessions that a style run writes, so the grid has cells.
+
+    The server names a session after the engine asset name when it starts a
+    run. These names follow that shape, so the grid reads the asset name out
+    of the directory name.
+
+    The tree holds one complete asset with a human choice, one asset that is
+    part way through, one asset whose name only the subject text gives, and
+    one session with no round at all.
+    """
+    # A cartoon forest that a person chose in the second round.
+    chosen = root / "cartoon" / "20260904-090000-forest"
+    chosen.mkdir(parents=True, exist_ok=True)
+    write_manifest(chosen, "cartoon", created + timedelta(days=3), 2)
+    write_round(chosen, 0, summary="a dense stand of trees")
+    write_round(
+        chosen, 1, parent="round-00/variant-b", summary="a dense stand of trees"
+    )
+    write_json(
+        chosen / "round-01" / "feedback.json",
+        {
+            "choice": "b",
+            "text": "B reads at tile size. Keep the canopy shape.",
+            "at": (created + timedelta(days=3, minutes=5))
+            .isoformat(timespec="seconds")
+            .replace("+00:00", "Z"),
+        },
+    )
+
+    # A cartoon water that the loop is part way through. One variant is
+    # drawn and has no critique. This is the live case.
+    live = root / "cartoon" / "20260904-091000-water"
+    live.mkdir(parents=True, exist_ok=True)
+    write_manifest(live, "cartoon", created + timedelta(days=3, minutes=10), 1)
+    write_round(live, 0, letters=("a",), with_critique=False, summary="open water")
+
+    # A cartoon hill whose name only the subject text gives. The session
+    # identifier carries no asset name, as a command line run does not.
+    unnamed = root / "cartoon" / "20260904-092000"
+    unnamed.mkdir(parents=True, exist_ok=True)
+    write_manifest(unnamed, "cartoon", created + timedelta(days=3, minutes=20), 1)
+    write_round(unnamed, 0, letters=("a", "b"), summary="a low rolling hill")
+
+    # A pencil session that holds no round, and no manifest.
+    empty = root / "pencil" / "20260904-093000-mountain"
+    empty.mkdir(parents=True, exist_ok=True)
+
+
+def build_styleguide(root: Path, clean: bool = True) -> Path:
+    """Write a fake style guide, with two styles and no exemplar.
+
+    An exemplar directory starts empty. That is the state a person meets
+    before the first promotion, and the grid must render it.
+    """
+    root = Path(root)
+    if clean and root.exists():
+        shutil.rmtree(root)
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "score.md").write_text(
+        "# The score scale\n\nThe fixture score scale.\n", encoding="utf-8"
+    )
+    for style in FIXTURE_STYLES:
+        (root / f"{style}.md").write_text(
+            f"# The {style} style\n\nThe fixture rules of the {style} style.\n",
+            encoding="utf-8",
+        )
+        (root / "exemplars" / style).mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def build_workspace(root: Path, clean: bool = True) -> dict[str, Path]:
+    """Write every directory that the front end reads, and give the paths.
+
+    The front end reads four roots: the sessions, the style guide, the packs
+    and the runs. This writes the first two with data, and makes the other
+    two empty. An empty packs directory and an empty runs directory are the
+    first state a person meets.
+    """
+    root = Path(root)
+    paths = {
+        "sessions": root / "sessions",
+        "styleguide": root / "styleguide",
+        "packs": root / "packs",
+        "runs": root / "runs",
+    }
+    build(paths["sessions"], clean=clean)
+    build_styleguide(paths["styleguide"], clean=clean)
+    paths["packs"].mkdir(parents=True, exist_ok=True)
+    paths["runs"].mkdir(parents=True, exist_ok=True)
+    return paths
+
+
 def main() -> None:
-    """Write the fixture tree at the path the caller names."""
-    default = Path(__file__).resolve().parent.parent / "fixtures" / "sessions"
-    parser = argparse.ArgumentParser(description="write a fake direct-die session tree")
+    """Write the fixture workspace at the path the caller names."""
+    default = Path(__file__).resolve().parent.parent / "fixtures"
+    parser = argparse.ArgumentParser(
+        description="write a fake direct-die workspace for the front end"
+    )
     parser.add_argument(
-        "root", nargs="?", type=Path, default=default, help="the sessions root to write"
+        "root",
+        nargs="?",
+        type=Path,
+        default=default,
+        help="the workspace root to write",
     )
     parser.add_argument(
         "--keep",
@@ -272,8 +376,15 @@ def main() -> None:
         help="add to the tree instead of removing it first",
     )
     arguments = parser.parse_args()
-    root = build(arguments.root, clean=not arguments.keep)
-    print(f"wrote the fixture sessions to {root}")
+    paths = build_workspace(arguments.root, clean=not arguments.keep)
+    print(f"wrote the fixture workspace to {arguments.root}")
+    print(
+        "start the server with: python app.py"
+        f" --sessions {paths['sessions']}"
+        f" --styleguide {paths['styleguide']}"
+        f" --packs {paths['packs']}"
+        f" --runs {paths['runs']}"
+    )
 
 
 if __name__ == "__main__":

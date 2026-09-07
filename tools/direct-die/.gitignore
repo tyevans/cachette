@@ -8,6 +8,13 @@ sessions/hex-tile/*
 # The fixture script writes a fabricated tree for the review interface.
 fixtures/
 
+# A job record is the state of one run. It names one process on one machine,
+# so it means nothing in another checkout.
+runs/
+
+# A pack is not ignored. A person exports one and commits it when they want to
+# keep it. An export that nobody wants shows as an untracked directory.
+
 __pycache__/
 *.pyc
 .pytest_cache/

@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}direct-die packs{% endblock %}
+
+{% block main %}
+  <h1>Art packs</h1>
+  <p class="lede">
+    One row is an engine asset name. One column is a style. A cell says how
+    far the work went, and whether something draws it now.
+  </p>
+
+  {% if not styles %}
+    <p class="gap">
+      The style guide names no style yet, and the sessions directory holds
+      none either. A style is a rules file in the style guide directory.
+    </p>
+  {% endif %}
+
+  <section class="card start">
+    <h2>Start a run</h2>
+    <form method="post" action="/start" class="row">
+      <label>Style
+        <select name="style">
+          {% for name in styles %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Asset
+        <select name="slug">
+          <option value="">— type a subject instead —</option>
+          {% for slug in all_slugs %}<option value="{{ slug }}">{{ slug }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="wide">Subject
+        <input type="text" name="subject" placeholder="a dense stand of trees">
+      </label>
+      <label>Rounds
+        <select name="rounds">
+          {% for value in round_choices %}
+            <option value="{{ value }}" {{ 'selected' if value == 3 else '' }}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Variants
+        <select name="variants">
+          {% for value in variant_choices %}
+            <option value="{{ value }}" {{ 'selected' if value == 4 else '' }}>{{ value }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label class="check">
+        <input type="radio" name="scope" value="one" checked> One asset
+      </label>
+      <label class="check">
+        <input type="radio" name="scope" value="set"> The whole set of {{ all_slugs | length }}
+      </label>
+      <button type="submit" {{ 'disabled' if not styles else '' }}>Start</button>
+    </form>
+    <p class="note">
+      A run of one round of four variants takes about seventy seconds. The
+      page returns at once and the work goes on in the background.
+    </p>
+  </section>
+
+  {% if styles %}
+  <div class="grid-scroll">
+    <table class="grid">
+      <thead>
+        <tr>
+          <th class="corner">asset</th>
+          {% for name in styles %}
+            <th>
+              <a href="/packs/{{ name }}">{{ name }}</a>
+              <span class="count">
+                {{ packs.get(name, {}) | length }} of {{ all_slugs | length }} in the pack
+              </span>
+              <form method="post" action="/start" class="inline">
+                <input type="hidden" name="style" value="{{ name }}">
+                <input type="hidden" name="scope" value="set">
+                <input type="hidden" name="rounds" value="3">
+                <input type="hidden" name="variants" value="4">
+                <button type="submit" class="small">Run the set</button>
+              </form>
+            </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for slug, cells in rows %}
+          <tr>
+            <th class="rowname">
+              {{ slug }}
+              <span class="count">{{ cells[0].kind if cells else "" }}</span>
+            </th>
+            {% for cell in cells %}
+              <td class="cell state-{{ cell.state }}{{ ' running' if cell.running else '' }}">
+                <div class="shot">
+                  {% if cell.thumbnail %}
+                    <a href="{{ cell.round_link }}">
+                      <img class="checker" src="{{ cell.thumbnail }}" alt="{{ cell.slug }} in {{ cell.style }}">
+                    </a>
+                  {% else %}
+                    <span class="empty">no drawing</span>
+                  {% endif %}
+                </div>
+                <p class="badge">{{ cell.state }}</p>
+                {% if cell.running %}
+                  <p class="waiting">{{ cell.waiting }}</p>
+                  <p class="links"><a href="/runs/{{ cell.job.job_id }}">the run</a></p>
+                {% elif cell.pick %}
+                  <p class="links">
+                    <a href="{{ cell.round_link }}">{{ cell.pick.round_name }} {{ cell.pick.letter }}</a>
+                    {% if cell.pick.score is not none %}<span class="score">{{ cell.pick.score }}</span>{% endif %}
+                  </p>
+                  <p class="links source">
+                    {{ "you chose it" if cell.pick.chosen_by_person else "the best score" }}
+                  </p>
+                {% else %}
+                  <form method="post" action="/start" class="inline">
+                    <input type="hidden" name="style" value="{{ cell.style }}">
+                    <input type="hidden" name="slug" value="{{ cell.slug }}">
+                    <input type="hidden" name="scope" value="one">
+                    <input type="hidden" name="rounds" value="3">
+                    <input type="hidden" name="variants" value="4">
+                    <button type="submit" class="small">Draw it</button>
+                  </form>
+                {% endif %}
+                <p class="marks">
+                  {% if cell.promoted %}<span class="mark">exemplar</span>{% endif %}
+                  {% if cell.exported %}<span class="mark">in the pack</span>{% endif %}
+                </p>
+              </td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <p class="legend">
+    {% for name in ladder %}<span class="badge state-{{ name }}">{{ name }}</span>{% endfor %}
+  </p>
+  {% endif %}
+{% endblock %}

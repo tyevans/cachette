@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}the {{ style }} pack{% endblock %}
+
+{% block bar %}
+  <span class="crumb">pack / {{ style }}</span>
+{% endblock %}
+
+{% block main %}
+  <h1>The {{ style }} pack</h1>
+  <p class="lede">
+    An export copies the chosen drawing of each asset into one directory,
+    under the name that the engine uses. A pack with gaps is normal.
+  </p>
+
+  <section class="card">
+    <dl class="meta">
+      <dt>Directory</dt><dd class="sid">{{ directory }}</dd>
+      <dt>Written</dt><dd>{{ manifest.get("created") if manifest else "—" }}</dd>
+      <dt>Assets</dt><dd>{{ assets | length }} of {{ all_slugs | length }}</dd>
+    </dl>
+    {% if manifest is none %}
+      <p class="gap">
+        Nothing exported this style yet. The export writes pack.json, one SVG
+        for each asset, and the display render beside it.
+      </p>
+    {% endif %}
+    <form method="post" action="/packs/{{ style }}/export" class="inline">
+      <button type="submit">Export the pack</button>
+    </form>
+    {% if report %}
+      <p class="saved">
+        The export wrote {{ report.written | length }} asset{{ "" if report.written | length == 1 else "s" }}
+        to disk.
+      </p>
+      {% if report.removed %}
+        <p class="note">
+          It removed {{ report.removed | join(", ") }}, because the manifest
+          no longer names them.
+        </p>
+      {% endif %}
+      {% if report.skipped %}
+        <ul class="faults">
+          {% for slug, why in report.skipped %}
+            <li>{{ slug }}: {{ why }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endif %}
+    {% if manifest %}
+      <p class="links"><a href="/p/{{ style }}/pack.json">Read pack.json</a></p>
+    {% endif %}
+  </section>
+
+  <table class="grid pack">
+    <thead>
+      <tr>
+        <th>asset</th>
+        <th>in the pack</th>
+        <th>the chosen drawing</th>
+        <th>where it came from</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for slug in all_slugs %}
+        {% set entry = assets.get(slug) %}
+        {% set pick = picks.get(slug) %}
+        <tr>
+          <th class="rowname">{{ slug }}</th>
+          <td>
+            {% if entry %}
+              <img class="checker" src="/p/{{ style }}/{{ entry.png }}" alt="{{ slug }}">
+              <span class="count">{{ entry.svg }}</span>
+            {% else %}
+              <span class="empty">a gap</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if pick and pick.png_name %}
+              <img class="checker"
+                   src="/f/{{ style }}/{{ pick.session_id }}/{{ pick.round_name }}/{{ pick.png_name }}"
+                   alt="{{ slug }} candidate">
+            {% elif pick %}
+              <span class="empty">no render yet</span>
+            {% else %}
+              <span class="empty">nothing drawn</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if pick %}
+              <a href="/s/{{ style }}/{{ pick.session_id }}/{{ pick.round_name }}">
+                {{ pick.session_id }} {{ pick.round_name }} {{ pick.letter }}
+              </a>
+              <span class="count">
+                {{ "you chose it" if pick.chosen_by_person else "the best score" }}
+                {% if pick.score is not none %}, score {{ pick.score }}{% endif %}
+              </span>
+            {% else %}
+              <form method="post" action="/start" class="inline">
+                <input type="hidden" name="style" value="{{ style }}">
+                <input type="hidden" name="slug" value="{{ slug }}">
+                <input type="hidden" name="scope" value="one">
+                <input type="hidden" name="rounds" value="3">
+                <input type="hidden" name="variants" value="4">
+                <button type="submit" class="small">Draw it</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

@@ -55,7 +55,7 @@ def client(root: Path) -> TestClient:
 
 
 def test_the_index_lists_every_session(client: TestClient) -> None:
-    response = client.get("/")
+    response = client.get("/sessions")
     assert response.status_code == 200
     for asset in ("hex-forest", "hex-mountain", "hex-water", "unit-scout"):
         assert asset in response.text
@@ -65,6 +65,7 @@ def test_the_index_lists_every_session(client: TestClient) -> None:
     "path",
     [
         "/",
+        "/sessions",
         f"/s/{HEALTHY}",
         f"/s/{HEALTHY}/round-00",
         f"/s/{HEALTHY}/round-01",
@@ -104,18 +105,18 @@ def test_a_round_with_one_variant_shows_one_variant(client: TestClient) -> None:
 
 def test_a_round_with_no_critique_says_so(client: TestClient) -> None:
     response = client.get(f"/s/{PARTIAL}/round-02")
-    assert "No critique yet." in response.text
+    assert "The critique is not on disk yet." in response.text
 
 
 def test_a_broken_critique_file_reads_as_no_critique(client: TestClient) -> None:
     response = client.get(f"/s/{PARTIAL}/round-04")
     assert response.status_code == 200
-    assert "No critique yet." in response.text
+    assert "The critique is not on disk yet." in response.text
 
 
 def test_a_round_with_no_render_says_so(client: TestClient) -> None:
     response = client.get(f"/s/{PARTIAL}/round-03")
-    assert "No display render yet." in response.text
+    assert "The display render is not on disk yet." in response.text
     assert "no meta.json yet" in response.text
 
 
@@ -130,8 +131,15 @@ def test_a_session_with_no_manifest_says_so(client: TestClient) -> None:
 
 
 def test_an_empty_root_renders(tmp_path: Path) -> None:
-    empty_client = TestClient(create_app(tmp_path / "nothing-here"))
-    response = empty_client.get("/")
+    empty_client = TestClient(
+        create_app(
+            tmp_path / "no-sessions",
+            tmp_path / "no-styleguide",
+            tmp_path / "no-packs",
+            tmp_path / "no-runs",
+        )
+    )
+    response = empty_client.get("/sessions")
     assert response.status_code == 200
     assert "No session is on disk yet" in response.text
 

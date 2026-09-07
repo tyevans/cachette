@@ -17,9 +17,29 @@
       {% if saved %}
         <p class="saved">The feedback of this round is written.</p>
       {% endif %}
+      {% if promoted %}
+        <p class="saved">
+          The drawing is now an exemplar of {{ session.asset }}, under the
+          name {{ promoted }}. The next run reads it.
+        </p>
+      {% endif %}
 
       <h1>{{ round.name }}</h1>
+
+      {% if live %}
+        <p class="waiting live-line">
+          A run is writing this session now: {{ waiting }}.
+          The page keeps your typing. It offers a reload when the disk changes.
+        </p>
+      {% endif %}
+      <p class="reload" id="reload" hidden>
+        New files are on disk.
+        <a href="{{ base }}/{{ round.name }}">Reload the page</a>
+      </p>
+
       <dl class="meta">
+        <dt>Subject</dt><dd>{{ session.subject or "—" }}</dd>
+        <dt>Asset name</dt><dd>{{ slug or "not named" }}</dd>
         <dt>Prompt</dt><dd>{{ round.prompt_summary or "—" }}</dd>
         <dt>Parent</dt>
         <dd>
@@ -31,7 +51,10 @@
         </dd>
       </dl>
       {% if round.meta is none %}
-        <p class="gap">This round has no meta.json yet.</p>
+        <p class="gap">
+          This round has no meta.json yet. The loop writes it when the round
+          ends, so the drawings below arrive before it.
+        </p>
       {% endif %}
 
       <nav class="rounds strip">
@@ -73,7 +96,7 @@
                     alt="variant {{ variant.letter }} at display size"
                   >
                 {% else %}
-                  <p class="gap">No display render yet.</p>
+                  <p class="gap">The display render is not on disk yet.</p>
                 {% endif %}
               </div>
 
@@ -86,7 +109,7 @@
                     alt="variant {{ variant.letter }} at inspection size"
                   >
                 {% else %}
-                  <p class="gap">No inspection render yet.</p>
+                  <p class="gap">The inspection render is not on disk yet.</p>
                 {% endif %}
                 {% if variant.svg %}
                   <p><a href="{{ file_base }}/{{ variant.svg }}">Open the SVG source</a></p>
@@ -97,7 +120,7 @@
 
               <div class="critique">
                 {% if variant.critique is none %}
-                  <p class="gap">No critique yet.</p>
+                  <p class="gap">The critique is not on disk yet.</p>
                 {% else %}
                   <p class="verdict">
                     {{ variant.verdict or "no verdict" }}
@@ -147,6 +170,63 @@
           {% endif %}
         </div>
       </form>
+
+      {% if shown %}
+        <section class="card promote">
+          <h2>Make one of these an exemplar</h2>
+          <p class="note">
+            An exemplar is a picture that the critic aims at. A style with no
+            exemplar has only words to go on. This copies the SVG into the
+            style guide, under the engine asset name.
+          </p>
+          <div class="promote-row">
+            {% for variant in shown %}
+              {% if variant.svg %}
+                <form method="post" action="/promote" class="inline">
+                  <input type="hidden" name="style" value="{{ session.asset }}">
+                  <input type="hidden" name="session_id" value="{{ session.session_id }}">
+                  <input type="hidden" name="round_name" value="{{ round.name }}">
+                  <input type="hidden" name="letter" value="{{ variant.letter }}">
+                  <label class="letter">{{ variant.letter }}</label>
+                  <select name="slug">
+                    {% for name in all_slugs %}
+                      <option value="{{ name }}" {{ 'selected' if name == slug else '' }}>{{ name }}</option>
+                    {% endfor %}
+                  </select>
+                  <button type="submit" class="small">Promote</button>
+                </form>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
     </div>
   </div>
+{% endblock %}
+
+{% block script %}
+  {# The page holds typed feedback, so it never reloads on its own. It asks
+     the server for a short state string, and offers a reload when that
+     string changes. #}
+  <script>
+    (function () {
+      var mark = {{ fingerprint | tojson }};
+      var where = {{ ("/api/round/" ~ session.asset ~ "/" ~ session.session_id ~ "/" ~ round.name) | tojson }};
+      var banner = document.getElementById("reload");
+      function look() {
+        fetch(where, {cache: "no-store"})
+          .then(function (answer) { return answer.json(); })
+          .then(function (state) {
+            if (state.fingerprint && state.fingerprint !== mark) {
+              banner.hidden = false;
+            }
+            if (state.running || state.fingerprint === mark) {
+              window.setTimeout(look, 6000);
+            }
+          })
+          .catch(function () { window.setTimeout(look, 15000); });
+      }
+      window.setTimeout(look, 6000);
+    })();
+  </script>
 {% endblock %}

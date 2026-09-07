@@ -3,16 +3,35 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}direct-die review{% endblock %}</title>
+    <title>{% block title %}direct-die{% endblock %}</title>
     <link rel="stylesheet" href="/static/review.css">
   </head>
   <body>
     <header class="bar">
       <a class="home" href="/">direct-die</a>
+      <nav class="tabs">
+        <a href="/">Packs</a>
+        <a href="/sessions">Sessions</a>
+        <a href="/runs">Runs</a>
+        <a href="/exemplars">Exemplars</a>
+      </nav>
       {% block bar %}{% endblock %}
+      {% if active_jobs %}
+        <a class="live" href="/runs">
+          {{ active_jobs | length }} run{{ "" if active_jobs | length == 1 else "s" }} in flight
+        </a>
+      {% endif %}
     </header>
     <main>
       {% block main %}{% endblock %}
     </main>
+    {% if auto_reload is defined and auto_reload and active_jobs %}
+      {# The page holds no typed text, so a reload costs nothing. It runs
+         while work is in flight, and stops when the last job ends. #}
+      <script>
+        window.setTimeout(function () { window.location.reload(); }, 6000);
+      </script>
+    {% endif %}
+    {% block script %}{% endblock %}
   </body>
 </html>

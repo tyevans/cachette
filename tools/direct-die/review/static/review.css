@@ -167,3 +167,130 @@ ul.faults li { margin-bottom: .2rem; }
 /* A gap is a thing the generation loop has not written yet. */
 .gap { color: var(--warn); background: #fff8e6; border-left: 3px solid #e3b341; padding: .35rem .6rem; font-size: .88rem; margin: .4rem 0; }
 .saved { color: var(--good); background: #eaf6ec; border-left: 3px solid var(--good); padding: .4rem .7rem; }
+
+/* ---- The front end: the tabs, the grid, the runs, and the packs ---- */
+
+.tabs { display: flex; gap: .8rem; font-size: .9rem; }
+.tabs a { text-decoration: none; }
+.bar .live {
+  margin-left: auto;
+  background: #fff8e6;
+  border: 1px solid #e3b341;
+  border-radius: 999px;
+  padding: .1rem .6rem;
+  font-size: .82rem;
+  text-decoration: none;
+  color: var(--warn);
+}
+
+.lede { color: var(--dim); max-width: 44rem; margin: 0 0 1rem; }
+.note { color: var(--dim); font-size: .85rem; margin: .5rem 0 0; }
+.legend { display: flex; gap: .4rem; flex-wrap: wrap; margin-top: 1rem; }
+
+/* The start form. */
+.start form.row { display: flex; flex-wrap: wrap; gap: .75rem; align-items: end; }
+.start label { display: block; font-size: .82rem; color: var(--dim); }
+.start label.wide { flex: 1 1 16rem; }
+.start label.check { display: flex; align-items: center; gap: .35rem; color: var(--ink); }
+.start select, .start input[type=text] {
+  display: block;
+  margin-top: .2rem;
+  padding: .35rem .4rem;
+  font: inherit;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  width: 100%;
+  background: #fff;
+}
+.start button, form.inline button {
+  padding: .4rem .9rem;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--pick);
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+form.inline { display: inline-flex; gap: .3rem; align-items: center; margin: .25rem 0 0; }
+form.inline button.small, button.small {
+  padding: .15rem .5rem;
+  font-size: .8rem;
+  font-weight: 600;
+}
+form.inline select { font: inherit; font-size: .8rem; padding: .1rem .2rem; }
+
+/* The grid of every asset against every style. */
+.grid-scroll { overflow-x: auto; }
+table.grid { border-collapse: collapse; width: 100%; background: var(--card); }
+table.grid th, table.grid td {
+  border: 1px solid var(--line);
+  padding: .5rem;
+  vertical-align: top;
+  text-align: left;
+}
+table.grid thead th { background: #eef1f5; font-size: .9rem; }
+table.grid th.corner { width: 7rem; }
+table.grid th.rowname { font-family: ui-monospace, monospace; font-size: .9rem; width: 7rem; }
+table.grid td.cell { width: 11rem; }
+table.grid td.cell .shot { min-height: 3rem; display: flex; align-items: center; }
+.shot .empty, .empty { color: var(--dim); font-size: .8rem; }
+.badge {
+  display: inline-block;
+  border-radius: 3px;
+  padding: 0 .4rem;
+  font-size: .76rem;
+  margin: .3rem 0 0;
+  background: #eef1f5;
+  color: var(--dim);
+}
+.state-nothing .badge, .badge.state-nothing { background: #f1f2f4; color: var(--dim); }
+.state-started .badge, .badge.state-started { background: #eef4ff; color: var(--pick); }
+.state-drawn .badge, .badge.state-drawn { background: #fff8e6; color: var(--warn); }
+.state-chosen .badge, .badge.state-chosen { background: #eaf6ec; color: var(--good); }
+.state-promoted .badge, .badge.state-promoted { background: #e7f0ff; color: #1b4fa0; }
+.state-exported .badge, .badge.state-exported { background: #1a7f37; color: #fff; }
+td.cell.running { background: #fffdf5; box-shadow: inset 3px 0 0 #e3b341; }
+.waiting { color: var(--warn); font-size: .82rem; margin: .3rem 0 0; }
+.live-line { background: #fff8e6; border-left: 3px solid #e3b341; padding: .4rem .7rem; }
+.marks { margin: .3rem 0 0; display: flex; gap: .25rem; flex-wrap: wrap; }
+.mark { font-size: .72rem; color: var(--dim); border: 1px solid var(--line); border-radius: 3px; padding: 0 .3rem; }
+.links { margin: .3rem 0 0; font-size: .82rem; }
+.links.source { color: var(--dim); }
+
+/* The run pages. */
+.badge.run-running { background: #fff8e6; color: var(--warn); }
+.badge.run-queued { background: #f1f2f4; color: var(--dim); }
+.badge.run-done { background: #eaf6ec; color: var(--good); }
+.badge.run-failed { background: #fdecec; color: #a40e26; }
+.badge.run-stopped { background: #f1f2f4; color: var(--dim); }
+.badge.run-abandoned { background: #fdecec; color: #a40e26; }
+.card.item .subject { color: var(--dim); font-size: .88rem; margin: .2rem 0; }
+.strip-shots { display: flex; gap: .75rem; flex-wrap: wrap; margin: .5rem 0; }
+.strip-shots .shot { display: flex; flex-direction: column; gap: .2rem; align-items: flex-start; }
+.strip-shots img.checker.large { max-width: 8rem; }
+pre.log {
+  background: #14161a;
+  color: #d8dbe0;
+  padding: .6rem .8rem;
+  border-radius: 4px;
+  font-size: .78rem;
+  overflow-x: auto;
+}
+
+/* The pack page. */
+table.grid.pack td { vertical-align: middle; }
+table.grid.pack img.checker { max-width: 5rem; }
+
+/* The promotion panel on a round page. */
+.promote-row { display: flex; gap: .8rem; flex-wrap: wrap; }
+.promote-row form.inline { border: 1px solid var(--line); border-radius: 4px; padding: .3rem .5rem; }
+.promote-row .letter { font-weight: 700; text-transform: uppercase; }
+
+/* The reload offer on a round page. */
+.reload {
+  background: #eef4ff;
+  border-left: 3px solid var(--pick);
+  padding: .4rem .7rem;
+  font-size: .9rem;
+}

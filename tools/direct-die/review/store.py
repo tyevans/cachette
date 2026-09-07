@@ -163,6 +163,22 @@ class Session:
         return f"{self.asset}/{self.session_id}"
 
     @property
+    def subject(self) -> str | None:
+        """Give the subject that the loop drew, as the round metadata says.
+
+        The manifest holds no subject. The loop writes the subject into the
+        prompt summary of each round, before a semicolon. This reads the
+        first round that has one. Give `None` when no round has one.
+        """
+        for entry in self.rounds:
+            summary = entry.prompt_summary
+            if summary:
+                first = summary.split(";")[0].strip()
+                if first:
+                    return first
+        return None
+
+    @property
     def created(self) -> str | None:
         """Give the creation time that the loop recorded."""
         return self._manifest_string("created")
@@ -197,11 +213,41 @@ class Session:
         return value if isinstance(value, str) else None
 
 
-def _safe_name(name: str) -> str:
-    """Reject a path segment that could leave the sessions directory."""
+def safe_name(name: str) -> str:
+    """Reject a path segment that could leave the directory it names."""
     if not name or name in (".", "..") or "/" in name or "\\" in name:
         raise ContractError(f"unsafe path segment: {name!r}")
     return name
+
+
+# The old private name. The run manager and the pack export call the public
+# one. This alias keeps one definition of the rule.
+_safe_name = safe_name
+
+
+def write_json_atomically(path: Path, payload: object) -> Path:
+    """Write one JSON document, and give the path.
+
+    The write goes to a temporary name in the same directory, and then
+    renames. A rename inside one directory is atomic, so a reader never sees
+    half a file. Every write in this tool takes this form.
+    """
+    directory = path.parent
+    directory.mkdir(parents=True, exist_ok=True)
+    handle, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}-", suffix=".tmp", dir=directory
+    )
+    try:
+        with os.fdopen(handle, "w", encoding="utf-8") as stream:
+            json.dump(payload, stream, indent=2)
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_name, path)
+    except BaseException:
+        Path(temporary_name).unlink(missing_ok=True)
+        raise
+    return path
 
 
 class SessionStore:
@@ -363,18 +409,4 @@ class SessionStore:
             .isoformat(timespec="seconds")
             .replace("+00:00", "Z"),
         }
-        target = directory / "feedback.json"
-        handle, temporary_name = tempfile.mkstemp(
-            prefix=".feedback-", suffix=".json", dir=directory
-        )
-        try:
-            with os.fdopen(handle, "w", encoding="utf-8") as stream:
-                json.dump(payload, stream, indent=2)
-                stream.write("\n")
-                stream.flush()
-                os.fsync(stream.fileno())
-            os.replace(temporary_name, target)
-        except BaseException:
-            Path(temporary_name).unlink(missing_ok=True)
-            raise
-        return target
+        return write_json_atomically(directory / "feedback.json", payload)
