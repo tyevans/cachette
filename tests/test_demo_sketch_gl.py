@@ -268,8 +268,18 @@ def test_the_two_renderers_draw_one_road_network_on_a_flat_page() -> None:
 # row would put the ways on different tiles altogether.
 # **This was measured against the defect it stops.** With the inverse of the
 # lift in place the two masks overlap on about 92 percent of the pixels either
-# of them marks. With the inverse taken out they overlap on about 63 percent,
-# because the device renderer then draws the ways on the wrong tiles.
+# of them marks, at the angles the view opens at. With the inverse taken out
+# they overlap on about 63 percent, because the device renderer then draws the
+# ways on the wrong tiles.
+#
+# **This bound holds at the angles the view opens at, and not at every angle.**
+# A sweep over seven turns and four leans found the share falling as low as 0.42
+# on a lifted page, because the two renderers do not agree on which pixels show
+# the top of the ground. The count they disagree by is flat; the share is not,
+# because a low lean makes the ribbon small. A blocker holds that question, and
+# this bound should become a bound on the count once it is answered.[^1]
+#
+# [^1]: Blockers register, BLK-157. `docs/BLOCKERS.md`
 RELIEF_WAY_OVERLAP = 0.80
 
 # How far the lifted test magnifies the page, and which road it looks at.

@@ -25,11 +25,47 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-157**
+**Next number: BLK-158**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
 ## Open
+
+### BLK-157 — Which pixels are the top of the ground, when the two renderers disagree?
+
+**Blocks.** Any mark that is drawn on the top of the ground and not on the face
+below it. The road ribbon is the first of those. A unit disc and an upgrade
+glyph will be the next.
+
+**Owner.** Whoever next works on the sketch renderers.
+
+**Status.** Open.
+
+**What is not known.** The two renderers do not agree on which pixels show the
+top of the ground. The array renderer marks a pixel a cliff when it is not the
+landing of its own point. The device renderer reads a flag that the mesh pass
+writes from the skirt of a tile. The ribbon pass keys off that answer in both,
+and the device renderer therefore draws fewer ribbon pixels than the array
+renderer does.
+
+**What was measured.** A sweep over seven turns, four leans, two zooms and a
+flat page against a lifted one. On a flat page the two renderers agree pixel
+for pixel in almost every cell, so the inversion of the turn, the lean and the
+scale is exact. On a lifted page the device renderer draws between about sixty
+and ninety fewer ribbon pixels than the array renderer at every lean, and it
+never draws more. The count is flat; the share is not, because a low lean makes
+the ribbon small. The commit body holds the table.
+
+**Why it is a blocker and not a defect to fix now.** Nobody knows which of the
+two masks is the correct one. The array renderer's cliff mask and the mesh's
+skirt flag were written for different purposes, and the ribbon is the first
+pass to ask either of them a question about the top of the ground.
+
+**What the test does today.** The agreement test holds the overlap of the two
+ribbon masks above a share. It passes at the angles the view opens at, and the
+same bound fails at a turn of nought with the same lean. The bound is therefore
+not load-bearing across the view space, and it should become a bound on the
+count rather than on the share once the mask question is settled.
 
 ### BLK-156 — How much is the terrain height range worth in metres?
 
