@@ -22,6 +22,7 @@ from __future__ import annotations
 from cachette import World
 from cachette.demo.app import LAST_FUNCTION_KEY, SETTINGS_KEYS, Demo, panel_keys
 from cachette.demo.clock import SPEEDS, WHOLE_TICK, Clock, says
+from cachette.names import Names
 
 # A world small enough to step many times in a test.
 WIDTH = 32
@@ -33,7 +34,7 @@ FACTIONS = 3
 def a_demo() -> Demo:
     """Build a demonstration over a small world."""
     world = World(width=WIDTH, height=HEIGHT, seed=SEED, faction_count=FACTIONS)
-    return Demo(world, width=320, height=240, threads=1)
+    return Demo(world, Names(world.seed), width=320, height=240, threads=1)
 
 
 class Keys:
@@ -94,8 +95,14 @@ def test_a_paused_clock_states_no_speed_and_no_phase() -> None:
     assert clock.says() == "paused"
 
 
-def test_the_frame_takes_the_phase_and_the_speed_from_the_clock() -> None:
-    """The demonstration passes both on every frame, and the frame reports them."""
+def test_the_frame_takes_the_speed_from_the_clock() -> None:
+    """The demonstration passes the speed on every frame, and the frame says it.
+
+    **This checks the speed and not the phase.** The frame reading carries no
+    phase, so a test that reads it cannot say whether the phase reached the
+    drawing. The clock tests above fix what the phase is. What the frame does
+    with it stays unchecked here.
+    """
     demo = a_demo()
     demo.seed()
     # A seeded world holds a stale spatial structure until a step rebuilds
