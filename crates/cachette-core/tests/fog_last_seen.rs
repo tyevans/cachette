@@ -21,7 +21,10 @@
 //! [^2]: ADR-0059, fog storage grows with observed area, not with world area, decision D2. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 //! [^3]: Testing rules, section 2. `.agents/rules/testing.md`
 
-use cachette_core::{Axial, FactionId, TileKind, World, WorldConfig};
+use cachette_core::{
+    Axial, FactionId, Observation, SoldierArena, StateHash, Terrain, Tick, TileKind, World,
+    WorldConfig,
+};
 
 /// The extent of the fixture world.
 ///
@@ -30,12 +33,15 @@ use cachette_core::{Axial, FactionId, TileKind, World, WorldConfig};
 /// it inside the tick count these tests run.
 const EDGE: u32 = 40;
 
+/// The seed of the fixture world.
+const SEED: u64 = 11;
+
 /// Builds the fixture world.
 fn world() -> World {
     World::new(WorldConfig {
         width: EDGE,
         height: EDGE,
-        seed: 11,
+        seed: SEED,
         faction_count: 3,
         unit_capacity: 64,
     })
@@ -322,5 +328,41 @@ fn two_thread_counts_record_one_clock() {
     assert!(
         ages[0].iter().any(|row| row.3.is_none()),
         "the fixture must reach a cell the faction has never seen"
+    );
+}
+
+#[test]
+fn the_state_hash_moves_when_only_the_clock_moves() {
+    let world = world();
+    let (near, _) = two_far_cells(&world);
+    let layout = world.observation().layout();
+    let terrain = Terrain::new(SEED, world.grid());
+
+    let mut arena = SoldierArena::new(world.grid(), 8);
+    arena
+        .spawn(near, FactionId(0))
+        .expect("the ground admits a unit");
+
+    let mut early = Observation::new(layout);
+    early
+        .rebuild(&arena, terrain, 1, Tick(1))
+        .expect("the rebuild must run");
+    let mut late = Observation::new(layout);
+    late.rebuild(&arena, terrain, 1, Tick(500))
+        .expect("the rebuild must run");
+
+    assert_eq!(
+        early.seen_ever(FactionId(0)),
+        late.seen_ever(FactionId(0)),
+        "the two observations must hold one memory, or the hash moves for another reason"
+    );
+    assert!(
+        early.seen_ever(FactionId(0)) > 0,
+        "the fixture must reach a memory, or both hashes cover nothing"
+    );
+    assert_ne!(
+        early.hash_into(StateHash::new()).finish(),
+        late.hash_into(StateHash::new()).finish(),
+        "the clock is state the step carries forward, so it must enter the hash"
     );
 }

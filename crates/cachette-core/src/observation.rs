@@ -1144,7 +1144,7 @@ impl Observation {
             for (block, form) in &seen {
                 remembered.absorb(*block, form, tiles_in_block(layout, *block));
             }
-            let clock = self
+            let mut clock = self
                 .last_seen
                 .get_mut(index)
                 .map(|slot| slot.get_or_insert_with(|| vec![Tick(0); blocks]));
@@ -1155,12 +1155,11 @@ impl Observation {
                 if let Some(mask) = self.ever_masks.get_mut(*block as usize) {
                     *mask = mask.with(identity);
                 }
-            }
-            if let Some(clock) = clock {
-                for (block, _) in &seen {
-                    if let Some(slot) = clock.get_mut(*block as usize) {
-                        *slot = tick;
-                    }
+                if let Some(slot) = clock
+                    .as_mut()
+                    .and_then(|clock| clock.get_mut(*block as usize))
+                {
+                    *slot = tick;
                 }
             }
         }
