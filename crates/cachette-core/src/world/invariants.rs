@@ -598,6 +598,10 @@ mod tests {
     //! [^1]: Testing policy, section 2. `docs/TESTING.md`
 
     use super::*;
+    use crate::event::TileChanged;
+    use crate::holding::Holder;
+    use crate::types::{Fix32, Tick};
+    use crate::world::WorldConfig;
 
     /// Builds a world with a broken part.
     fn broken(change: impl FnOnce(&mut World)) -> World {
