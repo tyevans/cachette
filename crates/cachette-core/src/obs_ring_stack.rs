@@ -88,6 +88,38 @@ use crate::world::World;
 /// The positions that the ring stack block holds.
 pub const RING_STACK_SLOTS: u32 = RING_STACK_CELLS * RING_STACK_CHANNELS;
 
+/// The channel that carries how much of the cell lies inside the world.
+///
+/// **This channel gates the rest.** A ring that lies outside the world reads
+/// zero here, and every other channel of that cell reads zero because there
+/// is no ground to report. A policy reads this one and learns which rings its
+/// world reaches.
+pub const AREA_CHANNEL: u32 = 1;
+
+/// The channel that carries the observed share of the cell.
+pub const OBSERVED_CHANNEL: u32 = 2;
+
+/// The channel that carries the share of the cell the reader holds.
+pub const OWN_HELD_CHANNEL: u32 = 13;
+
+/// The channel that carries the rival unit presence of the cell.
+///
+/// **This is the one statement of that channel number.** The frontier block
+/// weights this channel by distance to give its threat pressure, and it reads
+/// the number here rather than holding a second copy of it.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+pub const RIVAL_PRESENCE_CHANNEL: u32 = 17;
+
+/// The channel that carries the settlement count of the reader in the cell.
+pub const OWN_SETTLEMENT_CHANNEL: u32 = 18;
+
+/// The channel that carries the share of the cell inside the reach of the
+/// reader.
+pub const OWN_REACH_CHANNEL: u32 = 22;
+
 /// What one pass of the ring stack touched.
 ///
 /// A test reads this to assert that the build cost follows the ground the

@@ -66,7 +66,7 @@ use crate::hex::Axial;
 use crate::obs_ring::{
     ring_band, ring_of_cell, sector_of_cell, shared_sector_of, FAR_SECTORS, RING_STACK_CELLS,
 };
-use crate::obs_ring_stack::RingStack;
+use crate::obs_ring_stack::{RingStack, RIVAL_PRESENCE_CHANNEL};
 use crate::obs_token::{SiteEntry, SITE_TOKENS};
 use crate::sim_math;
 use crate::types::FactionId;
@@ -74,9 +74,6 @@ use crate::world::World;
 
 /// The positions that the frontier block holds.
 pub const FRONTIER_SLOTS: u32 = 2 * FAR_SECTORS + 8;
-
-/// The channel of the ring stack that carries the rival unit presence.
-const RIVAL_PRESENCE_CHANNEL: u32 = 17;
 
 /// The reach headroom position, which the engine holds no source for.
 ///

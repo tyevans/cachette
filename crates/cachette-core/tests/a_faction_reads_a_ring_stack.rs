@@ -20,7 +20,9 @@
 
 use cachette_core::obs_frontier::FRONTIER_SLOTS;
 use cachette_core::obs_ring::{cell_of_delta, ring_of_cell, RING_STACK_CELLS, RING_STACK_CHANNELS};
-use cachette_core::obs_ring_stack::RING_STACK_SLOTS;
+use cachette_core::obs_ring_stack::{
+    AREA_CHANNEL, OWN_HELD_CHANNEL, OWN_REACH_CHANNEL, OWN_SETTLEMENT_CHANNEL, RING_STACK_SLOTS,
+};
 use cachette_core::obs_token::TOKEN_SLOTS;
 use cachette_core::{Axial, Entity, FactionId, SightRules, World, WorldConfig};
 
@@ -191,12 +193,12 @@ fn one_city_reads_one_settlement_channel_on_two_worlds() {
     let small_cell = cell_of_place(&small_stack, small.1);
     let large_cell = cell_of_place(&large_stack, large.1);
     assert!(
-        small_stack.channel(small_cell, 18) > 0,
+        small_stack.channel(small_cell, OWN_SETTLEMENT_CHANNEL) > 0,
         "the cell that carries the city of the small world reads no settlement"
     );
     assert_eq!(
-        small_stack.channel(small_cell, 18),
-        large_stack.channel(large_cell, 18),
+        small_stack.channel(small_cell, OWN_SETTLEMENT_CHANNEL),
+        large_stack.channel(large_cell, OWN_SETTLEMENT_CHANNEL),
         "one settlement reads one value, whatever the size of the world"
     );
 }
@@ -229,21 +231,21 @@ fn the_settlement_channel_agrees_when_the_arrangement_moves() {
     let first_cell = cell_of_place(&first, north.1);
     let second_cell = cell_of_place(&second, south.1);
     assert!(
-        first.channel(first_cell, 18) > 0,
+        first.channel(first_cell, OWN_SETTLEMENT_CHANNEL) > 0,
         "the cell that carries the northern city reads no settlement"
     );
     assert_eq!(
-        first.channel(first_cell, 18),
-        second.channel(second_cell, 18),
+        first.channel(first_cell, OWN_SETTLEMENT_CHANNEL),
+        second.channel(second_cell, OWN_SETTLEMENT_CHANNEL),
         "the settlement channel does not follow the place"
     );
 
     let first_held: i64 = (0..RING_STACK_CELLS)
-        .map(|cell| first.channel(cell, 13))
+        .map(|cell| first.channel(cell, OWN_HELD_CHANNEL))
         .filter(|value| *value > 0)
         .count() as i64;
     let second_held: i64 = (0..RING_STACK_CELLS)
-        .map(|cell| second.channel(cell, 13))
+        .map(|cell| second.channel(cell, OWN_HELD_CHANNEL))
         .filter(|value| *value > 0)
         .count() as i64;
     assert!(
@@ -361,7 +363,7 @@ fn the_reader_reads_the_ground_it_holds_and_does_not_watch() {
 
     let stack = stack_of(&world, READER);
     let held: i64 = (0..RING_STACK_CELLS)
-        .map(|cell| stack.channel(cell, 13))
+        .map(|cell| stack.channel(cell, OWN_HELD_CHANNEL))
         .sum();
     assert!(
         held > 0,
@@ -419,12 +421,12 @@ fn the_area_channel_separates_a_small_world_from_a_large_one() {
         .find(|cell| ring_of_cell(*cell) == 9)
         .expect("ring 9 has a cell");
     assert_eq!(
-        small_stack.channel(far, 1),
+        small_stack.channel(far, AREA_CHANNEL),
         0,
         "ring 9 lies outside a 48 by 48 world"
     );
     assert!(
-        large_stack.channel(far, 1) > 0,
+        large_stack.channel(far, AREA_CHANNEL) > 0,
         "ring 9 lies inside a 2048 by 2048 world"
     );
 }
