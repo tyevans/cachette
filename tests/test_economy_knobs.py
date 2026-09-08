@@ -84,9 +84,9 @@ def test_a_production_rate_set_from_python_fills_the_store(seed: int) -> None:
 
     References
     ----------
-    [^1]: ADR-0062, production and upkeep are rates attached to a site,
-    decisions D1 and D2.
-    ``docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md``
+    [^1]: ADR-0055, a site derives its effective rate from the world at each
+    application, decisions D1 and D3.
+    ``docs/adrs/draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md``
     """
     world = a_world(seed)
     site = a_site(world)
@@ -119,9 +119,9 @@ def test_a_production_rate_of_zero_adds_nothing_to_the_store(seed: int) -> None:
 
     References
     ----------
-    [^1]: ADR-0062, production and upkeep are rates attached to a site,
-    decisions D1 and D2.
-    ``docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md``
+    [^1]: ADR-0055, a site derives its effective rate from the world at each
+    application, decisions D1 and D3.
+    ``docs/adrs/draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md``
     """
     world = a_world(seed)
     site = a_site(world)
@@ -176,9 +176,9 @@ def test_an_upkeep_rate_set_from_python_empties_the_store(seed: int) -> None:
 
     References
     ----------
-    [^1]: ADR-0062, production and upkeep are rates attached to a site,
-    decisions D1 and D2.
-    ``docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md``
+    [^1]: ADR-0055, a site derives its effective rate from the world at each
+    application, decisions D1 and D3.
+    ``docs/adrs/draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md``
     """
     world = a_world(seed)
     site = a_site(world)
@@ -212,9 +212,9 @@ def test_production_pays_the_upkeep_of_the_same_application(seed: int) -> None:
 
     References
     ----------
-    [^1]: ADR-0062, production and upkeep are rates attached to a site,
-    decisions D1 and D2.
-    ``docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md``
+    [^1]: ADR-0055, a site derives its effective rate from the world at each
+    application, decisions D1 and D3.
+    ``docs/adrs/draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md``
     """
     world = a_world(seed)
     site = a_site(world)
@@ -270,9 +270,9 @@ def test_the_period_scales_an_application_and_not_the_rate(seed: int) -> None:
 
     References
     ----------
-    [^1]: ADR-0062, production and upkeep are rates attached to a site,
-    decisions D1 and D2.
-    ``docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md``
+    [^1]: ADR-0055, a site derives its effective rate from the world at each
+    application, decisions D1 and D3.
+    ``docs/adrs/draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md``
     """
     earned = []
     for period in (1, 4):
