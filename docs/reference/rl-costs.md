@@ -29,21 +29,23 @@ A shaped term weighs the change of one quantity since the previous decision.
 Each name below names one field of the observation array of a faction, and the
 schema of the world declares where that field sits.[^5]
 
-**A weight multiplies the raw value the schema declares.** The store total and
-the best renown are Q16.16 values as raw integers, so a weight on one of them
-carries a factor of 65536 that a weight on a tile count does not. A caller that
-writes a value into a row below states the unit in the derivation column.
+**A weight multiplies the bounded value the schema declares.** Every position
+of the observation array is a Q16.16 value between minus one and one, so 65536
+is one unit and no row carries a raw count. A term that names a compressed
+magnitude moves less at a large quantity than at a small one, because the map
+is a logarithm. A caller that writes a value into a row below states the unit
+in the derivation column.
 
 | Value | Read by | Set | Blocker | Derivation |
 |---|---|---|---|---|
-| `held_tiles`, the weight of one more tile the faction holds | The reward of a faction | unset, the project owner | BLK-050 | |
-| `seats_held`, the weight of one more seat the faction holds | The reward of a faction | unset, the project owner | BLK-050 | |
-| `live_units`, the weight of one more live unit | The reward of a faction | unset, the project owner | BLK-050 | |
-| `population`, the weight of one more person | The reward of a faction | unset, the project owner | BLK-050 | |
-| `store_total`, the weight of one raw Q16.16 unit of store | The reward of a faction | unset, the project owner | BLK-050 | |
-| `best_renown`, the weight of one raw Q16.16 unit of renown | The reward of a faction | unset, the project owner | BLK-050 | |
-| `wonder_progress`, the weight of one unit of work toward a wonder | The reward of a faction | unset, the project owner | BLK-050 | |
-| `wonder_claim`, the weight of the victory claim the wonder reader compares | The reward of a faction | unset, the project owner | BLK-050 | |
+| `held_tiles`, the weight of the compressed held tile count | The reward of a faction | unset, the project owner | BLK-050 | |
+| `domination_progress`, the weight of the seat share of the faction | The reward of a faction | unset, the project owner | BLK-050 | |
+| `live_units`, the weight of the compressed live unit count | The reward of a faction | unset, the project owner | BLK-050 | |
+| `population`, the weight of the compressed population total | The reward of a faction | unset, the project owner | BLK-050 | |
+| `store_total`, the weight of the compressed store total | The reward of a faction | unset, the project owner | BLK-050 | |
+| `best_renown`, the weight of the compressed best renown | The reward of a faction | unset, the project owner | BLK-050 | |
+| `wonder_progress`, the weight of the wonder work share | The reward of a faction | unset, the project owner | BLK-050 | |
+| `wonder_track_progress`, the weight of the wonder share of the faction | The reward of a faction | unset, the project owner | BLK-050 | |
 
 A caller may weigh any other field of the observation array that holds one
 position. The rows above are the terms the project reserved, and the module

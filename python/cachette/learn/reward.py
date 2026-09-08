@@ -145,13 +145,13 @@ if TYPE_CHECKING:
 # project names first.
 SHAPED_ROWS: Final[tuple[str, ...]] = (
     "held_tiles",
-    "seats_held",
+    "domination_progress",
     "live_units",
     "population",
     "store_total",
     "best_renown",
     "wonder_progress",
-    "wonder_claim",
+    "wonder_track_progress",
 )
 
 # The terminal outcomes the register holds one row for.
@@ -161,10 +161,12 @@ TERMINAL_ROWS: Final[tuple[str, ...]] = ("won", "lost", "drawn")
 RUNNING: Final = "running"
 OUTCOMES: Final[tuple[str, ...]] = (RUNNING, *TERMINAL_ROWS)
 
-# The fields of the observation array that decide the outcome.
-_GAME_OVER: Final = "game_over"
-_TICK: Final = "tick"
-_TICK_LIMIT: Final = "tick_limit"
+# The field of the observation array that decides the outcome.
+#
+# The array carries no game-over flag and no raw tick, because every position
+# of it is a bounded value. The record of the end is a public fact the world
+# reports directly, and the ticks left before the limit fires answer the draw.
+_REMAINING_TICKS: Final = "remaining_ticks"
 
 # The fields that state whether the faction can act. A faction that reads
 # zero in both holds nothing that takes a decision.
@@ -394,15 +396,10 @@ class Reward:
 
     def _outcome_of(self, world: World, reading: Mapping[str, int]) -> str:
         """Name the state of the run after one reading."""
-        if reading[_GAME_OVER] == 1:
-            end = world.game_end()
-            if end is None:
-                # The array says the engine recorded an end and the record
-                # is absent. Report a draw rather than invent a winner.
-                return "drawn"
+        end = world.game_end()
+        if end is not None:
             return "won" if end["winner"] == self._faction else "lost"
-        limit = reading[_TICK_LIMIT]
-        if limit > 0 and reading[_TICK] >= limit:
+        if world.tick_limit > 0 and reading[_REMAINING_TICKS] == 0:
             return "drawn"
         return RUNNING
 
@@ -440,7 +437,7 @@ def _term_starts(world: World, terms: Mapping[str, float | None]) -> dict[str, i
     """
     schema = world.observation_schema()
     rows = {row["name"]: row for row in schema["fields"]}
-    wanted = (*terms, _GAME_OVER, _TICK, _TICK_LIMIT, *_ACTING_FIELDS)
+    wanted = (*terms, _REMAINING_TICKS, *_ACTING_FIELDS)
     starts: dict[str, int] = {}
     for name in wanted:
         row = rows.get(name)

@@ -143,12 +143,14 @@ def test_each_seat_reads_its_own_observation() -> None:
     game.reset(viable_seeds(WORLD, 1, 900)[0])
     observations = game.observations()
     assert observations.shape[0] == 2
+    # The two seats read different arrays because they observe different
+    # ground. **No position of the array names a seat**, so the test cannot
+    # ask the array which seat read it, and a policy cannot learn a seat
+    # number from it either.
     assert not np.array_equal(observations[0], observations[1])
-    # The faction field of the array names the seat that read it.
     schema = game.world.observation_schema()
-    faction = next(row for row in schema["fields"] if row["name"] == "faction")
-    start = int(faction["start"])
-    assert [int(row[start]) for row in observations] == [0, 1]
+    names = {str(row["name"]) for row in schema["fields"]}
+    assert "faction" not in names
 
 
 class WatchedWorld:
@@ -356,6 +358,10 @@ def test_a_seated_generation_gives_one_answer_at_two_worker_counts() -> None:
         # chooses by the highest score, and multiplying every weight by one
         # positive number scales every score by the same factor. The control
         # therefore draws different weights, not larger ones.
+        #
+        # Not every draw gives a different answer. Two random policies can
+        # reach the same outcome on two seeds, so the control names a draw
+        # that is known to differ rather than any draw.
         rng = np.random.default_rng(draw)
         return [
             LinearPolicy(rng.standard_normal((actions, features)) * 0.5)
@@ -370,7 +376,7 @@ def test_a_seated_generation_gives_one_answer_at_two_worker_counts() -> None:
     one = play(population(0), workers=1)
     four = play(population(0), workers=4)
     assert np.array_equal(one, four)
-    assert not np.array_equal(one, play(population(11), workers=1))
+    assert not np.array_equal(one, play(population(1), workers=1))
 
 
 def test_a_seated_generation_ranks_the_margin_and_reports_the_return() -> None:

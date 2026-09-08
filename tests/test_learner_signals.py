@@ -94,10 +94,10 @@ def test_a_compound_signal_refuses_to_be_read_without_an_aggregation(
 ) -> None:
     """A guess here becomes an objective nobody chose."""
     observation = np.asarray(world.faction_observation(0))
-    relation = catalogue.signal("relation")
-    assert not relation.scalar
+    statistics = catalogue.signal("power_held_tiles")
+    assert not statistics.scalar
     with pytest.raises(ValueError, match="needs an aggregation"):
-        relation.read(observation)
+        statistics.read(observation)
 
 
 def test_every_aggregation_reduces_a_compound_signal(
@@ -105,16 +105,16 @@ def test_every_aggregation_reduces_a_compound_signal(
 ) -> None:
     """Each aggregation must answer, and the answers must bracket each other."""
     observation = np.asarray(world.faction_observation(0))
-    relation = catalogue.signal("relation")
-    window = observation[relation.start : relation.start + relation.positions]
-    lowest = relation.read(observation, Aggregation.LOWEST)
-    highest = relation.read(observation, Aggregation.HIGHEST)
-    mean = relation.read(observation, Aggregation.MEAN)
-    total = relation.read(observation, Aggregation.SUM)
+    statistics = catalogue.signal("power_held_tiles")
+    window = observation[statistics.start : statistics.start + statistics.positions]
+    lowest = statistics.read(observation, Aggregation.LOWEST)
+    highest = statistics.read(observation, Aggregation.HIGHEST)
+    mean = statistics.read(observation, Aggregation.MEAN)
+    total = statistics.read(observation, Aggregation.SUM)
     assert lowest == float(window.min())
     assert highest == float(window.max())
     assert lowest <= mean <= highest
-    assert total == pytest.approx(mean * relation.positions)
+    assert total == pytest.approx(mean * statistics.positions)
 
 
 def test_the_catalogue_names_the_alternatives_when_a_name_is_absent(
@@ -144,9 +144,9 @@ def test_reading_leaves_out_a_compound_signal_the_caller_did_not_aggregate(
 ) -> None:
     """An unnamed compound signal is absent rather than guessed at."""
     observation = np.asarray(world.faction_observation(0))
-    values = catalogue.read(observation, {"relation": Aggregation.SUM})
-    assert "relation" in values
-    assert "board_good" not in values
+    values = catalogue.read(observation, {"power_held_tiles": Aggregation.SUM})
+    assert "power_held_tiles" in values
+    assert "trade_board" not in values
     assert set(catalogue.read_scalars(observation)) <= set(values)
 
 

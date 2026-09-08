@@ -690,11 +690,13 @@ class ObservationField(TypedDict):
     The dtype entry names the NumPy element type of every position.
 
     The low and high entries give the lowest and the highest value any
-    position of the field may hold. A field whose bounds are the whole range
-    of the element type has no tighter bound that the world parameters give.
+    position of the field may hold. Every position of the array is a Q16.16
+    value, so 65536 is one unit and no bound leaves the range minus 65536 to
+    65536.
 
-    A field whose name starts with ``cell_`` holds one position for each cell
-    of the block lattice, in ascending cell order.
+    A field whose bounds are zero and zero is reserved. It reads zero in every
+    position until a layout revision claims it, and that zero does not state a
+    real quantity of zero.
     """
 
     name: str
@@ -761,7 +763,7 @@ class ControllerActions(TypedDict):
     encoded: npt.NDArray[np.uint8]
 
 class ObservationSchema(TypedDict):
-    """The declared layout of the observation array of one world.
+    """The declared layout of the observation array.
 
     This is the only declaration of that layout. Decode the array by
     arithmetic over this schema. Do not write a position, a length or a bound
