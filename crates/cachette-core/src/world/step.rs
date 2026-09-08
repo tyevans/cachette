@@ -675,7 +675,7 @@ impl World {
         {
             let _span = stage::open(Stage::Observe);
             self.observation
-                .rebuild(&self.soldiers, self.terrain, threads)?;
+                .rebuild(&self.soldiers, self.terrain, threads, tick)?;
         }
         // The drift runs after every cause of this frame has written the
         // relation and before the controller reads it, so the controller

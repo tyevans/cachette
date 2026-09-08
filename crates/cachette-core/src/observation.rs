@@ -89,7 +89,7 @@ use crate::holding::FactionMask;
 use crate::slots::Slots;
 use crate::soldier::SoldierArena;
 use crate::terrain::{Terrain, TileKind};
-use crate::types::{FactionId, TileIdx, FACTION_CEILING};
+use crate::types::{FactionId, Tick, TileIdx, FACTION_CEILING};
 
 /// How far a unit sees before the rules round the number, in hex steps.
 ///
@@ -776,6 +776,31 @@ pub struct Observation {
     seen_masks: Vec<FactionMask>,
     /// Which factions have ever seen each block.
     ever_masks: Vec<FactionMask>,
+    /// The tick on which each faction last saw each block.
+    ///
+    /// **The clock is one entry for each block and not one for each tile.**
+    /// A tick for each tile for each faction is a field of the world indexed
+    /// by the faction, which the record refuses on the same grounds it
+    /// refuses a bit for each tile for each faction.[^1] The entry for a
+    /// block follows the observed area in the way the layers do: a faction
+    /// allocates the array on its first observation and never on its
+    /// creation.
+    ///
+    /// **An entry means nothing until the remembered layer holds a tile in
+    /// that block.** The layer is what says whether a faction ever saw the
+    /// block, so the reader asks the layer first and the clock second. A
+    /// second record of whether a block was ever seen would be one fact in
+    /// two places.[^2]
+    ///
+    /// The clock is state that the step carries forward, so it enters the
+    /// state hash beside the remembered layer.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^3]: ADR-0059, fog storage grows with observed area, not with world area, decision D5. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    last_seen: Vec<Option<Vec<Tick>>>,
 }
 
 impl Observation {
@@ -799,6 +824,7 @@ impl Observation {
             remembered: vec![None; factions],
             seen_masks: vec![FactionMask::EMPTY; blocks],
             ever_masks: vec![FactionMask::EMPTY; blocks],
+            last_seen: vec![None; factions],
         }
     }
 
@@ -923,14 +949,56 @@ impl Observation {
         arena: &SoldierArena,
         terrain: Terrain,
         threads: usize,
+        tick: Tick,
     ) -> Result<(), BridgeError> {
         if arena.grid() != self.grid {
             return Err(BridgeError::GridMismatch);
         }
         let stamps = self.collect_stamps(arena);
         let produced = self.rebuild_blocks(&stamps, terrain, threads);
-        self.apply(produced);
+        self.apply(produced, tick);
         Ok(())
+    }
+
+    /// Returns the tick on which one faction last saw one block.
+    ///
+    /// Returns `None` when the faction has never seen a tile of the block. A
+    /// caller tells a memory of tick zero from no memory at all, because the
+    /// two answers differ in kind.
+    ///
+    /// **The granularity is the block and not the tile.** A tick for each
+    /// tile for each faction is a field of the world indexed by the faction,
+    /// and the record refuses one.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D2. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    #[must_use]
+    pub fn block_last_seen(&self, faction: FactionId, block: u32) -> Option<Tick> {
+        let layer = self.remembered_layer(faction)?;
+        if layer.block_population(block) == 0 {
+            return None;
+        }
+        self.last_seen
+            .get(faction.0 as usize)
+            .and_then(Option::as_ref)
+            .and_then(|clock| clock.get(block as usize))
+            .copied()
+    }
+
+    /// Returns the ticks that have passed since one faction last saw one
+    /// block.
+    ///
+    /// A block the faction sees now reports zero. A block it saw once and
+    /// does not see now reports the ticks between then and now. A block it
+    /// has never seen reports `None`.
+    ///
+    /// The arithmetic saturates at zero, so a caller that passes a tick
+    /// before the reading reads zero rather than a wrapped count.
+    #[must_use]
+    pub fn block_age(&self, faction: FactionId, block: u32, now: Tick) -> Option<u64> {
+        let last = self.block_last_seen(faction, block)?;
+        Some(now.0.saturating_sub(last.0))
     }
 
     /// Returns one stamp for each block that each observer of each faction
@@ -1038,8 +1106,9 @@ impl Observation {
 
     /// Writes the rebuilt blocks into the visible layers, folds them into the
     /// remembered layers, and derives the two block masks.
-    fn apply(&mut self, produced: Vec<(u32, u16, u32, BlockForm)>) {
+    fn apply(&mut self, produced: Vec<(u32, u16, u32, BlockForm)>, tick: Tick) {
         let layout = self.layout;
+        let blocks = layout.block_count() as usize;
         let factions = FACTION_CEILING as usize;
         let mut by_faction: Vec<Vec<(u32, u32, BlockForm)>> = vec![Vec::new(); factions];
         for (block, faction, population, form) in produced {
@@ -1075,12 +1144,23 @@ impl Observation {
             for (block, form) in &seen {
                 remembered.absorb(*block, form, tiles_in_block(layout, *block));
             }
+            let clock = self
+                .last_seen
+                .get_mut(index)
+                .map(|slot| slot.get_or_insert_with(|| vec![Tick(0); blocks]));
             for (block, _) in &seen {
                 if let Some(mask) = self.seen_masks.get_mut(*block as usize) {
                     *mask = mask.with(identity);
                 }
                 if let Some(mask) = self.ever_masks.get_mut(*block as usize) {
                     *mask = mask.with(identity);
+                }
+            }
+            if let Some(clock) = clock {
+                for (block, _) in &seen {
+                    if let Some(slot) = clock.get_mut(*block as usize) {
+                        *slot = tick;
+                    }
                 }
             }
         }
@@ -1109,6 +1189,20 @@ impl Observation {
             };
             hash = hash.write_u64(index as u64);
             hash = layer.hash_into(hash);
+            // The clock of a block the faction never saw states nothing, so
+            // the walk takes the blocks the layer populated and no others.
+            // A hash over every block would make two worlds that differ in
+            // nothing hash apart when one of them had once allocated wider.
+            for block in layer.populated_blocks() {
+                let tick = self
+                    .last_seen
+                    .get(index)
+                    .and_then(Option::as_ref)
+                    .and_then(|clock| clock.get(*block as usize))
+                    .copied()
+                    .unwrap_or(Tick(0));
+                hash = hash.write_u64(tick.0);
+            }
         }
         hash
     }
