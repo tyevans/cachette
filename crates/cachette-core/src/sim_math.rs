@@ -434,3 +434,147 @@ pub const fn sine_of_steps(phase: i64) -> Fix32 {
     let high = sine_at_step(step + 1) as i64;
     Fix32(saturate_i32(low + (high - low) * part / fine))
 }
+
+/// The structural cap of a compressed magnitude, in bits.
+///
+/// A compressed magnitude divides the base-two logarithm of a quantity by
+/// this number, so the cap fixes the quantity at which the magnitude reads
+/// one. Forty bits admits every quantity below 1.1 times 10 to the twelfth.
+/// The largest quantity the observation carries is a fixed-point store total
+/// summed over one million units, and that fits.
+///
+/// The cap is a property of the widest quantity the engine holds, so it is a
+/// structural constant and not a budget.[^1]
+///
+/// # References
+///
+/// [^1]: Decision Record Scope, section 4.1. `.agents/rules/adr-scope.md`
+pub const MAGNITUDE_CAP_BITS: u32 = 40;
+
+/// Returns a part of a whole, bounded to the closed interval zero to one.
+///
+/// A learner reads one bounded number for every position of its input, and a
+/// raw count is not bounded. This function is the share form of that rule.
+/// The caller names the whole, and the schema of the observation names it
+/// again for the reader.
+///
+/// A whole of zero or below reads as one, so the function never divides by
+/// zero. A negative part reads as zero. The division truncates toward zero,
+/// which is the rounding rule of the whole observation.
+#[must_use]
+pub const fn bounded_share(part: i64, whole: i64) -> Fix32 {
+    let whole = if whole < 1 { 1 } else { whole };
+    let part = if part < 0 { 0 } else { part };
+    let scaled = ((part as i128) << FIX_FRACTIONAL_BITS) / whole as i128;
+    let one = Fix32::ONE.0 as i128;
+    if scaled > one {
+        Fix32::ONE
+    } else {
+        Fix32(scaled as i32)
+    }
+}
+
+/// Returns the signed relation between two magnitudes.
+///
+/// The relation is the difference of the two divided by the sum of their
+/// absolute values. It lies in the closed interval minus one to one, and it
+/// needs no chosen denominator, so it bounds a comparison between two
+/// quantities that no structural total covers.
+///
+/// A pair that is zero in both places reads as zero.
+#[must_use]
+pub const fn signed_relation(a: i64, b: i64) -> Fix32 {
+    let sum = a.unsigned_abs().saturating_add(b.unsigned_abs());
+    let scale = if sum < 1 { 1 } else { sum };
+    let scaled = (((a as i128) - (b as i128)) << FIX_FRACTIONAL_BITS) / scale as i128;
+    let one = Fix32::ONE.0 as i128;
+    if scaled > one {
+        Fix32::ONE
+    } else if scaled < -one {
+        Fix32(-Fix32::ONE.0)
+    } else {
+        Fix32(scaled as i32)
+    }
+}
+
+/// Returns the base-two logarithm of a value, in fixed point.
+///
+/// The result is the logarithm of the value, with sixteen fractional bits. A
+/// value of zero reads as zero, which is the logarithm of one.
+///
+/// The function runs sixteen exact squaring steps. Each step squares the
+/// mantissa and takes one fractional bit of the answer, so the result holds
+/// no rounding beyond the truncation of the last bit. It reads no table and
+/// it holds no state.
+#[must_use]
+pub const fn log2_fixed(value: u64) -> u32 {
+    let value = if value < 1 { 1 } else { value };
+    let exponent = 63 - value.leading_zeros();
+    let mut mantissa = (value as u128) << (63 - exponent);
+    let mut out = exponent << FIX_FRACTIONAL_BITS;
+    let mut bit = 1u32 << (FIX_FRACTIONAL_BITS - 1);
+    while bit != 0 {
+        mantissa = (mantissa * mantissa) >> 63;
+        if mantissa >= 1u128 << 64 {
+            mantissa >>= 1;
+            out |= bit;
+        }
+        bit >>= 1;
+    }
+    out
+}
+
+/// Returns a quantity compressed into the closed interval minus one to one.
+///
+/// The function is an integer form of a symmetric logarithm. It is monotone
+/// in the absolute value, it preserves the sign, and it is bounded. A world
+/// model that trains across domains of very different scale uses the same
+/// device, and a static compression removes the need for a learned
+/// per-dimension scale.[^1]
+///
+/// The compression holds no state, so the same world state gives the same
+/// answer in every run. A running mean and variance would give the same range
+/// control and would make the answer depend on the data seen so far, which
+/// the determinism rule forbids.[^2]
+///
+/// # References
+///
+/// [^1]: Report 42, what a policy should be able to see, section 4. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+/// [^2]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+#[must_use]
+pub const fn compressed_magnitude(value: i64) -> Fix32 {
+    let logarithm = log2_fixed(1u64.saturating_add(value.unsigned_abs()));
+    let capped = (logarithm as i64) / MAGNITUDE_CAP_BITS as i64;
+    let one = Fix32::ONE.0 as i64;
+    let bounded = if capped > one { one } else { capped };
+    if value < 0 {
+        Fix32(-(bounded as i32))
+    } else {
+        Fix32(bounded as i32)
+    }
+}
+
+/// Returns a cyclic phase as a triangle wave, in the closed interval minus
+/// one to one.
+///
+/// A learner that reads a raw tick count inside a cycle cannot see that the
+/// last tick of the cycle sits beside the first. A triangle wave is
+/// continuous across the wrap, and it needs no trigonometry and no table.
+///
+/// A period of zero or below reads as a period of one.
+#[must_use]
+pub const fn phase_triangle(phase: i64, period: i64) -> Fix32 {
+    let period = if period < 1 { 1 } else { period };
+    let one = Fix32::ONE.0 as i64;
+    let mut inside = phase % period;
+    if inside < 0 {
+        inside += period;
+    }
+    let quarter = ((inside as i128) * 4 * one as i128 / period as i128) as i64;
+    let folded = if quarter < 2 * one {
+        quarter
+    } else {
+        4 * one - quarter
+    };
+    Fix32((folded - one) as i32)
+}

@@ -41,6 +41,7 @@ pub mod holding;
 mod household;
 pub mod influence;
 pub mod luxury;
+pub mod obs_ring;
 pub mod observation;
 pub mod padded;
 pub mod plan;
