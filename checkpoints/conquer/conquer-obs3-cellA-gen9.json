@@ -1,0 +1,17 @@
+{
+  "file": "conquer-obs3-cellA-gen9.npz",
+  "search": "population 64, 8 seeds, 32 directions",
+  "generation": 9,
+  "validation_score": -587.44375,
+  "validation_seeds": 32,
+  "wins_of_thirtytwo": 11,
+  "chance_of_thirtytwo": 10.7,
+  "yardstick_of_thirtytwo": 13,
+  "note": "the yardstick plays the controller in every seat, so it is the chance line",
+  "standard_error_wins": 2.7,
+  "observation_version": 3,
+  "action_version": 1,
+  "decision_interval": 10,
+  "policy_kind": "linear",
+  "sha256": "f1d7d82980b4af89ccd1a74d74df7baca759b371ed5d4e82241043366f140094"
+}
