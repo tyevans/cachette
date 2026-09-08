@@ -22,6 +22,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from cachette import World
+from cachette.demo import app
+from cachette.demo.app import build_world
 from cachette.demo.surface import Surface
 
 WIDTH = 7
@@ -170,8 +173,35 @@ def test_a_name_with_no_full_stop_is_refused(tmp_path: Path) -> None:
     assert not path.exists()
 
 
+def a_world_that_promotes_on_the_first_due_tick(
+    extent: int, factions: int, seed: int, weather_pitch: int
+) -> World:
+    """Build the world of the run, and make every live soldier eligible.
+
+    A soldier is promoted when its deeds reach a threshold. Deeds come only
+    from gathering. Most worlds gather too little to reach the opening
+    threshold inside sixty ticks, and some worlds never reach it. The run
+    draws a seed, so a test that demands a promotion of that run fails on
+    most seeds.
+
+    A threshold of zero makes every live soldier eligible at once. The
+    promotion pass runs on a schedule, and the first due tick of that
+    schedule then promotes somebody in every world. The founding seats a
+    group for each faction, and the run stops before the first step when no
+    faction found a place. A live soldier is therefore always there.
+
+    The signature matches the function that this replaces, because the run
+    calls it with four positional arguments.
+    """
+    world = build_world(extent, factions, seed, weather_pitch)
+    world.set_deed_threshold(0)
+    return world
+
+
 def test_the_picture_runs_the_world_before_it_draws(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The picture mode steps the count it was given, then draws.
 
@@ -180,16 +210,23 @@ def test_the_picture_runs_the_world_before_it_draws(
     reported every one of those subsystems at zero. Each zero was the fixture
     and not the engine.
 
-    Sixty steps is past the first promotion. The world takes a fixed seed and
-    the engine gives one answer at any thread count, so the tick a promotion
-    lands on is a property of the engine rather than of this machine. The tick
-    itself is not asserted here, because it moves whenever a pass that feeds a
-    unit changes.
+    The promotion is the witness that the run happened. A step announces it,
+    and the drawing never does. The fixture makes the promotion certain
+    rather than likely. The run draws a seed, and the deeds a world gathers
+    in sixty ticks follow that seed, so this test failed on most seeds while
+    it took the world that the run builds.
+
+    The tick of the promotion is not asserted here, because it moves whenever
+    the promotion schedule or a pass that feeds a unit changes.
+
+    The line reads "became a character" for one person and "became characters"
+    for more than one, so a match on the singular alone counts a promotion of
+    three as no promotion at all.
     """
-    from cachette.demo.app import main
+    monkeypatch.setattr(app, "build_world", a_world_that_promotes_on_the_first_due_tick)
 
     path = tmp_path / "run.png"
-    assert main(["--picture", str(path), "--ticks", "60"]) == 0
+    assert app.main(["--picture", str(path), "--ticks", "60"]) == 0
     printed = capsys.readouterr().out
 
     written = [line for line in printed.splitlines() if line.startswith("wrote ")]
@@ -197,9 +234,6 @@ def test_the_picture_runs_the_world_before_it_draws(
     tick = int(written[0].split("at tick ")[1].split(",")[0])
     assert tick >= 60, printed
 
-    # The line reads "became a character" for one and "became characters" for
-    # more than one, so a match on the singular alone counts a promotion of
-    # three as no promotion at all.
     promotions = [line for line in printed.splitlines() if "became " in line]
     assert promotions, printed
     assert path.read_bytes()[:8] == SIGNATURE
