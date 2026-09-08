@@ -140,6 +140,18 @@ STORE_SCALE = 1.0e-5
 # term without drowning the shaping that leads to it.
 WIN = 2000.0
 
+# What one tick of survival is worth. A faction cannot be eliminated, so an
+# episode that ends before the tick limit ended because a rival won. The tick
+# the run reached is therefore how long the seat denied a win.
+#
+# **The weight is bounded, and the bound is not a matter of taste.** A win and
+# a loss stand two win weights apart. The shaped terms of this strategy pay at
+# most one for each tile of the world, plus this weight for each tick of the
+# limit. When that sum reaches the outcome gap, a candidate that lost slowly
+# outranks a candidate that won quickly, and the search then learns to lose
+# slowly. A test states the bound and fails on a weight that crosses it.
+SURVIVAL = 0.5
+
 STRATEGIES: dict[str, tuple[EnvConfig, Weighting, str]] = {
     # Win, and almost nothing else. The small territory term is the only
     # thing that separates two candidates that both lost, and without it the
@@ -174,6 +186,28 @@ STRATEGIES: dict[str, tuple[EnvConfig, Weighting, str]] = {
     "land-net": (
         WORLD,
         Weighting(terms={"held_tiles": 1.0}, won=WIN, lost=-WIN, drawn=0.0),
+        "mlp",
+    ),
+    # Take ground, hold it, and survive. **The outcome term separates two
+    # candidates into two classes, and the search ranks rather than scores,
+    # so every candidate that lost is one class however it lost.** A faction
+    # cannot be eliminated, so an episode ends before the tick limit only
+    # when a rival wins. The tick a run reaches therefore measures how long
+    # the seat denied a win, and weighing it turns the two classes of a loss
+    # into as many classes as there are decisions.
+    #
+    # The weight must not let a long loss outrank a short win. The outcome
+    # pays twice the win weight across the two classes, the ground term pays
+    # at most one for each tile of the world, and the survival term pays its
+    # weight for each tick up to the limit. A test holds the arithmetic.
+    "land-hold-net": (
+        WORLD,
+        Weighting(
+            terms={"held_tiles": 1.0, "tick": SURVIVAL},
+            won=WIN,
+            lost=-WIN,
+            drawn=0.0,
+        ),
         "mlp",
     ),
     # Fill the stores. Ground scores a little, for the same reason.
