@@ -30,11 +30,11 @@ level.
 
 [objective.territory]
 description = "The share of the world this faction holds."
-terms = [{ signal = "held_tiles", kind = "share", against = "cell_tiles" }]
+terms = [{ signal = "held_share_world", kind = "fixed_point" }]
 
 [objective.settlements]
-description = "How many seats this faction holds."
-terms = [{ signal = "seats_held", kind = "magnitude" }]
+description = "How many settlements this faction holds."
+terms = [{ signal = "settlements", kind = "magnitude" }]
 
 [objective.military]
 description = "How many units this faction keeps alive."
@@ -49,8 +49,8 @@ description = "What this faction holds in its stores."
 terms = [{ signal = "store_total", kind = "magnitude" }]
 
 [objective.renown]
-description = "The best renown this faction has reached."
-terms = [{ signal = "best_renown", kind = "magnitude" }]
+description = "The best renown this faction has reached, against the renown a win needs."
+terms = [{ signal = "best_renown_share", kind = "fixed_point" }]
 
 [objective.wonder]
 description = "The work this faction has put into a wonder."
@@ -58,19 +58,19 @@ terms = [{ signal = "wonder_progress", kind = "magnitude" }]
 
 [objective.trade]
 description = """
-How much quantity stands on the trade board this faction can see. The board
-holds one position for each row it carries, so the term sums the rows.
+How much the trade board this faction can see offers. The board holds one
+position for each good class and each measure of it, so the term sums them.
 """
 terms = [
-  { signal = "board_quantity", kind = "magnitude", aggregation = "sum" },
+  { signal = "trade_board", kind = "magnitude", aggregation = "sum" },
 ]
 
 [objective.diplomacy]
 description = """
-The mean standing between this faction and the other factions. The relation
-holds one position for each other faction, so the term takes the mean.
+How the other factions regard this faction, as the mean of the standings
+they hold toward it. The engine publishes that mean already scaled.
 """
-terms = [{ signal = "relation", kind = "magnitude", aggregation = "mean" }]
+terms = [{ signal = "relation_mean_in", kind = "fixed_point" }]
 
 [style.aggressive]
 description = """

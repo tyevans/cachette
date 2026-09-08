@@ -397,7 +397,7 @@ def test_a_share_term_needs_a_denominator_and_a_magnitude_refuses_one() -> None:
     with pytest.raises(ObjectiveError, match="needs a second signal"):
         Term(signal="held_tiles", kind=TermKind.SHARE)
     with pytest.raises(ObjectiveError, match="bounds itself"):
-        Term(signal="held_tiles", kind=TermKind.MAGNITUDE, against="cell_tiles")
+        Term(signal="held_tiles", kind=TermKind.MAGNITUDE, against="world_tiles")
 
 
 def test_a_run_cannot_be_configured_to_vary_the_objective_by_candidate() -> None:
