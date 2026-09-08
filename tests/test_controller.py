@@ -134,8 +134,8 @@ def test_the_census_answers_one_integer_for_each_name_of_the_rust_table() -> Non
 
     What is left is what the boundary can get wrong on its own: a duplicated
     key, a value that is not an integer, and an order that moves between two
-    readings of one world. The three names below are the ones the other tests
-    of this file read, so they are the interface this file depends on.
+    readings of one world. The four names below are the ones this file reads,
+    so they are the interface it depends on.
     """
     world = seeded_world()
     world.step(1)
