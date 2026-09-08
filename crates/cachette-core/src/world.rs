@@ -2330,7 +2330,10 @@ impl World {
         // leaves stale is a confident wrong answer.[^5]
         //
         // [^5]: Findings register, FND-029. `docs/FINDINGS.md`
-        self.derive_destination_fields();
+        {
+            let _span = stage::open(Stage::SendDeriveDestinations);
+            self.derive_destination_fields();
+        }
         Ok(())
     }
 
@@ -9260,18 +9263,30 @@ impl World {
     /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, the consequences. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
     /// [^3]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
     fn rebuild_level_1(&mut self, threads: usize) -> Result<(), BridgeError> {
-        self.pyramid.rebuild(
-            &self.values,
-            self.holding.holders(),
-            &self.soldiers,
-            &self.bridge,
-            &self.depletion,
-            threads,
-        )?;
-        self.exits.derive(&self.pyramid);
+        {
+            let _span = stage::open(Stage::RebuildPyramid);
+            self.pyramid.rebuild(
+                &self.values,
+                self.holding.holders(),
+                &self.soldiers,
+                &self.bridge,
+                &self.depletion,
+                threads,
+            )?;
+        }
+        {
+            let _span = stage::open(Stage::RebuildExits);
+            self.exits.derive(&self.pyramid);
+        }
         self.derive_return_fields();
-        self.derive_stock_field();
-        self.derive_destination_fields();
+        {
+            let _span = stage::open(Stage::RebuildStock);
+            self.derive_stock_field();
+        }
+        {
+            let _span = stage::open(Stage::RebuildDestinations);
+            self.derive_destination_fields();
+        }
         Ok(())
     }
 
@@ -9374,6 +9389,7 @@ impl World {
     /// [^1]: Findings register, FND-029. `docs/FINDINGS.md`
     /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
     fn derive_return_fields(&mut self) {
+        let _span = stage::open(Stage::RebuildReturns);
         self.returns.derive(&self.pyramid, &self.site_seeds());
         // **No return plane conducts across water**, so every plane takes the
         // land crossing. The empty slice is how the approach field states
@@ -9381,6 +9397,8 @@ impl World {
         // derivation.[^3]
         //
         // [^3]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+        drop(_span);
+        let _span = stage::open(Stage::RebuildHomeApproaches);
         self.home_approaches
             .derive(self.terrain, &self.site_seed_tiles(), &[]);
     }
@@ -16720,6 +16738,7 @@ impl World {
         // last tick did.[^5]
         //
         // [^5]: Findings register, FND-498. `docs/FINDINGS.md`
+        let prologue_span = stage::open(Stage::ControllerPrologue);
         self.fold_the_controller_into_the_census();
         self.fold_campaigns_into_the_census();
         self.controller.clear_log();
@@ -16764,6 +16783,7 @@ impl World {
         }
         self.close_campaigns(&cohorts);
         let objectives = self.campaign_objectives();
+        drop(prologue_span);
         // The rival of a faction is the other faction with the most held
         // tiles. A faction with no speaker has no rival, because the verb
         // would refuse it.
@@ -16803,20 +16823,23 @@ impl World {
         // and the project order below then reads what it wrote.[^7]
         //
         // [^7]: ADR-0152, a faction plans its roads and zones with one solver, decisions D2 and D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
-        for index in 0..factions {
-            let faction = FactionId(index as u16);
-            // A faction under external control and a faction with no seat
-            // receive no evaluation, so neither gets a plan.[^8]
-            //
-            // [^8]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D6 and D7. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-            let evaluated = self
-                .controller
-                .row(faction)
-                .is_some_and(|row| row.externally_controlled == 0 && row.seat().is_some());
-            if !evaluated {
-                continue;
+        {
+            let _span = stage::open(Stage::ControllerSolvePlan);
+            for index in 0..factions {
+                let faction = FactionId(index as u16);
+                // A faction under external control and a faction with no seat
+                // receive no evaluation, so neither gets a plan.[^8]
+                //
+                // [^8]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D6 and D7. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+                let evaluated = self
+                    .controller
+                    .row(faction)
+                    .is_some_and(|row| row.externally_controlled == 0 && row.seat().is_some());
+                if !evaluated {
+                    continue;
+                }
+                self.solve_plan(faction);
             }
-            self.solve_plan(faction);
         }
         // The rows the unit type table fills. A row whose every column is
         // zero can do nothing, so the controller does not offer it. The list
@@ -16829,6 +16852,7 @@ impl World {
             .collect();
         let queue_draw = self.controller.queue_draw_index();
         let due = self.controller.board_due(tick);
+        let states_span = stage::open(Stage::ControllerStates);
         let states: Vec<FactionState> = (0..factions)
             .map(|index| {
                 let faction = FactionId(index as u16);
@@ -16890,10 +16914,15 @@ impl World {
                 }
             })
             .collect();
-        let plan = self.controller.plan(self.config.seed, tick, &states);
+        drop(states_span);
+        let plan = {
+            let _span = stage::open(Stage::ControllerPlan);
+            self.controller.plan(self.config.seed, tick, &states)
+        };
         if plan.is_empty() {
             return;
         }
+        let _apply_span = stage::open(Stage::ControllerApply);
         // One scan of the arena, in slot order, buckets the live units by
         // faction. Only a faction that emitted a command gets a bucket.
         let mut wanted = vec![false; factions];
@@ -16914,8 +16943,14 @@ impl World {
         for (faction, sequence, choice) in plan {
             let set = std::mem::take(&mut sets[usize::from(faction.0)]);
             let applied = match choice {
-                Choice::Gather(kind) => self.order_gather_set(&set, kind) < set.len(),
-                Choice::Build(kind) => self.order_build_set(&set, kind) < set.len(),
+                Choice::Gather(kind) => {
+                    let _span = stage::open(Stage::ControllerOrderSet);
+                    self.order_gather_set(&set, kind) < set.len()
+                }
+                Choice::Build(kind) => {
+                    let _span = stage::open(Stage::ControllerOrderSet);
+                    self.order_build_set(&set, kind) < set.len()
+                }
                 // The relation move goes through the same verb a caller
                 // uses, with the speaker the scan above found. A faction
                 // with no speaker planned no move, so the refusal here is
@@ -16923,6 +16958,7 @@ impl World {
                 //
                 // [^4]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2 and D3. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
                 Choice::Relation(other) => {
+                    let _span = stage::open(Stage::ControllerRelation);
                     speakers[usize::from(faction.0)].is_some_and(|speaker| {
                         self.move_relation(speaker, other, controller::RELATION_STEP)
                             .is_ok()
@@ -16933,6 +16969,7 @@ impl World {
                 //
                 // [^5]: Balance register, the campaign cohort size. `docs/reference/balance.md`
                 Choice::Campaign { tile, .. } => {
+                    let _span = stage::open(Stage::ControllerCampaign);
                     let cohort = self.campaigns.cohort_size();
                     self.grid.address_of(tile).is_some_and(|address| {
                         self.raise_campaign(faction, address, cohort).is_ok()
@@ -16943,16 +16980,29 @@ impl World {
                 // world as the commands before it in this plan left it.[^6]
                 //
                 // [^6]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decisions D2 and D5. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-                Choice::Advertise => self.controller_write_board(faction, sequence),
-                Choice::Trade => self.controller_trade_step(faction),
-                Choice::Carry => self.controller_carriers(faction),
-                Choice::Project => self.controller_take_projects(faction),
+                Choice::Advertise => {
+                    let _span = stage::open(Stage::ControllerTrade);
+                    self.controller_write_board(faction, sequence)
+                }
+                Choice::Trade => {
+                    let _span = stage::open(Stage::ControllerTrade);
+                    self.controller_trade_step(faction)
+                }
+                Choice::Carry => {
+                    let _span = stage::open(Stage::ControllerTrade);
+                    self.controller_carriers(faction)
+                }
+                Choice::Project => {
+                    let _span = stage::open(Stage::ControllerProject);
+                    self.controller_take_projects(faction)
+                }
                 // The queue order goes through the one verb a Python caller
                 // calls. The site is the lowest-slot site of the faction
                 // whose queue has room, and the verb counts a refusal.[^11]
                 //
                 // [^11]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decisions D2 and D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
                 Choice::Queue(unit_type) => {
+                    let _span = stage::open(Stage::ControllerQueue);
                     let site = self.controller_queue_site(faction);
                     site.is_some_and(|site| {
                         self.order_site_queue(faction, site, QueueOrder::Push(unit_type))
@@ -16964,7 +17014,10 @@ impl World {
                 // planned.[^12]
                 //
                 // [^12]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-                Choice::Cross(tile) => self.controller_cross(faction, tile),
+                Choice::Cross(tile) => {
+                    let _span = stage::open(Stage::ControllerCross);
+                    self.controller_cross(faction, tile)
+                }
                 // **The settle order reads the arena and not the set above.**
                 // The set is taken by the first command a faction emits, and
                 // the settle order draws last, so it would read an empty set
@@ -16972,7 +17025,10 @@ impl World {
                 // the settlers of the faction from the arena instead.[^13]
                 //
                 // [^13]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D5. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
-                Choice::Settle => self.controller_settle(faction),
+                Choice::Settle => {
+                    let _span = stage::open(Stage::ControllerSettle);
+                    self.controller_settle(faction)
+                }
             };
             let applied = u8::from(applied);
             sets[usize::from(faction.0)] = set;

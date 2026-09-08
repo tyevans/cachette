@@ -71,3 +71,10 @@ test = false
 name = "legal_actions"
 harness = false
 test = false
+
+# The benchmark measures one tick of the world the trainer builds, stage by
+# stage. It is not a test, and no assertion in this project reads a clock.
+[[bench]]
+name = "training_tick"
+harness = false
+test = false

@@ -119,6 +119,15 @@ macro_rules! declare_stages {
             /// it reaches the case. A world with no unit would open them
             /// zero times, and that is the pass doing no work rather than a
             /// span that went missing.
+            ///
+            /// **A stage that declares zero opens as often as the world asks
+            /// it to, and the fixture of the check asks it never.** The
+            /// stages inside the controller apply are of that kind. The
+            /// controller emits a command only when a faction has work, so a
+            /// frame opens a given verb between zero times and once. Zero is
+            /// what the check's own world gives, and it is not a claim that
+            /// the step never opens the stage. A benchmark that wants the
+            /// count reads the `entries` column of the table.
             #[must_use]
             pub const fn entries_for_each_frame(self) -> u64 {
                 match self {
@@ -180,6 +189,12 @@ declare_stages! {
     SettlePositions,          "settle_positions",           true,  1, false;
     Promote,                  "promote",                    true,  1, false;
     RebuildLevel1,            "rebuild_level_1",            true,  1, false;
+    RebuildPyramid,           "rebuild_pyramid",            true,  1, true;
+    RebuildExits,             "rebuild_exits",              false, 1, true;
+    RebuildReturns,           "rebuild_returns",            false, 1, true;
+    RebuildHomeApproaches,    "rebuild_home_approaches",    false, 1, true;
+    RebuildStock,             "rebuild_stock",              false, 1, true;
+    RebuildDestinations,      "rebuild_destinations",       false, 1, true;
     InfluenceSolve,           "influence_solve",            true,  1, false;
     Convert,                  "convert",                    true,  1, false;
     WeatherSolve,             "weather_solve",              true,  1, false;
@@ -187,6 +202,20 @@ declare_stages! {
     Observe,                  "observe",                    true,  1, false;
     RelationDrift,            "relation_drift",             false, 1, false;
     Controller,               "controller",                 false, 1, false;
+    ControllerSolvePlan,      "controller_solve_plan",      false, 1, true;
+    ControllerStates,         "controller_states",          false, 1, true;
+    ControllerPrologue,       "controller_prologue",        false, 1, true;
+    ControllerPlan,           "controller_plan",            false, 1, true;
+    ControllerApply,          "controller_apply",           false, 0, true;
+    ControllerOrderSet,       "controller_order_set",       false, 0, true;
+    ControllerCampaign,       "controller_campaign",        false, 0, true;
+    ControllerTrade,          "controller_trade",           false, 0, true;
+    ControllerProject,        "controller_project",         false, 0, true;
+    ControllerSettle,         "controller_settle",          false, 0, true;
+    ControllerQueue,          "controller_queue",           false, 0, true;
+    ControllerCross,          "controller_cross",           false, 0, true;
+    ControllerRelation,       "controller_relation",        false, 0, true;
+    SendDeriveDestinations,   "send_derive_destinations",   false, 0, true;
     BridgeRefreshClosing,     "bridge_refresh_closing",     false, 1, false;
 }
 
