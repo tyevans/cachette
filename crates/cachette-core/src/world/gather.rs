@@ -8,6 +8,7 @@
 use super::errors::StepError;
 use super::World;
 use crate::event::ResourceTaken;
+use crate::event_memory::MemoryKind;
 use crate::resource::{ledger_key, Amount, ResourceKind, RESOURCE_KIND_COUNT};
 use crate::sim_math;
 use crate::slots::Slots;
@@ -330,6 +331,7 @@ impl World {
                     amount,
                     intent.kind.to_u8(),
                 ));
+                self.remember_the_take(intent.unit, amount);
             }
             if granted > 0 {
                 run.push((key, granted));
@@ -343,6 +345,24 @@ impl World {
         depletion.merge_ascending(&run, tick, &|tile| self.tile_ground(tile));
         self.depletion = depletion;
         Ok(())
+    }
+
+    /// Records one take against the faction of the unit that took it.
+    ///
+    /// **The faction is read here, and not at the end of the step.** The
+    /// gather event carries the unit and no faction, and a meeting later in
+    /// the same step may end that unit. A reader at the end of the step would
+    /// then ask the arena about a unit the arena no longer holds, and it would
+    /// count nothing. This call therefore stands beside the log, where the
+    /// faction column still names the faction of the slot.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: The event history advance. [`World::advance_event_memory`]
+    fn remember_the_take(&mut self, unit: Entity, amount: u32) {
+        let faction = self.soldiers.faction_column()[unit.index() as usize];
+        self.event_memory
+            .record(faction, MemoryKind::ResourceGathered, i64::from(amount));
     }
 
     /// Gives every soldier in the set the order to gather one kind.

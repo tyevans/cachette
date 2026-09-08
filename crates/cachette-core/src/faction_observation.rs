@@ -128,6 +128,8 @@
 
 use crate::controller::WEIGHT_COUNT;
 use crate::event_layout::ColumnKind;
+use crate::event_memory::{Decay, BLAMED_KIND_COUNT, KIND_COUNT};
+use crate::faction_memory_observation as memory;
 use crate::faction_view::{Admit, BlockMask, FactionViewError};
 use crate::types::{FactionId, Fix32};
 use crate::world::World;
@@ -144,7 +146,7 @@ use crate::world::World;
 /// # References
 ///
 /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-pub const OBSERVATION_VERSION: u32 = 4;
+pub const OBSERVATION_VERSION: u32 = 5;
 
 /// Returns the faction that one position of a faction-indexed field names.
 ///
@@ -296,11 +298,59 @@ pub enum ObsField {
     CellHeightTotal,
     /// The food of the observed tiles of each cell, as raw Q16.16.
     CellFoodTotal,
+    /// The share of its own stock that each kind of event moved lately, over
+    /// the short memory.
+    ///
+    /// **The array is a snapshot, and this is the memory beside it.** A
+    /// snapshot cannot tell a faction that is gaining ground from one that is
+    /// losing it, and it cannot say that a rival is taking a city now.[^1]
+    ///
+    /// Each position holds one kind of event, in the order the kind list
+    /// declares. The value is the part of the stock of the reader that the
+    /// events of one step move, so a small world and a large one with the
+    /// same event rate read the same value.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: The event history. [`crate::event_memory`]
+    /// [^2]: Research report 42, what a policy should be able to see, section 8.1. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+    MemoryRecent,
+    /// The same share of each kind of event, over the long memory.
+    MemoryLasting,
+    /// The signed relation between the short memory and the long memory of
+    /// each kind.
+    ///
+    /// **This is the position that separates a spike from a trend.** Both
+    /// memories reach the same share for the same constant arrival rate, so
+    /// this reads zero while the rate holds, positive while it rises and
+    /// negative while it falls. A rival that takes a city this minute raises
+    /// the short memory alone. A rival that keeps killing the people of the
+    /// reader raises both.
+    MemoryTrend,
+    /// The share of each kind of event that the single worst rival caused,
+    /// over the long memory.
+    ///
+    /// The field holds one position for each kind that names a faction as its
+    /// cause. **No position names a seat.** A league seats one policy in
+    /// different seats between games, so a policy that learned a seat number
+    /// would read another faction's quantities under the same weight.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-647. `docs/FINDINGS.md`
+    MemoryWorstRival,
+    /// How concentrated the cause of each kind of event is over the rivals,
+    /// over the long memory.
+    ///
+    /// The value is the sum of the squared rival shares. Two rivals in equal
+    /// measure give one half, and one rival that does everything gives one. A
+    /// reader tells one enemy from a field of them by this position alone.
+    MemoryConcentration,
 }
 
 impl ObsField {
     /// Every field, in the order the array holds them.
-    pub const ALL: [Self; 30] = [
+    pub const ALL: [Self; 35] = [
         Self::Tick,
         Self::TickLimit,
         Self::Faction,
@@ -331,6 +381,11 @@ impl ObsField {
         Self::CellValueTotal,
         Self::CellHeightTotal,
         Self::CellFoodTotal,
+        Self::MemoryRecent,
+        Self::MemoryLasting,
+        Self::MemoryTrend,
+        Self::MemoryWorstRival,
+        Self::MemoryConcentration,
     ];
 
     /// Returns the name of the field.
@@ -367,6 +422,11 @@ impl ObsField {
             Self::CellValueTotal => "cell_value_total",
             Self::CellHeightTotal => "cell_height_total",
             Self::CellFoodTotal => "cell_food_total",
+            Self::MemoryRecent => "memory_recent",
+            Self::MemoryLasting => "memory_lasting",
+            Self::MemoryTrend => "memory_trend",
+            Self::MemoryWorstRival => "memory_worst_rival",
+            Self::MemoryConcentration => "memory_concentration",
         }
     }
 
@@ -403,6 +463,8 @@ impl ObsField {
             | Self::CellValueTotal
             | Self::CellHeightTotal
             | Self::CellFoodTotal => shape.cell_count,
+            Self::MemoryRecent | Self::MemoryLasting | Self::MemoryTrend => KIND_COUNT as u32,
+            Self::MemoryWorstRival | Self::MemoryConcentration => BLAMED_KIND_COUNT as u32,
         }
     }
 
@@ -434,6 +496,11 @@ impl ObsField {
                 (-shape.cell_accumulator(), shape.cell_accumulator())
             }
             Self::CellHeightTotal => (0, shape.cell_accumulator()),
+            Self::MemoryRecent
+            | Self::MemoryLasting
+            | Self::MemoryWorstRival
+            | Self::MemoryConcentration => (0, memory::ONE),
+            Self::MemoryTrend => (-memory::ONE, memory::ONE),
         }
     }
 }
@@ -727,6 +794,17 @@ impl World {
                 ObsField::CellValueTotal => scatter(span, &cells, |cell| cell.value_total),
                 ObsField::CellHeightTotal => scatter(span, &cells, |cell| cell.height_total),
                 ObsField::CellFoodTotal => scatter(span, &cells, |cell| cell.food_total),
+                ObsField::MemoryRecent => {
+                    memory::write_shares(self, faction, Decay::Recent, span);
+                }
+                ObsField::MemoryLasting => {
+                    memory::write_shares(self, faction, Decay::Lasting, span);
+                }
+                ObsField::MemoryTrend => memory::write_trends(self, faction, span),
+                ObsField::MemoryWorstRival => memory::write_worst_rival(self, faction, span),
+                ObsField::MemoryConcentration => {
+                    memory::write_concentration(self, faction, span);
+                }
             }
         }
         Ok(out)

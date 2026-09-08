@@ -626,7 +626,7 @@ fn the_schema_reports_the_layout_version() {
     // four is such a change: the field count did not move.
     assert_eq!(
         (OBSERVATION_VERSION, world.observation_schema().rows().len()),
-        (4, 30),
+        (5, 35),
         "the field set and the version must move together",
     );
 }

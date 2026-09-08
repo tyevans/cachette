@@ -54,6 +54,7 @@ use crate::event::{
     FactionEliminated, ResourceTaken, SettlementFounded, SiteTaken, TileChanged, UpgradeCollapsed,
     UpgradeFinished,
 };
+use crate::event_memory::EventMemory;
 use crate::fire::{FireEnded, FireField, FireStarted, UnitBurned};
 use crate::hex::Grid;
 use crate::holding::Holding;
@@ -94,6 +95,7 @@ mod controller;
 mod controller_targets;
 mod conversion;
 mod errors;
+mod event_memory;
 mod fire;
 mod founding;
 mod gather;
@@ -1035,6 +1037,25 @@ pub struct World {
     /// [^1]: Findings register, FND-498. `docs/FINDINGS.md`
     /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     census: CensusTotals,
+    /// What has happened to each faction lately, and which faction did it.
+    ///
+    /// The history holds a decayed count of each kind of event for each
+    /// faction, and a second count keyed on the ordered pair of the subject
+    /// and the faction that caused the event. The step advances it once for
+    /// each step, because every event log holds one step and no more: a
+    /// reader that sampled the logs at its own pace would miss every step it
+    /// did not sample.[^1]
+    ///
+    /// **This is not simulated state and it does not enter the hash.** No
+    /// pass and no verb reads it. It is a derived count of what already
+    /// happened, in the way the census totals beside it are.[^2] [^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: The event history. [`EventMemory`]
+    /// [^2]: ADR-0164, every stored value the step reads enters the state hash, decision D1. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    /// [^3]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    event_memory: EventMemory,
 }
 
 impl World {
