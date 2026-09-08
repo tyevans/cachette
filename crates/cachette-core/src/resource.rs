@@ -1256,7 +1256,10 @@ mod ceiling_tests {
     ///
     /// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
     fn field() -> ResourceField {
-        ResourceField::new(Terrain::new(0xFEED_FACE_1234_5678, Grid::new(320, 320).expect("320 by 320 is a legal extent")))
+        ResourceField::new(Terrain::new(
+            0xFEED_FACE_1234_5678,
+            Grid::new(320, 320).expect("320 by 320 is a legal extent"),
+        ))
     }
 
     #[test]

@@ -29,7 +29,7 @@
 use bytemuck::{Pod, Zeroable};
 
 use crate::hash::StateHash;
-use crate::types::Fix32;
+use crate::types::{Accum, Fix32};
 
 /// The number of rows that the unit type table holds.
 ///
@@ -606,6 +606,50 @@ impl UnitTypeTable {
         self.rows[attacker.index()].attack.0 > self.rows[defender.index()].armour.0
     }
 
+    /// Returns the military strength of one unit of a type.
+    ///
+    /// **The strength is the attack plus the armour.** The two columns are the
+    /// whole of what a meeting reads: the harm one group delivers is its
+    /// attack scaled by its count, and the armour of the defender is the
+    /// threshold that the attack must pass before any harm counts at
+    /// all.[^1] [^2] Both columns therefore raise the worth of a unit, and
+    /// neither substitutes for the other.
+    ///
+    /// **The product of the two columns is refused.** A product states that a
+    /// unit strong in both is worth more than two units each strong in one,
+    /// which is closer to how a meeting resolves. It also reads zero for
+    /// every unit whose armour is zero, and every row of the default table
+    /// carries an armour of zero. A strength that is identically zero on
+    /// every world the project builds today publishes a constant, and a
+    /// policy learns nothing from a constant.
+    ///
+    /// The sum saturates rather than wraps, in the way every fixed-point sum
+    /// in this project does.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0122, an attacker whose attack does not exceed the defender's armour contributes exactly zero, decision D1. `docs/adrs/draft/adr-0122-an-attacker-below-the-armour-contributes-exactly-zero.md`
+    /// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    #[must_use]
+    pub const fn strength(&self, unit_type: UnitTypeId) -> Fix32 {
+        let row = &self.rows[unit_type.index()];
+        crate::sim_math::add(row.attack, row.armour)
+    }
+
+    /// Returns the military strength of a group of one type.
+    ///
+    /// The result widens, because a strength summed over the population of
+    /// the target world passes the range of the fixed-point type.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D3. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    #[must_use]
+    pub const fn group_strength(&self, unit_type: UnitTypeId, count: u32) -> Accum {
+        crate::sim_math::scale_by_count(self.strength(unit_type), count)
+    }
+
     /// Absorbs the table into the state hash.
     ///
     /// The table decides what a later frame does, so the whole-world hash
@@ -656,6 +700,71 @@ mod tests {
                 assert!(!table.penetrates(attacker, defender));
             }
         }
+    }
+
+    #[test]
+    fn strength_rises_with_the_attack_and_with_the_armour() {
+        let mut table = UnitTypeTable::empty();
+        let unit = UnitTypeId::from_u8(0).expect("zero names a row");
+        table
+            .define(0, fighter(Fix32::from_int(3), Fix32::from_int(0)))
+            .expect("the row is legal");
+        let no_armour = table.strength(unit);
+        table
+            .define(0, fighter(Fix32::from_int(3), Fix32::from_int(2)))
+            .expect("the row is legal");
+        let with_armour = table.strength(unit);
+        table
+            .define(0, fighter(Fix32::from_int(5), Fix32::from_int(2)))
+            .expect("the row is legal");
+        let more_attack = table.strength(unit);
+        assert!(
+            with_armour.0 > no_armour.0,
+            "armour must raise the strength"
+        );
+        assert!(
+            more_attack.0 > with_armour.0,
+            "attack must raise the strength"
+        );
+    }
+
+    #[test]
+    fn a_unit_with_no_armour_still_holds_strength() {
+        let table = DEFAULT_UNIT_TYPE_TABLE;
+        let soldier = SOLDIER;
+        assert_eq!(table.row(soldier).armour, Fix32::ZERO);
+        assert!(
+            table.strength(soldier).0 > 0,
+            "a product of the two columns would read zero here, and every row of the default table would"
+        );
+    }
+
+    #[test]
+    fn a_group_strength_is_the_unit_strength_scaled_by_the_count() {
+        let table = DEFAULT_UNIT_TYPE_TABLE;
+        let soldier = SOLDIER;
+        let one = i64::from(table.strength(soldier).0);
+        assert_eq!(table.group_strength(soldier, 0).0, 0);
+        assert_eq!(table.group_strength(soldier, 1).0, one);
+        assert_eq!(table.group_strength(soldier, 1_000_000).0, one * 1_000_000);
+    }
+
+    #[test]
+    fn a_strength_over_the_target_population_stays_inside_the_accumulator() {
+        let mut table = UnitTypeTable::empty();
+        let unit = UnitTypeId::from_u8(0).expect("zero names a row");
+        table
+            .define(0, fighter(Fix32::MAX, Fix32::MAX))
+            .expect("the row is legal");
+        let widest = table.group_strength(unit, 1_000_000);
+        assert!(
+            widest.0 > 0,
+            "the widest row over the target population must not wrap"
+        );
+        assert!(
+            widest.0 < i64::MAX / 2,
+            "the widest row over the target population must keep headroom"
+        );
     }
 
     #[test]
