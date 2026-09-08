@@ -1175,6 +1175,12 @@ impl Observation {
     /// The walk takes the factions in faction order and the blocks in block
     /// number order.[^3]
     ///
+    /// **The clock enters beside the remembered layer, and only for the
+    /// blocks that layer populated.** The clock of a block the faction never
+    /// saw states nothing. A hash over every block of the array would make
+    /// two worlds that hold the same memory hash apart when one of them had
+    /// allocated its array wider.
+    ///
     /// # References
     ///
     /// [^1]: ADR-0164, every stored value the step reads enters the state hash, decisions D1 and D2. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
@@ -1189,10 +1195,6 @@ impl Observation {
             };
             hash = hash.write_u64(index as u64);
             hash = layer.hash_into(hash);
-            // The clock of a block the faction never saw states nothing, so
-            // the walk takes the blocks the layer populated and no others.
-            // A hash over every block would make two worlds that differ in
-            // nothing hash apart when one of them had once allocated wider.
             for block in layer.populated_blocks() {
                 let tick = self
                     .last_seen

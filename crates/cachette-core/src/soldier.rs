@@ -792,8 +792,6 @@ impl SoldierArena {
         // The faction is below the ceiling, because the guard above refused
         // every other value, so the index is inside the array.
         self.by_faction[faction.0 as usize] += 1;
-        // A spawned slot carries the default type, and the despawn of the
-        // slot before it removed whatever type that unit held.
         self.by_faction_type[faction.0 as usize][DEFAULT_UNIT_TYPE.index()] += 1;
         // A reused slot starts empty because the despawn emptied it, and the
         // arena invariant fails when a dead slot carries anything. A second
@@ -1710,10 +1708,6 @@ impl SoldierArena {
         if counted != self.by_faction {
             return false;
         }
-        // The per-faction, per-type population is derived from the same two
-        // columns and the type column. The arena maintains it, and its rows
-        // sum to the per-faction population, so this recounts it and compares
-        // both. Nothing else fails when the copies disagree.[^4]
         let mut by_type = [[0u32; UNIT_TYPE_COUNT]; FACTION_CEILING as usize];
         for index in 0..slots {
             if self.live[index] == 1 {

@@ -799,12 +799,6 @@ impl World {
             .resources()
             .original(address, ResourceKind::Food)
             .ok_or(FactionViewError::NoTile(address))?;
-        // The deposit flag reads the generated stock of every kind, because
-        // the pyramid counts a tile that the ground gave any deposit. A
-        // masked reader that asked about one kind would state a different
-        // field under one name.[^3]
-        //
-        // [^3]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
         let deposit = ResourceKind::ALL.iter().any(|kind| {
             self.resources()
                 .original_of_ground(address, ground.kind, *kind)
