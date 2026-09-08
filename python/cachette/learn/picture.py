@@ -1010,7 +1010,7 @@ def _animation(names: Sequence[str], seconds: float) -> str:
         '<!doctype html><meta charset="utf-8">'
         "<title>the observation over time</title>"
         "<style>body{margin:0;background:#fff}"
-        ".stack{position:relative}"
+        ".stack{position:relative;min-height:100vh}"
         "img{position:absolute;top:0;left:0;opacity:0;"
         f"animation:flip {total:.3f}s steps(1,end) infinite}}"
         "@keyframes flip{0%{opacity:1}"
