@@ -49,6 +49,7 @@ import numpy as np
 from cachette._core import Batch, World
 
 from .reward import Reward, RewardStep, Weighting
+from .signals import SignalCatalogue
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Callable, Sequence
@@ -214,6 +215,12 @@ class Env:
         self.action_length: int = int(action["length"])
         self.observation_version: int = int(observation["version"])
         self.action_version: int = int(action["version"])
+        # Every quantity the engine publishes about the seat, read from the
+        # schema of the probe world. **A caller reads an observation through
+        # this and never through a position of its own.** A tuple of names
+        # written by hand is a second declaration of what the engine
+        # publishes, and nothing fails when the two disagree.
+        self.signals: SignalCatalogue = SignalCatalogue.of_world(probe)
 
     @property
     def config(self) -> EnvConfig:
@@ -224,6 +231,21 @@ class Env:
     def seat(self) -> int:
         """The faction the learner plays."""
         return self._config.seat
+
+    @property
+    def decisions(self) -> int:
+        """How many decisions this episode has taken."""
+        return self._decisions
+
+    @property
+    def terminated(self) -> bool:
+        """Whether the game ended this episode."""
+        return self._terminated
+
+    @property
+    def truncated(self) -> bool:
+        """Whether the horizon or the tick limit ended this episode."""
+        return self._truncated
 
     def _build(self, seed: int) -> World:
         """Build one world, seed it, and give the seat to the caller."""
@@ -272,7 +294,9 @@ class Env:
         **A caller that reads this holds the whole truth of the world.** The
         environment itself calls no reader outside the faction-scoped set, and
         a caller that reaches through this property leaves that guarantee
-        behind. It exists for a test and for a report written after a run.
+        behind. It exists for a test, for a report written after a run, and
+        for the batch, which needs the handle of every world it steps in one
+        crossing.
         """
         return self._require_world()
 
@@ -332,26 +356,53 @@ class Env:
         the middle of a decision the caller thinks is one step.
         """
         world = self._require_world()
-        if self._reward is None:  # pragma: no cover - reset builds both
-            message = "the environment has no reward. Call reset first."
-            raise RuntimeError(message)
         if self.done:
             message = "the episode has ended. Call reset before stepping again."
             raise RuntimeError(message)
 
-        applied = (
-            world.act(self._config.seat, int(action))
-            if self._config.controlled
-            else None
-        )
+        applied = self.apply(action)
         for _ in range(self._config.decision_interval):
             world.step(self._config.threads)
             if on_tick is not None:
                 on_tick(world)
-        self._decisions += 1
+        return self.settle(applied)
 
+    def apply(self, action: int) -> bool | None:
+        """Send one action to the verb, and say whether the verb took it.
+
+        The answer is true when the verb accepted the action, and false when
+        the verb refused it. The answer is absent when the seat is not
+        controlled, because nothing here chose an action.
+
+        A refusal is not an error. The engine reports it and the world runs
+        anyway. A caller that measures a policy counts the refusals, because a
+        policy whose actions the engine mostly refuses is close to a no-op
+        whatever it chooses.
+        """
+        world = self._require_world()
+        if not self._config.controlled:
+            return None
+        return world.act(self._config.seat, int(action))
+
+    def settle(self, applied: bool | None = None) -> StepResult:
+        """Close one decision: count it, read the reward, and score the change.
+
+        The environment counts the decision, reads the reward of the seat, and
+        decides whether the episode ended. It runs no tick of its own, so a
+        caller that ran the world itself calls this to finish the decision.
+        The batch does that: it applies every action, steps every world in one
+        crossing, then closes each decision here.
+
+        The applied entry is what ``apply`` answered. It travels into the
+        result, so a caller reads the refusal of the decision it just took.
+        """
+        world = self._require_world()
+        if self._reward is None:  # pragma: no cover - reset builds both
+            message = "the environment has no reward. Call reset first."
+            raise RuntimeError(message)
+        self._decisions += 1
         reading = self._reward.read(world)
-        self._settle(reading)
+        self._record_end(reading)
         return StepResult(
             observation=self.observation(),
             reward=reading.value,
@@ -368,7 +419,22 @@ class Env:
             },
         )
 
-    def _settle(self, reading: RewardStep) -> None:
+    def idle(self) -> StepResult:
+        """Return the result of an environment whose episode already ended.
+
+        The batch keeps every environment in index order, so a finished
+        episode still reports a row. The row earns nothing and changes
+        nothing, and the skipped entry of the info says so.
+        """
+        return StepResult(
+            observation=self.observation(),
+            reward=0.0,
+            terminated=self._terminated,
+            truncated=self._truncated,
+            info={"skipped": True},
+        )
+
+    def _record_end(self, reading: RewardStep) -> None:
         """Decide whether the episode ended, and how it ended."""
         if reading.outcome in ("won", "lost"):
             self._terminated = True
@@ -518,7 +584,7 @@ class VectorEnv:
         ]
         self._live = list(range(self._count))
         self.world_ticks = 0
-        self._batch = Batch([env._require_world() for env in self._envs], self._workers)
+        self._batch = Batch([env.world for env in self._envs], self._workers)
         return np.stack(rows)
 
     def action_masks(self) -> np.ndarray:
@@ -544,10 +610,13 @@ class VectorEnv:
             raise ValueError(message)
 
         live = [index for index, env in enumerate(self._envs) if not env.done]
-        if self._config.controlled:
-            for index in live:
-                env = self._envs[index]
-                env._require_world().act(env.seat, int(actions[index]))
+        # Every live environment applies its own action and reports whether
+        # the verb took it. The answer travels into the result of that
+        # environment, so a caller measures how much of what a policy chose
+        # the engine carried out.
+        applied = {
+            index: self._envs[index].apply(int(actions[index])) for index in live
+        }
 
         # One crossing for every world that is still running. **A world whose
         # episode has ended leaves the batch**, because a game resolves after
@@ -560,7 +629,7 @@ class VectorEnv:
         # finished.
         if live != self._live:
             self._batch = Batch(
-                [self._envs[index]._require_world() for index in live], self._workers
+                [self._envs[index].world for index in live], self._workers
             )
             self._live = live
         self.world_ticks += len(live) * self._config.decision_interval
@@ -574,34 +643,10 @@ class VectorEnv:
 
         results: list[StepResult] = []
         for index, env in enumerate(self._envs):
-            if index not in live:
-                results.append(
-                    StepResult(
-                        observation=env.observation(),
-                        reward=0.0,
-                        terminated=env._terminated,
-                        truncated=env._truncated,
-                        info={"skipped": True},
-                    )
-                )
-                continue
-            env._decisions += 1
-            reading = env._reward.read(env._require_world())  # type: ignore[union-attr]
-            env._settle(reading)
-            results.append(
-                StepResult(
-                    observation=env.observation(),
-                    reward=reading.value,
-                    terminated=env._terminated,
-                    truncated=env._truncated,
-                    info={
-                        "outcome": reading.outcome,
-                        "shaped": reading.shaped,
-                        "terminal": reading.terminal,
-                        "changes": dict(reading.changes),
-                    },
-                )
-            )
+            if index in applied:
+                results.append(env.settle(applied[index]))
+            else:
+                results.append(env.idle())
         return results
 
     @property
