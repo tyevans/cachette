@@ -23,9 +23,52 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-282**
+**Next number: DEC-283**
 
 ## Open
+
+### DEC-282 — What are the parameters of the fixed observation layout?
+
+**Open. Engineering owns it.**
+
+A draft record makes the width of the observation a constant, and it holds no
+figure.[^DEC282A] The width is therefore a function of the layout parameters
+alone. Those parameters are the ring count, the sector count of a ring, the
+channel count of a spatial cell, the token count of each token set, the channel
+count of a token, the cap of a compressed magnitude, the class count of each
+taxonomy, and the size of the reserve. A register holds a row for each
+one.[^DEC282B]
+
+A research report recommends a value for every parameter and derives each
+one.[^DEC282C] The report also says plainly that the reserve size is a
+judgement and not a measurement, and that the channel count and the cell count
+are design knobs.
+
+**Option A. Take the recommendation of the report as it stands.** The report
+derives each value, and the whole layout is consistent. The first
+implementation then has one set of numbers to build against. Nothing prices a
+block before the project pays for it.
+
+**Option B. Price each block before the layout is fixed.** The report gives a
+method that uses episodes rather than training runs. It ranks each position
+against the outcome and removes one block at a time. A block that costs nothing
+to remove becomes reserve. This costs a corpus of episodes and a probe, and it
+delays the builder.
+
+**Option C. Build the smallest layout that removes the three defects, and grow
+it through the reserve.** A revision claims a reserved position, so the width
+does not move. Every growth step retires every policy trained before it, which
+is the cost the reserve exists to avoid.
+
+**Recommendation. Option A for the first implementation, then Option B.** The
+three defects the record names are independent of every parameter, so a wrong
+parameter costs sample efficiency and a wrong rule costs the whole run. Price
+the blocks against a corpus once the array exists, and move a priced-out block
+into the reserve at the next revision.
+
+**Nothing is stopped.** The record expresses every parameter as a register row,
+so the builder can start against provisional values and the register records
+which are provisional.
 
 ### DEC-276 — What does a remembered place answer about what was built there?
 
@@ -84,6 +127,14 @@ faction knows. The array itself needs no change under any of the three options,
 because it reads the tile reader and the masked summary rather than the layer.
 Option B or option C therefore changes the layer and the state hash, and it
 changes no position of the observation.
+
+**A draft record sharpens this question again.** It replaces the lattice block
+of the observation with a stack of rings around the faction, and it bounds the
+build cost by the area the faction has observed.[^DEC276H] That bound obliges a
+remembered value for every channel that fog governs, and the count of finished
+upgrades of a rival is one of those channels. Option A leaves that channel
+reading nothing at a cell the faction no longer watches. The choice between the
+three options still changes no position of the array.
 
 ### DEC-275 — Does the territory reader compare a share of the tiles?
 
@@ -4848,6 +4899,10 @@ generation, and reports that number beside the relative one.
 [^DEC276B]: ADR-0059, fog storage grows with observed area, not with world area, decision D2. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^DEC276D]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
 [^DEC276F]: ADR-0059, fog storage grows with observed area, not with world area, decision D5. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+[^DEC276H]: ADR-0195, the observation of a faction is a fixed-width scale-free table in an egocentric frame, decisions D3 and D5. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+[^DEC282A]: ADR-0195, the observation of a faction is a fixed-width scale-free table in an egocentric frame, decision D1. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+[^DEC282B]: Reinforcement learning parameters register, the observation layout. `docs/reference/rl-costs.md`
+[^DEC282C]: Research report 42, what a policy should be able to see, sections 9 and 12. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
 [^DEC276G]: Backlog item 0516, give a faction one flat observation array, and declare its layout in a schema. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
 [^DEC277B]: Research report 30, the published atmospheric math, section 9. `docs/research/reports/30-the-published-atmospheric-math.md`
 [^DEC277C]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
