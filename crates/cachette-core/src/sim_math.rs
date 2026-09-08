@@ -434,3 +434,157 @@ pub const fn sine_of_steps(phase: i64) -> Fix32 {
     let high = sine_at_step(step + 1) as i64;
     Fix32(saturate_i32(low + (high - low) * part / fine))
 }
+
+/// The bit width that bounds a compressed magnitude.
+///
+/// A compressed magnitude divides the base-two logarithm of a quantity by
+/// this width, so a quantity below two to this power maps inside the unit
+/// range. The width is a structural cap and not a budget: it is the widest
+/// quantity the observation of a faction can carry, which is a fixed-point
+/// store total summed over the unit ceiling of the world.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 42, what a policy should be able to see, section 4. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+pub const MAGNITUDE_CAP_BITS: u32 = 40;
+
+/// Returns the part of a whole, bounded to the unit range.
+///
+/// The result lies between zero and one. A whole of zero or below reads as
+/// one, and a part below zero reads as zero, so the function is total and it
+/// never divides by zero. The division truncates toward zero.
+///
+/// **A learner reads this value, so it must be bounded whatever the world
+/// size.** A raw count means one thing on a small world and another thing on
+/// a large one, and a policy trained against one cannot read the other.[^1]
+/// The caller names the denominator, and the denominator is a structural
+/// property of the world or a total the engine already keeps.[^2]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-670. `docs/FINDINGS.md`
+/// [^2]: Research report 42, what a policy should be able to see, section 8.1. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+#[must_use]
+pub const fn bounded_share(part: i64, whole: i64) -> Fix32 {
+    let whole = if whole < 1 { 1 } else { whole };
+    let part = if part < 0 { 0 } else { part };
+    let wide = ((part as i128) << FIX_FRACTIONAL_BITS) / (whole as i128);
+    let one = Fix32::ONE.0 as i128;
+    Fix32(if wide > one {
+        Fix32::ONE.0
+    } else {
+        wide as i32
+    })
+}
+
+/// Returns the signed relation between two magnitudes.
+///
+/// The result lies between minus one and one. It is the difference of the two
+/// values over the sum of their magnitudes, so it bounds itself and the
+/// caller names no denominator. Two equal values give zero. A first value
+/// with a second of zero gives one.
+///
+/// The division truncates toward zero. A sum of magnitudes of zero reads as
+/// one, so the function is total.
+#[must_use]
+pub const fn signed_relation(a: i64, b: i64) -> Fix32 {
+    let scale = (a.unsigned_abs() as i128) + (b.unsigned_abs() as i128);
+    let scale = if scale < 1 { 1 } else { scale };
+    let wide = (((a as i128) - (b as i128)) << FIX_FRACTIONAL_BITS) / scale;
+    let one = Fix32::ONE.0 as i128;
+    if wide > one {
+        Fix32::ONE
+    } else if wide < -one {
+        Fix32(-Fix32::ONE.0)
+    } else {
+        Fix32(wide as i32)
+    }
+}
+
+/// Returns a quantity compressed into the unit range, keeping its sign.
+///
+/// The result lies between minus one and one. It is the base-two logarithm
+/// of one plus the magnitude of the value, over the cap width, with the sign
+/// of the value restored.[^1] The map is monotone in the magnitude, so a
+/// larger quantity always reads larger.
+///
+/// **This is the one form the observation publishes for a quantity with no
+/// named denominator.** A running total declared with the whole integer range
+/// as its bound spans twelve orders of magnitude, and a learner that takes a
+/// fixed-size step cannot serve such an input.[^2]
+///
+/// # References
+///
+/// [^1]: Research report 42, what a policy should be able to see, section 4. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+/// [^2]: Findings register, FND-670. `docs/FINDINGS.md`
+#[must_use]
+pub const fn compressed_magnitude(value: i64) -> Fix32 {
+    let logarithm = log2_fixed(1 + value.unsigned_abs()) as i64;
+    let scaled = logarithm / (MAGNITUDE_CAP_BITS as i64);
+    let one = Fix32::ONE.0 as i64;
+    let bounded = if scaled > one {
+        Fix32::ONE.0
+    } else {
+        scaled as i32
+    };
+    if value < 0 {
+        Fix32(-bounded)
+    } else {
+        Fix32(bounded)
+    }
+}
+
+/// Returns the base-two logarithm of a whole number, in Q16.16.
+///
+/// The answer is exact to the last fractional bit. The function reads the
+/// leading zero count for the whole part, then squares the mantissa sixteen
+/// times for the fractional bits. Every step is an integer operation, so two
+/// runs on two machines give one answer.
+///
+/// A value of zero reads as one, because the logarithm of zero has no
+/// integer answer and this module does not panic on a caller error.
+#[must_use]
+pub const fn log2_fixed(value: u64) -> u32 {
+    let value = if value < 1 { 1 } else { value };
+    let exponent = 63 - value.leading_zeros();
+    let mut mantissa = (value as u128) << (63 - exponent);
+    let mut out = exponent << FIX_FRACTIONAL_BITS;
+    let mut bit = 1u32 << (FIX_FRACTIONAL_BITS - 1);
+    while bit != 0 {
+        mantissa = (mantissa * mantissa) >> 63;
+        if mantissa >= 1u128 << 64 {
+            mantissa >>= 1;
+            out |= bit;
+        }
+        bit >>= 1;
+    }
+    out
+}
+
+/// Returns one quadrature of a cyclic phase, as a triangle wave.
+///
+/// The result lies between minus one and one. It rises across the first half
+/// of the period and falls across the second half, so it is continuous at the
+/// wrap point.
+///
+/// **A single phase value carries a step at the wrap point, and a learner
+/// reads that step as a large change in the world.** A caller therefore takes
+/// this value twice, once at the phase and once a quarter period after it,
+/// and the pair removes the step.[^1]
+///
+/// A period of zero or below reads as one, so the function is total.
+///
+/// # References
+///
+/// [^1]: Research report 42, what a policy should be able to see, section 9.2. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+#[must_use]
+pub const fn phase_triangle(phase: i64, period: i64) -> Fix32 {
+    let period = if period < 1 { 1 } else { period };
+    let turn = phase % period;
+    let turn = if turn < 0 { turn + period } else { turn };
+    let one = Fix32::ONE.0 as i128;
+    let whole = (turn as i128) * 4 * one / (period as i128);
+    let half = 2 * one;
+    let risen = if whole < half { whole } else { 4 * one - whole };
+    Fix32((risen - one) as i32)
+}
