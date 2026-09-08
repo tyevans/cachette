@@ -652,6 +652,29 @@ impl core::fmt::Display for StepError {
 
 impl std::error::Error for StepError {}
 
+/// Whether a level 1 rebuild derives the destination field, or leaves it to
+/// the step.
+///
+/// **The step derives the field after the controller.** The controller sends
+/// several times in one frame, and each send changes the seed set of a plane,
+/// so a field derived at the barrier is overwritten before anything reads
+/// it.[^1]
+///
+/// Every other path leaves the field derived, because a caller outside a
+/// frame reads it as soon as the call returns.[^2]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-664. `docs/FINDINGS.md`
+/// [^2]: Findings register, FND-029. `docs/FINDINGS.md`
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Destinations {
+    /// Derive the field before the call returns.
+    Derive,
+    /// Leave the field to the one derivation the step makes at its end.
+    AtTheEndOfTheStep,
+}
+
 /// The settings that build a world.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WorldConfig {
@@ -999,6 +1022,33 @@ pub struct World {
     /// [^1]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
     /// [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D1. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
     destination_crossings: Vec<u8>,
+    /// Whether the step derives the destination field before it returns.
+    ///
+    /// **The field is derived once for each frame, after the last verb that
+    /// changes its seeds.** The send verb ends by deriving the field, because
+    /// a caller may read a direction between two steps and a derived value
+    /// that one path leaves stale is a confident wrong answer.[^1] That
+    /// reason asks for one derivation and not one for each send. The
+    /// controller sends several times in one frame, and the barrier derives
+    /// the field before it, so a frame that took three orders derived the
+    /// whole field four times and read three of them never.
+    ///
+    /// The flag says that the step will derive the field before it returns.
+    /// It states a fact about the frame and not about the caller: the verb
+    /// asks nothing about who called it, and every caller reaches the same
+    /// verb.[^2] The step sets the flag around the controller alone, so a
+    /// caller outside a step always finds the field derived.
+    ///
+    /// **Nothing between the barrier and the end of the step reads the
+    /// field.** The movement pass and the release of sent units are the two
+    /// readers, and both run near the start of a frame.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-029. `docs/FINDINGS.md`
+    /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    /// [^3]: Findings register, FND-664. `docs/FINDINGS.md`
+    destinations_deferred: bool,
     /// The load at which a unit counts as laden.
     ///
     /// A laden unit takes the option that carries its load home, and a unit
@@ -1912,6 +1962,7 @@ impl World {
             approaches: ApproachField::new(layout),
             destination_seeds: vec![Vec::new(); config.destination_plane_count() as usize],
             destination_crossings: vec![0; config.destination_plane_count() as usize],
+            destinations_deferred: false,
             carry_mark: CARRY_MARK_DEFAULT,
             holding: Holding::new(layout),
             luxuries: LuxuryField::new(),
@@ -2009,7 +2060,7 @@ impl World {
         // A world that has never stepped still answers a question about a
         // region. A level that nothing rebuilt would describe an empty world
         // and would be wrong rather than absent.
-        world.rebuild_level_1(1)?;
+        world.rebuild_level_1(1, Destinations::Derive)?;
         // The conductance of a cell follows the ground it covers, and the
         // ground does not change for the life of a world, so this runs once
         // and never again. It reads the level that the rebuild above just
@@ -2341,12 +2392,18 @@ impl World {
                 "a resolved identity must name a soldier the arena can send"
             );
         }
-        // The field is derived here as well as at the barrier. A caller reads
-        // the direction between two steps, and a derived value that one path
-        // leaves stale is a confident wrong answer.[^5]
+        // The verb leaves the field derived. A caller reads the direction
+        // between two steps, and a derived value that one path leaves stale
+        // is a confident wrong answer.[^5]
+        //
+        // **The step derives the field once, after the controller.** It sets
+        // the flag while the controller runs, and it derives the field before
+        // it returns, so the reason above holds for every caller and the
+        // frame pays for one derivation rather than one for each send.[^8]
         //
         // [^5]: Findings register, FND-029. `docs/FINDINGS.md`
-        {
+        // [^8]: Findings register, FND-664. `docs/FINDINGS.md`
+        if !self.destinations_deferred {
             let _span = stage::open(Stage::SendDeriveDestinations);
             self.derive_destination_fields();
         }
@@ -7062,7 +7119,7 @@ impl World {
         // [^5]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
         {
             let _span = stage::open(Stage::RebuildLevel1);
-            self.rebuild_level_1(threads)?;
+            self.rebuild_level_1(threads, Destinations::AtTheEndOfTheStep)?;
         }
 
         // The influence solve runs last, after every change this frame made
@@ -7165,7 +7222,30 @@ impl World {
         // [^24]: ADR-0148, a game end is recorded once and stops the controllers, decision D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
         {
             let _span = stage::open(Stage::Controller);
+            // **The controller sends several times in one frame.** Each send
+            // leaves the field derived for a caller that reads it between two
+            // steps, and inside a frame that derivation is thrown away by the
+            // next send. The flag says that the step derives the field below,
+            // so the frame pays for one derivation.[^26]
+            //
+            // [^26]: Findings register, FND-664. `docs/FINDINGS.md`
+            self.destinations_deferred = true;
             self.run_controller();
+            self.destinations_deferred = false;
+        }
+        // **The destination field is derived here, once for each frame.** The
+        // barrier above left it, and the controller changed the seed set of
+        // every plane it sent on. This is the last thing in the frame that
+        // touches the field, and a caller between two steps reads what it
+        // wrote.[^26]
+        //
+        // The probe switch removes this derivation, so the field describes
+        // the seed set as it stood before the controller sent anything. A
+        // test that a stale field would pass proves nothing.
+        #[cfg(not(feature = "probe-stale-destinations"))]
+        {
+            let _span = stage::open(Stage::RebuildDestinations);
+            self.derive_destination_fields();
         }
         // **A step leaves the world readable.** The controller founds cities,
         // and a founding seats a group and spends the settler. Both change
@@ -9278,7 +9358,7 @@ impl World {
     /// arena.
     pub fn rebuild_pyramid(&mut self, threads: usize) -> Result<(), StepError> {
         self.refresh_bridge()?;
-        self.rebuild_level_1(threads)?;
+        self.rebuild_level_1(threads, Destinations::Derive)?;
         Ok(())
     }
 
@@ -9304,7 +9384,11 @@ impl World {
     /// [^1]: Findings register, FND-029. `docs/FINDINGS.md`
     /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, the consequences. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
     /// [^3]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D2. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
-    fn rebuild_level_1(&mut self, threads: usize) -> Result<(), BridgeError> {
+    fn rebuild_level_1(
+        &mut self,
+        threads: usize,
+        destinations: Destinations,
+    ) -> Result<(), BridgeError> {
         {
             let _span = stage::open(Stage::RebuildPyramid);
             self.pyramid.rebuild(
@@ -9331,7 +9415,18 @@ impl World {
             let _span = stage::open(Stage::RebuildStock);
             self.derive_stock_field();
         }
-        {
+        // **The step derives the destination field after the controller and
+        // not here.** The controller sends several times in one frame, and
+        // each send changes the seed set of a plane, so a field derived here
+        // is overwritten before anything reads it. Nothing between this
+        // barrier and the end of the step reads the field.[^5]
+        //
+        // Every other path through this function leaves the field derived,
+        // because a caller outside a frame reads it as soon as the call
+        // returns.[^1]
+        //
+        // [^5]: Findings register, FND-664. `docs/FINDINGS.md`
+        if destinations == Destinations::Derive {
             let _span = stage::open(Stage::RebuildDestinations);
             self.derive_destination_fields();
         }

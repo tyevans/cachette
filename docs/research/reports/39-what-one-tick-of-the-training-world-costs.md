@@ -713,10 +713,12 @@ which.
    measurement and two shapes of fix. The cheaper one takes a late training
    tick from 15.3 to 9.9 milliseconds. The better one takes it to 7.2. Both
    also flatten the spread between worlds that the earlier report found.
+   **This is done, and the findings register holds what it gave.**[^16]
 2. **Correct the thread guard of the influence solve.** Section 4.4 measures
    it and names the condition. It is 8.5 percent of an early training frame,
    it is one condition in one function, and three separate sweeps agree on the
-   cause.
+   cause. **This is done, and the findings register holds what it
+   gave.**[^16]
 3. **Run the stage table at the target extent on a seeded world.** Section 9
    shows that the only measurement this project has at that extent holds no
    settlement and no controller, so it prices none of the stages that hold a
@@ -742,3 +744,4 @@ which.
 [^13]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^14]: The stage cost test. `crates/cachette-core/tests/stage_cost.rs`
 [^15]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+[^16]: Findings register, FND-664 and FND-665. `docs/FINDINGS.md`

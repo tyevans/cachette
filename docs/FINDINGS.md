@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-648**
+**Next number: FND-666**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -17015,6 +17015,64 @@ defect: neither crate holds unsafe code beyond two plain-data
 declarations, so a stale structure gives a refusal or a wrong count and never
 a bad dereference.[^F648E]
 
+### FND-664 — The destination field was derived four times in one frame, and three of the four were thrown away
+
+**Believed.** The send verb must derive the destination field before it
+returns. A caller reads a direction between two steps, and a derived value
+that one path leaves stale is a confident wrong answer.[^F664A] The project
+read that reason as a reason to derive inside the verb on every call.
+
+**True.** The reason asks for one derivation in a frame, not one for each
+send. The built-in controller calls the send verb up to three times in one
+frame, and the barrier of the frame derives the field before it. Two passes
+read the field, and both run near the start of a frame: the movement pass and
+the release of sent units. Nothing between the barrier and the end of the step
+reads it, so three of the four derivations were thrown away.
+
+**Evidence.** A stage table of the training world, 48 tiles a side, three
+factions, one thread, on one pinned performance core of a development
+machine.[^F664B] A late frame spent 7.77 milliseconds of 14.75 in the send
+derivation and 2.59 in the barrier derivation. The step now derives the field
+once, after the controller, and the same window costs 6.94 milliseconds. The
+mean frame over an episode of 2500 ticks falls from 13.29 to 6.65
+milliseconds. **The whole-world state hash does not move.** It is the same
+after 1220 ticks, the same after 2500 ticks, and the same at 1, 2, 4 and 12
+threads.[^F160A]
+
+**What follows.** The verb still leaves the field derived for every caller
+outside a step, so the reason above holds. The step sets one flag while the
+controller runs, and it derives the field once before it returns. The flag
+states a fact about the frame and not about the caller, so the verb asks
+nothing about who called it.[^F664D] Two tests drive the engine and read the
+field through the public reader, and one test-only switch removes the
+derivation to prove that both tests fail.[^F664E]
+
+### FND-665 — A guard that avoided a thread for small work did not cover the case of one thread
+
+**Believed.** The influence relaxation takes the single-threaded path when the
+work is too small to divide. The guard compared the cell count against the
+thread count, and it read the two numbers the caller supplied.
+
+**True.** The guard is the wrong way round for one thread. A level 1 cell
+covers a block of 32 tiles a side, so a world of 48 tiles a side holds four
+cells. At four threads the guard reads four against four and takes the cheap
+path. At one thread it reads four against one, so it starts one thread for
+each faction and each pass to relax four cells. **The trainer runs one thread
+for each world, so every training frame paid it.**
+
+**Evidence.** A report measured the solve at 499 microseconds at one thread and
+at 2.4 microseconds at four, on one world with one state hash. Three sweeps in
+that report agree on the cause: the cost is linear in the faction count, a
+world of 24 tiles a side with one cell costs 0.4 microseconds, and the solve
+gets slower from one thread to two.[^F665A] The guard now takes the
+single-threaded path when the caller asks for one thread. The solve falls from
+346 to 2.0 microseconds for each frame, and the early training frame falls
+from 3.85 to 3.51 milliseconds.[^F664B]
+
+**What follows.** A guard that avoids a thread for small work must also cover
+the case of one thread. The two conditions read the numbers the caller
+supplied, and they hold no constant of their own.
+
 ## References
 
 [^F643A]: ADR-0192, a window of controller commands is one label distribution over the action table, decision D2. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
@@ -17035,3 +17093,8 @@ a bad dereference.[^F648E]
 [^F647B]: The observation test of the engine. `crates/cachette-core/tests/a_faction_reads_one_flat_array.rs`
 [^F647C]: ADR-0193, a faction's observation names another faction by a position relative to the reader, decision D1. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
 [^F647D]: The policy fit of the control plane. `python/cachette/learn/policy.py`
+[^F664A]: Findings register, FND-029. `docs/FINDINGS.md`
+[^F664B]: Report 39, what one tick of the training world costs. `docs/research/reports/39-what-one-tick-of-the-training-world-costs.md`
+[^F664D]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+[^F664E]: The test that the step derives the destination field after the controller. `crates/cachette-core/tests/the_step_derives_the_destination_field_after_the_controller.rs`
+[^F665A]: Report 39, the second defect, section 4.4. `docs/research/reports/39-what-one-tick-of-the-training-world-costs.md`
