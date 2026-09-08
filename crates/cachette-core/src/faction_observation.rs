@@ -1217,10 +1217,13 @@ impl World {
                 continue;
             };
             if owner != faction {
-                if self.faction_has_seen(faction, address) {
-                    if let Some(place) = scan.settlements_seen.get_mut(usize::from(owner.0)) {
-                        *place += 1;
-                    }
+                let seen = self.faction_has_seen(faction, address);
+                if let Some(place) = scan
+                    .settlements_seen
+                    .get_mut(usize::from(owner.0))
+                    .filter(|_| seen)
+                {
+                    *place += 1;
                 }
                 continue;
             }
@@ -1281,10 +1284,13 @@ impl World {
                 }
                 continue;
             }
-            if finished && self.faction_has_seen(faction, address) {
-                if let Some(place) = scan.finished_seen.get_mut(usize::from(owner.0)) {
-                    *place += 1;
-                }
+            let seen = finished && self.faction_has_seen(faction, address);
+            if let Some(place) = scan
+                .finished_seen
+                .get_mut(usize::from(owner.0))
+                .filter(|_| seen)
+            {
+                *place += 1;
             }
         }
         if let Some(place) = scan.finished_seen.get_mut(usize::from(faction.0)) {
