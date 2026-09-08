@@ -40,21 +40,34 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from .reward import OUTCOMES, RUNNING
+
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Mapping, Sequence
 
     from .env import Env
 
-# The outcome names the engine records for one episode, and the name each one
-# takes in a reading. **The reading reports one column for each outcome rather
-# than the name itself**, so a mean over episodes is the share of episodes
-# that ended that way.
-OUTCOME_COLUMNS: dict[str, str] = {
-    "won": "won",
-    "lost": "lost",
-    "drawn": "drawn",
-    "running": "unresolved",
-}
+
+def outcome_columns(outcome: str) -> dict[str, float]:
+    """Return one column for each outcome, with a one in the column that holds.
+
+    A reading reports one column for each outcome rather than the name
+    itself, so a mean over many episodes is the share of episodes that ended
+    that way.
+
+    **The set of outcomes comes from the reward module, which declares it.**
+    A second list here would be one fact stored twice, with nothing that
+    fails when the copies disagree. The engine calls the unfinished state
+    ``running`` and a report has always called that column ``unresolved``, so
+    this is the one place that translates between the two.
+    """
+    if outcome not in OUTCOMES:
+        message = f"{outcome!r} names no outcome. The reward module holds {OUTCOMES}."
+        raise ValueError(message)
+    reported = {RUNNING: "unresolved"}
+    columns = {reported.get(name, name): 0.0 for name in OUTCOMES}
+    columns[reported.get(outcome, outcome)] = 1.0
+    return columns
 
 
 @dataclass(frozen=True)
@@ -136,8 +149,7 @@ class EpisodeRecord:
         translate between them.
         """
         row = {name: float(value) for name, value in self.signals.items()}
-        for outcome, column in OUTCOME_COLUMNS.items():
-            row[column] = 1.0 if self.outcome == outcome else 0.0
+        row.update(outcome_columns(self.outcome))
         row["end_tick"] = float(self.signals.get("tick", 0.0))
         return row
 
@@ -274,6 +286,10 @@ class GenerationRecord:
         the validation seeds, and the run reports every validation score
         against it, because a relative score cannot say whether the whole
         population improved.
+
+        The degenerate entry is one when the generation carried no
+        information and the centre did not move. A reader of the report finds
+        the wasted generations by that entry alone.
         """
         return {
             "generation": float(self.generation),
@@ -281,9 +297,6 @@ class GenerationRecord:
             "mean": float(np.mean(self.ranked)),
             "worst": min(self.ranked),
             "spread": self.spread,
-            # One when the generation carried no information and the centre
-            # did not move. A reader of the report finds the wasted
-            # generations by this field alone.
             "degenerate": 0.0 if self.informative else 1.0,
             "absolute_spread": self.absolute_spread,
             "absolute_mean": float(np.mean(self.absolute)),
@@ -350,9 +363,9 @@ def episode_records(
 
 
 __all__ = [
-    "OUTCOME_COLUMNS",
     "EpisodeRecord",
     "GenerationRecord",
     "PopulationRecord",
     "episode_records",
+    "outcome_columns",
 ]

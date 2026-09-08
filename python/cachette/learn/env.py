@@ -192,7 +192,14 @@ class Env:
     """
 
     def __init__(self, config: EnvConfig, weighting: Weighting) -> None:
-        """Build the environment. This builds no world; ``reset`` does that."""
+        """Build the environment. This builds no world; ``reset`` does that.
+
+        The signal catalogue names every quantity the engine publishes about
+        the seat, and it comes from the schema of a probe world. **A caller
+        reads an observation through it and never through a position of its
+        own.** A tuple of names written by hand is a second declaration of
+        what the engine publishes, and nothing fails when the two disagree.
+        """
         self._config = config
         self._weighting = weighting
         self._world: World | None = None
@@ -215,11 +222,6 @@ class Env:
         self.action_length: int = int(action["length"])
         self.observation_version: int = int(observation["version"])
         self.action_version: int = int(action["version"])
-        # Every quantity the engine publishes about the seat, read from the
-        # schema of the probe world. **A caller reads an observation through
-        # this and never through a position of its own.** A tuple of names
-        # written by hand is a second declaration of what the engine
-        # publishes, and nothing fails when the two disagree.
         self.signals: SignalCatalogue = SignalCatalogue.of_world(probe)
 
     @property
@@ -594,10 +596,14 @@ class VectorEnv:
     def step(self, actions: Sequence[int]) -> list[StepResult]:
         """Take one decision in each environment, in one crossing.
 
-        Every environment applies its own action first. The batch then runs
-        every world, and each environment reads its own reward. An
-        environment whose episode has ended takes the no-op and stays where
-        it is.
+        Every environment applies its own action first and reports whether the
+        verb took it. The batch then runs every world, and each environment
+        reads its own reward. An environment whose episode has ended takes the
+        no-op and stays where it is.
+
+        The answer of each verb travels into the result of its own
+        environment, so a caller measures how much of what a policy chose the
+        engine carried out.
         """
         if self._batch is None:
             message = "the vector has no episode. Call reset first."
@@ -610,10 +616,6 @@ class VectorEnv:
             raise ValueError(message)
 
         live = [index for index, env in enumerate(self._envs) if not env.done]
-        # Every live environment applies its own action and reports whether
-        # the verb took it. The answer travels into the result of that
-        # environment, so a caller measures how much of what a policy chose
-        # the engine carried out.
         applied = {
             index: self._envs[index].apply(int(actions[index])) for index in live
         }

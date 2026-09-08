@@ -76,6 +76,12 @@ def run_population(
 
     The world at index ``candidate * len(seeds) + seed`` belongs to that pair.
     The batch reports in index order, so the mapping holds for every step.
+
+    The record counts what each world chose and what its verb refused. **The
+    engine answers that on every action, and the batch used to throw the
+    answer away**, so no figure of a run said how much of what a policy chose
+    the engine carried out. A policy the engine mostly refuses is close to a
+    no-op whatever it chooses.
     """
     ordered = [int(seed) for seed in seeds]
     pairs = [(c, s) for c in range(len(policies)) for s in range(len(ordered))]
@@ -83,10 +89,6 @@ def run_population(
     vector.reset([ordered[s] for _, s in pairs])
 
     returns = np.zeros(len(pairs))
-    # What each world chose and what its verb refused. **The engine answers
-    # this on every action and the batch used to throw the answer away**, so
-    # no figure of a run said how much of what a policy chose the engine
-    # carried out. A policy the engine mostly refuses is close to a no-op.
     chosen = [0] * len(pairs)
     refused = [0] * len(pairs)
     started = time.perf_counter()

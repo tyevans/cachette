@@ -118,7 +118,12 @@ class ShardScore:
     The wins and the games are counts and not a share. A share cannot be
     combined without the games behind it, and a run whose shards hold
     different candidate counts would report a mean that the single-process
-    run does not report.
+    run does not report. The chosen and the refused entries are counts for
+    the same reason.
+
+    The episodes entry holds one record for each episode the shard played, in
+    candidate order. The combination concatenates them in shard order, which
+    is candidate order.
     """
 
     first_candidate: int
@@ -128,13 +133,8 @@ class ShardScore:
     wins: int
     games: int
     ticks: int
-    # What the candidates of this shard chose, and how many of those choices
-    # the verbs refused. Both are counts, for the same reason the wins are: a
-    # share cannot be combined without the count behind it.
     chosen: int = 0
     refused: int = 0
-    # One record for each episode the shard played, in candidate order. The
-    # combination concatenates them in shard order, which is candidate order.
     episodes: tuple[EpisodeRecord, ...] = ()
 
 
