@@ -93,6 +93,21 @@ impl ResourceKind {
     /// Every kind, in the order of its number.
     pub const ALL: [Self; RESOURCE_KIND_COUNT] = [Self::Food, Self::Wood, Self::Stone];
 
+    /// Returns the most that the generator ever puts on one tile of this
+    /// kind.
+    ///
+    /// The value is a structural property of the terrain stock table, so a
+    /// reader that publishes a stock as a share of its range divides by
+    /// this.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D2. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    #[must_use]
+    pub const fn most_on_one_tile(self) -> Amount {
+        Amount(MAX_TILE_STOCK[self.index()])
+    }
+
     /// Returns the kind as a small integer.
     ///
     /// The numbering is stable, because a state hash, an event and a sort key
@@ -177,6 +192,42 @@ const CEILING: [[u32; RESOURCE_KIND_COUNT]; TERRAIN_KIND_COUNT] = [
     // Mountain.
     [0, 0, 16],
 ];
+
+/// The most that the generator ever puts on one tile, for each kind.
+///
+/// The value is a structural property of the terrain stock table and not a
+/// measured figure. The generator draws a size below the ceiling of the
+/// ground and adds one, so the ceiling of the ground is the largest amount a
+/// tile of that ground carries. The largest over every ground is therefore
+/// the largest over the world.
+///
+/// **The table above is the one declaration, and this derives from it.** A
+/// second hand-written maximum would be a copy that nothing checks, and that
+/// is the defect shape this project keeps meeting.[^1]
+///
+/// A reader that publishes a stock as a share of its range divides by this.
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+pub const MAX_TILE_STOCK: [u32; RESOURCE_KIND_COUNT] = max_tile_stock();
+
+/// Returns the largest ceiling of each column of the terrain stock table.
+const fn max_tile_stock() -> [u32; RESOURCE_KIND_COUNT] {
+    let mut most = [0u32; RESOURCE_KIND_COUNT];
+    let mut column = 0;
+    while column < RESOURCE_KIND_COUNT {
+        let mut row = 0;
+        while row < TERRAIN_KIND_COUNT {
+            if CEILING[row][column] > most[column] {
+                most[column] = CEILING[row][column];
+            }
+            row += 1;
+        }
+        column += 1;
+    }
+    most
+}
 
 /// The chance in sixteenths that a tile of each ground carries a deposit.
 ///
@@ -1184,5 +1235,88 @@ impl CarryLoad {
         let mut amounts = self.amounts;
         amounts[kind.index()] = amounts[kind.index()].saturating_sub(amount.0);
         Self { amounts }
+    }
+}
+
+#[cfg(test)]
+mod ceiling_tests {
+    use super::{Amount, ResourceField, ResourceKind, CEILING, MAX_TILE_STOCK};
+    use crate::hex::{Axial, Grid};
+    use crate::terrain::{Terrain, TileKind};
+
+    /// A world wide enough that every column of the terrain stock table
+    /// reaches its ceiling.
+    ///
+    /// The fixture is not the world of the demonstration binary. It is wide
+    /// enough that the presence draw and the size draw both reach their top
+    /// value for the kinds that any ground carries, which is the extreme the
+    /// assertion needs.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+    fn field() -> ResourceField {
+        ResourceField::new(Terrain::new(0xFEED_FACE_1234_5678, Grid::new(320, 320).expect("320 by 320 is a legal extent")))
+    }
+
+    #[test]
+    fn the_generator_never_passes_the_declared_ceiling() {
+        let field = field();
+        let grid = field.grid();
+        for row in 0..grid.height() {
+            for column in 0..grid.width() {
+                let address = Axial::new(column as i32, row as i32);
+                for kind in ResourceKind::ALL {
+                    let Some(stock) = field.original(address, kind) else {
+                        continue;
+                    };
+                    assert!(
+                        stock.0 <= kind.most_on_one_tile().0,
+                        "{kind:?} at ({column}, {row}) holds {} above the ceiling {}",
+                        stock.0,
+                        kind.most_on_one_tile().0
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_fixture_reaches_the_ceiling_of_every_kind() {
+        let field = field();
+        let grid = field.grid();
+        let mut most = [Amount::ZERO; super::RESOURCE_KIND_COUNT];
+        for row in 0..grid.height() {
+            for column in 0..grid.width() {
+                let address = Axial::new(column as i32, row as i32);
+                for kind in ResourceKind::ALL {
+                    let Some(stock) = field.original(address, kind) else {
+                        continue;
+                    };
+                    if stock.0 > most[kind.index()].0 {
+                        most[kind.index()] = stock;
+                    }
+                }
+            }
+        }
+        for kind in ResourceKind::ALL {
+            assert_eq!(
+                most[kind.index()].0,
+                kind.most_on_one_tile().0,
+                "the fixture must reach the ceiling of {kind:?}, or the ceiling test measures the fixture"
+            );
+        }
+    }
+
+    #[test]
+    fn the_ceiling_is_the_largest_ground_of_its_column() {
+        for kind in ResourceKind::ALL {
+            let largest = TileKind::ALL
+                .iter()
+                .map(|ground| CEILING[ground.to_u8() as usize][kind.index()])
+                .max()
+                .expect("the terrain table holds at least one ground");
+            assert_eq!(MAX_TILE_STOCK[kind.index()], largest);
+        }
     }
 }
