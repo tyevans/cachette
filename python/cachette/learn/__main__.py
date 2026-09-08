@@ -187,6 +187,17 @@ STORE_SCALE = 1.0e-5
 # term without drowning the shaping that leads to it.
 WIN = 2000.0
 
+# A loss must cost less than a win pays, by the ratio the chance line sets.
+# A seat of a symmetric game of three factions takes one third of the wins
+# whatever the players do. With a symmetric pair an attempt at a win scores
+# a third of the win less two thirds of the loss, which is negative for every
+# win rate below one half, so the objective ranks a draw above the attempt and
+# the policy learns to survive. This ratio makes the attempt worth making
+# above a win rate of about one part in eleven.[^1]
+#
+# [^1]: Findings register, FND-679. `docs/FINDINGS.md`
+LOSS = WIN / 10.0
+
 
 STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
     # Win, and almost nothing else. The small territory term is the only
@@ -194,7 +205,7 @@ STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
     # first generations hold no signal at all.
     "conquer": (
         WORLD,
-        Weighting(terms={"held_tiles": 0.1}, won=WIN, lost=-WIN, drawn=0.0),
+        Weighting(terms={"held_tiles": 0.1}, won=WIN, lost=-LOSS, drawn=0.0),
         "linear",
     ),
     # The same scoring as the conquest strategy, over a policy with one
@@ -202,13 +213,13 @@ STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
     # the pair measures what the depth is worth.
     "conquer-net": (
         WORLD,
-        Weighting(terms={"held_tiles": 0.1}, won=WIN, lost=-WIN, drawn=0.0),
+        Weighting(terms={"held_tiles": 0.1}, won=WIN, lost=-LOSS, drawn=0.0),
         "mlp",
     ),
     # Take ground and hold it. Nothing else scores.
     "land": (
         WORLD,
-        Weighting(terms={"held_tiles": 1.0}, won=WIN, lost=-WIN, drawn=0.0),
+        Weighting(terms={"held_tiles": 1.0}, won=WIN, lost=-LOSS, drawn=0.0),
         "linear",
     ),
     # The same scoring as the ground strategy, over a policy with one hidden
@@ -221,7 +232,7 @@ STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
     # [^1]: Findings register, FND-650. `docs/FINDINGS.md`
     "land-net": (
         WORLD,
-        Weighting(terms={"held_tiles": 1.0}, won=WIN, lost=-WIN, drawn=0.0),
+        Weighting(terms={"held_tiles": 1.0}, won=WIN, lost=-LOSS, drawn=0.0),
         "mlp",
     ),
     # Fill the stores. Ground scores a little, for the same reason.
@@ -230,7 +241,7 @@ STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
         Weighting(
             terms={"store_total": STORE_SCALE, "held_tiles": 0.5},
             won=WIN,
-            lost=-WIN,
+            lost=-LOSS,
             drawn=0.0,
         ),
         "linear",
@@ -242,7 +253,7 @@ STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
         Weighting(
             terms={"population": 3.0, "held_tiles": 0.25},
             won=WIN,
-            lost=-WIN,
+            lost=-LOSS,
             drawn=0.0,
         ),
         "linear",
