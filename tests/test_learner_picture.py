@@ -62,6 +62,14 @@ from cachette.learn.signals import Signal, SignalCatalogue
 #
 # The engine names the ring stack channels already, so the material for the
 # fourth exists and the schema does not carry it to Python.
+# Five tests need the spatial part. Three of them name a gate. The other two
+# need a panel to exist at all: the coverage test drops the last panel and
+# expects the drawing to miss a position, and the lattice test reads the
+# ``cell_*`` rows straight out of the schema. A page of scalar blocks alone
+# holds no panel, so dropping the last one forgets nothing.
+#
+# The scalar coverage path still holds. The page covers all 4819 positions of
+# the merged layout, including the five memory fields, through its blocks.
 NEEDS_A_SPATIAL_SCHEMA = pytest.mark.skip(
     reason=(
         "the drawing tool cannot gate the new spatial blocks. The schema must "
@@ -104,6 +112,7 @@ def test_the_page_draws_every_position_of_every_declared_field() -> None:
         assert undrawn == [], f"{row['name']} is not in the picture"
 
 
+@NEEDS_A_SPATIAL_SCHEMA
 def test_a_field_the_page_forgets_fails_the_coverage_check() -> None:
     """Prove that the coverage check can fail.
 
@@ -124,6 +133,7 @@ def test_a_field_the_page_forgets_fails_the_coverage_check() -> None:
     assert not bool(forgetful.drawn().all())
 
 
+@NEEDS_A_SPATIAL_SCHEMA
 def test_the_page_draws_the_lattice_as_a_grid_when_no_field_states_a_space() -> None:
     world = a_world(width=48, height=48)
     page = a_page(world)
