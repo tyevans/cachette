@@ -301,11 +301,36 @@ macro_rules! column_reader {
         /// asserts that every declared field lies inside its own type, so a
         /// field that this crate declares is always in range.
         ///
+        /// **The reader checks the field against the record before it reads
+        /// a byte.** The declared width and the width this reader crosses
+        /// are two statements of one fact, and the slice index alone would
+        /// report a disagreement between them as a range that names no
+        /// field.[^1]
+        ///
         /// # Panics
         ///
-        /// Panics when the field lies outside the record.
+        /// Panics when the field is not this width, and when the field lies
+        /// outside the record. The message names the field in both cases.
+        ///
+        /// # References
+        ///
+        /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
         #[must_use]
         pub fn $name<T: EventLayout>(log: &[T], field: &EventField) -> Vec<$type> {
+            let name = field.field;
+            let size = core::mem::size_of::<T>();
+            assert!(
+                field.width == $width,
+                "the field `{name}` is {} bytes wide and this reader crosses {} bytes",
+                field.width,
+                $width
+            );
+            assert!(
+                field.offset + $width <= size,
+                "the field `{name}` covers bytes {} to {} of a record of {size} bytes",
+                field.offset,
+                field.offset + $width
+            );
             let mut column = Vec::with_capacity(log.len());
             for event in log {
                 let bytes = bytemuck::bytes_of(event);
