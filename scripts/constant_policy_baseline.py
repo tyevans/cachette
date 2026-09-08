@@ -168,7 +168,16 @@ def main() -> None:
         if (share := done.get(name)) is not None
     ]
 
-    pending = [(index, name) for index, name in enumerate(names) if name not in done]
+    # **The decisive comparison runs first.** The question this script exists
+    # to answer is whether a stored policy beats the best policy that reads
+    # nothing, and a run ordered by array index answers it last. A stopped run
+    # then holds every constant score and none of the comparison. The stored
+    # policies sit at the end of the list because they are appended to it, so
+    # the order of the list is not the order of the work.
+    pending = sorted(
+        ((index, name) for index, name in enumerate(names) if name not in done),
+        key=lambda entry: (entry[0] < schema_rows, entry[0]),
+    )
     for start in range(0, len(pending), arguments.batch):
         batch = pending[start : start + arguments.batch]
         returns, readings, _ = run_population(
