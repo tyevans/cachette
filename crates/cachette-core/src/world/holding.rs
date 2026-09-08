@@ -228,6 +228,41 @@ impl World {
             .map(|city| city.reach)
     }
 
+    /// Returns how many finished upgrades one city counts toward its reach.
+    ///
+    /// The count is the finished upgrades that stand on ground of the faction
+    /// of the city, and to which this city is the nearest city of that
+    /// faction. Two cities of one faction therefore split the upgrades
+    /// between them, and no upgrade counts twice.
+    ///
+    /// Returns `None` when the identity names no live settlement.
+    #[must_use]
+    pub fn city_finished_upgrades(&self, site: Entity) -> Option<u32> {
+        let slot = self.settlements.slot_of(site)?;
+        self.holding
+            .cities(&self.settlements, &self.upgrades)
+            .into_iter()
+            .find(|city| city.slot == slot)
+            .map(|city| city.finished)
+    }
+
+    /// Returns how many steps of reach one city may still earn.
+    ///
+    /// The value is the bound of the reach rules less the reach the city
+    /// holds now. A city at the bound reads zero, and no upgrade it finishes
+    /// widens its ground.[^1]
+    ///
+    /// Returns `None` when the identity names no live settlement.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    #[must_use]
+    pub fn city_reach_headroom(&self, site: Entity) -> Option<u32> {
+        let reach = self.city_reach(site)?;
+        Some(self.holding.rules().cap().saturating_sub(reach))
+    }
+
     /// Reports whether one faction holds one tile.
     ///
     /// Returns `None` when the address lies outside the world. The call reads
