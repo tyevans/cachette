@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-676**
+**Next number: FND-679**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -17517,10 +17517,16 @@ the tiles the faction sees in the current frame, and the field states that
 scope. The two therefore report the same quantity at two scopes, and they
 disagree by an order of magnitude.
 
-**Evidence.** One world of 48 by 48 at three factions ran 200 ticks. The held
-tile count read 191. The lattice field for own held tiles summed to 21. The
-field for tiles seen in the frame summed to 74, and the field for tiles ever
-seen summed to 167 of 2304.[^F670B]
+**Evidence.** One world of 48 by 48 at three factions ran 400 ticks, sampled
+every 40 ticks.[^F670B] The true held count reaches 191 at tick 200 and stands
+there until tick 400, where it reads 192. Over that span the lattice field for
+own held tiles reads 21, then 7, then 7, then 7, then 21, then 15. The ground
+did not move and the reported figure fell by two thirds and returned.
+
+Over the same span the field for tiles seen in the frame rises from 74 to 175,
+so the reported figure is not monotone in sight either. The lattice field never
+exceeds the seen-now field in any sample, which is the scope the field
+declares.
 
 **What follows.** The picture a faction reads of its own borders moves when its
 units move, and the ground did not move. A learner that reads the lattice cannot
@@ -17530,11 +17536,92 @@ No rule of the game hides a faction's own holdings from it. The scope is correct
 for a rival's ground and wrong for the reader's own, and one field carries both
 under one rule.
 
+### FND-676 — A shaped reward of first differences is the terminal reward of the endpoints, under the optimiser this project uses
+
+**Believed.** The reward takes a weighted change of each term at every
+decision, so a candidate is scored on the path it took and not only on where it
+finished. A weighting whose shaped weights are all zero is the terminal reward,
+and a weighting with shaped weights is a shaped reward.
+
+**True.** The two are the same score. Evolution strategies rank a candidate by
+the undiscounted return of an episode, which is the sum of the rewards of its
+decisions. A sum of first differences telescopes, so the sum over an episode is
+the weighted difference between the last reading and the first. Every
+intermediate reading cancels against its neighbour.
+
+**Evidence.** One episode of 40 decisions on a 24 by 24 world at three
+factions, with a weight on the held tile count and on the population, summed to
+a reward of -1.0. The weighted difference between the last reading and the
+first is -1.0. The two agree to nine decimal places.[^F676A]
+
+**What follows.** The per-decision machinery of the reward buys nothing under
+this optimiser. It is not wrong and it is not free: it reads the observation at
+every decision and computes a difference that the sum then discards.
+
+A shaping term that does reach the optimiser must not be a difference of a
+potential. It must be a quantity that accumulates, such as a count of events
+over the episode, or the reward must be discounted, which this optimiser does
+not do. A method that follows a discounted gradient would use the difference
+form correctly, so the choice of shaping form is bound to the choice of
+optimiser and cannot be made once.[^F676B]
+
+### FND-677 — Twenty-nine percent of the observation carries nothing or a copy of another position
+
+**Believed.** The observation publishes thirty fields, and a field the schema
+declares is a quantity a policy can read.
+
+**True.** Fifty-three of the 184 positions of a 48 by 48 world at three
+factions carry no value or carry a copy of another position. A policy that
+reads them learns from a constant or learns one quantity under two weights.
+
+**Evidence.** Seventy-five samples of the array, over three seats of one world,
+every 25 ticks to tick 600.[^F677A]
+
+The board wants field holds 24 positions and reads zero in every sample. The
+board asking quantity field holds 24 positions and is identical to the board
+quantity field in every sample. The open tiles field of each cell is identical
+to the ever seen field of that cell in every sample. The population is
+identical to the live unit count in every sample. The best renown and the
+wonder claim read zero in every sample.
+
+**What follows.** A duplicate position is the defect shape this register
+records first, and here it reaches a learner as two weights over one fact. A
+field that is always zero is worse than absent, because a reader cannot tell an
+unpublished quantity from a quantity that is genuinely zero.
+
+The population reading the live unit count is the most costly of these. A
+faction grows its people and its army separately, and a policy that weighs
+population is weighing its army.
+
+### FND-678 — The summary cells of one world differ in area, and the observation publishes sums over them
+
+**Believed.** A cell of the summary lattice covers a block of tiles, and one
+position of each cell states how many tiles that cell covers, so a caller never
+divides by the wrong count.
+
+**True.** The statement is correct and no caller divides. The observation
+publishes the total of each quantity over the cell and publishes no mean, so a
+comparison between two cells carries the ratio of their areas.
+
+**Evidence.** On a 48 by 48 world the tiles of each cell read 1024, 512, 512
+and 256.[^F677A] The summary block is 32 tiles wide, so the edge of the world
+cuts three of the four cells. The largest cell covers 44 percent of the world
+and the smallest covers 11 percent. The value, the height and the food of each
+cell are published as totals over those unequal areas.
+
+**What follows.** A policy that compares the food of one cell against the food
+of another is comparing area for the most part. The cell tile count is present,
+so the division is available to a reader that performs it, and the array does
+not perform it.
+
 ## References
 
 [^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
 [^F670A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D2. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F670B]: The commit `Record what the observation width follows, and how its own ground flickers`. Read its message for the figures.
+[^F676A]: The commit `Record that a difference reward telescopes, and what the array does not carry`. Read its message for the measurement.
+[^F676B]: Report 42, what a policy should be able to see, section 10.4. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+[^F677A]: The commit `Merge the tool that draws what a policy sees`. Read its message for the figures.
 [^F668A]: The commit `Measure what sets how well one generation points the right way`. Read its message for the figures.
 [^F667A]: The commit `Measure what water does to a training world, and free two colliding numbers`. Read its message for the figures.
 [^F667B]: Findings register, FND-666. `docs/FINDINGS.md`
