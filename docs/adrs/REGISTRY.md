@@ -444,6 +444,7 @@ without stating a constraint is worse than no record.
 | 0192 | A window of controller commands is one label distribution over the action table. Extends ADR-0154 D6 and ADR-0176 D4, which put a controller choice and a learner action in one encoding but state no rule for reading a window of them as one supervised label; every decision of both stands | Draft | 0001, 0003, 0004, 0144, 0154, 0176 | `draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md` |
 | 0193 | A faction's observation names another faction by a position relative to the reader. Extends ADR-0154 D1, which declares the layout in a schema but states no order inside a field that holds one position for each faction; every decision of ADR-0154 stands | Draft | 0053, 0146, 0149, 0154 | `draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md` |
 | 0194 | A generation is scored in shards and combined in candidate order | Draft | 0001, 0040, 0154, 0155 | `draft/adr-0194-a-generation-is-scored-in-shards.md` |
+| 0195 | The observation of a faction is a fixed-width scale-free table in an egocentric frame. Supersedes ADR-0193, whose relative seat order is replaced by order statistics and a fixed token set, and extends ADR-0154 D2, which bounds every length but lets a length follow the world shape and the faction count | Draft | 0001, 0002, 0004, 0022, 0053, 0059, 0154, 0176, 0193 | `draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md` |
 
 ### Retired numbers
 
