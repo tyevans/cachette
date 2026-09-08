@@ -16886,6 +16886,35 @@ rather than a number. Do not read the shard path as the cause of the first
 failure.
 
 
+### FND-647 — The observation named a rival by its seat, and one seat of a test agreed with it
+
+**Believed.** The observation array of a faction was correct. It reported the
+relation toward each faction and the trade board of each faction, and every test
+of it passed.
+
+**False.** Six fields of the array were addressed by the absolute seat number:
+the relation field and five board fields. A reader in seat zero and a reader in
+seat one therefore found two different factions at one position. The trainer
+turns the seat of a candidate at each seed index of a generation, so one set of
+weights read the array under two meanings inside one generation.[^F647A]
+
+**Evidence.** The addressing is now relative to the reader, and two tests read
+one world from every seat of it.[^F647B] The absolute indexing was put back
+behind an edit to the one function that states the mapping. Both tests then
+failed, at three factions and at five, and the assertion that failed named seat
+one. **Seat zero passed in both.** The rotation and the seat number agree for
+seat zero, so a test that read one seat could never have failed.
+
+**What follows.** A field of the array that holds one position for each faction
+is addressed by the distance from the reader.[^F647C] The layout version rose,
+so the fit check refuses every stored policy of the earlier layout.[^F647D]
+Those policies are retired and no migration recovers them, because a policy
+trained across seats learned a function of two meanings at once.
+
+**The shape.** A test of a per-reader field must read more than one reader. One
+reader agrees with a defect whenever that reader is the one the defect is
+indexed from.
+
 ## References
 
 [^F643A]: ADR-0192, a window of controller commands is one label distribution over the action table, decision D2. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
@@ -16897,3 +16926,7 @@ failure.
 [^F644A]: The observation reader of the binding. `crates/cachette-py/src/lib.rs`
 [^F644B]: The policy pilot of the demonstration. `python/cachette/demo/pilot.py`
 [^F644C]: Backlog item 0528, let a stored policy play a demonstration to the end of a game. `docs/backlog/proposed/0528-let-a-stored-policy-play-a-demonstration-to-the-end-of-a-game.md`
+[^F647A]: The seated league of the control plane, the seat-matched plan. `python/cachette/learn/league.py`
+[^F647B]: The observation test of the engine. `crates/cachette-core/tests/a_faction_reads_one_flat_array.rs`
+[^F647C]: ADR-0193, a faction's observation names another faction by a position relative to the reader, decision D1. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
+[^F647D]: The policy fit of the control plane. `python/cachette/learn/policy.py`
