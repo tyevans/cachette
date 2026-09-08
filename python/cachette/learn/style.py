@@ -19,7 +19,7 @@ refusals, and never in both. A refusal is a statement, and silence is not.
 
 A weight of zero is refused as well. A zero weight and a refusal mean the
 same thing to the arithmetic and different things to a reader, so this module
-admits one of the two spellings.
+admits one of the two spellings. A decision record binds the rule.[^3]
 
 # Floating point is allowed here
 
@@ -34,6 +34,9 @@ engine through the objective set and writes nothing back.
 
 [^2]: ADR-0002, state holds no floating point number, decision D4.
 ``docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md``
+
+[^3]: ADR-0196, a reward is a bounded weighted objective vector, decision D3.
+``docs/adrs/draft/adr-0196-a-reward-is-a-bounded-weighted-objective-vector.md``
 """
 
 from __future__ import annotations

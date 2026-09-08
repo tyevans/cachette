@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <polygon points="32,2 58,17 58,47 32,62 6,47 6,17" fill="#3f6fa8"/>
-  <path d="M12,24 L24,20 L36,24 L48,20 L52,26 L38,30 L26,26 L14,30 Z" fill="#5b91c9"/>
-  <path d="M10,42 L22,38 L34,42 L46,38 L52,44 L38,48 L26,44 L12,48 Z" fill="#5b91c9"/>
-  <ellipse cx="32" cy="55" rx="10" ry="3" fill="#33608f"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <polygon points="32,2 58,17 58,47 32,62 6,47 6,17" fill="#1d4b73"/>
+  <path d="M 6 24 C 20 16, 44 32, 58 24 L 58 32 C 44 40, 20 24, 6 32 Z" fill="#4a8fbf"/>
+  <path d="M 6 40 C 20 32, 44 48, 58 40 L 58 48 C 44 56, 20 40, 6 48 Z" fill="#4a8fbf"/>
+  <ellipse cx="32" cy="54" rx="16" ry="6" fill="#102f4a"/>
 </svg>

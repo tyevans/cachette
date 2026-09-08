@@ -17,7 +17,8 @@ A term over a raw count means different things on two worlds. Half of a 24 by
 24 world and half of a 512 by 512 world are the same play and a different
 number, so a weight tuned on one misreads the other.[^2] This module
 therefore admits no raw term. Every term states one of four kinds, and each
-kind maps its signal into the closed interval from minus one to one.
+kind maps its signal into the closed interval from minus one to one. A
+decision record binds that rule and the normalisation of the combination.[^6]
 
 - A share divides the signal by a named denominator signal.
 - A signed relation divides the difference of two signals by the sum of their
@@ -68,6 +69,10 @@ publish fails with the list of what the world does publish.
 [^5]: ADR-0195, the observation of a faction is a fixed-width scale-free
 table.
 ``docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md``
+
+[^6]: ADR-0196, a reward is a bounded weighted objective vector, decisions D1
+and D2.
+``docs/adrs/draft/adr-0196-a-reward-is-a-bounded-weighted-objective-vector.md``
 
 [^6]: ADR-0154, the observation and the action of a faction are
 schema-declared bounded tables the engine owns, decision D1.

@@ -56,12 +56,16 @@ from cachette.learn.train import run_population
 # rather than a predictor of it.
 IGNORED: frozenset[str] = frozenset(
     {
-        "tick_limit",  # the same number in every episode
-        "faction",  # the seat, which is the same in every episode
-        "game_over",  # true at the end of every episode
-        "weight",  # a scaling constant of the array
-        "wonder_claim",  # a win condition, so it is the outcome and not a proxy
-        "tick",  # the tick of the end, which the row also carries as end_tick
+        "world_tiles",  # the same number in every episode
+        "world_passable_tiles",  # the same number in every episode
+        "seated_faction_share",  # the same number in every episode
+        "objective_weight",  # the style the caller chose, not a proxy
+        "wonder_track_progress",  # a win condition, so it is the outcome
+        "domination_progress",  # a win condition, so it is the outcome
+        "renown_progress",  # a win condition, so it is the outcome
+        "ground_progress",  # a win condition, so it is the outcome
+        "tick_share",  # the position in the episode, which every row shares
+        "remaining_ticks",  # the same quantity as the tick share
     }
 )
 
@@ -69,7 +73,7 @@ IGNORED: frozenset[str] = frozenset(
 # reading names the tick of the end differently from the schema, and a reader
 # who takes the reported name into a weighting gets an error rather than a
 # reward.
-WEIGHABLE_AS: dict[str, str] = {"end_tick": "tick"}
+WEIGHABLE_AS: dict[str, str] = {"end_tick": "remaining_ticks"}
 
 
 @dataclass

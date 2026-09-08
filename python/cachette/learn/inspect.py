@@ -81,8 +81,8 @@ def behaviour(
         "live_units": [
             int(env.observation()[starts["live_units"]]) for env in vector.envs
         ],
-        "seats_held": [
-            int(env.observation()[starts["seats_held"]]) for env in vector.envs
+        "domination_progress": [
+            int(env.observation()[starts["domination_progress"]]) for env in vector.envs
         ],
     }
 
