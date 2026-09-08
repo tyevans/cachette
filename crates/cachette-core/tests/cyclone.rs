@@ -358,7 +358,7 @@ fn a_storm_gives_one_answer_at_any_thread_count() {
 fn the_genesis_draw_reads_the_frame() {
     let mut tried = 0;
     for tick in 0..512u64 {
-        if cyclone_forms(SEED, cachette_core::Tick(tick)) {
+        if cyclone_forms(SEED, cachette_core::Tick(tick), 0) {
             tried += 1;
         }
     }
@@ -373,10 +373,10 @@ fn the_genesis_draw_reads_the_frame() {
 #[test]
 fn the_genesis_draw_reads_the_seed() {
     let one: Vec<bool> = (0..512)
-        .map(|tick| cyclone_forms(SEED, cachette_core::Tick(tick)))
+        .map(|tick| cyclone_forms(SEED, cachette_core::Tick(tick), 0))
         .collect();
     let other: Vec<bool> = (0..512)
-        .map(|tick| cyclone_forms(SEED + 1, cachette_core::Tick(tick)))
+        .map(|tick| cyclone_forms(SEED + 1, cachette_core::Tick(tick), 0))
         .collect();
     assert_ne!(one, other, "two seeds tried on the same frames");
 }
@@ -385,16 +385,57 @@ fn the_genesis_draw_reads_the_seed() {
 #[test]
 fn the_genesis_cell_reads_the_frame_and_the_seed() {
     let cells = 4096;
-    let here = cyclone_genesis_cell(SEED, cachette_core::Tick(7), cells);
+    let here = cyclone_genesis_cell(SEED, cachette_core::Tick(7), 0, cells);
     assert_ne!(
         here,
-        cyclone_genesis_cell(SEED, cachette_core::Tick(8), cells),
+        cyclone_genesis_cell(SEED, cachette_core::Tick(8), 0, cells),
         "the cell did not move with the frame"
     );
     assert_ne!(
         here,
-        cyclone_genesis_cell(SEED + 1, cachette_core::Tick(7), cells),
+        cyclone_genesis_cell(SEED + 1, cachette_core::Tick(7), 0, cells),
         "the cell did not move with the seed"
+    );
+}
+
+/// **The genesis draws read the attempt.** One solve makes several attempts,
+/// and attempts that shared a key would name one cell and either all go ahead
+/// or all stop. The field would then raise one storm each solve at most,
+/// whatever the attempt count said.
+#[test]
+fn the_genesis_draws_read_the_attempt() {
+    let cells = 4096;
+    let tick = cachette_core::Tick(7);
+    let here = cyclone_genesis_cell(SEED, tick, 0, cells);
+    assert_ne!(
+        here,
+        cyclone_genesis_cell(SEED, tick, 1, cells),
+        "two attempts of one frame named one cell"
+    );
+    let gates: Vec<bool> = (0..64)
+        .map(|attempt| cyclone_forms(SEED, tick, attempt))
+        .collect();
+    assert!(
+        gates.iter().any(|open| *open) && gates.iter().any(|open| !*open),
+        "the attempts of one frame all gave {gates:?}"
+    );
+}
+
+/// **The genesis draws read nothing else.** A draw that moved when no field
+/// of its key moved would hold state, and the field would not repeat.
+#[test]
+fn the_genesis_draws_repeat_on_one_key() {
+    let cells = 4096;
+    let tick = cachette_core::Tick(7);
+    assert_eq!(
+        cyclone_genesis_cell(SEED, tick, 3, cells),
+        cyclone_genesis_cell(SEED, tick, 3, cells),
+        "one key gave two cells"
+    );
+    assert_eq!(
+        cyclone_forms(SEED, tick, 3),
+        cyclone_forms(SEED, tick, 3),
+        "one key gave two answers"
     );
 }
 
