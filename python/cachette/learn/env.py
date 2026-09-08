@@ -55,7 +55,7 @@ if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
 
     import numpy.typing as npt
 
-    from cachette._core import GameEnd, ObservationSchema
+    from cachette._core import FoundingReport, GameEnd, ObservationSchema
 
 # The reader names the environment is allowed to call on a world.
 #
@@ -384,12 +384,46 @@ class Env:
         return self._reward.outcome
 
 
-def viable_seeds(config: EnvConfig, count: int, start: int = 0) -> list[int]:
-    """Return the first seeds that build a world every faction can sit in.
+def seats_every_faction(reports: Sequence[FoundingReport], factions: int) -> bool:
+    """Say whether a founding report gives every faction a seat it can hold.
 
-    Not every seed gives a world with a place for each faction. A seed that
-    seats nobody raises, and a training run that met one mid-generation would
-    lose the generation. A caller therefore takes its seeds from here.
+    The engine seats each faction in turn and reports the outcome of each
+    one. **It refuses the whole world only when it seats nobody.** A world
+    that seats one faction of three is therefore a world the engine accepts,
+    and that world is over on the first tick: the seated faction holds every
+    settlement, so the engine records a domination win.
+
+    A seat also has to feed the group that takes it. The engine states that
+    for each seat it filled, and the answer is a property of the site rather
+    than a threshold this module invented. A faction whose site reaches no
+    food starves within about a hundred ticks, whatever it does.
+
+    Both refusals name a world where no policy can matter. The score of such
+    a world is the same for every candidate of a generation, so the
+    generation ranks a set of equal numbers.
+    """
+    if len(reports) != factions:
+        return False
+    if not all(bool(report.get("seated")) for report in reports):
+        return False
+    return all(bool(report.get("carries_its_group")) for report in reports)
+
+
+def viable_seeds(config: EnvConfig, count: int, start: int = 0) -> list[int]:
+    """Return the first seeds that build a world a policy can decide.
+
+    Not every seed gives a world with a place for each faction. The engine
+    refuses a world that seats nobody, and a training run that met one
+    mid-generation would lose the generation.
+
+    **A seat that the engine filled is not always a seat that can play.** The
+    engine accepts a world that seats one faction of three, and that world
+    ends on the first tick by domination. It also accepts a seat whose site
+    reaches no food, and that faction starves within about a hundred ticks.
+    In both worlds every candidate of a generation scores the same number, so
+    the generation carries no information. This function therefore takes the
+    founding report of each world and keeps only the seeds where every
+    faction holds a seat that feeds it.
 
     The search walks upward from the start, so the same start and the same
     count always give the same seeds.
@@ -404,11 +438,12 @@ def viable_seeds(config: EnvConfig, count: int, start: int = 0) -> list[int]:
             faction_count=config.faction_count,
         )
         try:
-            world.seed_world()
+            reports = world.seed_world()
         except Exception:
             seed += 1
             continue
-        found.append(seed)
+        if seats_every_faction(reports, config.faction_count):
+            found.append(seed)
         seed += 1
     return found
 

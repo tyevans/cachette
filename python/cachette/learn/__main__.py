@@ -492,6 +492,19 @@ def main() -> int:
         }
         result["holdout"] = measured
         report["strategies"][name] = result  # type: ignore[index]
+        # **A generation that carried no information hides inside a mean and a
+        # best.** Every candidate scored the same number, so the mean equals
+        # the best, and that reads like a population which agreed. The trainer
+        # names each one as it happens, and this line names them again beside
+        # the held-out figures, where a reader who reads only the end of a
+        # strategy still meets them.
+        wasted = result["degenerate_generations"]
+        if wasted:
+            print(
+                f"  {len(wasted)} of {arguments.generations} generations carried "
+                f"no information and moved no centre: {wasted}",
+                flush=True,
+            )
         for label in ("trained", "untrained", "random", "controller"):
             row = measured[label]
             print(
