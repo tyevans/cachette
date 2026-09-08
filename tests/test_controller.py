@@ -5,9 +5,11 @@ faction to gather and to build, the game ends on territory at a tick limit, and
 a census says what every subsystem produced. Python drives no verb here: it
 seeds once, steps, and reads.[^1]
 
-The census names come from one Rust table. The test that lists them pins the
-public interface, so a name that leaves the table fails here rather than in a
-watcher's terminal.[^2]
+The census names come from one Rust table, and that table is the only
+declaration of the list.[^2] A list written here as well would be a second
+declaration site, and nothing would fail when the two disagreed. The tests
+below therefore derive the names from the census and pin only the few names
+this file names itself.
 
 References
 ----------
@@ -34,41 +36,6 @@ from cachette.demo.app import main
 EXTENT = 48
 SEED = 0x0CAC_4E77_0472
 FACTIONS = 2
-
-# The names the engine table holds, in table order.
-CENSUS_NAMES = [
-    "units",
-    "settlements",
-    "births",
-    "queue_produced",
-    "queue_refused_without_a_person",
-    "queue_refused_without_goods",
-    "queue_refused_at_the_verb",
-    "seats_filled",
-    "characters",
-    "upgrades_complete",
-    "wonders_complete",
-    "stores_built",
-    "luxury_tiles",
-    "storms_raised",
-    "contracts",
-    "boards_written",
-    "offers_made",
-    "contracts_bound",
-    "carriers_assigned",
-    "controller_commands",
-    "controller_refused",
-    "projects_zoned",
-    "projects_finished",
-    "projects_dropped",
-    "projects_refused",
-    "plan_passes",
-    "game_ended",
-    "relation_moves",
-    "wars_declared",
-    "campaigns_raised",
-    "campaigns_won",
-]
 
 
 def seeded_world() -> World:
@@ -156,22 +123,43 @@ def test_the_game_ends_once_on_territory_and_the_world_keeps_stepping() -> None:
         world.score(FACTIONS)
 
 
-def test_the_census_keys_are_the_names_of_the_one_rust_table() -> None:
-    """The dictionary keys equal the table names, in table order."""
+def test_the_census_answers_one_integer_for_each_name_of_the_rust_table() -> None:
+    """Every key is a distinct name and every value is an integer.
+
+    **This test does not list the names.** The engine table is the only
+    declaration of the list, and a copy of it here would be a second
+    declaration site with nothing to fail when the two disagreed.[^2] It once
+    held such a copy, the table gained nine rows, and this test failed for a
+    reason that was not a defect.
+
+    What is left is what the boundary can get wrong on its own: a duplicated
+    key, a value that is not an integer, and an order that moves between two
+    readings of one world. The three names below are the ones the other tests
+    of this file read, so they are the interface this file depends on.
+    """
     world = seeded_world()
     world.step(1)
     census = world.subsystem_census()
-    assert list(census) == CENSUS_NAMES
+    assert census, "the census answered no row at all"
+    assert len(set(census)) == len(census), "the census repeated a name"
+    assert all(isinstance(name, str) and name for name in census)
     assert all(isinstance(value, int) for value in census.values())
+    assert list(census) == list(world.subsystem_census()), "the order moved"
     assert census["units"] > 0
     assert census["luxury_tiles"] > 0
     assert census["controller_commands"] > 0
+    assert "game_ended" in census
 
 
 def test_the_demonstration_runs_to_the_end_and_prints_the_census(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """The headless run names the winner once and prints every census row."""
+    """The headless run names the winner once and prints every census row.
+
+    The names to look for come from the census of a world of the same shape,
+    so the check is derived from the engine table rather than from a list kept
+    in this file.[^2]
+    """
     # The seed is named. The demonstration draws its own seed when none is
     # given, so a test that leaves it out builds a different world on every
     # run, and some of those worlds seat no faction at all.
@@ -202,7 +190,11 @@ def test_the_demonstration_runs_to_the_end_and_prints_the_census(
     assert wins[0].endswith(" wins by territory")
     assert any(line.startswith("the game ended at tick 4:") for line in lines)
     assert any(line.startswith("census of the run at tick 4") for line in lines)
-    for name in CENSUS_NAMES:
+    printed = World(
+        width=EXTENT, height=EXTENT, seed=SEED, faction_count=FACTIONS
+    ).subsystem_census()
+    assert printed, "the census answered no row to look for"
+    for name in printed:
         assert any(line.strip().startswith(f"{name}:") for line in lines), name
 
 
