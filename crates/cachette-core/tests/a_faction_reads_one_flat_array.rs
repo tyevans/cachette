@@ -20,7 +20,9 @@
 //! [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
 
 use cachette_core::faction_observation::OBSERVATION_VERSION;
-use cachette_core::{Axial, Entity, FactionId, Holder, SightRules, World, WorldConfig};
+use cachette_core::{
+    Advert, Axial, Entity, FactionId, Holder, SightRules, World, WorldConfig, ADVERT_OFFERS,
+};
 
 /// A world wide enough to hold cells that one faction never reaches.
 ///
@@ -617,9 +619,240 @@ fn the_schema_reports_the_layout_version() {
     // The pair below can fail. Add or remove a field and the count moves, so
     // the assertion fails until the version moves with it, which is the whole
     // of the rule this test exists to hold.
+    //
+    // The pair catches a field the layout gained or lost. It cannot catch a
+    // field that kept its length and changed its meaning, and the version
+    // moves for that too. The addressing change that made this pair read
+    // four is such a change: the field count did not move.
     assert_eq!(
         (OBSERVATION_VERSION, world.observation_schema().rows().len()),
-        (3, 30),
+        (4, 30),
         "the field set and the version must move together",
     );
+}
+
+// Every faction-indexed field is addressed relative to the reader.
+//
+// The two tests below read one world from two seats. A field addressed by a
+// seat number would put a rival's quantities under the same position for one
+// reader and under a different position for the other, and a policy that the
+// league moves between seats would then read two things under one weight.[^1]
+//
+// [^1]: ADR-0193, a faction's observation names another faction by a position relative to the reader, decision D1. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
+
+/// Builds a world of one faction count in which every faction-indexed
+/// quantity differs from every other.
+///
+/// **The fixture asserts that it produced the case.** A world in which two
+/// factions hold the same relation and post the same board would read the
+/// same from either seat, whichever way the field is addressed, so the
+/// assertions below would pass over a defect.[^1]
+///
+/// The relation of every ordered pair takes a value of its own, and the board
+/// of every faction takes quantities of its own. The step runs first, so the
+/// fog layers are filled by the pass that fills them and not by the test.
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+fn a_world_where_every_faction_differs(faction_count: u16) -> World {
+    let config = WorldConfig {
+        faction_count,
+        ..WIDE
+    };
+    let mut world = World::new(config).expect("the configuration describes a world");
+    world
+        .set_choice_schedule(KEEP_STILL)
+        .expect("the exponent is inside the range");
+    world.set_sight_rules(SightRules::new(4, 1, 16, 0));
+
+    let count = i32::from(faction_count);
+    for from in 0..count {
+        let camp = ground_near(&world, Axial::new(8 + from * 12, 8), 8);
+        a_unit_at(&mut world, camp, FactionId(from as u16));
+    }
+    world.step(1).expect("the step runs");
+
+    for from in 0..count {
+        for to in 0..count {
+            if from == to {
+                continue;
+            }
+            let value = 1_000 * (from + 1) + (to + 1);
+            assert!(
+                world.set_relation(FactionId(from as u16), FactionId(to as u16), value),
+                "the fixture writes the relation of every ordered pair"
+            );
+        }
+        let rows: Vec<Advert> = (0..i32::from(world.board_rows()))
+            .map(|row| Advert {
+                good: ((from + row) % 3) as u8,
+                wants: ADVERT_OFFERS,
+                asking_good: ((from + row + 1) % 3) as u8,
+                padding: 0,
+                quantity: (100_000 * (from + 1) + row) as u32,
+                asking_quantity: (200_000 * (from + 1) + row) as u32,
+            })
+            .collect();
+        world
+            .advertise(FactionId(from as u16), &rows)
+            .expect("the board fits the bound and names a resource kind");
+    }
+
+    // The fixture asserts the distribution it needs: no two ordered pairs
+    // hold one relation, and no two factions post one board quantity.
+    let mut relations = Vec::new();
+    let mut quantities = Vec::new();
+    for from in 0..count {
+        for to in 0..count {
+            if from != to {
+                relations.push(world.relation(FactionId(from as u16), FactionId(to as u16)));
+            }
+        }
+        quantities.push(world.market(FactionId(from as u16))[0].quantity);
+    }
+    let mut sorted = relations.clone();
+    sorted.sort_unstable();
+    sorted.dedup();
+    assert_eq!(
+        sorted.len(),
+        relations.len(),
+        "the fixture needs a distinct relation for every ordered pair"
+    );
+    let mut sorted = quantities.clone();
+    sorted.sort_unstable();
+    sorted.dedup();
+    assert_eq!(
+        sorted.len(),
+        quantities.len(),
+        "the fixture needs a distinct board quantity for every faction"
+    );
+    world
+}
+
+/// The names of the fields that hold one block of board rows for each
+/// faction.
+const BOARD_FIELDS: [&str; 5] = [
+    "board_good",
+    "board_quantity",
+    "board_wants",
+    "board_asking_good",
+    "board_asking_quantity",
+];
+
+/// Reads what one position of a board field holds for one faction.
+fn advert_position(advert: &Advert, name: &str) -> i64 {
+    match name {
+        "board_good" => i64::from(advert.good),
+        "board_quantity" => i64::from(advert.quantity),
+        "board_wants" => i64::from(advert.wants),
+        "board_asking_good" => i64::from(advert.asking_good),
+        _ => i64::from(advert.asking_quantity),
+    }
+}
+
+/// Returns the faction that one relative position of a faction-indexed field
+/// names.
+///
+/// **The rule is written out here, and it is not taken from the engine.** A
+/// test that read its expectation from the same mapping the writer uses would
+/// agree with a broken mapping, and it would pass over the defect it exists to
+/// catch.[^1]
+///
+/// The test states this rule, and it states no position of the array. A
+/// position comes from the schema, in the way every other test here takes
+/// one.[^2]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 1. `.agents/rules/testing.md`
+/// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+fn named_by(reader: FactionId, offset: u32, faction_count: u32) -> FactionId {
+    FactionId(((u32::from(reader.0) + offset) % faction_count) as u16)
+}
+
+/// Asserts that every reader of one world finds one meaning at one relative
+/// position.
+///
+/// The reader's own block comes first, and the rivals follow it in the
+/// rotation the record states.
+fn every_reader_agrees_on_the_relative_positions(faction_count: u16) {
+    let world = a_world_where_every_faction_differs(faction_count);
+    let count = u32::from(faction_count);
+    let rows = u32::from(world.board_rows());
+
+    let mut relation_by_reader = Vec::new();
+    for seat in 0..faction_count {
+        let reader = FactionId(seat);
+        let values = observation_of(&world, reader);
+
+        assert_eq!(
+            field(&world, &values, "faction")[0],
+            i64::from(seat),
+            "the array names the faction that reads it"
+        );
+
+        let relation = field(&world, &values, "relation");
+        assert_eq!(relation.len(), count as usize);
+        for offset in 0..count {
+            let other = named_by(reader, offset, count);
+            assert_eq!(
+                relation[offset as usize],
+                i64::from(world.relation(reader, other).unwrap_or(0)),
+                "reader {seat} holds the relation toward the faction {offset} seats after it"
+            );
+        }
+        relation_by_reader.push(relation.to_vec());
+
+        for name in BOARD_FIELDS {
+            let block = field(&world, &values, name);
+            assert_eq!(block.len(), (count * rows) as usize);
+            for offset in 0..count {
+                let other = named_by(reader, offset, count);
+                let board = world.market(other);
+                for row in 0..rows {
+                    assert_eq!(
+                        block[(offset * rows + row) as usize],
+                        advert_position(&board[row as usize], name),
+                        "reader {seat} holds the {name} of the faction {offset} seats after it"
+                    );
+                }
+            }
+            // The reader's own block comes first, whatever seat it holds.
+            let own = world.market(reader);
+            for row in 0..rows {
+                assert_eq!(
+                    block[row as usize],
+                    advert_position(&own[row as usize], name),
+                    "reader {seat} holds its own {name} in the first block"
+                );
+            }
+        }
+    }
+
+    // Two readers of one world must not read one relation vector. A field
+    // that answered the same for every seat would carry no relation at all,
+    // and the assertions above would hold over it.
+    for (seat, relation) in relation_by_reader.iter().enumerate().skip(1) {
+        assert_ne!(
+            relation, &relation_by_reader[0],
+            "seat {seat} reads its own relations and not seat zero's"
+        );
+    }
+}
+
+/// Two seats of one world read one meaning at one relative position, at the
+/// training faction count.
+#[test]
+fn two_seats_of_one_world_agree_on_the_relative_positions() {
+    every_reader_agrees_on_the_relative_positions(3);
+}
+
+/// The rule holds at a faction count the training shape does not use.
+///
+/// A rule that only held at three factions would be a coincidence of the
+/// shape the trainer runs.
+#[test]
+fn the_relative_positions_hold_at_five_factions() {
+    every_reader_agrees_on_the_relative_positions(5);
 }

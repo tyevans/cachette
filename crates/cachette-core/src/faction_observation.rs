@@ -53,6 +53,26 @@
 //! quantity.[^6] A learner reads this array, so the array carries both: the
 //! work, and the claim the reader compares.
 //!
+//! # Every faction-indexed field is addressed relative to the reader
+//!
+//! A field that holds one position for each faction is addressed by the
+//! distance from the faction that reads, and never by a seat number.[^10]
+//! Position zero of such a field names the reader itself. Position `k` names
+//! the faction `k` seats after the reader, counting round the seats. The
+//! reader therefore finds its own quantities at one place, whatever seat it
+//! holds, and it finds its first rival at the next place.
+//!
+//! **A seat number in the array would make the array mean two things.** A
+//! league seats one policy in one seat for one game and in another seat for
+//! the next, so a policy that learned a seat number reads another faction's
+//! quantities under the same weight.[^11] The array was never wrong; it was
+//! addressed inconsistently between readers, and a policy cannot learn a
+//! relation from that.
+//!
+//! The order is a rotation and not a sort. A sort by a game quantity would
+//! give a policy a meaningful order, and it would also move a rival between
+//! positions from one decision to the next, because the quantity moves.[^10]
+//!
 //! # Which space every index lives in
 //!
 //! The map block is indexed by the cell index of the block lattice. The fog
@@ -103,6 +123,8 @@
 //! [^7]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 //! [^8]: Findings register, FND-569. `docs/FINDINGS.md`
 //! [^9]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+//! [^10]: ADR-0193, a faction's observation names another faction by a position relative to the reader, decision D1. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
+//! [^11]: Findings register, FND-647. `docs/FINDINGS.md`
 
 use crate::controller::WEIGHT_COUNT;
 use crate::event_layout::ColumnKind;
@@ -122,7 +144,37 @@ use crate::world::World;
 /// # References
 ///
 /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-pub const OBSERVATION_VERSION: u32 = 3;
+pub const OBSERVATION_VERSION: u32 = 4;
+
+/// Returns the faction that one position of a faction-indexed field names.
+///
+/// **A faction-indexed field is addressed by the distance from the reader,
+/// and never by a seat number.** Position zero names the reader. Position
+/// `offset` names the faction `offset` seats after the reader, counting round
+/// the seats of the world.[^1]
+///
+/// This function is the only statement of that mapping inside the engine.
+/// Every writer of a faction-indexed field calls it, so no field can address
+/// its positions its own way.[^2]
+///
+/// **It is not public, because no caller outside the engine reads it yet.** A
+/// caller that decodes the array holds the seat of the reader at the faction
+/// field, and the rule is one addition and one remainder. Publishing a reader
+/// that nothing invokes would ship an inert capability.[^3]
+///
+/// A faction count of zero has no seat to name, so the answer is the reader.
+///
+/// # References
+///
+/// [^1]: ADR-0193, a faction's observation names another faction by a position relative to the reader, decision D1. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
+/// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^3]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
+const fn faction_at_offset(reader: FactionId, offset: u32, faction_count: u32) -> FactionId {
+    if faction_count == 0 {
+        return reader;
+    }
+    FactionId(((reader.0 as u32 + offset) % faction_count) as u16)
+}
 
 /// One field of the observation array.
 ///
@@ -167,17 +219,39 @@ pub enum ObsField {
     ///
     /// [^1]: Findings register, FND-568. `docs/FINDINGS.md`
     WonderClaim,
-    /// The relation of the faction toward each faction, by faction number.
+    /// The relation of the faction toward each faction, by the distance from
+    /// the reader.
+    ///
+    /// Position zero holds the relation of the reader toward itself. Position
+    /// `k` holds its relation toward the faction `k` seats after it. **No
+    /// position of this field names a seat number.**[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0193, a faction's observation names another faction by a position relative to the reader, decision D1. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
     Relation,
     /// The good each board row offers, over every faction.
+    ///
+    /// The field holds one block of board rows for each faction, and the
+    /// blocks run in the order the relation field runs: block zero is the
+    /// board of the reader, and block `k` is the board of the faction `k`
+    /// seats after it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0193, a faction's observation names another faction by a position relative to the reader, decision D1. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
     BoardGood,
-    /// The quantity each board row offers.
+    /// The quantity each board row offers, in the block order the good field
+    /// states.
     BoardQuantity,
-    /// The good each board row asks for.
+    /// The good each board row asks for, in the block order the good field
+    /// states.
     BoardWants,
-    /// The good each board row wants paid in.
+    /// The good each board row wants paid in, in the block order the good
+    /// field states.
     BoardAskingGood,
-    /// The quantity each board row asks for.
+    /// The quantity each board row asks for, in the block order the good
+    /// field states.
     BoardAskingQuantity,
     /// The weight vector of the faction, in the order the vector declares.
     Weight,
@@ -597,8 +671,8 @@ impl World {
                 ObsField::WonderProgress => span[0] = standing.wonder_progress,
                 ObsField::WonderClaim => span[0] = claim,
                 ObsField::Relation => {
-                    for (number, place) in span.iter_mut().enumerate() {
-                        let other = FactionId(number as u16);
+                    for (offset, place) in span.iter_mut().enumerate() {
+                        let other = faction_at_offset(faction, offset as u32, shape.faction_count);
                         *place = i64::from(self.relation(faction, other).unwrap_or(0));
                     }
                 }
@@ -607,9 +681,10 @@ impl World {
                 | ObsField::BoardWants
                 | ObsField::BoardAskingGood
                 | ObsField::BoardAskingQuantity => {
-                    for number in 0..shape.faction_count {
-                        let board = self.market(FactionId(number as u16));
-                        let base = (number * shape.board_rows) as usize;
+                    for offset in 0..shape.faction_count {
+                        let other = faction_at_offset(faction, offset, shape.faction_count);
+                        let board = self.market(other);
+                        let base = (offset * shape.board_rows) as usize;
                         for (offset, advert) in board.iter().enumerate() {
                             let Some(place) = span.get_mut(base + offset) else {
                                 continue;
