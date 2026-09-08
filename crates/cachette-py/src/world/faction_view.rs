@@ -12,6 +12,7 @@
 use super::PyWorld;
 use crate::errors::{VerbError, ViewError};
 use crate::world::identity::resolve;
+use cachette_core::faction_observation::observation_schema;
 use cachette_core::faction_view::{Admit, FactionTile};
 use cachette_core::{Axial, FactionId, FactionWeights, WEIGHT_HIGH, WEIGHT_LOW};
 use numpy::{PyArray1, ToPyArray};
@@ -258,17 +259,21 @@ impl PyWorld {
     /// a length or a bound into a file outside the engine.** Read the schema
     /// and decode by arithmetic over it.[^2]
     ///
-    /// The length is a function of the world parameters, and never of the
-    /// population.[^3] A faction that loses every unit reads an array of the
-    /// same length as a faction that holds a million.
+    /// **The length is one number for every world.** No field of the layout
+    /// follows the world shape, the faction count or the population.[^3] A
+    /// faction that loses every unit reads an array of the same length as a
+    /// faction that holds a million, and a policy trained on a small world
+    /// reads a large one.
     ///
-    /// No position holds a floating point number. A fixed-point value crosses
-    /// as its raw integer, and the caller scales it.[^4]
+    /// No position holds a floating point number. Every position is a Q16.16
+    /// value between minus one and one, so 65536 is one unit.[^4]
     ///
-    /// A cell the faction has never seen a tile of reads as zero in every
-    /// position. The `cell_seen_now` and `cell_seen_ever` fields of that cell
-    /// state that the faction holds none of it, so a caller tells an
-    /// unobserved cell from an empty one.
+    /// **A field whose declared bounds are zero and zero is reserved.** It
+    /// reads zero in every position until a layout revision claims it, and
+    /// that zero does not state a real quantity of zero. The confidence
+    /// statistic of each rival power quantity states how much of the estimate
+    /// the faction observed, so a caller tells an unobserved estimate from a
+    /// real zero.
     ///
     /// This method copies the array.
     ///
@@ -357,8 +362,7 @@ impl PyWorld {
     /// [^4]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
     /// [^5]: Findings register, FND-569. `docs/FINDINGS.md`
     fn observation_schema<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
-        let world = self.lock();
-        let schema = world.observation_schema();
+        let schema = observation_schema();
         let fields = PyList::empty(python);
         for row in schema.rows() {
             let entry = PyDict::new(python);

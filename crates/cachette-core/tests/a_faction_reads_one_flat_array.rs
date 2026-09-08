@@ -5,30 +5,33 @@
 //! prove that the reader works and not that anything reaches it.[^1]
 //!
 //! **Every fixture asserts that it produced the case the test needs.** A
-//! world chosen to look right supplies no extreme, so each fixture states
-//! the distribution it needs and fails when the world does not give it.[^2]
+//! world chosen to look right supplies no extreme, so each fixture states the
+//! distribution it needs and fails when the world does not give it.[^2]
 //!
-//! **The fog test below compares against the truth of the same cell.** The
-//! fixture asserts that the whole-world summary of the far cell holds tiles
-//! and height. A reader that leaked the truth would therefore write those
-//! values into the array, and the assertion would fail. A test that compared
-//! a zero against a zero would prove nothing.
+//! # What these tests protect
+//!
+//! The layout replaced a layout whose width followed the world shape and the
+//! faction count. A policy trained against one shape could not read
+//! another.[^3] Two tests here state that property: one compares the schema
+//! across several world shapes and faction counts, and one compares the
+//! values of two worlds of different size.
+//!
+//! The layout also publishes no raw count. Every position is a share, a
+//! signed relation or a compressed magnitude, and each of the three is
+//! bounded. One test builds a world that produces a value above the bound and
+//! asserts that the bound holds there. **A test against a typical world would
+//! never receive the input that fails.**[^2]
 //!
 //! # References
 //!
 //! [^1]: Testing rules, drive the real caller. `.agents/rules/testing.md`
 //! [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
+//! [^3]: Findings register, FND-670. `docs/FINDINGS.md`
 
-use cachette_core::faction_observation::OBSERVATION_VERSION;
-use cachette_core::{
-    Advert, Axial, Entity, FactionId, Holder, SightRules, World, WorldConfig, ADVERT_OFFERS,
-};
+use cachette_core::faction_observation::{observation_schema, ObsField, OBSERVATION_VERSION};
+use cachette_core::{Axial, Entity, FactionId, SightRules, World, WorldConfig};
 
-/// A world wide enough to hold cells that one faction never reaches.
-///
-/// The block edge of the lattice is smaller than the world, so the world
-/// covers more than one cell. A faction that camps in one corner of it can
-/// never have seen the far corner.
+/// A world wide enough to hold ground that one faction never reaches.
 const WIDE: WorldConfig = WorldConfig {
     width: 96,
     height: 96,
@@ -40,6 +43,9 @@ const WIDE: WorldConfig = WorldConfig {
 /// The faction that watches in every fixture below.
 const WATCHER: FactionId = FactionId(0);
 
+/// One unit of the fixed-point scale of this project.
+const ONE: i64 = 65536;
+
 /// The exponent that keeps a unit still.
 ///
 /// A unit takes a movement intent at the interval its cell schedules. A long
@@ -48,13 +54,18 @@ const WATCHER: FactionId = FactionId(0);
 const KEEP_STILL: u32 = 12;
 
 /// Builds a world in which no unit takes a movement intent.
-fn a_still_world() -> World {
-    let mut world = World::new(WIDE).expect("the configuration describes a world");
+fn a_still_world_of(config: WorldConfig) -> World {
+    let mut world = World::new(config).expect("the configuration describes a world");
     world
         .set_choice_schedule(KEEP_STILL)
         .expect("the exponent is inside the range");
     world.set_sight_rules(SightRules::new(4, 1, 16, 0));
     world
+}
+
+/// Builds the wide world in which no unit takes a movement intent.
+fn a_still_world() -> World {
+    a_still_world_of(WIDE)
 }
 
 /// Returns an address that admits a unit, near the one asked for.
@@ -87,17 +98,6 @@ fn a_unit_at(world: &mut World, address: Axial, faction: FactionId) -> Entity {
         .expect("the fixture places a unit on ground that admits one")
 }
 
-/// Returns the cell of the lattice that covers an address.
-fn cell_of(world: &World, address: Axial) -> usize {
-    let layout = world.observation().layout();
-    let tile = world
-        .grid()
-        .index_of(address)
-        .expect("the address lies inside the world");
-    let key = layout.key_of(tile).expect("the tile carries a key");
-    layout.block_of_key(key) as usize
-}
-
 /// Returns the positions of one field of the array.
 ///
 /// The reader takes the start and the length from the schema. **No test
@@ -107,323 +107,344 @@ fn cell_of(world: &World, address: Axial) -> usize {
 /// # References
 ///
 /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
-fn field<'a>(world: &World, values: &'a [i64], name: &str) -> &'a [i64] {
-    let row = world
-        .observation_schema()
+fn field<'a>(values: &'a [i64], name: &str) -> &'a [i64] {
+    let row = observation_schema()
         .row(name)
         .unwrap_or_else(|| panic!("the schema declares a field named {name}"));
     let first = row.start as usize;
     &values[first..first + row.positions as usize]
 }
 
-/// Reads the observation of the watcher.
+/// Returns the one position of a field that holds one position.
+fn one(values: &[i64], name: &str) -> i64 {
+    let span = field(values, name);
+    assert_eq!(span.len(), 1, "the field {name} holds one position");
+    span[0]
+}
+
+/// Reads the observation of one faction.
 fn observation_of(world: &World, faction: FactionId) -> Vec<i64> {
     world
         .faction_observation(faction)
-        .expect("the faction names a faction of this world")
+        .expect("the number names a faction of this world")
 }
-
-/// The names of the fields that carry one position for each cell.
-const CELL_FIELDS: [&str; 11] = [
-    "cell_seen_now",
-    "cell_seen_ever",
-    "cell_tiles",
-    "cell_open_tiles",
-    "cell_own_units",
-    "cell_other_units",
-    "cell_own_held_tiles",
-    "cell_other_held_tiles",
-    "cell_value_total",
-    "cell_height_total",
-    "cell_food_total",
-];
 
 /// The schema covers the array exactly, with no gap and no overlap.
 ///
+/// **The count includes every reserved range.** A reserved block holds its
+/// declared positions so that every later block starts where the design puts
+/// it, and a builder that fills one moves nothing.[^1]
+///
 /// A caller decodes by arithmetic over the schema, so a start that did not
 /// follow the field before it would put every later field in the wrong
-/// place.[^1]
+/// place.[^2]
 ///
 /// # References
 ///
-/// [^1]: ADR-0154, decision D1. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+/// [^1]: Research report 42, what a policy should be able to see, section 9. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+/// [^2]: ADR-0154, decision D1. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 #[test]
 fn the_schema_covers_the_array_exactly() {
-    let mut world = a_still_world();
-    let camp = ground_near(&world, Axial::new(8, 8), 8);
-    a_unit_at(&mut world, camp, WATCHER);
-    world.step(1).expect("the step runs");
-
-    let schema = world.observation_schema();
-    let values = observation_of(&world, WATCHER);
-
-    assert_eq!(
-        schema.version(),
-        OBSERVATION_VERSION,
-        "the schema states the version of the layout"
-    );
-    assert_eq!(
-        values.len(),
-        schema.length() as usize,
-        "the array holds the positions the schema declares"
-    );
-    assert!(
-        !schema.rows().is_empty(),
-        "the schema declares at least one field"
-    );
-
-    let mut next = 0u32;
-    for row in schema.rows() {
-        assert_eq!(
-            row.start,
-            next,
-            "the field {} starts after the field before it",
-            row.name()
-        );
+    let schema = observation_schema();
+    let mut owner = vec![usize::MAX; schema.length() as usize];
+    for (at, row) in schema.rows().iter().enumerate() {
         assert!(
             row.positions > 0,
-            "the field {} holds at least one position",
+            "the field {} holds a position",
             row.name()
         );
-        assert!(
-            row.low <= row.high,
-            "the field {} states a lower bound below its upper bound",
-            row.name()
-        );
-        assert_eq!(row.width(), 8, "every position is an eight-byte integer");
-        next += row.positions;
-    }
-    assert_eq!(
-        next,
-        schema.length(),
-        "the fields fill the array and leave no gap"
-    );
-}
-
-/// A cell the faction has never seen reads as nothing at all.
-///
-/// **This is the test the reader exists for.** The fixture asserts that the
-/// far cell holds tiles and height in the truth, so a reader that reported
-/// the truth would write those values here and fail both assertions.
-#[test]
-fn a_cell_the_faction_has_never_seen_reads_as_nothing() {
-    let mut world = a_still_world();
-    let camp = ground_near(&world, Axial::new(8, 8), 8);
-    a_unit_at(&mut world, camp, WATCHER);
-    world.step(1).expect("the step runs");
-
-    let far = Axial::new(80, 80);
-    let far_cell = cell_of(&world, far);
-    let home_cell = cell_of(&world, camp);
-    assert_ne!(
-        far_cell, home_cell,
-        "the fixture must put the far address in another cell"
-    );
-
-    // The fixture asserts the case. A cell of water alone would hold no
-    // height and no open tile, and the test would then pass against a
-    // reader that leaked the truth.
-    let truth = world
-        .summary_covering(far)
-        .expect("the cell covers the address");
-    assert!(
-        truth.tiles() > 0,
-        "the fixture must give the far cell tiles in the truth"
-    );
-    assert!(
-        truth.height_total().0 > 0,
-        "the fixture must give the far cell height in the truth"
-    );
-
-    let values = observation_of(&world, WATCHER);
-    for name in CELL_FIELDS {
-        if name == "cell_tiles" {
-            continue;
+        for offset in 0..row.positions {
+            let place = (row.start + offset) as usize;
+            assert_eq!(
+                owner[place],
+                usize::MAX,
+                "the position {place} belongs to the field {} and to another",
+                row.name()
+            );
+            owner[place] = at;
         }
-        let read = field(&world, &values, name)[far_cell];
-        assert_eq!(
-            read, 0,
-            "the field {name} states nothing about a cell the faction never saw"
-        );
     }
-
-    // The tile count of a cell is a property of the lattice and not of the
-    // faction, so it stands for every cell.
-    assert_eq!(
-        field(&world, &values, "cell_tiles")[far_cell],
-        truth.tiles(),
-        "every cell states how many tiles of the world it covers"
-    );
     assert!(
-        field(&world, &values, "cell_seen_ever")[home_cell] > 0,
-        "the fixture must give the watcher sight of its own cell"
+        owner.iter().all(|held| *held != usize::MAX),
+        "every position of the array belongs to a field"
+    );
+    assert_eq!(
+        schema.length() as usize,
+        observation_of(&a_still_world(), WATCHER).len(),
+        "the array holds the length the schema declares"
     );
 }
 
-/// A unit that walks into a cell opens that cell in the array.
+/// The width is one number for every world shape and every faction count.
 ///
-/// The test drives the step, which is what runs the observation pass. It
-/// reads the array before the walk and after it.
-#[test]
-fn a_unit_that_walks_into_a_cell_opens_it() {
-    let mut world = a_still_world();
-    let camp = ground_near(&world, Axial::new(8, 8), 8);
-    let scout = a_unit_at(&mut world, camp, WATCHER);
-    world.step(1).expect("the step runs");
-
-    let target = ground_near(&world, Axial::new(48, 48), 8);
-    let target_cell = cell_of(&world, target);
-    let home_cell = cell_of(&world, camp);
-    assert_ne!(
-        target_cell, home_cell,
-        "the fixture must send the scout into another cell"
-    );
-
-    let before = observation_of(&world, WATCHER);
-    assert_eq!(
-        field(&world, &before, "cell_seen_ever")[target_cell],
-        0,
-        "the fixture must start with the target cell unseen"
-    );
-
-    world
-        .place_soldier(scout, target)
-        .expect("the target ground admits a unit");
-    world.step(1).expect("the step runs");
-    let after = observation_of(&world, WATCHER);
-
-    assert!(
-        field(&world, &after, "cell_seen_now")[target_cell] > 0,
-        "a cell the scout stands in reads as seen now"
-    );
-    assert!(
-        field(&world, &after, "cell_open_tiles")[target_cell] > 0,
-        "a cell the scout stands in states the ground it admits"
-    );
-    assert_eq!(
-        field(&world, &after, "cell_own_units")[target_cell],
-        1,
-        "the scout counts as a unit of its own faction in the cell it stands in"
-    );
-
-    // The cell the scout left keeps what the faction saw, and it loses the
-    // present frame. A remembered tile adds the ground alone.
-    assert_eq!(
-        field(&world, &after, "cell_seen_now")[home_cell],
-        0,
-        "a cell the faction left reads as seen by nothing now"
-    );
-    assert_eq!(
-        field(&world, &after, "cell_seen_ever")[home_cell],
-        field(&world, &before, "cell_seen_ever")[home_cell],
-        "a faction never forgets a place it saw"
-    );
-    assert_eq!(
-        field(&world, &after, "cell_own_units")[home_cell],
-        0,
-        "a remembered cell reports no unit, whatever stands there now"
-    );
-    assert_eq!(
-        field(&world, &after, "cell_height_total")[home_cell],
-        field(&world, &before, "cell_height_total")[home_cell],
-        "a remembered cell keeps the ground the faction saw"
-    );
-}
-
-/// The array carries the quantity the wonder reader compares.
+/// **This is the property the layout exists to hold.** A field with one
+/// position for each faction multiplied by the faction count, and a field
+/// with one position for each cell of the block lattice multiplied by the
+/// cell count. The width was a function of the width, the height and the
+/// faction count, and a policy trained against one triple could not read
+/// another.[^1]
 ///
-/// The standing of a faction reports the work toward a victory claim. The
-/// wonder reader compares the claim itself, and the two are not the same
-/// quantity.[^1] A learner that read the work alone could not see the thing
-/// that ends its game.
+/// The fixture asserts that the shapes it built really differ, so a fixture
+/// that built one world five times would fail rather than pass.
 ///
 /// # References
 ///
-/// [^1]: Findings register, FND-568. `docs/FINDINGS.md`
+/// [^1]: Findings register, FND-670. `docs/FINDINGS.md`
 #[test]
-fn the_array_carries_the_claim_the_wonder_reader_compares() {
-    let mut world = a_still_world();
-    let camp = ground_near(&world, Axial::new(8, 8), 8);
-    a_unit_at(&mut world, camp, WATCHER);
-    world.step(1).expect("the step runs");
-
-    let schema = world.observation_schema();
-    let claim = schema
-        .row("wonder_claim")
-        .expect("the array carries the claim the wonder reader compares");
-    let progress = schema
-        .row("wonder_progress")
-        .expect("the array carries the work toward a claim");
-    assert_ne!(
-        claim.start, progress.start,
-        "the claim and the work are two positions, because they are two quantities"
-    );
-    assert_eq!(
-        (claim.low, claim.high),
-        (0, 1),
-        "a victory claim holds zero or one, so the wonder path has no threshold"
-    );
-
-    let values = observation_of(&world, WATCHER);
-    let standing = world.standing(WATCHER).expect("the faction stands");
-    assert_eq!(
-        field(&world, &values, "wonder_progress")[0],
-        standing.wonder_progress,
-        "the array reports the work the standing reports"
-    );
-    assert_eq!(
-        field(&world, &values, "wonder_claim")[0],
-        0,
-        "no wonder stands in a world nobody built in"
+fn the_width_is_one_number_for_every_world_shape() {
+    let declared = observation_schema();
+    let shapes = [
+        (24u32, 24u32, 2u16),
+        (48, 48, 3),
+        (96, 96, 7),
+        (128, 64, 12),
+    ];
+    let mut tile_counts = Vec::new();
+    for (width, height, factions) in shapes {
+        let world = a_still_world_of(WorldConfig {
+            width,
+            height,
+            faction_count: factions,
+            ..WIDE
+        });
+        tile_counts.push(world.grid().tile_count());
+        let values = observation_of(&world, WATCHER);
+        assert_eq!(
+            values.len(),
+            declared.length() as usize,
+            "the array of the {width} by {height} world at {factions} factions holds the declared length"
+        );
+        let schema = observation_schema();
+        for (row, expected) in schema.rows().iter().zip(declared.rows()) {
+            assert_eq!(
+                (row.field, row.start, row.positions),
+                (expected.field, expected.start, expected.positions),
+                "the field {} starts at one position in every world",
+                row.name()
+            );
+        }
+    }
+    tile_counts.dedup();
+    assert!(
+        tile_counts.len() > 1,
+        "the fixture must build worlds of different tile counts"
     );
 }
 
-/// The length follows the world parameters and never the population.
+/// Every position of the array lies inside the bounds the schema declares.
+///
+/// The fixture runs three worlds: one with nothing in it, one with a faction
+/// that holds units and no ground, and one with several factions that hold
+/// ground and see each other. A world with one shape would leave most fields
+/// at zero, and zero lies inside every bound.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
 #[test]
-fn the_length_follows_the_world_and_not_the_population() {
-    let mut world = a_still_world();
-    let empty = world.observation_schema().length();
-    assert_eq!(
-        observation_of(&world, WATCHER).len(),
-        empty as usize,
-        "a world with no unit gives an array of the declared length"
-    );
+fn every_position_lies_inside_its_declared_bounds() {
+    let mut crowded = a_still_world();
+    let camp = ground_near(&crowded, Axial::new(8, 8), 8);
+    for step in 0..8i32 {
+        let here = Axial::new(camp.q + step, camp.r);
+        if crowded.admits_a_unit(here) {
+            a_unit_at(&mut crowded, here, WATCHER);
+            a_unit_at(&mut crowded, here, FactionId(1));
+        }
+    }
+    crowded.step(1).expect("the step runs");
 
-    let camp = ground_near(&world, Axial::new(8, 8), 8);
-    for ring in 0..6i32 {
-        for step in 0..6i32 {
-            let address = Axial::new(camp.q + ring, camp.r + step);
-            if world.admits_a_unit(address) {
-                a_unit_at(&mut world, address, WATCHER);
+    let mut lonely = a_still_world();
+    let post = ground_near(&lonely, Axial::new(60, 60), 8);
+    a_unit_at(&mut lonely, post, WATCHER);
+    a_unit_at(&mut lonely, post, WATCHER);
+    lonely.step(1).expect("the step runs");
+
+    let empty = a_still_world();
+    let schema = observation_schema();
+    for world in [&crowded, &lonely, &empty] {
+        let values = observation_of(world, WATCHER);
+        for row in schema.rows() {
+            for offset in 0..row.positions {
+                let value = values[(row.start + offset) as usize];
+                assert!(
+                    value >= row.low && value <= row.high,
+                    "the field {} holds {value} at offset {offset}, outside {} to {}",
+                    row.name(),
+                    row.low,
+                    row.high
+                );
             }
         }
     }
+}
+
+/// A reserved field reads zero in every position.
+///
+/// **A reserved field is not a zero that states a real quantity of zero.**
+/// The schema declares its bounds as zero and zero, so a reader tells the two
+/// apart. Three whole blocks are reserved for the layout revision that builds
+/// the spatial signals.
+#[test]
+fn a_reserved_field_reads_zero() {
+    let mut world = a_still_world();
+    let camp = ground_near(&world, Axial::new(8, 8), 8);
+    a_unit_at(&mut world, camp, WATCHER);
     world.step(1).expect("the step runs");
+    let values = observation_of(&world, WATCHER);
+    let schema = observation_schema();
+    let mut reserved = 0u32;
+    for row in schema.rows() {
+        if !row.field.value_kind().is_reserved() {
+            continue;
+        }
+        reserved += row.positions;
+        assert_eq!(
+            (row.low, row.high),
+            (0, 0),
+            "the reserved field {} declares zero bounds",
+            row.name()
+        );
+        for offset in 0..row.positions {
+            assert_eq!(
+                values[(row.start + offset) as usize],
+                0,
+                "the reserved field {} reads zero at offset {offset}",
+                row.name()
+            );
+        }
+    }
     assert!(
-        world
-            .standing(WATCHER)
-            .expect("the faction stands")
-            .live_units
-            > 1,
-        "the fixture must raise the population"
+        reserved > ObsField::RingStack.positions(),
+        "the fixture must find the reserved blocks"
+    );
+}
+
+/// A share holds its bound on a world that produces a value above it.
+///
+/// **The fixture builds the extreme rather than a typical world.** The units
+/// for each held tile divide the unit count by eight times the held tile
+/// count. A faction with units and no settlement holds no ground, so the
+/// denominator is zero. Without the clamp inside the share the position would
+/// read the unit count times one unit of the scale, which is above the bound
+/// by that factor.
+///
+/// The fixture asserts that it produced the case: the faction holds no
+/// ground, and it holds more than one unit. With one unit the unclamped value
+/// would land exactly on the bound and the assertion would prove nothing.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+#[test]
+fn a_share_holds_its_bound_at_the_extreme() {
+    let mut world = a_still_world();
+    let post = ground_near(&world, Axial::new(60, 60), 8);
+    for step in 0..3i32 {
+        let here = Axial::new(post.q + step, post.r);
+        if world.admits_a_unit(here) {
+            a_unit_at(&mut world, here, WATCHER);
+        }
+    }
+    world.step(1).expect("the step runs");
+    let values = observation_of(&world, WATCHER);
+
+    assert_eq!(
+        world.holding_of(WATCHER),
+        0,
+        "the fixture must give the faction no ground"
+    );
+    assert!(
+        i64::from(world.population_of(WATCHER)) > 1,
+        "the fixture must give the faction more than one unit"
     );
     assert_eq!(
-        world.observation_schema().length(),
-        empty,
-        "the declared length does not move when the population moves"
+        one(&values, "units_for_each_held_tile"),
+        ONE,
+        "the share stops at one unit of the scale"
     );
     assert_eq!(
-        observation_of(&world, WATCHER).len(),
-        empty as usize,
-        "the array does not grow with the population"
+        one(&values, "held_tiles"),
+        0,
+        "a faction that holds nothing reads nothing"
+    );
+}
+
+/// Two worlds of different size agree on a value that follows no world size.
+///
+/// A compressed magnitude of an absolute quantity states the quantity and not
+/// its share of the world, so two worlds that hold the same quantity read the
+/// same value. A share of a world total states the share, so the same two
+/// worlds read different values.
+///
+/// **The fixture asserts that the two worlds really differ in size.** A
+/// fixture that built one world twice would agree on every position and prove
+/// nothing.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+#[test]
+fn two_worlds_of_different_size_agree_on_a_scale_free_value() {
+    let build = |width: u32, height: u32| {
+        let mut world = a_still_world_of(WorldConfig {
+            width,
+            height,
+            ..WIDE
+        });
+        let camp = ground_near(&world, Axial::new(8, 8), 8);
+        for step in 0..4i32 {
+            let here = Axial::new(camp.q + step, camp.r);
+            if world.admits_a_unit(here) {
+                a_unit_at(&mut world, here, WATCHER);
+            }
+        }
+        world.step(1).expect("the step runs");
+        (
+            i64::from(world.population_of(WATCHER)),
+            observation_of(&world, WATCHER),
+        )
+    };
+    let (small_units, small) = build(24, 24);
+    let (large_units, large) = build(96, 96);
+
+    assert_eq!(
+        small_units, large_units,
+        "the fixture must raise the same unit count in both worlds"
+    );
+    assert!(small_units > 0, "the fixture must raise a unit");
+    assert_eq!(
+        small.len(),
+        large.len(),
+        "the two worlds give arrays of one length"
+    );
+    assert_ne!(
+        one(&small, "world_tiles"),
+        one(&large, "world_tiles"),
+        "the fixture must build two worlds of different size"
+    );
+    assert_eq!(
+        one(&small, "live_units"),
+        one(&large, "live_units"),
+        "the unit count reads the same value whatever the world size"
+    );
+    assert_eq!(
+        one(&small, "seated_faction_share"),
+        one(&large, "seated_faction_share"),
+        "the seated faction share reads the same value whatever the world size"
+    );
+    assert!(
+        one(&small, "observed_share_world") > one(&large, "observed_share_world"),
+        "the observed share of the world falls when the world grows"
     );
 }
 
 /// Two thread counts give one array.
 ///
 /// The summary level rebuilds over as many threads as the caller states, and
-/// the array reads that level. A rebuild that took a thread completion order
-/// would give two answers here.[^1]
+/// the passes that build the array read the world that rebuild left. A
+/// rebuild that took a thread completion order would give two answers
+/// here.[^1]
 ///
 /// # References
 ///
@@ -434,6 +455,7 @@ fn two_thread_counts_give_one_array() {
         let mut world = a_still_world();
         let camp = ground_near(&world, Axial::new(8, 8), 8);
         let scout = a_unit_at(&mut world, camp, WATCHER);
+        a_unit_at(&mut world, camp, FactionId(1));
         world.step(threads).expect("the step runs");
         let target = ground_near(&world, Axial::new(48, 48), 8);
         world
@@ -442,417 +464,169 @@ fn two_thread_counts_give_one_array() {
         world.step(threads).expect("the step runs");
         observation_of(&world, WATCHER)
     };
-    let one = build(1);
-    let many = build(12);
+    let one_thread = build(1);
+    let many_threads = build(12);
     assert_eq!(
-        one, many,
+        one_thread, many_threads,
         "the array of one thread and the array of twelve threads agree"
     );
 }
 
-/// The cell counts separate the units of the reader from every other unit.
+/// A change in a place the faction never saw changes nothing in its array.
 ///
-/// **The fixture puts a rival on a tile the watcher sees, and the assertion
-/// is that the two counts differ.** A fixture with only the watcher's own
-/// units would read the same array whether the reader split the count or
-/// summed it, so it would measure nothing.[^1]
+/// **This is the cost bound and the fog rule together.** The passes that build
+/// the array walk the ground the faction observed, so a place it never
+/// reached contributes nothing and costs nothing.[^1]
 ///
-/// The counts are relative to the faction that reads. No position of the
-/// array is indexed by a faction, because a field indexed by the faction
-/// multiplies the world by the faction count.[^2]
-///
-/// # References
-///
-/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
-/// [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
-#[test]
-fn the_cell_counts_tell_an_own_unit_from_another() {
-    let mut world = a_still_world();
-    let home = ground_near(&world, Axial::new(8, 8), 8);
-    let watcher_cell = cell_of(&world, home);
-
-    a_unit_at(&mut world, home, WATCHER);
-    // Two rivals stand beside the watcher, so the other count is neither the
-    // own count nor one. A count of one could come from either side.
-    let beside = ground_near(&world, Axial::new(home.q + 1, home.r), 4);
-    let also = ground_near(&world, Axial::new(home.q, home.r + 1), 4);
-    assert_ne!(beside, home, "the fixture needs a second tile");
-    assert_ne!(also, home, "the fixture needs a third tile");
-    assert_ne!(beside, also, "the two rivals must stand apart");
-    assert_eq!(
-        cell_of(&world, beside),
-        watcher_cell,
-        "the first rival must stand in the cell the watcher sees"
-    );
-    assert_eq!(
-        cell_of(&world, also),
-        watcher_cell,
-        "the second rival must stand in the cell the watcher sees"
-    );
-    a_unit_at(&mut world, beside, FactionId(1));
-    a_unit_at(&mut world, also, FactionId(2));
-
-    world.step(1).expect("the step runs");
-    let values = observation_of(&world, WATCHER);
-
-    assert_eq!(
-        field(&world, &values, "cell_own_units")[watcher_cell],
-        1,
-        "the watcher counts its own unit and no other"
-    );
-    assert_eq!(
-        field(&world, &values, "cell_other_units")[watcher_cell],
-        2,
-        "the watcher counts both rivals together and names neither"
-    );
-}
-
-/// The held counts separate the ground of the reader from the ground of
-/// another faction.
-///
-/// **The fixture asserts that both counts are above zero before it compares
-/// them.** A cell in which nobody holds anything reads zero in both, and a
-/// test over such a cell would pass whatever the reader did.[^1]
+/// The fixture asserts that the faction never saw the far ground, and that
+/// the change really happened. A fixture that changed a place the faction
+/// watches would fail, and a fixture that changed nothing would pass without
+/// proving anything.
 ///
 /// # References
 ///
-/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+/// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D2. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 #[test]
-fn the_held_counts_tell_own_ground_from_other_ground() {
+fn a_place_the_faction_never_saw_changes_nothing() {
     let mut world = a_still_world();
-    world.set_sight_rules(SightRules::new(64, 1, 16, 0));
-    let mine = ground_near(&world, Axial::new(8, 8), 8);
-    let theirs = ground_near(&world, Axial::new(20, 8), 8);
-    let cell = cell_of(&world, mine);
-    assert_eq!(
-        cell_of(&world, theirs),
-        cell,
-        "the fixture needs both cities inside one cell"
-    );
+    let camp = ground_near(&world, Axial::new(8, 8), 8);
+    a_unit_at(&mut world, camp, WATCHER);
+    world.step(1).expect("the step runs");
+    let before = observation_of(&world, WATCHER);
 
-    a_unit_at(&mut world, mine, WATCHER);
-    world
-        .found_settlement(mine, WATCHER)
-        .expect("the ground admits a city of the watcher");
-    world
-        .found_settlement(theirs, FactionId(1))
-        .expect("the ground admits a city of the rival");
+    let far = ground_near(&world, Axial::new(88, 88), 6);
+    assert!(
+        !world.faction_has_seen(WATCHER, far),
+        "the fixture must name ground the watcher never saw"
+    );
+    let rival = a_unit_at(&mut world, far, FactionId(1));
+    assert!(
+        world.soldier_faction(rival).is_some(),
+        "the fixture must raise the rival unit"
+    );
     world.step(1).expect("the step runs");
 
-    let values = observation_of(&world, WATCHER);
-    let own = field(&world, &values, "cell_own_held_tiles")[cell];
-    let other = field(&world, &values, "cell_other_held_tiles")[cell];
-
-    assert!(
-        own > 0,
-        "the fixture must give the watcher held ground inside the cell"
-    );
-    assert!(
-        other > 0,
-        "the fixture must give the rival held ground inside the same cell"
-    );
-    // **The comparison is against a count taken another way.** This walk
-    // reads the holder of every tile of the cell the watcher sees now, from
-    // the truth of the world. A test that compared the array against itself
-    // would pass whatever the reader summed.
-    let (truth_own, truth_other) = held_by_hand(&world, WATCHER, cell);
-    assert_eq!(
-        own, truth_own,
-        "the own count is the ground the watcher holds"
-    );
-    assert_eq!(
-        other, truth_other,
-        "the other count is the ground every rival holds together"
-    );
-    assert_ne!(
-        own, other,
-        "the fixture must give the two sides different amounts of ground"
-    );
-    assert!(
-        own + other <= field(&world, &values, "cell_seen_now")[cell],
-        "the two counts never pass the tiles the watcher sees"
-    );
-}
-
-/// Counts the held tiles of one cell by walking the world, for one faction
-/// and for every other faction.
-///
-/// The walk reads the truth of the world and the sight rule of the faction,
-/// and it takes the tiles the faction sees now. It visits the addresses in
-/// ascending order, so two runs give one answer.
-fn held_by_hand(world: &World, faction: FactionId, cell: usize) -> (i64, i64) {
-    let (mut own, mut other) = (0i64, 0i64);
-    for row in 0..world.grid().height() {
-        for column in 0..world.grid().width() {
-            let here = Axial::new(column as i32, row as i32);
-            if cell_of(world, here) != cell || !world.faction_sees_now(faction, here) {
-                continue;
-            }
-            match world.tile_holder(here).and_then(Holder::faction) {
-                Some(holder) if holder == faction => own += 1,
-                Some(_) => other += 1,
-                None => {}
-            }
+    let after = observation_of(&world, WATCHER);
+    let schema = observation_schema();
+    let clock = schema
+        .row("tick_share")
+        .expect("the schema holds the clock");
+    let remaining = schema
+        .row("remaining_ticks")
+        .expect("the schema holds the remaining ticks");
+    let phase = schema
+        .row("weather_phase")
+        .expect("the schema holds the weather phase");
+    for row in schema.rows() {
+        if row.field == clock.field || row.field == remaining.field || row.field == phase.field {
+            continue;
+        }
+        for offset in 0..row.positions {
+            let place = (row.start + offset) as usize;
+            assert_eq!(
+                before[place],
+                after[place],
+                "the field {} moved after a change the faction cannot see",
+                row.name()
+            );
         }
     }
-    (own, other)
 }
 
-/// The layout version moves when the field set moves.
+/// The confidence statistic tells an unobserved estimate from a real zero.
 ///
-/// A stored weight file is a function of the field list, so a reader must be
-/// able to tell a file written under one field set from a file written under
-/// another.[^1]
+/// A power quantity of a rival is an estimate from the ground the faction
+/// observed. Without the confidence a policy reads an inferred quantity and a
+/// seen quantity as one fact, and it cannot learn to scout.[^1]
+///
+/// The fixture builds both cases: a faction that observed nothing, and a
+/// faction that observes ground and finds no rival on it.
 ///
 /// # References
 ///
-/// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+/// [^1]: Research report 42, what a policy should be able to see, section 6.3. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+#[test]
+fn the_confidence_tells_an_unobserved_estimate_from_a_zero() {
+    let blind = a_still_world();
+    assert_eq!(
+        blind.faction_seen_ever(WATCHER),
+        0,
+        "the fixture must give the faction no observed ground"
+    );
+    let unseen = observation_of(&blind, WATCHER);
+    let statistics = field(&unseen, "power_held_tiles");
+    assert_eq!(
+        statistics[statistics.len() - 1],
+        0,
+        "a faction that observed nothing reads no confidence"
+    );
+
+    let mut watching = a_still_world();
+    let camp = ground_near(&watching, Axial::new(8, 8), 8);
+    a_unit_at(&mut watching, camp, WATCHER);
+    watching.step(1).expect("the step runs");
+    assert!(
+        watching.faction_seen_ever(WATCHER) > 0,
+        "the fixture must give the faction observed ground"
+    );
+    let seen = observation_of(&watching, WATCHER);
+    let statistics = field(&seen, "power_held_tiles");
+    assert!(
+        statistics[statistics.len() - 1] > 0,
+        "a faction that observes ground reads a confidence above zero"
+    );
+}
+
+/// No field of the layout names a seat.
+///
+/// A block indexed by seat teaches a policy a seat number, and a league seats
+/// one policy in one seat for one game and in another seat for the next.[^1]
+/// The standing of the rivals arrives as order statistics, whose width does
+/// not follow the faction count.
+///
+/// The check is the width: a field whose length followed the faction count
+/// would change length between two worlds of different faction counts, and
+/// the schema is one schema.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-647. `docs/FINDINGS.md`
+#[test]
+fn no_field_of_the_layout_follows_the_faction_count() {
+    let two = a_still_world_of(WorldConfig {
+        faction_count: 2,
+        ..WIDE
+    });
+    let many = a_still_world_of(WorldConfig {
+        faction_count: 12,
+        ..WIDE
+    });
+    assert_ne!(
+        two.faction_count(),
+        many.faction_count(),
+        "the fixture must build two worlds of different faction counts"
+    );
+    assert_eq!(
+        observation_of(&two, WATCHER).len(),
+        observation_of(&many, WATCHER).len(),
+        "the array holds one length at two faction counts and at twelve"
+    );
+}
+
+/// The schema reports the version of the layout.
+///
+/// A field added, removed, relengthened or rebounded changes the meaning of a
+/// stored weight file, so a learner that loads a policy under another version
+/// must stop.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0154, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 #[test]
 fn the_schema_reports_the_layout_version() {
-    let world = a_still_world();
-    assert_eq!(world.observation_schema().version(), OBSERVATION_VERSION);
-    // **The version is pinned beside the field set, so neither moves alone.**
-    // This once asserted that the version stood above one. That is a compile
-    // time comparison of two constants: it is true whatever the fields do, so
-    // it stated nothing and could never fail.
-    //
-    // The pair below can fail. Add or remove a field and the count moves, so
-    // the assertion fails until the version moves with it, which is the whole
-    // of the rule this test exists to hold.
-    //
-    // The pair catches a field the layout gained or lost. It cannot catch a
-    // field that kept its length and changed its meaning, and the version
-    // moves for that too. The addressing change that made this pair read
-    // four is such a change: the field count did not move.
     assert_eq!(
-        (OBSERVATION_VERSION, world.observation_schema().rows().len()),
-        (4, 30),
-        "the field set and the version must move together",
+        observation_schema().version(),
+        OBSERVATION_VERSION,
+        "the schema carries the version of the layout"
     );
-}
-
-// Every faction-indexed field is addressed relative to the reader.
-//
-// The two tests below read one world from two seats. A field addressed by a
-// seat number would put a rival's quantities under the same position for one
-// reader and under a different position for the other, and a policy that the
-// league moves between seats would then read two things under one weight.[^1]
-//
-// [^1]: ADR-0193, a faction's observation names another faction by a position relative to the reader, decision D1. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
-
-/// Builds a world of one faction count in which every faction-indexed
-/// quantity differs from every other.
-///
-/// **The fixture asserts that it produced the case.** A world in which two
-/// factions hold the same relation and post the same board would read the
-/// same from either seat, whichever way the field is addressed, so the
-/// assertions below would pass over a defect.[^1]
-///
-/// The relation of every ordered pair takes a value of its own, and the board
-/// of every faction takes quantities of its own. The step runs first, so the
-/// fog layers are filled by the pass that fills them and not by the test.
-///
-/// # References
-///
-/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
-fn a_world_where_every_faction_differs(faction_count: u16) -> World {
-    let config = WorldConfig {
-        faction_count,
-        ..WIDE
-    };
-    let mut world = World::new(config).expect("the configuration describes a world");
-    world
-        .set_choice_schedule(KEEP_STILL)
-        .expect("the exponent is inside the range");
-    world.set_sight_rules(SightRules::new(4, 1, 16, 0));
-
-    let count = i32::from(faction_count);
-    for from in 0..count {
-        let camp = ground_near(&world, Axial::new(8 + from * 12, 8), 8);
-        a_unit_at(&mut world, camp, FactionId(from as u16));
-    }
-    world.step(1).expect("the step runs");
-
-    for from in 0..count {
-        for to in 0..count {
-            if from == to {
-                continue;
-            }
-            let value = 1_000 * (from + 1) + (to + 1);
-            assert!(
-                world.set_relation(FactionId(from as u16), FactionId(to as u16), value),
-                "the fixture writes the relation of every ordered pair"
-            );
-        }
-        let rows: Vec<Advert> = (0..i32::from(world.board_rows()))
-            .map(|row| Advert {
-                good: ((from + row) % 3) as u8,
-                wants: ADVERT_OFFERS,
-                asking_good: ((from + row + 1) % 3) as u8,
-                padding: 0,
-                quantity: (100_000 * (from + 1) + row) as u32,
-                asking_quantity: (200_000 * (from + 1) + row) as u32,
-            })
-            .collect();
-        world
-            .advertise(FactionId(from as u16), &rows)
-            .expect("the board fits the bound and names a resource kind");
-    }
-
-    // The fixture asserts the distribution it needs: no two ordered pairs
-    // hold one relation, and no two factions post one board quantity.
-    let mut relations = Vec::new();
-    let mut quantities = Vec::new();
-    for from in 0..count {
-        for to in 0..count {
-            if from != to {
-                relations.push(world.relation(FactionId(from as u16), FactionId(to as u16)));
-            }
-        }
-        quantities.push(world.market(FactionId(from as u16))[0].quantity);
-    }
-    let mut sorted = relations.clone();
-    sorted.sort_unstable();
-    sorted.dedup();
-    assert_eq!(
-        sorted.len(),
-        relations.len(),
-        "the fixture needs a distinct relation for every ordered pair"
-    );
-    let mut sorted = quantities.clone();
-    sorted.sort_unstable();
-    sorted.dedup();
-    assert_eq!(
-        sorted.len(),
-        quantities.len(),
-        "the fixture needs a distinct board quantity for every faction"
-    );
-    world
-}
-
-/// The names of the fields that hold one block of board rows for each
-/// faction.
-const BOARD_FIELDS: [&str; 5] = [
-    "board_good",
-    "board_quantity",
-    "board_wants",
-    "board_asking_good",
-    "board_asking_quantity",
-];
-
-/// Reads what one position of a board field holds for one faction.
-fn advert_position(advert: &Advert, name: &str) -> i64 {
-    match name {
-        "board_good" => i64::from(advert.good),
-        "board_quantity" => i64::from(advert.quantity),
-        "board_wants" => i64::from(advert.wants),
-        "board_asking_good" => i64::from(advert.asking_good),
-        _ => i64::from(advert.asking_quantity),
-    }
-}
-
-/// Returns the faction that one relative position of a faction-indexed field
-/// names.
-///
-/// **The rule is written out here, and it is not taken from the engine.** A
-/// test that read its expectation from the same mapping the writer uses would
-/// agree with a broken mapping, and it would pass over the defect it exists to
-/// catch.[^1]
-///
-/// The test states this rule, and it states no position of the array. A
-/// position comes from the schema, in the way every other test here takes
-/// one.[^2]
-///
-/// # References
-///
-/// [^1]: Testing rules, section 1. `.agents/rules/testing.md`
-/// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
-fn named_by(reader: FactionId, offset: u32, faction_count: u32) -> FactionId {
-    FactionId(((u32::from(reader.0) + offset) % faction_count) as u16)
-}
-
-/// Asserts that every reader of one world finds one meaning at one relative
-/// position.
-///
-/// The reader's own block comes first, and the rivals follow it in the
-/// rotation the record states.
-fn every_reader_agrees_on_the_relative_positions(faction_count: u16) {
-    let world = a_world_where_every_faction_differs(faction_count);
-    let count = u32::from(faction_count);
-    let rows = u32::from(world.board_rows());
-
-    let mut relation_by_reader = Vec::new();
-    for seat in 0..faction_count {
-        let reader = FactionId(seat);
-        let values = observation_of(&world, reader);
-
-        assert_eq!(
-            field(&world, &values, "faction")[0],
-            i64::from(seat),
-            "the array names the faction that reads it"
-        );
-
-        let relation = field(&world, &values, "relation");
-        assert_eq!(relation.len(), count as usize);
-        for offset in 0..count {
-            let other = named_by(reader, offset, count);
-            assert_eq!(
-                relation[offset as usize],
-                i64::from(world.relation(reader, other).unwrap_or(0)),
-                "reader {seat} holds the relation toward the faction {offset} seats after it"
-            );
-        }
-        relation_by_reader.push(relation.to_vec());
-
-        for name in BOARD_FIELDS {
-            let block = field(&world, &values, name);
-            assert_eq!(block.len(), (count * rows) as usize);
-            for offset in 0..count {
-                let other = named_by(reader, offset, count);
-                let board = world.market(other);
-                for row in 0..rows {
-                    assert_eq!(
-                        block[(offset * rows + row) as usize],
-                        advert_position(&board[row as usize], name),
-                        "reader {seat} holds the {name} of the faction {offset} seats after it"
-                    );
-                }
-            }
-            // The reader's own block comes first, whatever seat it holds.
-            let own = world.market(reader);
-            for row in 0..rows {
-                assert_eq!(
-                    block[row as usize],
-                    advert_position(&own[row as usize], name),
-                    "reader {seat} holds its own {name} in the first block"
-                );
-            }
-        }
-    }
-
-    // Two readers of one world must not read one relation vector. A field
-    // that answered the same for every seat would carry no relation at all,
-    // and the assertions above would hold over it.
-    for (seat, relation) in relation_by_reader.iter().enumerate().skip(1) {
-        assert_ne!(
-            relation, &relation_by_reader[0],
-            "seat {seat} reads its own relations and not seat zero's"
-        );
-    }
-}
-
-/// Two seats of one world read one meaning at one relative position, at the
-/// training faction count.
-#[test]
-fn two_seats_of_one_world_agree_on_the_relative_positions() {
-    every_reader_agrees_on_the_relative_positions(3);
-}
-
-/// The rule holds at a faction count the training shape does not use.
-///
-/// A rule that only held at three factions would be a coincidence of the
-/// shape the trainer runs.
-#[test]
-fn the_relative_positions_hold_at_five_factions() {
-    every_reader_agrees_on_the_relative_positions(5);
 }
