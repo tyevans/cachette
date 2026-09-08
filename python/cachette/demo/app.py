@@ -127,9 +127,11 @@ PICTURE_HEIGHT = 1400
 # **A picture at tick 2 shows a world in which nothing has happened.** No seat
 # is held, no unit carries a load, no store has rationed and no soldier has
 # been promoted, so a picture taken then reports every subsystem at zero and
-# each of those zeros is the fixture rather than the engine. The seats fill,
-# the carrying starts and the first promotion lands well inside this count,
-# so a reader sees the subsystems the panel reports.
+# each of those zeros is the fixture rather than the engine. The seats fill
+# and the carrying starts well inside this count, so a reader sees those
+# subsystems report. A promotion needs deeds, and a world that gathers slowly
+# reaches the deed threshold after this count or never, so a picture states
+# no character on many seeds.
 #
 # This is a default and not a bound. `--ticks` takes any count, including 0
 # for a picture of the world as it was founded.
