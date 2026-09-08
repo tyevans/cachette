@@ -90,6 +90,25 @@ readonly STOP_ON_COLLAPSE="${CACHETTE_TRAIN_STOP_ON_COLLAPSE:-1}"
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+# **The compiled extension is a function of the sources that build it, and of
+# nothing else in the tree.** A run that changes only a document rebuilds the
+# same bytes, and the build costs about a quarter of an hour on the target
+# before the first episode runs. The key below names the build inputs, so a
+# later run with the same inputs installs the wheel the earlier run made.
+readonly WHEEL_CACHE="${CACHETTE_WHEEL_CACHE:-$HOME/.cache/cachette-wheels}"
+
+# The key holds the sources, the two manifests that pin the dependency
+# versions, and the toolchain file that pins the compiler. A change to any one
+# of them changes the bytes, and a change to anything else does not.
+build_key() {
+    local parts=""
+    local path
+    for path in crates Cargo.lock Cargo.toml rust-toolchain.toml; do
+        parts="$parts$(git -C "$root" rev-parse "HEAD:$path" 2>/dev/null || echo none)"
+    done
+    printf '%s' "$parts" | sha256sum | cut -c1-16
+}
+
 say() { printf '=== %s\n' "$1" >&2; }
 die() { printf '%s\n' "$1" >&2; exit 1; }
 
@@ -360,6 +379,22 @@ connect() {
     remote="ec2-user@$HOST"
 }
 
+# Fetch the wheel a build produced, once, into the cache. A run that received
+# a wheel already has it, and a run whose build has not finished has nothing to
+# fetch yet, so this stays quiet until there is something to take.
+fetch_wheel() {
+    [ -n "${wheel_key:-}" ] || return 0
+    local target="$WHEEL_CACHE/$wheel_key.whl"
+    [ -f "$target" ] && return 0
+    mkdir -p "$WHEEL_CACHE"
+    if scp "${ssh_options[@]}" "$remote:cachette.whl" "$target.part" >/dev/null 2>&1; then
+        mv "$target.part" "$target"
+        say "Kept the wheel for build $wheel_key. The next run with these sources skips the compiler"
+    else
+        rm -f "$target.part"
+    fi
+}
+
 # The loop that follows a running job. It polls, renders the dashboard, and
 # ends when the marker says the run finished, when the search has stopped, or
 # when the local deadline passes.
@@ -378,6 +413,7 @@ follow() {
         state="$(ssh "${ssh_options[@]}" "$remote" 'cat /tmp/marker 2>/dev/null' \
             2>/dev/null || true)"
         render_progress
+        fetch_wheel
         case "$state" in
             done*) finished="done" ;;
             failed*)
@@ -628,6 +664,19 @@ say "Copying the tracked files"
 scp "${ssh_options[@]}" "$out_dir/tree.tgz" "$remote:tree.tgz" >/dev/null
 rm -f "$out_dir/tree.tgz"
 
+# **A cached wheel skips the compiler, and the compiler is most of the wait.**
+# The instance installs the wheel when one arrives and builds one when none
+# does. The follower fetches the wheel a build produces, so the next run with
+# the same inputs pays nothing for it.
+wheel_key="$(build_key)"
+cached_wheel="$WHEEL_CACHE/$wheel_key.whl"
+if [ -f "$cached_wheel" ]; then
+    say "Sending the cached wheel for build $wheel_key. The instance skips the compiler"
+    scp "${ssh_options[@]}" "$cached_wheel" "$remote:cachette.whl" >/dev/null
+else
+    say "No cached wheel for build $wheel_key. The instance compiles once, and the run keeps the result"
+fi
+
 # --------------------------------------------------------------------- remote
 
 cat > "$out_dir/remote.sh" <<'REMOTE'
@@ -647,21 +696,49 @@ sudo dnf install -y -q gcc gcc-c++ tar gzip python3.12 python3.12-devel \
     >/dev/null
 mkdir -p cachette
 tar -xzf tree.tgz -C cachette
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
-    | sh -s -- -y --profile minimal --default-toolchain none >/dev/null
-. "$HOME/.cargo/env"
+# **The compiler is only needed when no wheel arrived.** Installing the Rust
+# toolchain and building the extension is most of the time between boot and
+# the first episode, and the bytes it produces are a function of the sources
+# alone. A run that received a wheel skips both.
+if [ -f "$HOME/cachette.whl" ]; then
+    printf 'a wheel arrived for this build. Skipping the compiler\n'
+else
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --profile minimal --default-toolchain none >/dev/null
+    . "$HOME/.cargo/env"
+fi
 curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null
 . "$HOME/.local/bin/env" 2>/dev/null || export PATH="$HOME/.local/bin:$PATH"
 cd cachette
-# The toolchain manifest at the root pins the channel, so rustup installs the
-# version the project states and this script names none.
-rustup show active-toolchain
+
+# **The sync installs the dependencies and never the project itself.** The
+# build backend of this package is the Rust builder, so a plain sync compiles
+# the extension, and the release build after it then compiles the same sources
+# a second time. The project arrives below as one wheel, built once or fetched
+# from the cache.
+uv sync --frozen --no-install-project 2>&1 | tail -5 \
+    || uv sync --no-install-project 2>&1 | tail -5
 
 # The extension is a compiled module, so the learner needs a build and not
 # only an install. This is the step that fails first if the target platform
 # cannot build it, and it fails before anything long has run.
-uv sync --frozen 2>&1 | tail -5 || uv sync 2>&1 | tail -5
-uv run maturin develop --release 2>&1 | tail -5
+if [ ! -f "$HOME/cachette.whl" ]; then
+    # The toolchain manifest at the root pins the channel, so rustup installs
+    # the version the project states and this script names none.
+    rustup show active-toolchain
+    # **Build a wheel rather than install in place.** The two produce the same
+    # module, and only the wheel is a file the follower can fetch and keep for
+    # the next run.
+    uv run --no-project --with maturin maturin build --release \
+        --out "$HOME/wheelhouse" 2>&1 | tail -5
+    cp "$HOME"/wheelhouse/*.whl "$HOME/cachette.whl"
+fi
+uv pip install --reinstall "$HOME/cachette.whl" 2>&1 | tail -3
+
+# **The module must import before anything long runs.** A wheel built for
+# another platform or another Python installs without a word and fails at the
+# first episode, which is an hour of billing after the mistake.
+uv run --no-sync python -c 'import cachette._core; print("the engine module imports")'
 # numpy on aarch64 is the one dependency this project does not control the
 # build of. The line below states which wheel arrived, so a report can say
 # whether it was a native wheel or a build from source.
