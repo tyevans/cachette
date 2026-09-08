@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-670**
+**Next number: FND-672**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -17329,9 +17329,68 @@ one policy as though they were thirty one policies.
 
 The trainer still holds its own reported tuple. Replacing it is the work that
 follows, and until it is replaced the two sets can disagree again.
+### FND-670 — The width of the observation follows the world shape and the faction count, so a policy fits one world and no other
+
+**Believed.** The observation is a bounded table, so a learner can train one
+function of it. The record states that no length follows the population, and the
+engine holds to that.[^F670A]
+
+**True.** No length follows the population, and several lengths follow the world
+shape and the faction count. A field with one position for each faction
+multiplies by the faction count. A field with one position for each cell of the
+block lattice multiplies by the cell count, and the cell count follows the tile
+count. The width is therefore a function of the triple of width, height and
+faction count, and a policy trained against one triple cannot read another.
+
+**Evidence.** The width was measured over five square worlds at three factions,
+and over four faction counts at one world shape. The commit message holds the
+table.[^F670B] The width runs from 151 positions at 24 by 24 to 1724 at 384 by
+384. It runs from 143 positions at two factions to 553 at twelve. The lattice
+holds one cell at 24 by 24 and 144 cells at 384 by 384, at about 1024 tiles for
+each cell.
+
+**What follows.** Two consequences, and the second is the worse one.
+
+A run cannot transfer a policy between world shapes, so every measurement taken
+on a small world is a measurement of a different function than the one a large
+world would train. The project trains on 24 by 24 and on 48 by 48 and states
+its target at 16.7 million tiles.
+
+At 24 by 24 the lattice holds one cell. Every spatial field of the observation
+then holds one position that covers the whole world, so the policy reads no
+spatial information at all on the world the project trains on most. At the
+target tile count the same rule gives about 16,400 cells and about 170,000
+positions, which no policy of this project reads. The encoding is blind at the
+small end and does not fit at the large end, and one rule produces both.
+
+### FND-671 — A faction reads its own territory through the fog of this frame, so its own borders flicker
+
+**Believed.** A faction knows the ground it holds. The observation reports the
+held tile count, and the lattice reports where that ground lies.
+
+**True.** The held tile count is the whole count. The lattice field is scoped to
+the tiles the faction sees in the current frame, and the field states that
+scope. The two therefore report the same quantity at two scopes, and they
+disagree by an order of magnitude.
+
+**Evidence.** One world of 48 by 48 at three factions ran 200 ticks. The held
+tile count read 191. The lattice field for own held tiles summed to 21. The
+field for tiles seen in the frame summed to 74, and the field for tiles ever
+seen summed to 167 of 2304.[^F670B]
+
+**What follows.** The picture a faction reads of its own borders moves when its
+units move, and the ground did not move. A learner that reads the lattice cannot
+tell the loss of ground from the loss of sight of ground it still holds.
+
+No rule of the game hides a faction's own holdings from it. The scope is correct
+for a rival's ground and wrong for the reader's own, and one field carries both
+under one rule.
+
 ## References
 
 [^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
+[^F670A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D2. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^F670B]: The commit `Record what the observation width follows, and how its own ground flickers`. Read its message for the figures.
 [^F668A]: The commit `Measure what sets how well one generation points the right way`. Read its message for the figures.
 [^F667A]: The commit `Measure what water does to a training world, and free two colliding numbers`. Read its message for the figures.
 [^F667B]: Findings register, FND-666. `docs/FINDINGS.md`
