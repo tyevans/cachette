@@ -55,7 +55,7 @@ promotion path of item 0066 leads nowhere.[^7]
 
 **Conflict surface.** `crates/cachette-core/src/ruler.rs` is new, and
 `crates/cachette-core/src/character.rs` gains a position column.
-`crates/cachette-core/src/world.rs` at the barrier. It writes a source term
+`crates/cachette-core/src/world/pyramid.rs` at the barrier. It writes a source term
 into the influence field that item 0104 builds, and it does not change how that
 field is stored or solved. **It shares
 `character.rs` with item 0067**, so the two do not run beside each other.

@@ -280,7 +280,7 @@ blocker holds that gap.[^21]
 ## References
 
 [^1]: PRD-0001, a faction sees only what its own units observe. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
-[^2]: The world module of the core crate, the subsystem census. `crates/cachette-core/src/world.rs`
+[^2]: The world module of the core crate, the subsystem census. `crates/cachette-core/src/world/census.rs`
 [^3]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables the engine owns, decision D3. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^4]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^5]: ADR-0022, level 0 is the only truth, and every level above it is derived, decisions D1 and D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
