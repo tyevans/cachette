@@ -47,13 +47,14 @@ from typing import TYPE_CHECKING, Protocol
 import numpy as np
 
 from .policy import LinearPolicy, MLPPolicy
+from .structured import STRUCTURED_KIND, StructuredPolicy
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from .env import Env
 
-# A policy the search can perturb. Both kinds answer ``flat`` and ``rebuild``,
-# so the search never asks which kind it holds.
-Trainable = LinearPolicy | MLPPolicy
+# A policy the search can perturb. Every kind answers ``flat`` and
+# ``rebuild``, so the search never asks which kind it holds.
+Trainable = LinearPolicy | MLPPolicy | StructuredPolicy
 
 
 @dataclass(frozen=True)
@@ -218,7 +219,13 @@ def shell_policy(kind: str, probe: Env, hidden: int) -> Trainable:
 
     The lengths come from the engine schemas through the probe environment.
     This module states none of its own.
+
+    The structured kind reads the whole layout and not only the length, so it
+    takes the signal catalogue of the probe. That catalogue is the schema the
+    engine published, and this module states no part of it.
     """
+    if kind == STRUCTURED_KIND:
+        return StructuredPolicy.of_catalogue(probe.action_length, probe.signals)
     if kind == "mlp":
         return MLPPolicy.zeros(probe.action_length, probe.observation_length, hidden)
     return LinearPolicy.zeros(probe.action_length, probe.observation_length)

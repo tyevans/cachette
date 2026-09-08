@@ -36,10 +36,14 @@ from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
+from .layout import ObservationLayout
+
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Mapping
 
     from cachette._core import ActionSchema, ObservationSchema
+
+    from .structured import StructuredPolicy
 
 # The divisor that brings the signed logarithm into roughly one unit. A store
 # total of a raw Q16.16 quantity reaches about twenty in the logarithm, so
@@ -469,8 +473,10 @@ class MLPPolicy:
 
 
 def load_policy(
-    path: Path, wanted: PolicyFit | None = None
-) -> tuple[LinearPolicy | MLPPolicy, dict[str, object]]:
+    path: Path,
+    wanted: PolicyFit | None = None,
+    layout: ObservationLayout | None = None,
+) -> tuple[LinearPolicy | MLPPolicy | StructuredPolicy, dict[str, object]]:
     """Read a weight file, and return the policy it holds and what it names.
 
     The file states its own kind. A file written before this module held two
@@ -482,13 +488,32 @@ def load_policy(
     file holds, which is correct for a reader that only reports what a file
     says.
 
+    **Pass the layout when the policy is a structured one.** The two schema
+    versions catch a change the engine made to the observation. They do not
+    catch a change a caller made to the geometry it states over one version,
+    and a stack of 151 cells by 25 channels holds the same positions as a
+    stack of 25 cells by 151 channels. The layout separates the two.
+
     Raises ``PolicyFitError`` when a fit is asked for and the file does not
-    match it, and when a fit is asked for and the file states none.
+    match it, when a fit is asked for and the file states none, and when a
+    layout is asked for and the file reads another one.
     """
     stored = np.load(path, allow_pickle=False)
     kind = str(stored["kind"]) if "kind" in stored.files else "linear"
-    skip = {"weights", "first", "second", "kind"}
-    meta = {key: stored[key].tolist() for key in stored.files if key not in skip}
+    skip = {
+        "weights",
+        "first",
+        "second",
+        "kind",
+        "flat",
+        "projection",
+        "architecture",
+    }
+    meta = {
+        key: stored[key].tolist()
+        for key in stored.files
+        if key not in skip and not key.startswith("layout_")
+    }
     meta["kind"] = kind
     if wanted is not None:
         held = PolicyFit.read(meta)
@@ -501,6 +526,16 @@ def load_policy(
             )
             raise PolicyFitError(message)
         held.check(wanted, path)
+    if kind == "structured":
+        # The structured policy reads this module for the encoder and the
+        # fit, so the import sits here and the two modules do not form a
+        # cycle at import time.
+        from .structured import StructuredPolicy
+
+        policy = StructuredPolicy.restore(stored)
+        if layout is not None:
+            policy.check_layout(layout, path)
+        return policy, meta
     if kind == "mlp":
         return MLPPolicy(stored["first"], stored["second"]), meta
     return LinearPolicy(stored["weights"]), meta
