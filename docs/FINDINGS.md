@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-645**
+**Next number: FND-648**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -16939,6 +16939,53 @@ trained across seats learned a function of two meanings at once.
 **The shape.** A test of a per-reader field must read more than one reader. One
 reader agrees with a defect whenever that reader is the one the defect is
 indexed from.
+### FND-648 — A verb the control plane runs between two steps left the world unreadable, and the refusal named none of its cause
+
+**Believed.** The observation reader refused once three seated policies had
+acted, and the condition looked like a property of the number of policies or
+of an event of the world. Four reports named four different events before the
+traceback: nothing at all, a win by territory, the first character of the
+world, and the opening banner of the run.[^F648A]
+
+**True.** None of those events is the cause. **A verb that a caller runs
+between two steps changes the soldier arena and leaves the derived unit
+structure behind it.** The step rebuilds that structure at its barriers, and a
+verb outside a step reaches no barrier, so every reader between the verb and
+the next step meets a refusal. The action verb, the founding verb, the
+conversion verb, the spawn verb and the removal verb all did this. The
+observation of one faction is the reader that reported it, because the
+demonstration gives each seated policy its decision in seat order, and the
+policy of the second faction reads after the policy of the first has acted.
+
+**Why one policy never saw it.** A single pilot reads immediately after a
+step, so the barrier of that step has already repaired the structure. Two
+pilots put a read between a verb and the next step. That is the whole of the
+difference, and it is why a run with one policy took five hundred ticks
+without a refusal.
+
+**Why the line above each traceback misled.** The demonstration announces the
+events of a tick after it has given every pilot its decision. The last line a
+watcher sees therefore belongs to the tick before the refusal, and it names
+whatever the world announced then. Three readers took that line for the
+trigger.
+
+**Evidence.** A world of 48 tiles a side, two factions, one thread. A settler
+spawns, the world steps, and the action verb founds a city. The observation of
+the acting faction then refuses. The refusal now names the cause: the
+structure holds one revision and the arena holds another. A probe over the
+verbs of the binding refused after the spawn verb, the removal verb, the
+founding verb and the conversion verb, and answered after each of them once
+the verb restored the structure. A test drives each verb and reads
+afterwards.[^F648B]
+
+**What follows.** A verb that changes the arena calls the one refresh before
+it returns, and the public rebuild is the form a caller of a primitive
+calls.[^F648C] The reader carries a refusal that names its cause, so a stale
+structure states both revisions and a structure that was never built says
+so.[^F648D] The two failure families of the trainer are not shown to be this
+defect: neither crate holds unsafe code beyond two plain-data
+declarations, so a stale structure gives a refusal or a wrong count and never
+a bad dereference.[^F648E]
 
 ## References
 
@@ -16950,7 +16997,12 @@ indexed from.
 [^F641E]: ADR-0192, a window of controller commands is one label distribution over the action table, decisions D2 and D4. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
 [^F644A]: The observation reader of the binding. `crates/cachette-py/src/lib.rs`
 [^F644B]: The policy pilot of the demonstration. `python/cachette/demo/pilot.py`
-[^F644C]: Backlog item 0528, let a stored policy play a demonstration to the end of a game. `docs/backlog/proposed/0528-let-a-stored-policy-play-a-demonstration-to-the-end-of-a-game.md`
+[^F644C]: Backlog item 0528, let a stored policy play a demonstration to the end of a game. `docs/backlog/complete/0528-let-a-stored-policy-play-a-demonstration-to-the-end-of-a-game.md`
+[^F648A]: Findings register, FND-644. `docs/FINDINGS.md`
+[^F648B]: The test that drives each verb and reads afterwards. `crates/cachette-core/tests/a_step_leaves_the_world_readable.rs`
+[^F648C]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decisions D3 and D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^F648D]: The refusal of a faction reader. `crates/cachette-core/src/faction_view.rs`
+[^F648E]: Findings register, FND-646. `docs/FINDINGS.md`
 [^F647A]: The seated league of the control plane, the seat-matched plan. `python/cachette/learn/league.py`
 [^F647B]: The observation test of the engine. `crates/cachette-core/tests/a_faction_reads_one_flat_array.rs`
 [^F647C]: ADR-0193, a faction's observation names another faction by a position relative to the reader, decision D1. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`

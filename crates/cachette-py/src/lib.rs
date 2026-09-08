@@ -1471,12 +1471,25 @@ impl PyWorld {
                             .expect("this call made the identity a moment ago");
                         world.despawn_soldier(entity);
                     }
+                    // A refused set leaves the world as it found it, and
+                    // that includes the derived unit structure.[^4]
+                    world
+                        .rebuild_bridge(1)
+                        .map_err(|refusal| VerbError::new_err(refusal.to_string()))?;
                     return Err(VerbError::new_err(format!(
                         "the address ({q}, {r}) refused a soldier: {error}"
                     )));
                 }
             }
         }
+        // **The verb leaves the world readable.** A spawn moves the arena
+        // past the derived unit structure, and a reader between two steps is
+        // not obliged to step first.[^4]
+        //
+        // [^4]: Findings register, FND-647. `docs/FINDINGS.md`
+        world
+            .rebuild_bridge(1)
+            .map_err(|error| VerbError::new_err(error.to_string()))?;
         Ok(made.to_pyarray(python))
     }
 
@@ -1510,6 +1523,14 @@ impl PyWorld {
                 "a resolved identity must name a soldier the arena can remove"
             );
         }
+        // **The verb leaves the world readable.** A removal moves the arena
+        // past the derived unit structure, and a reader between two steps is
+        // not obliged to step first.[^2]
+        //
+        // [^2]: Findings register, FND-647. `docs/FINDINGS.md`
+        world
+            .rebuild_bridge(1)
+            .map_err(|error| VerbError::new_err(error.to_string()))?;
         Ok(())
     }
 
@@ -3595,7 +3616,9 @@ impl PyWorld {
     ///
     /// Raises `VerbError` when the number names no faction of this world, or
     /// when the `admit` argument names neither rule. Raises `ViewError` when
-    /// the address lies outside the world.
+    /// the address lies outside the world, and when the derived unit
+    /// structure does not describe the units. The message names which of the
+    /// two happened.
     ///
     /// # References
     ///
@@ -3627,7 +3650,7 @@ impl PyWorld {
         }
         let masked = world
             .faction_summary_covering(FactionId(faction), Axial::new(q, r), rule)
-            .ok_or_else(|| ViewError::new_err(format!("({q}, {r}) names no cell of this world")))?;
+            .map_err(|error| ViewError::new_err(error.to_string()))?;
         let summary = masked.summary();
         let fields = PyDict::new(python);
         fields.set_item("q", q)?;
@@ -3682,7 +3705,7 @@ impl PyWorld {
     ///
     /// Raises `VerbError` when the number names no faction of this world.
     /// Raises `ViewError` when the derived unit structure does not describe
-    /// the units.
+    /// the units, and the message names which refusal the structure gave.
     ///
     /// # References
     ///
@@ -3701,9 +3724,15 @@ impl PyWorld {
                 "{faction} names no faction of this world"
             )));
         }
+        // **The message names the reason.** The reader returns a refusal
+        // that names its cause, and a stale derived structure names both
+        // revisions. A sentence that named none of it sent four readers of
+        // one traceback looking for four different causes.[^5]
+        //
+        // [^5]: Findings register, FND-647. `docs/FINDINGS.md`
         let values = world
             .faction_observation(FactionId(faction))
-            .ok_or_else(|| ViewError::new_err("the world cannot describe its own units"))?;
+            .map_err(|error| ViewError::new_err(error.to_string()))?;
         Ok(values.to_pyarray(python))
     }
 

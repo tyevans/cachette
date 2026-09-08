@@ -97,7 +97,9 @@ pub use descent::{
     Descent, DescentError, DescentId, HouseId, Parents, DESCENT_CEILING, RELATION_DEPTH,
 };
 pub use event::{FactionEliminated, ResourceTaken, SiteTaken, TileChanged};
-pub use faction_view::{Admit, FactionTile, Ground, MaskedSummary, SeenTile, SeenUnit, Sighting};
+pub use faction_view::{
+    Admit, FactionTile, FactionViewError, Ground, MaskedSummary, SeenTile, SeenUnit, Sighting,
+};
 pub use fire::{
     FireEnded, FireField, FireStarted, FireTile, GroundReading, UnitBurned, BURN_FOR_EACH_TICK,
     CHANCE_WHOLE, DOUSE_WORK_FOR_EACH_UNIT, END_CAUSE_BURNT_OUT, END_CAUSE_DOUSED,

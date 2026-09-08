@@ -26,7 +26,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from cachette import World
+from cachette import VerbError, World
 from cachette.demo.app import Demo, main
 from cachette.demo.clock import SPEEDS
 from cachette.demo.pilot import PolicyChoiceError, chosen_policies, seat_policies
@@ -384,3 +384,87 @@ def test_the_zero_policy_takes_the_no_op(tmp_path: Path) -> None:
     mask = world.legal_actions(1)
     assert zero.choose(observation, mask) == 0
     assert np.asarray(mask)[0] == 1, "the no-op row is not legal"
+
+
+# The unit type row that founds a city. The table holds it, and the test
+# reads the column rather than naming a number of its own.
+def settler_type(world: World) -> int:
+    """Give back the unit type whose row founds a city."""
+    table = world.unit_type_table()
+    group = np.asarray(table["settle_group"])
+    rows = np.flatnonzero(group > 0)
+    assert len(rows), "the unit type table holds no row that founds a city"
+    return int(rows[0])
+
+
+def a_settler_that_can_found(demo: Demo, faction: int) -> int:
+    """Put a settler of one faction on ground where the settle verb takes.
+
+    **The fixture asserts that it reached the case.** A settler on ground the
+    founding survey refuses leaves the verb refusing, and a test over a world
+    where nothing founded proves nothing.[^1]
+
+    References
+    ----------
+    [^1]: Testing Rules, section 2a. ``.agents/rules/testing.md``
+    """
+    world = demo.world
+    settle = verb_named(world, "settle")
+    kind = settler_type(world)
+    for row in range(6, SIDE - 6, 4):
+        for column in range(6, SIDE - 6, 4):
+            try:
+                made = world.spawn_soldiers([(column, row)], faction)
+            except VerbError:
+                # The ground of a tile comes from the seed, so a candidate
+                # may hold water. The search takes the next one.
+                continue
+            if not len(made):
+                continue
+            unit = int(made[0])
+            world.set_unit_types([unit], kind)
+            world.step(1)
+            if int(np.asarray(world.legal_actions(faction))[settle]) == 1:
+                return unit
+            world.despawn_soldiers([unit])
+    message = "the fixture found no ground where the settle verb takes"
+    raise AssertionError(message)
+
+
+def test_a_policy_that_founds_a_city_leaves_the_world_readable(
+    tmp_path: Path,
+) -> None:
+    """Two policies play on, and the founding of one does not stop the other.
+
+    **This drives the frames.** The demonstration steps the world and gives
+    every pilot its decision, in seat order. The first pilot founds a city,
+    which changes the unit arena, and the second pilot then reads its
+    observation before the next step. The engine answered that read with a
+    refusal, and the run stopped with a view error.[^1]
+
+    References
+    ----------
+    [^1]: Findings register, FND-644 and FND-647. ``docs/FINDINGS.md``
+    """
+    demo = build()
+    world = demo.world
+    settle = verb_named(world, "settle")
+    a_settler_that_can_found(demo, 0)
+    sites = world.settlement_count
+
+    first = write_policy(tmp_path / "founds", world, action=settle)
+    second = write_policy(tmp_path / "follows", world, action=settle)
+    demo.pilots = seat_policies(world, [(0, first), (1, second)])
+
+    for _ in range(FRAMES):
+        demo.advance()
+
+    assert world.settlement_count > sites, (
+        "the fixture must reach the case: no policy founded a city"
+    )
+    for pilot in demo.pilots:
+        assert pilot.decisions > 1, "the frames gave a policy no decision"
+    # The world answers every faction after the founding, and the reader that
+    # the pilot uses is the reader this asserts on.
+    for faction in range(world.faction_count):
+        world.faction_observation(faction)

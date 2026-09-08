@@ -128,7 +128,7 @@
 
 use crate::controller::WEIGHT_COUNT;
 use crate::event_layout::ColumnKind;
-use crate::faction_view::{Admit, BlockMask};
+use crate::faction_view::{Admit, BlockMask, FactionViewError};
 use crate::types::{FactionId, Fix32};
 use crate::world::World;
 
@@ -625,17 +625,23 @@ impl World {
     /// position, and the two count positions of that cell state that the
     /// faction holds none of it.
     ///
-    /// Returns `None` when the faction names no faction of this world, or
-    /// when the derived unit structure does not describe the units.
+    /// # Errors
+    ///
+    /// Returns an error when the number names no faction of this world, and
+    /// when the derived unit structure does not describe the units. **The
+    /// error names the cause.** A stale structure names the revision it holds
+    /// and the revision the arena holds.[^4]
     ///
     /// # References
     ///
     /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D3. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
     /// [^2]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D1. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
     /// [^3]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D2. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-    #[must_use]
-    pub fn faction_observation(&self, faction: FactionId) -> Option<Vec<i64>> {
-        let standing = self.standing(faction)?;
+    /// [^4]: Findings register, FND-647. `docs/FINDINGS.md`
+    pub fn faction_observation(&self, faction: FactionId) -> Result<Vec<i64>, FactionViewError> {
+        let standing = self
+            .standing(faction)
+            .ok_or(FactionViewError::NoSuchFaction(faction))?;
         let schema = self.observation_schema();
         let shape = WorldShape::of(self);
         let cells = self.observed_cells(faction)?;
@@ -644,7 +650,9 @@ impl World {
             .victory_claims()
             .get(usize::from(faction.0))
             .map_or(0, |pair| pair.0);
-        let weights = self.faction_weights(faction)?;
+        let weights = self
+            .faction_weights(faction)
+            .ok_or(FactionViewError::NoSuchFaction(faction))?;
         let weight_bytes = [
             i64::from(weights.war),
             i64::from(weights.trade),
@@ -721,7 +729,7 @@ impl World {
                 ObsField::CellFoodTotal => scatter(span, &cells, |cell| cell.food_total),
             }
         }
-        Some(out)
+        Ok(out)
     }
 
     /// Builds one row for each cell of the lattice, over what one faction
@@ -736,9 +744,11 @@ impl World {
     /// The tile count of a cell is a property of the lattice and not of the
     /// faction, so every row carries it.
     ///
-    /// Returns `None` when the derived unit structure does not describe the
-    /// units.
-    fn observed_cells(&self, faction: FactionId) -> Option<Vec<CellRow>> {
+    /// # Errors
+    ///
+    /// Returns an error when the derived unit structure does not describe the
+    /// units, and when the world holds no tile at an address of a cell.
+    fn observed_cells(&self, faction: FactionId) -> Result<Vec<CellRow>, FactionViewError> {
         let observation = self.observation();
         let count = observation.layout().block_count();
         let mut cells = vec![CellRow::default(); count as usize];
@@ -773,7 +783,7 @@ impl World {
             cell.height_total = summary.height_total().0;
             cell.food_total = summary.food_total().0;
         }
-        Some(cells)
+        Ok(cells)
     }
 }
 

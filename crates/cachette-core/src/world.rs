@@ -863,6 +863,21 @@ pub struct World {
     upgrades: UpgradeMap,
     /// Level 1 of the pyramid, derived from level 0 at the barrier.
     pyramid: Pyramid,
+    /// The arena revision that the last level 1 rebuild read.
+    ///
+    /// **Level 1 states its own freshness here.** A verb that a caller runs
+    /// between two steps restores the derived unit structure and rebuilds no
+    /// level, so the freshness of that structure says nothing about this
+    /// level. A check that read one to answer for the other stated one fact
+    /// in two places.[^1] [^2]
+    ///
+    /// It holds nothing before the first rebuild.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^2]: Findings register, FND-647. `docs/FINDINGS.md`
+    level_1_arena: Option<u64>,
     /// The direction that each level 1 cell holds, for each option.
     ///
     /// The array is what movement steers by. It is a projection of level 1,
@@ -1888,6 +1903,7 @@ impl World {
             delivered: [0; RESOURCE_KIND_COUNT],
             upgrades: UpgradeMap::new(),
             pyramid: Pyramid::new(layout, ResourceField::new(terrain))?,
+            level_1_arena: None,
             exits: ExitField::new(cell_lattice),
             returns: ReturnField::new(cell_lattice, config.faction_count),
             home_approaches: ApproachField::new(layout),
@@ -2866,13 +2882,20 @@ impl World {
     /// [^3]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
     #[must_use]
     pub fn settle_set(&mut self, units: &[Entity]) -> Vec<SettleOutcome> {
-        units
+        let outcomes: Vec<SettleOutcome> = units
             .iter()
             .map(|unit| {
                 let result = self.settle_one(*unit);
                 SettleOutcome::new(*unit, result)
             })
-            .collect()
+            .collect();
+        // A founding seats a group and spends the settler, so the arena has
+        // moved past the derived unit structure. The verb leaves the world
+        // readable, in the way the seeding verb does.[^2]
+        //
+        // [^2]: Findings register, FND-647. `docs/FINDINGS.md`
+        self.leave_the_world_readable();
+        outcomes
     }
 
     /// Founds a city from one settler, and spends it.
@@ -4439,6 +4462,11 @@ impl World {
         }
         let marks = conversion::marks_for_set(&self.soldiers, units, faction);
         self.apply_converts(&marks);
+        // A faction change raises the arena revision, so the verb leaves the
+        // world readable before it returns.[^2]
+        //
+        // [^2]: Findings register, FND-647. `docs/FINDINGS.md`
+        self.leave_the_world_readable();
         Ok(())
     }
 
@@ -5205,19 +5233,28 @@ impl World {
 
     /// Rebuilds the unit-to-tile bridge from the soldier columns.
     ///
-    /// The step calls this at the barrier. A caller that changes the
-    /// population outside a step calls it to make the bridge readable
-    /// again.
+    /// **This is the public form of the rule that a verb leaves the world
+    /// readable.** A caller that spawns, removes or moves a unit outside a
+    /// step calls it, and the world answers every reader again.[^1] The
+    /// call compares two revisions and returns when the arena has not moved,
+    /// so a caller pays for one rebuild and never for two.[^2]
+    ///
+    /// The step calls the same rule at each of its barriers.
     ///
     /// # Errors
     ///
     /// Returns an error when the caller asks for zero threads, or when the
     /// rebuild refuses.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decisions D3 and D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    /// [^2]: Findings register, FND-647. `docs/FINDINGS.md`
     pub fn rebuild_bridge(&mut self, threads: usize) -> Result<(), StepError> {
         if threads == 0 {
             return Err(StepError::ZeroThreads);
         }
-        self.bridge.rebuild(&self.soldiers)?;
+        self.refresh_bridge()?;
         Ok(())
     }
 
@@ -5812,16 +5849,21 @@ impl World {
         //
         // The tile total holds at every moment, because the ground does not
         // change. The unit total holds at a barrier only: a spawn made between
-        // two frames leaves the level as stale as the structure it was built
-        // from, which is the documented state and not a defect. The freshness
-        // of the derived structure is what says which moment this is.
+        // two frames leaves the level stale, which is the documented state and
+        // not a defect.
+        //
+        // **Level 1 says which moment it describes, and the derived unit
+        // structure does not say it for level 1.** A verb restores that
+        // structure and rebuilds no level, so a check that read the structure
+        // here would ask the level about an arena it never counted.[^5]
         //
         // [^4]: ADR-0023, an aggregate combines exactly, in any order, decision D5. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+        // [^5]: Findings register, FND-647. `docs/FINDINGS.md`
         let total = self.pyramid.total();
         if total.tiles() != i64::from(self.grid.tile_count()) {
             return false;
         }
-        if self.bridge.describes(&self.soldiers).is_ok()
+        if self.level_1_arena == Some(self.soldiers.revision())
             && total.units() != i64::from(self.soldiers.len())
         {
             return false;
@@ -9274,6 +9316,12 @@ impl World {
                 threads,
             )?;
         }
+        // Level 1 counted the units of this arena, so it states the
+        // revision it read. Nothing else says which moment the level
+        // describes.[^4]
+        //
+        // [^4]: Findings register, FND-648. `docs/FINDINGS.md`
+        self.level_1_arena = Some(self.soldiers.revision());
         {
             let _span = stage::open(Stage::RebuildExits);
             self.exits.derive(&self.pyramid);
@@ -12768,6 +12816,34 @@ impl World {
         }
         self.bridge.rebuild(&self.soldiers)?;
         Ok(())
+    }
+
+    /// Restores the derived unit structure after a verb changed the arena.
+    ///
+    /// **A verb that a caller runs between two steps ends here.** The step
+    /// rebuilds at its barriers, and a verb outside a step reaches no
+    /// barrier, so the verb itself is the only thing that can leave the
+    /// world readable. A reader is not obliged to step first, and four
+    /// reports of one refusal came from readers that did not.[^1] [^2]
+    ///
+    /// The call compares two revisions and returns when the verb changed no
+    /// structure. It rebuilds when the verb changed one.
+    ///
+    /// The rebuild refuses only when the arena describes another world, and
+    /// a verb of this world cannot produce that state. The assertion states
+    /// that, so a build with the assertions on stops rather than carrying
+    /// on.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decisions D3 and D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    /// [^2]: Findings register, FND-647. `docs/FINDINGS.md`
+    fn leave_the_world_readable(&mut self) {
+        let outcome = self.refresh_bridge();
+        debug_assert!(
+            outcome.is_ok(),
+            "a verb of this world leaves a structure that describes it"
+        );
     }
 }
 
@@ -17878,6 +17954,19 @@ impl World {
             return false;
         };
         let applied = self.apply_verb(faction, verb, &arguments);
+        // **An action leaves the world readable.** A verb of the table
+        // founds a city, spends a settler, or changes the faction of a unit,
+        // and each of those moves the arena past the derived unit
+        // structure.[^4] A caller sends an action between two steps, so the
+        // barrier of the next step is too late: the reader that runs before
+        // it met a refusal, and the refusal named nothing.[^5]
+        //
+        // The refresh compares two revisions on a tick that changed no
+        // structure, and it rebuilds on a tick that did.
+        //
+        // [^4]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decisions D3 and D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        // [^5]: Findings register, FND-647. `docs/FINDINGS.md`
+        self.leave_the_world_readable();
         let tick = self.tick;
         self.controller.push(ControllerCommand {
             tick,
