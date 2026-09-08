@@ -16,9 +16,21 @@ winner holds the higher value. A field at 0.5 orders candidates no better than
 a coin. A field at 1.0 orders them exactly as winning does. **A field below 0.5
 orders them backwards, and weighing it teaches the search to lose.**
 
-The candidates are drawn the way a generation draws them: a random projection
-network with random weights at the search width. So the spread this measures is
-the spread the search actually sees.
+The candidates are a random projection network with random weights at the search
+width, drawn on the unit sphere. **That is the neighbourhood a run starts from
+and not the neighbourhood a trained centre sits in.** A generation late in a run
+perturbs a centre that already plays, so its spread is narrower and its ordering
+may differ. Read this as the answer for the reward a run should start with.
+
+**A field that accumulates is confounded with how long the episode ran.** A
+candidate that lost at tick 500 held ground for a fifth as long as one that lost
+at the limit, and a winner ends its episode the moment it wins. The raw share
+therefore reads a short win as a low value on every accumulating field, which
+pushes such a field below a coin for a reason that is not about play. The table
+reports a second share beside the first: the same measure over the value divided
+by the end tick, which is the rate rather than the total. **Read the two
+together.** A field whose total orders badly and whose rate orders well is a
+field the episode length is hiding.
 
 Run it with the candidate count and the world count:
 
@@ -34,6 +46,7 @@ from pathlib import Path
 
 import numpy as np
 
+from cachette.learn.env import Env
 from cachette.learn.policy import MLPPolicy, Policy, RandomPolicy
 from cachette.learn.reward import Weighting
 from cachette.learn.train import REPORT_FIELDS, run_population
@@ -64,6 +77,7 @@ class Ranking:
 
     field: str
     auc: float
+    rate_auc: float
     pairs: int
     spread: float
 
@@ -127,10 +141,17 @@ def main() -> None:
     # itself and the ranking here is by outcome alone.
     weighting = Weighting(terms={}, won=1.0, lost=0.0, drawn=0.0)
 
-    # The candidates are drawn as a generation draws them, so the spread is the
-    # spread the search sees. One random policy sits among them as a control.
+    # The candidates are drawn on the unit sphere, which is the neighbourhood
+    # generation zero draws from. One random policy sits among them as a
+    # control.
     generator = np.random.default_rng(20260908)
-    zero = MLPPolicy.zeros(29, 184, arguments.hidden)
+    # **The two lengths come from the engine and never from a constant here.**
+    # A length written by hand is a second declaration of a number the engine
+    # owns, and nothing fails when the two disagree.
+    probe = Env(WORLD, weighting)
+    zero = MLPPolicy.zeros(
+        probe.action_length, probe.observation_length, arguments.hidden
+    )
     size = zero.flat().size
     policies: list[Policy] = []
     for _ in range(arguments.policies - 1):
@@ -175,29 +196,47 @@ def main() -> None:
         f"worlds hold both a winner and a loser and so can order anything\n"
     )
 
+    # The end tick of each episode, which the rate divides by. It is never
+    # zero, because an episode takes at least one decision before it ends.
+    ticks = columns["end_tick"]
+
     rankings: list[Ranking] = []
     for field in fields:
         auc, pairs = within_world_auc(seeds, columns[field], won)
+        rate_auc, _ = within_world_auc(seeds, columns[field] / ticks, won)
         rankings.append(
             Ranking(
                 field=field,
                 auc=auc,
+                rate_auc=rate_auc,
                 pairs=pairs,
                 spread=float(np.nanmean(np.nanstd(columns[field], axis=0))),
             )
         )
-    rankings.sort(key=lambda entry: -entry.auc if entry.auc == entry.auc else 0.0)
-
-    print(
-        f"{'field':>22s} {'weigh as':>16s} {'orders like winning':>20s} {'pairs':>7s}"
+    # A field with no ordered pair reads back as not a number. It sorts last,
+    # because a field this run could not measure is not a field it ranked
+    # above the fields it could.
+    rankings.sort(
+        key=lambda entry: (
+            entry.auc != entry.auc,
+            -entry.auc if entry.auc == entry.auc else 0.0,
+        )
     )
+
+    print(f"{'field':>22s} {'weigh as':>16s} {'total':>9s} {'rate':>9s} {'pairs':>7s}")
     for entry in rankings:
         weigh = WEIGHABLE_AS.get(entry.field, entry.field)
-        print(f"{entry.field:>22s} {weigh:>16s} {entry.auc:20.3f} {entry.pairs:7d}")
+        print(
+            f"{entry.field:>22s} {weigh:>16s} {entry.auc:9.3f} "
+            f"{entry.rate_auc:9.3f} {entry.pairs:7d}"
+        )
     print(
         "\n0.5 is a coin. Above 0.5 the field orders candidates the way "
         "winning does.\nBelow 0.5 it orders them backwards, and weighing it "
-        "teaches the search to lose."
+        "teaches the search to lose.\nThe total column reads the value at the "
+        "end. The rate column divides it by the end tick,\nso a field whose "
+        "total is low only because the episode was short shows the "
+        "difference."
     )
 
     if arguments.out is not None:
