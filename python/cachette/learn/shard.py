@@ -52,21 +52,17 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from .env import Env
-from .train import (
-    Generation,
-    generation_noise,
-    pair_candidates,
-    score_generation,
-    shell_policy,
-)
+from .record import EpisodeRecord
+from .rollout import Generation, score_generation
+from .search import generation_noise, pair_candidates, shell_policy
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Sequence
     from types import TracebackType
 
+    from .config import TrainConfig
     from .env import EnvConfig
     from .reward import Weighting
-    from .train import TrainConfig
 
 # The variables that hold a matrix library to one thread. Each library reads
 # its own, and a library that reads none starts one thread for each core.
@@ -122,7 +118,12 @@ class ShardScore:
     The wins and the games are counts and not a share. A share cannot be
     combined without the games behind it, and a run whose shards hold
     different candidate counts would report a mean that the single-process
-    run does not report.
+    run does not report. The chosen and the refused entries are counts for
+    the same reason.
+
+    The episodes entry holds one record for each episode the shard played, in
+    candidate order. The combination concatenates them in shard order, which
+    is candidate order.
     """
 
     first_candidate: int
@@ -132,6 +133,9 @@ class ShardScore:
     wins: int
     games: int
     ticks: int
+    chosen: int = 0
+    refused: int = 0
+    episodes: tuple[EpisodeRecord, ...] = ()
 
 
 def shard_ranges(pairs: int, processes: int, width: int) -> list[tuple[int, int]]:
@@ -180,7 +184,7 @@ def play_shard(task: ShardTask) -> ShardScore:
     probe = Env(task.env_config, task.weighting)
     shell = shell_policy(task.kind, probe, task.hidden)
     noise = generation_noise(
-        config.seed, task.generation, config.population // 2, task.centre.size
+        config.seed, task.generation, config.pairs, task.centre.size
     )
     candidates = pair_candidates(
         shell, task.centre, noise, config.sigma, task.first_pair, task.last_pair
@@ -201,6 +205,9 @@ def play_shard(task: ShardTask) -> ShardScore:
         wins=round(played.won * games),
         games=games,
         ticks=played.ticks,
+        chosen=played.chosen,
+        refused=played.refused,
+        episodes=played.episodes,
     )
 
 
@@ -236,6 +243,9 @@ def combine_shards(scores: Sequence[ShardScore], candidates: int) -> Generation:
         absolute=np.concatenate([score.absolute for score in ordered]),
         won=sum(score.wins for score in ordered) / games if games else 0.0,
         ticks=sum(score.ticks for score in ordered),
+        chosen=sum(score.chosen for score in ordered),
+        refused=sum(score.refused for score in ordered),
+        episodes=tuple(episode for score in ordered for episode in score.episodes),
     )
 
 
@@ -326,7 +336,7 @@ def run_sharded_generation(
     centre, the same generation and the same seeds. The shard count changes
     how the work is spread, and it changes nothing else.
     """
-    pairs = train_config.population // 2
+    pairs = train_config.pairs
     width = max(1, len(train_config.learner_seats))
     ranges = shard_ranges(pairs, pool.processes, width)
     tasks = [

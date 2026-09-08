@@ -180,7 +180,7 @@ def main() -> None:
     )
     for start in range(0, len(pending), arguments.batch):
         batch = pending[start : start + arguments.batch]
-        returns, readings, _ = run_population(
+        played = run_population(
             WORLD,
             weighting,
             [policies[index] for index, _ in batch],
@@ -188,6 +188,7 @@ def main() -> None:
             arguments.workers,
             label=f"batch {start // arguments.batch + 1}",
         )
+        returns, readings = played.returns, played.rows()
         # **The returns arrive shaped one row for each policy, and the readings
         # arrive flat with one entry for each policy and seed together.** Under
         # this weighting an episode returns one for a win and nothing

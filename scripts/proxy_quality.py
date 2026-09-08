@@ -49,7 +49,7 @@ import numpy as np
 from cachette.learn.env import Env
 from cachette.learn.policy import MLPPolicy, Policy, RandomPolicy
 from cachette.learn.reward import Weighting
-from cachette.learn.train import REPORT_FIELDS, run_population
+from cachette.learn.train import run_population
 
 # Fields that cannot inform a ranking, and why each is left out. A constant
 # cannot order anything, and the outcome fields are the thing being predicted
@@ -61,6 +61,7 @@ IGNORED: frozenset[str] = frozenset(
         "game_over",  # true at the end of every episode
         "weight",  # a scaling constant of the array
         "wonder_claim",  # a win condition, so it is the outcome and not a proxy
+        "tick",  # the tick of the end, which the row also carries as end_tick
     }
 )
 
@@ -82,15 +83,20 @@ class Ranking:
     spread: float
 
 
-def candidate_fields() -> list[str]:
+def candidate_fields(probe: Env) -> list[str]:
     """Return the fields this measurement can read for one episode.
 
-    **The reading reports a fixed set and not the terms of the weighting.**
-    The trainer names that set, and it holds the tick of the end under another
-    name, so a caller that asks the schema instead gets fields no reading
-    carries. The set below is what an episode actually reports.
+    **The set comes from the schema of the engine and not from a tuple.** The
+    catalogue of the environment names every one-position quantity the engine
+    publishes, and a reading of an episode carries all of them. A tuple
+    written here would be a second declaration of that set, and a name the
+    schema stopped carrying would read as a missing value rather than fail.
+
+    The engine spells the tick of the end ``tick`` and a reading also carries
+    it as ``end_tick``, so both names are candidates.
     """
-    return [name for name in (*REPORT_FIELDS, "end_tick") if name not in IGNORED]
+    named = [signal.name for signal in probe.signals.scalars()]
+    return [name for name in (*named, "end_tick") if name not in IGNORED]
 
 
 def within_world_auc(
@@ -133,7 +139,6 @@ def main() -> None:
     from cachette.learn.env import viable_seeds
 
     seeds = viable_seeds(WORLD, arguments.seeds, arguments.seed_start)
-    fields = candidate_fields()
 
     # **The weighting shapes nothing.** The reading reports its fixed set
     # whatever the weighting says, so no term is needed to read a field. The
@@ -149,6 +154,7 @@ def main() -> None:
     # A length written by hand is a second declaration of a number the engine
     # owns, and nothing fails when the two disagree.
     probe = Env(WORLD, weighting)
+    fields = candidate_fields(probe)
     zero = MLPPolicy.zeros(
         probe.action_length, probe.observation_length, arguments.hidden
     )
@@ -163,9 +169,9 @@ def main() -> None:
         f"playing {len(policies)} candidates over {len(seeds)} worlds, "
         f"{len(policies) * len(seeds)} episodes, reading {len(fields)} fields"
     )
-    _, readings, _ = run_population(
+    readings = run_population(
         WORLD, weighting, policies, seeds, arguments.workers, label="proxy"
-    )
+    ).rows()
 
     # The readings arrive flat, one for each candidate and seed together, at
     # index candidate times seed count plus seed.
