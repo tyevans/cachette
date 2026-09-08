@@ -44,13 +44,40 @@ def test_the_water_account_is_exact() -> None:
 
 
 def test_a_watcher_reads_the_whole_field_in_one_crossing() -> None:
+    """One crossing answers what a loop of single-cell reads answers.
+
+    The array holds one entry for each weather cell of the world, and the
+    weather pitch is a parameter of the constructor. A watcher therefore
+    indexes it by `weather_cells_wide` and never by the level 1 pitch.
+
+    **The array is not the whole account.** The engine steps a margin of
+    cells outside the world, the margin holds water, and the totals hold the
+    margin so that the account balances.[^2] The sum of the array is
+    therefore at or below the ground total, and it falls below it as soon as
+    water crosses the border. The loop of single-cell reads is the exact
+    comparison, because it covers the same cells the array covers.
+
+    References
+    ----------
+    [^2]: ADR-0141, a weather pass moves water and never scales it.
+    ``docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md``
+    """
     world = World(**COASTAL)
     for _ in range(32):
         world.step(4)
     plane = world.weather_ground()
+    across = world.weather_cells_wide
+    down = world.weather_cell_count // across
+    edge = world.weather_cell_tiles
     assert plane.dtype.name == "int64"
-    assert len(plane) == world.cells_wide * world.cells_wide
-    assert int(plane.sum()) == world.weather_totals()["ground"]
+    assert len(plane) == world.weather_cell_count
+    one_at_a_time = sum(
+        world.ground_water_at(column * edge, row * edge)
+        for row in range(down)
+        for column in range(across)
+    )
+    assert int(plane.sum()) == one_at_a_time
+    assert 0 < one_at_a_time <= world.weather_totals()["ground"]
 
 
 def test_a_read_outside_the_world_refuses() -> None:

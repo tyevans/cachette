@@ -330,16 +330,23 @@ impl PyWorld {
         Ok(report)
     }
 
-    /// The water on the ground of every level 1 cell, as a NumPy array.
+    /// The water on the ground of every weather cell of the world, as a
+    /// NumPy array.
     ///
     /// The result is a one-dimensional array of `numpy.int64`, in cell index
     /// order, and the unit is drops. A drop is a whole number and it is not a
-    /// fixed-point value. Take `index % cells_wide` for the column of a cell
-    /// and `index // cells_wide` for its row.
+    /// fixed-point value. Take `index % weather_cells_wide` for the column of
+    /// a cell and `index // weather_cells_wide` for its row. **The weather
+    /// pitch is a parameter of the constructor**, so it agrees with the level
+    /// 1 pitch only when the world takes the level 1 weather pitch.
     ///
     /// **This is one crossing, and it replaces a loop.** A watcher that read
     /// each cell through `ground_water_at` would pay one crossing for each
     /// cell. The control plane never loops over the world.
+    ///
+    /// **The array covers the world and the totals cover the margin around
+    /// it.** The sum of this array is therefore at or below the `ground`
+    /// total, and it falls below it as soon as water crosses the border.
     ///
     /// The array is empty when no water has entered the world yet.
     fn weather_ground<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i64>> {
@@ -356,7 +363,11 @@ impl PyWorld {
         plane.to_pyarray(python)
     }
 
-    /// The water in the air over every level 1 cell, as a NumPy array.
+    /// The water in the air over every weather cell of the world, as a NumPy
+    /// array.
+    ///
+    /// The shape, the order and the unit are those of `weather_ground`, and
+    /// the sum stands against the `air` total in the same way.
     fn weather_air<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i64>> {
         let world = self.lock();
         // The reading crops the margin away, as the ground reading does.

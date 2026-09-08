@@ -66,8 +66,8 @@ impl PyWorld {
     /// level 1 cell is the set, or `give_tiles` or `take_tiles`, a list of
     /// addresses, or both. The kind and the amount of a land side are ignored,
     /// because the amount is the tile count. Every tile must be held by the
-    /// party that owes it, and no tile may carry an upgrade while the question
-    /// of what happens to the upgrade is open.[^2]
+    /// party that owes it. **A tile that carries an upgrade may be traded**,
+    /// and the upgrade goes to the taker with the ground.[^2]
     ///
     /// A relation side keeps its kind and its amount. It is stored, and it
     /// delivers as a logged no-op until the relation matrix exists.
@@ -75,7 +75,7 @@ impl PyWorld {
     /// # References
     ///
     /// [^1]: ADR-0126, a trade negotiation is engine state and the words are not, decision D3. `docs/adrs/draft/adr-0126-a-trade-negotiation-is-engine-state.md`
-    /// [^2]: Blockers register, BLK-036. `docs/BLOCKERS.md`
+    /// [^2]: ADR-0180, a site changes hands or the taker destroys it, decision D2. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
     #[allow(clippy::too_many_arguments)]
     #[pyo3(signature = (
         proposer,

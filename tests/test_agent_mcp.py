@@ -20,6 +20,7 @@ References
 [^6]: ADR-0163, an event declares its layout once and the binding derives
     every column.
     ``docs/adrs/draft/adr-0163-an-event-declares-its-layout-once-and-the-binding-derives-every-column.md``
+[^7]: Findings register, FND-648. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -490,12 +491,19 @@ def test_a_census_refuses_a_radius_above_the_ceiling() -> None:
 def test_a_census_counts_the_units_a_spawn_put_in_the_window() -> None:
     """The crowding counts are of the window, and a spawn moves them.
 
-    The step is not decoration. The unit-to-tile bridge is derived and it
-    rebuilds at the barrier, so a census taken before the step reads a bridge
-    that predates the spawn and refuses.
+    **No step stands between a spawn and a census.** The unit-to-tile bridge
+    is derived, and the step rebuilds it at its barriers. A verb a caller runs
+    between two steps reaches no barrier, so it restores the bridge before it
+    returns, and a reader that runs in that gap meets no refusal.[^7]
+
+    The census therefore answers the same crowding twice: once directly after
+    the spawn, and once after a step. A census that answered only after the
+    step would say that an agent must step to read what its own verb just did.
+    The tick of the report is not part of the comparison, because the step
+    moves it.
     """
 
-    async def body(session: ClientSession) -> tuple[bool, dict[str, Any]]:
+    async def body(session: ClientSession) -> tuple[dict[str, Any], dict[str, Any]]:
         built = await _call(
             session, "build_world", width=16, height=16, seed=GATHER_SEED
         )
@@ -506,16 +514,17 @@ def test_a_census_counts_the_units_a_spawn_put_in_the_window() -> None:
             world=name,
             addresses=[list(address) for address in GATHER_ADDRESSES],
         )
-        stale = await session.call_tool(
-            "window_census", {"world": name, "q": 0, "r": 0, "radius": 2}
-        )
+        at_once = await _call(session, "window_census", world=name, q=0, r=0, radius=2)
         await _call(session, "step_world", world=name, ticks=1)
-        return bool(getattr(stale, "is_error", False)), await _call(
+        return at_once, await _call(
             session, "window_census", world=name, q=0, r=0, radius=2
         )
 
-    refused, counted = _drive(body)
-    assert refused, "a census over a stale bridge must refuse"
+    at_once, counted = _drive(body)
+    crowding = ("units", "crowd_worst", "tiles_at_capacity", "crowded_q", "crowded_r")
+    assert [at_once[name] for name in crowding] == [
+        counted[name] for name in crowding
+    ], "the census answered the spawn and the step apart"
     assert counted["units"] == len(GATHER_ADDRESSES)
     assert counted["crowd_worst"] == 1
     assert (counted["crowded_q"], counted["crowded_r"]) != (None, None)

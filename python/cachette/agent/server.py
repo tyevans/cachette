@@ -460,7 +460,7 @@ class TileReport:
     ground that nobody holds.
 
     **This report names no unit.** A count of the units on a tile comes from
-    the derived bridge, which answers after a step. Ask window_census for it.
+    the derived bridge. Ask window_census for it.
     """
 
     world: str

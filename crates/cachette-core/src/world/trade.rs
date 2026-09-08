@@ -239,22 +239,23 @@ impl World {
     /// The give side is what the proposer owes and the take side is what the
     /// responder owes. A land side is checked against its debtor: every tile
     /// of the give side must be held by the proposer, and every tile of the
-    /// take side by the responder.[^2] A land side whose tiles carry an
-    /// upgrade is refused while the question of what happens to the upgrade
-    /// is open.[^3]
+    /// take side by the responder.[^2] **A land side whose tiles carry an
+    /// upgrade is admitted.** An upgrade changes hands with the ground,
+    /// because the engine stores it against the tile and stores no owner
+    /// beside it.[^3]
     ///
     /// # Errors
     ///
     /// Returns every error the resource verb returns, and also an error when
     /// a tag names no kind, when a land side is empty or names more tiles than
-    /// the bound, when a tile lies outside the world, when the debtor does not
-    /// hold a tile, or when a tile carries an upgrade.
+    /// the bound, when a tile lies outside the world, or when the debtor does
+    /// not hold a tile.
     ///
     /// # References
     ///
     /// [^1]: ADR-0147, a contract consideration is a tagged kind, decision D1. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
     /// [^2]: ADR-0147, a contract consideration is a tagged kind, decision D4. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
-    /// [^3]: Blockers register, BLK-036. `docs/BLOCKERS.md`
+    /// [^3]: ADR-0180, a site changes hands or the taker destroys it, decision D2. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
     pub fn offer_consideration(
         &mut self,
         proposer: FactionId,

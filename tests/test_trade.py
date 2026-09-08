@@ -24,6 +24,10 @@ References
 [^3]: ADR-0152, a faction plans its roads and zones with one solver,
 decision D5.
 ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+
+[^4]: ADR-0055, a site derives its effective rate from the world at each
+application, decisions D1 and D3.
+``docs/adrs/draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md``
 """
 
 from __future__ import annotations
@@ -56,18 +60,36 @@ ACT_DEFAULT = 7
 
 FOOD = 0
 
+# The ceiling the doc comment of `set_economy_schedule` states on the period.
+PERIOD_CEILING = 32767
+
+# The tick of the first economy application the fixture admits. No test here
+# steps that far.
+FIRST_RATE_TICK = 500
+
 
 def a_world(seed: int = 7) -> World:
-    """Build a world in which both factions hold ground and stand somewhere."""
+    """Build a world in which both factions hold ground and stand somewhere.
+
+    Three things that move a store are off, because these tests state what a
+    delivery moved into one.
+
+    The plan is off. The engine otherwise zones projects and sends the idle
+    units of a faction to them, and every unit these tests stand somewhere
+    would walk away.[^3]
+
+    Growth is off. A site that grew would take food out of the same store
+    between the two readings.
+
+    The economy schedule is pushed past every step these tests take. The rate
+    pass spends a derived upkeep that holds a share of the store itself, so an
+    application between the two readings takes a share of what the delivery
+    just moved.[^4]
+    """
     world = World(width=WIDTH, height=HEIGHT, seed=seed, faction_count=2)
-    # The plan is off. The engine otherwise zones projects and sends the idle
-    # units of a faction to them, and every unit these tests stand somewhere
-    # would walk away.[^3]
     world.set_plan_rules(0, 0, 0, 0, 0)
-    # Growth is off. These tests state what a delivery moved into a store, and
-    # a site that grew would take food out of the same store between the two
-    # readings.[^4]
     world.set_birth_chance(0)
+    world.set_economy_schedule(period=PERIOD_CEILING, phase=FIRST_RATE_TICK)
     world.found_run_for_every_faction(24)
     for _ in range(6):
         world.step(threads=1)
@@ -215,9 +237,9 @@ def test_a_bound_contract_moves_the_goods() -> None:
     after = world.site_economy(site)["store"]
     assert after > before, "the store of the receiving settlement did not rise"
 
-    # The quantity that arrived is the quantity the contract named, in the
-    # fixed-point scale the store keeps. Nothing above the debt moved.
-    assert after - before == 3 * 65536
+    assert after - before == 3 * 65536, (
+        "the quantity that arrived is not the quantity the contract named"
+    )
 
     # A delivery takes a quantity out of the carries and puts it into a store,
     # so it must credit the account that links the two. Nothing else fails

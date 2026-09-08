@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-672**
+**Next number: FND-676**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -553,6 +553,42 @@ about the target stays open, because it is about the target.
 a class of figure can leave a legitimate quantity with no owner. When the
 project bans a measurement, ask what the ban also silences.
 
+
+### FND-675 — The economy period was believed to cancel over a span, and the holding term ended that
+
+**Believed.** The stored rate is what one tick earns and the engine multiplies
+it by the period to get one application, so two worlds on different periods
+reach the same total over a whole number of periods and differ only part way
+through one. The accepted record that attaches a rate to a site states this as
+a consequence, and one Python test asserted the equality.[^F675A]
+
+**True.** The first half holds and the second does not. The rate is still what
+one tick earns and an application still pays for the period. The upkeep now
+carries a holding term derived from what the store holds at the application, so
+a longer period takes that term from a store read fewer times, and the two runs
+part company.[^F675B]
+
+**Evidence.** One site on a world of 16 tiles a side, a base production of one
+unit, a store starting empty, eight ticks. A period of one earns 372374 in the
+Q16.16 scale and a period of four earns 380928, a difference of 2.3 percent.
+The coarser period earns more, which is the direction the discretisation
+predicts. The term that ends the cancellation arrived in 60c33a2a, which
+switched the upkeep sink on. Whether the equality ever passed in the suite was
+not established, because the suite was not run when that change landed.
+
+**What follows.** The draft record for the derived rate now carries this
+consequence.[^F675B] **The accepted record still states the equality as exact,
+so it now says something false.** It has many dependents and the retcon window
+has passed, so the repair is a reviewer's call: either a superseding record or
+an in-place amendment under the registry rule.[^F675C] Nothing in the tree
+fails while it stands, because a record is prose.
+
+The statement that survives, and that a test may assert, is that the period
+scales an application and not the rate. The two defects the equality protected
+against both move a span total by a factor of four: a rate spent once for each
+application earns a quarter, and a period paid for twice earns four times as
+much. A bound of a factor of two on either side excludes both and admits the
+holding term.
 
 ## B. Claims refuted
 
@@ -2550,6 +2586,63 @@ engine verb. The verbs the policies ran were the settling verb, the queue verb
 and the build verb, so the derived unit structure is the thing to look at
 first.[^F644B] An item holds the repair.[^F644C]
 
+
+### FND-673 — Two tests read a cropped weather array as if it were the whole account
+
+**Believed.** A weather array is the weather of the world. The sum of the
+ground array therefore equals the ground total, and the centre of the air array
+is the centre of the water in the air.
+
+**True.** The engine steps a margin of weather cells outside the world so that
+the border has real upwind. The totals hold the margin, because the water
+account balances only when they do, and the arrays crop it away. The sum of an
+array is therefore at or below its total, and it falls below as soon as water
+crosses the border.[^F673A]
+
+**Evidence.** On a coastal world of 128 tiles a side, after 32 steps of 4
+ticks, the ground array sums to 32242 drops against a ground total of 79452.
+The margin holds 59 percent of the ground water.
+
+A god-strike at the centre of a world 32 weather cells across reaches both
+borders on the second step. By the eighth step 36450 drops of 393586 are
+outside the reading, and the losses on the two sides are of the same order, so
+the measured centre of the air had moved against the wind. A test that
+integrated eight steps therefore accused the wind reader of swapping an axis it
+had not swapped.
+
+**What follows.** A test that reads a cropped array must either compare it
+against the same cells read one at a time, or prove that the quantity has not
+reached the border. The two tests now do one each, and the second asserts the
+proof so that a longer span fails on the margin rather than on the axis.
+
+**The shape.** A reader that crops needs a guard and not a comment. Both
+bindings said in their doc comments that the reading crops the margin away, and
+both tests were written against them anyway. A sentence in a doc comment does
+not fail.
+
+### FND-674 — A list of engine names in a test is a second declaration site, and it decayed by nine rows
+
+**Believed.** A test that lists the names of an engine table pins the public
+interface, so a name that leaves the table fails in the suite rather than in a
+watcher's terminal.
+
+**True.** The list is a second declaration site of the thing it checks. The
+census table in the engine carries a doc comment that says it is the only
+declaration of the list, and that names a test as one of the readers of the
+table.[^F674A] The binding builds the dictionary from that table, so the only
+disagreement the list can find is one the table itself introduced.
+
+**Evidence.** The table grew from 31 rows to 40. Nine names went in the middle,
+so the list and the table diverged at index nine and the test failed. Nothing
+else broke. Two tests read the list, and one of them was checking that a
+printed run names every row, which is derivable from the census of a world of
+the same shape.
+
+**What follows.** Derive the list from the tree in the test. Pin by name only
+the names the test itself reads, which is the interface that test depends on.
+What is left for the boundary is what the boundary can get wrong on its own: a
+repeated key, a value of the wrong type, and an order that moves between two
+readings of one world.
 
 ## D. Cost estimates that were wrong
 
@@ -11545,6 +11638,57 @@ more. The test above it asserts that every seated person lives. This one takes
 the rate away and asserts that they do not. A survivor count would be the same
 decaying figure again.
 
+### FND-672 — A wave of engine work landed with the Python suite unrun, and none of the thirteen failures was a regression
+
+**Believed.** Thirteen Python tests that drive the engine were failing on
+`main`. The economy figures and the trade figures moved together, and a wave of
+weather work had landed on 6 and 7 September, so the pattern read as a
+regression from the weather: weather moves tile water, and a site's production
+rate reads the ground.
+
+**True.** No failure of the thirteen was an engine regression. Eleven stated
+behaviour that a deliberate change had replaced. One restated a list that the
+engine declares. One used an instrument that cannot measure what it asserts;
+whether it once could was not established, because the weather module has
+changed by 1847 lines since that test landed and no older tree was built.
+Five changes, one stale list and one bad instrument account for all thirteen:
+
+    six  economy tests    the production pipeline scales the stored rate,
+                          and the upkeep gained a holding term
+    two  trade tests      the same holding term, taken on the tick the
+                          measured step crosses
+    one  land trade test  BLK-036 resolved and the refusal it asserted was
+                          removed on purpose
+    one  agent test       every caller-facing verb now leaves the world
+                          readable, so the refusal it asserted is repaired
+    one  controller test  the census table grew and the list in the test
+                          did not
+    one  weather test     the lattice gained a margin that the totals hold
+                          and the arrays crop away
+    one  wind test        the centre of a cropped array measured what left
+                          the world
+
+**Evidence.** Each failure was traced to the commit that changed the
+behaviour, and each change carries its own reasoning in its commit message or
+in a record. The economy and trade group is 17227805 and 60c33a2a, the land
+group is 62fefa40, the readable-world group is the repair that FND-648
+records, and the weather group is 4fc66047.[^F672A] **None of the five
+commits the reading named is the cause of any failure.** Weather is involved
+in one of the thirteen, and through the margin rather than through the water
+it moves.
+
+**The record predicted the work and nobody did it.** The draft record for the
+derived rate states in its own consequences that every test which sets a
+production rate, steps and asserts a store quantity now reads a different
+number, and that this is fallout of switching on a sink rather than a defect of
+the sink.[^F672B] The fallout was named and left.
+
+**What follows.** A record that names its own fallout has not carried it out. A
+change that lands with a suite unrun leaves the next reader unable to tell a
+regression from an intended change, and the reading of the pattern was wrong in
+this case. Put the fallout in the item, and run the suite the changed behaviour
+is stated in.
+
 ## References
 
 [^F443A]: Review of backlog item 0390, section 5. `docs/reviews/0390-the-fallen-log.md`
@@ -17419,3 +17563,10 @@ under one rule.
 [^F665A]: Report 39, the second defect, section 4.4. `docs/research/reports/39-what-one-tick-of-the-training-world-costs.md`
 [^F666A]: The degenerate world test of the learner. `tests/test_learner_degenerate.py`
 [^F666B]: Findings register, FND-544. `docs/FINDINGS.md`
+[^F672A]: Findings register, FND-648. `docs/FINDINGS.md`
+[^F672B]: ADR-0055, a site derives its effective rate from the world at each application, the consequences. `docs/adrs/draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md`
+[^F673A]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
+[^F674A]: The census table of the engine. `crates/cachette-core/src/world/census.rs`
+[^F675A]: ADR-0062, production and upkeep are rates attached to a site, the consequences. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+[^F675B]: ADR-0055, a site derives its effective rate from the world at each application, the consequences. `docs/adrs/draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md`
+[^F675C]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`
