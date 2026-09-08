@@ -434,3 +434,43 @@ pub const fn sine_of_steps(phase: i64) -> Fix32 {
     let high = sine_at_step(step + 1) as i64;
     Fix32(saturate_i32(low + (high - low) * part / fine))
 }
+
+/// Moves a decayed counter one step, and adds the arrivals of that step.
+///
+/// The recursion is `total - (total >> bits) + arrivals`. It holds one shift
+/// and two additions, so it needs no division and no floating point
+/// number.[^1]
+///
+/// **The fixed point of the recursion is the arrival rate shifted left by the
+/// same bits.** Take a constant arrival of `a` on every step. The counter
+/// grows while `total >> bits` stays below `a`, and it stops at the first
+/// value whose shift equals `a`, which is `a` shifted left by `bits`. A
+/// caller therefore reads the counter as an arrival rate at a stated scale,
+/// and the bound of the counter is the largest arrival one step can hold at
+/// the same scale.
+///
+/// A negative total is refused and reads as zero, because a counter of
+/// arrivals never falls below zero. A shift at or above the width of the
+/// value would be undefined, so the shift saturates at one below the width.
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decisions D1 and D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+#[must_use]
+pub const fn decay(total: i64, arrivals: i64, bits: u32) -> i64 {
+    if total < 0 {
+        return if arrivals > 0 { arrivals } else { 0 };
+    }
+    let bits = if bits < i64::BITS {
+        bits
+    } else {
+        i64::BITS - 1
+    };
+    let leaving = total >> bits;
+    let held = total - leaving;
+    if arrivals > 0 {
+        held.saturating_add(arrivals)
+    } else {
+        held
+    }
+}
