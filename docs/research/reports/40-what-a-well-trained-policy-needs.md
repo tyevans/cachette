@@ -35,7 +35,9 @@ The one comparable quantity is the win share, the baseline for it is exactly
 one third, and it needs no measurement at all.
 
 **The four settings to change are a population of 64, two seeds per
-generation, a hidden width of 8, and a survival term in the reward.** All four
+generation, a hidden width of 8, and a smaller weight on held ground.** **The
+fourth was a survival term and a measurement retired it. Read section 3.4
+before acting on this report.** All four
 are settings rather than code. A simulation of the trainer places that point a
 quarter above the present one for the same episodes, and section 2.5 states
 what the simulation assumes and how to falsify it.
@@ -219,8 +221,9 @@ depend on the candidate at all, which is the only case that carries no
 information. It fired in 10 of 132 generations of the measured run.
 
 **The cost of a hostile world is smaller than it looks, and section 3.4 makes
-it smaller still.** A survival term orders the candidates of a generation
-where nobody won, so long as two episodes end at different ticks.
+it smaller still.** Held ground orders the candidates of a generation where
+nobody won, and it orders them at 0.871. **An earlier version of this report
+named a survival term here, and section 3.4 retires it.**
 
 ### 2.5 The seed count against the generation count, resolved by simulation
 
@@ -320,9 +323,9 @@ landscape may punish that. Watch the validation trace of the first fifty
 generations before committing a long run.
 
 The model has no guard. A population of 64 ties more often than one of 256,
-because fewer candidates give fewer chances to differ. The survival term of
-section 3.4 is therefore a prerequisite of the small population, not an
-independent change.
+because fewer candidates give fewer chances to differ. **Held ground at a
+weight of 0.1 is what orders those generations**, and section 3.4 states why a
+survival term is not.
 
 ## 3 Only the order of the scores reaches the update
 
@@ -400,47 +403,77 @@ warns that a rise in held ground need not be a rise in wins.[^5]
 over a 2304 tile map can outrank an outcome, which section 3.2 shows. A tile
 weight of 0.1 cannot. **Prefer the smaller weight.**
 
-### 3.4 Break the tie with the survival time, which costs nothing
+### 3.4 The survival term was wrong, and a measurement retired it
 
-**Read.** The observation carries the tick. The reward weighs the change of
-any field of the schema that holds one position, and the tick holds one.[^4]
-The sum of that weighted change over an episode telescopes to the weighted end
-tick, in the way section 3.2 describes for held ground.
+**This section recommended a survival term. The recommendation is withdrawn.**
+The original reasoning is kept below, because the way it failed is the useful
+part.
 
-**Read.** A faction cannot be eliminated. A faction that loses every unit and
-every person keeps its ground and its seat, and it may still win at the tick
-limit.[^21] An episode therefore ends early only when some faction wins.
+**What this section argued.** The observation carries the tick, and the reward
+weighs the change of any field that holds one position.[^4] A faction cannot be
+eliminated, so a faction that loses every unit keeps its ground and its seat and
+may still win at the tick limit.[^21] **The author concluded that an episode
+therefore ends early only when some rival wins**, so the end tick measures how
+long the seat denied a win.
 
-**Reasoning.** The end tick measures how long the faction denied every rival a
-win. It takes 250 levels over an episode of 250 decisions, against the two
-levels of the outcome on one world. **It is dense, it never ties while any two
-episodes end at different ticks, and it is monotone toward the tick limit
-path**, because the territory reader compares held ground at the limit and a
-faction must reach the limit to be compared.
+**What the argument missed.** An episode also ends early when the reading seat
+**itself** wins, by domination. **Winners end early.** So a long episode is
+evidence of not winning, and weighing the tick positively rewards not winning.
 
-Keep the weight below the outcome gap, by the rule of section 3.2. The end
-tick reaches 2500, so a weight below 0.8 cannot cross an outcome boundary at a
-win weight of 2000. A weight of 0.2 gives a spread up to 500 inside one
-outcome class.
+**Measured, and the measurement is what settled it.** A run of 28 candidates
+over 8 worlds gave 249 winner-and-loser pairs. For each field it computed the
+share of same-world pairs where the winner holds the higher value. A share of
+0.5 is a coin.
 
-**Derived.** In the measured run, 46 of 132 generations had no winner and 10
-of those had a score spread of exactly zero. The zero-spread ten ended every
-episode at the same tick, so no term can order them. **The survival term can
-order the other 36**, which is 27 percent of all generations.
+| Field | Share | Field | Share |
+|---|---|---|---|
+| `held_tiles` | 0.871 | `population` | 0.735 |
+| `seats_held` | 0.827 | `wonder_progress` | 0.528 |
+| `store_total` | 0.771 | `best_renown` | 0.500 |
+| `live_units` | 0.735 | `end_tick` | **0.444** |
 
-**This is a weighting, not a code change.** The trainer already accepts it.
+**The end tick orders candidates backwards. Weighing it teaches the search to
+lose.** The strategy that carried it, and its bound test, are removed from the
+tree.[^23]
+
+**The figures are narrow and the direction is not.** Only 11 of 224 episodes
+were won, and all 249 pairs come from 3 maps. The candidates are random rather
+than trained. **The gap between 0.871 and 0.444 is wide enough to act on. The
+exact figures are not.**
+
+**Two corrections to what stood here, and both matter to a later reader.**
+
+**The stated bound was wrong.** This section said a weight below 0.8 cannot
+cross an outcome boundary at a win weight of 2000. **A win and a loss stand two
+win weights apart, so the gap is 4000 and the ceiling alone is 1.6.** The author
+took the gap for the win weight. A later session made the same error and a test
+now holds the arithmetic.[^23]
+
+**The tie this section set out to break is real, and held ground breaks it.**
+In the measured run 46 of 132 generations had no winner. Held ground orders the
+candidates of those generations, and it orders them at 0.871. **A separate term
+was never needed for the tie.**
+
+**The lesson, which is the reason this section is kept.** A derivation about a
+reward is a hypothesis about an ordering, and an ordering is cheap to measure.
+**Measure it before shipping the weight.** Two independent derivations reached
+this wrong answer and the agreement between them was read as evidence. A
+companion report holds the failure register entry.[^24]
 
 ### 3.5 The one weighting to run
 
-The concrete recommendation is one weighting, not six.
+The concrete recommendation is one weighting, not six. **The tick row of this
+table is removed, for the reason section 3.4 gives.**
 
 | Term | Weight | Why |
 |---|---|---|
 | `won` | +2000 | The outcome dominates, as it should |
 | `lost` | -2000 | |
 | `drawn` | 0 | |
-| `tick` | 0.2 | Dense, 250 levels, cannot cross the outcome gap |
-| `held_tiles` | 0.1 | A proxy for strength, and it cannot cross the gap |
+| `held_tiles` | 0.1 | The best proxy measured, at 0.871, and it cannot cross the gap |
+| `seats_held` | 20 | The second best, at 0.827, and it adds a level where a seat changed hands |
+
+**The shaped terms then pay at most 290 against an outcome gap of 4000.**
 
 **Report the win share beside every return this weighting produces.** Section
 9 holds the protocol.
@@ -934,7 +967,8 @@ cell-hours. **This is the cheapest decisive experiment and it comes first.**
 
 **Experiment 2. The recommended setting, run long.** One arm at a population
 of 64, two seeds, a hidden width of 8, a learning rate of 0.08, and the
-weighting of section 3.5 including the survival term. Run 400 generations.
+weighting of section 3.5, which no longer holds a survival term. Run 400
+generations.
 Validate on 512 fixed seeds every 20 generations. *Tests:* every change this
 report recommends, together. *Kills it if:* the validation trace is flat
 between generation 100 and generation 400. *Cost:* 10.2 cell-hours for the
@@ -987,7 +1021,8 @@ do it with a decision record, because it changes a schema the engine owns.
 Change four things before any box starts. Each is a setting or one line, and
 none is engineering.
 
-Add the survival term of section 3.4 to the weighting. Set the population to
+Set the weighting to the table of section 3.5, and add no survival term. Set
+the population to
 64 and the seeds to two. Set the hidden width to 8. Log the score vector of
 each generation.
 
@@ -1023,3 +1058,5 @@ share.
 [^20]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^21]: Findings register, FND-583. `docs/FINDINGS.md`
 [^22]: Findings register, FND-667. `docs/FINDINGS.md`
+[^23]: The commit `Remove the survival term, because the tick of the end predicts losing`. Read its message for the 249-pair table.
+[^24]: Report 41, a handbook for training a policy, section 9.1. `docs/research/reports/41-a-handbook-for-training-a-policy.md`
