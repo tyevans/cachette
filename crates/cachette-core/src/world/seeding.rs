@@ -21,6 +21,7 @@ use crate::choose::{ChoiceSchedule, NeedBuckets, WeightProfile};
 use crate::climate::ClimateField;
 use crate::cohort::{CohortTable, DeathPlane, DrawLedger, NeedRule};
 use crate::controller::Controller;
+use crate::event_memory::EventMemory;
 use crate::fire::FireField;
 use crate::founding::FoundingOutcome;
 use crate::growth;
@@ -289,6 +290,7 @@ impl World {
             campaigns: CampaignRegister::new(config.faction_count),
             plan: PlanRegister::new(config.faction_count, PlanRules::DEFAULT),
             census: CensusTotals::default(),
+            event_memory: EventMemory::new(config.faction_count),
             schedule: RateSchedule::DEFAULT,
             rates: RateTable::new(),
             effective_rates: RateTable::new(),

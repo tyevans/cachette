@@ -203,6 +203,9 @@ impl World {
         if self.trade.factions() != self.config.faction_count {
             return false;
         }
+        if self.event_memory.factions() != usize::from(self.config.faction_count.max(1)) {
+            return false;
+        }
         // The board is either empty or one block for each faction.
         if !self.market.check_invariants() {
             return false;

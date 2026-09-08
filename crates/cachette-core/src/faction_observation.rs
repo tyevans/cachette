@@ -94,6 +94,8 @@
 
 use crate::action::{CandidateKind, Verb};
 use crate::event_layout::ColumnKind;
+use crate::event_memory::{Decay, BLAMED_KIND_COUNT, KIND_COUNT};
+use crate::faction_memory_observation as memory;
 use crate::faction_view::{BlockMask, FactionViewError};
 use crate::hex::Axial;
 use crate::holding::Holder;
@@ -733,6 +735,55 @@ declare_observation_fields! {
     /// positions read zero, because the twelve-element objective vector of
     /// the reward design does not exist in the engine yet.
     ObjectiveWeight => "objective_weight", OBJECTIVE_WEIGHT_COUNT, Relation;
+    /// The share of its own stock that each kind of event moved lately, over
+    /// the short memory.
+    ///
+    /// **The array is a snapshot, and this is the memory beside it.** A
+    /// snapshot cannot tell a faction that is gaining ground from one that is
+    /// losing it, and it cannot say that a rival is taking a city now.[^1]
+    ///
+    /// Each position holds one kind of event, in the order the kind list
+    /// declares. The value is the part of the stock of the reader that the
+    /// events of one step move, so a small world and a large one with the
+    /// same event rate read the same value.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: The event history. [`crate::event_memory`]
+    /// [^2]: Research report 42, what a policy should be able to see, section 8.1. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+    MemoryRecent => "memory_recent", KIND_COUNT as u32, Share;
+    /// The same share of each kind of event, over the long memory.
+    MemoryLasting => "memory_lasting", KIND_COUNT as u32, Share;
+    /// The signed relation between the short memory and the long memory of
+    /// each kind.
+    ///
+    /// **This is the position that separates a spike from a trend.** Both
+    /// memories reach the same share for the same constant arrival rate, so
+    /// this reads zero while the rate holds, positive while it rises and
+    /// negative while it falls. A rival that takes a city this minute raises
+    /// the short memory alone. A rival that keeps killing the people of the
+    /// reader raises both.
+    MemoryTrend => "memory_trend", KIND_COUNT as u32, Relation;
+    /// The share of each kind of event that the single worst rival caused,
+    /// over the long memory.
+    ///
+    /// The field holds one position for each kind that names a faction as its
+    /// cause. **No position names a seat.** A league seats one policy in
+    /// different seats between games, so a policy that learned a seat number
+    /// would read another faction's quantities under the same weight.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-647. `docs/FINDINGS.md`
+    MemoryWorstRival => "memory_worst_rival", BLAMED_KIND_COUNT as u32, Share;
+    /// How concentrated the cause of each kind of event is over the rivals,
+    /// over the long memory.
+    ///
+    /// The value is the sum of the squared rival shares. Two rivals in equal
+    /// measure give one half, and one rival that does everything gives one. A
+    /// reader tells one enemy from a field of them by this position alone.
+    MemoryConcentration => "memory_concentration", BLAMED_KIND_COUNT as u32, Share;
+
     /// **Reserved.** The positions the layout holds back for a later signal.
     LayoutReserve => "layout_reserve", LAYOUT_RESERVE, Reserved;
 }
@@ -1976,6 +2027,17 @@ impl World {
             let first = row.start as usize;
             let span = &mut out[first..first + row.positions as usize];
             match row.field {
+                ObsField::MemoryRecent => {
+                    memory::write_shares(self, faction, Decay::Recent, span);
+                }
+                ObsField::MemoryLasting => {
+                    memory::write_shares(self, faction, Decay::Lasting, span);
+                }
+                ObsField::MemoryTrend => memory::write_trends(self, faction, span),
+                ObsField::MemoryWorstRival => memory::write_worst_rival(self, faction, span),
+                ObsField::MemoryConcentration => {
+                    memory::write_concentration(self, faction, span);
+                }
                 ObsField::RingStack => span.copy_from_slice(read.ring_stack.slots()),
                 ObsField::FrontierBySector => span.copy_from_slice(read.frontier.slots()),
                 ObsField::EntityTokens => span.copy_from_slice(read.tokens.slots()),

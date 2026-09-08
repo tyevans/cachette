@@ -744,6 +744,7 @@ impl World {
             let _span = stage::open(Stage::BridgeRefreshClosing);
             self.refresh_bridge()?;
         }
+        self.advance_event_memory();
         Ok(&self.log)
     }
 

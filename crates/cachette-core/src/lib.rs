@@ -30,6 +30,8 @@ pub mod descent;
 pub mod effective;
 pub mod event;
 pub mod event_layout;
+pub mod event_memory;
+pub(crate) mod faction_memory_observation;
 pub mod faction_observation;
 pub mod faction_view;
 pub mod fire;
@@ -101,6 +103,7 @@ pub use descent::{
     Descent, DescentError, DescentId, HouseId, Parents, DESCENT_CEILING, RELATION_DEPTH,
 };
 pub use event::{FactionEliminated, ResourceTaken, SiteTaken, TileChanged};
+pub use event_memory::{Decay, EventMemory, MemoryKind, Stock};
 pub use faction_view::{
     Admit, FactionTile, FactionViewError, Ground, MaskedSummary, SeenTile, SeenUnit, Sighting,
 };

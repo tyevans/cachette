@@ -9,6 +9,7 @@ use super::World;
 use crate::cohort::{
     self, CohortTable, DrawLedger, NeedCondition, NeedRule, SiteRationed, UnitStarved,
 };
+use crate::event_memory::MemoryKind;
 use crate::types::Entity;
 
 impl World {
@@ -134,6 +135,24 @@ impl World {
     /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D3. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     /// [^3]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D5. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
     /// [^4]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
+    /// Records one starved unit against its faction in the event history.
+    ///
+    /// **The faction is read here, and not at the end of the step.** The
+    /// starvation event carries the unit and no faction, and the history
+    /// advances after every pass of the step has run. A reader there would ask
+    /// the arena about a unit the arena no longer holds, and it would count
+    /// nothing. This call therefore stands beside the despawn, where the
+    /// faction column still names the faction of the slot.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: The event history advance. [`World::advance_event_memory`]
+    fn remember_the_starved_unit(&mut self, slot: usize) {
+        let faction = self.soldiers.faction_column()[slot];
+        self.event_memory
+            .record(faction, MemoryKind::OwnUnitsStarved, 1);
+    }
+
     pub(super) fn reap(&mut self, threads: usize) -> Result<(), StepError> {
         self.starved_log.clear();
         if !self.schedule.due(self.tick) {
@@ -154,6 +173,7 @@ impl World {
         for slot in order {
             let index = slot as usize;
             let deficit = self.soldiers.deficit_column()[index];
+            self.remember_the_starved_unit(index);
             let generation = self.soldiers.generation_of(slot);
             let unit = Entity::new(slot, generation)
                 .expect("a marked slot is live, so it holds a generation of one or more");
