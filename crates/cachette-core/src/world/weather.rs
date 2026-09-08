@@ -197,6 +197,52 @@ impl World {
         Some(self.weather.cell_is_wet(self.weather_cell_of(tile)?))
     }
 
+    /// Reports whether a storm stands over one tile.
+    ///
+    /// A storm puts a pressure deficit on the cells it reaches, and the
+    /// deficit falls to nothing one cell beyond its radius. A tile is under a
+    /// storm when the cell that covers it carries a deficit above zero.
+    ///
+    /// The answer is the coarseness of the weather lattice, which is coarser
+    /// than the tile field, so two tiles of one weather cell answer alike.[^1]
+    ///
+    /// **No decision record holds the storm.** The deficit cone is stated in
+    /// the weather module and nowhere else.
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+    #[must_use]
+    pub fn tile_under_a_storm(&self, address: Axial) -> Option<bool> {
+        let tile = self.grid.index_of(address)?;
+        Some(self.weather.depression_at(self.weather_cell_of(tile)?) > 0)
+    }
+
+    /// Reports whether any hazard the engine holds stands over one tile.
+    ///
+    /// **The engine holds two hazards and no others.** A tile burns, and a
+    /// storm stands over it. Neither is invented here: the fire field holds
+    /// the first and the weather field holds the second.
+    ///
+    /// **This reader is the one declaration of that set.** A caller that
+    /// combined the two readers of its own would hold a second statement of
+    /// which hazards exist, and a third hazard would then reach one caller
+    /// and not the other.[^1]
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn tile_under_a_hazard(&self, address: Axial) -> Option<bool> {
+        let burning = self.tile_is_burning(address)?;
+        let storm = self.tile_under_a_storm(address)?;
+        Some(burning || storm)
+    }
+
     /// Puts weather over a set of places, at the command of a god.
     ///
     /// The faction is the congregation the god directs. Each place names a
