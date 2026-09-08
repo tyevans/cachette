@@ -283,8 +283,11 @@ fn every_position_lies_inside_its_declared_bounds() {
 ///
 /// **A reserved field is not a zero that states a real quantity of zero.**
 /// The schema declares its bounds as zero and zero, so a reader tells the two
-/// apart. Three whole blocks are reserved for the layout revision that builds
-/// the spatial signals.
+/// apart.
+///
+/// The three spatial blocks are built, so none of them is reserved. The test
+/// derives that relationship from the schema rather than naming a count, so
+/// a later revision that claims another reserve does not make it false.
 #[test]
 fn a_reserved_field_reads_zero() {
     let mut world = a_still_world();
@@ -293,9 +296,18 @@ fn a_reserved_field_reads_zero() {
     world.step(1).expect("the step runs");
     let values = observation_of(&world, WATCHER);
     let schema = observation_schema();
-    let spatial = ObsField::RingStack.positions()
-        + ObsField::FrontierBySector.positions()
-        + ObsField::EntityTokens.positions();
+    let spatial = [
+        ObsField::RingStack,
+        ObsField::FrontierBySector,
+        ObsField::EntityTokens,
+    ];
+    for field in spatial {
+        assert!(
+            !field.value_kind().is_reserved(),
+            "the block {} is built, so the schema must not call it reserved",
+            field.name()
+        );
+    }
     let mut reserved = 0u32;
     for row in schema.rows() {
         if !row.field.value_kind().is_reserved() {
@@ -323,8 +335,8 @@ fn a_reserved_field_reads_zero() {
         }
     }
     assert!(
-        reserved > spatial,
-        "the reserve holds positions beyond the three blocks another revision owns"
+        reserved > 0,
+        "the layout holds a reserve, and this test proves the reserve reads zero"
     );
     assert!(
         reserved < schema.length(),
@@ -490,59 +502,66 @@ fn two_thread_counts_give_one_array() {
 /// the array walk the ground the faction observed, so a place it never
 /// reached contributes nothing and costs nothing.[^1]
 ///
+/// The test builds the same world twice and raises the rival in one of them.
+/// It then requires the two arrays to agree at every position. **The
+/// comparison needs no exclusion.** A field that moves with the tick, such as
+/// the clock, the ticks that remain, the weather phase or a weather channel
+/// of the ring stack, advances the same way in both worlds, so only the rival
+/// can make a position differ. A test that compared one world before and
+/// after a step would have to excuse every such field, and each excuse is a
+/// position the fog rule stops covering.
+///
 /// The fixture asserts that the faction never saw the far ground, and that
-/// the change really happened. A fixture that changed a place the faction
-/// watches would fail, and a fixture that changed nothing would pass without
-/// proving anything.
+/// the rival really rose. A fixture that changed a place the faction watches
+/// would fail, and a fixture that changed nothing would pass without proving
+/// anything.
 ///
 /// # References
 ///
 /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D2. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 #[test]
 fn a_place_the_faction_never_saw_changes_nothing() {
-    let mut world = a_still_world();
-    let camp = ground_near(&world, Axial::new(8, 8), 8);
-    a_unit_at(&mut world, camp, WATCHER);
-    world.step(1).expect("the step runs");
-    let before = observation_of(&world, WATCHER);
-
-    let far = ground_near(&world, Axial::new(88, 88), 6);
-    assert!(
-        !world.faction_has_seen(WATCHER, far),
-        "the fixture must name ground the watcher never saw"
-    );
-    let rival = a_unit_at(&mut world, far, FactionId(1));
-    assert!(
-        world.soldier_faction(rival).is_some(),
-        "the fixture must raise the rival unit"
-    );
-    world.step(1).expect("the step runs");
-
-    let after = observation_of(&world, WATCHER);
+    let plain = a_watched_world(None);
+    let rivalled = a_watched_world(Some(Axial::new(88, 88)));
     let schema = observation_schema();
-    let clock = schema
-        .row("tick_share")
-        .expect("the schema holds the clock");
-    let remaining = schema
-        .row("remaining_ticks")
-        .expect("the schema holds the remaining ticks");
-    let phase = schema
-        .row("weather_phase")
-        .expect("the schema holds the weather phase");
     for row in schema.rows() {
-        if row.field == clock.field || row.field == remaining.field || row.field == phase.field {
-            continue;
-        }
         for offset in 0..row.positions {
             let place = (row.start + offset) as usize;
             assert_eq!(
-                before[place],
-                after[place],
+                plain[place],
+                rivalled[place],
                 "the field {} moved after a change the faction cannot see",
                 row.name()
             );
         }
     }
+}
+
+/// Builds the watcher world, and raises a rival near one address of it.
+///
+/// The rival rises after the first step, so the watcher has already filled
+/// its fog layers when the rival appears. The fixture asserts that the
+/// watcher never saw the ground it puts the rival on, because a rival on
+/// watched ground would prove nothing about the fog rule.
+fn a_watched_world(rival: Option<Axial>) -> Vec<i64> {
+    let mut world = a_still_world();
+    let camp = ground_near(&world, Axial::new(8, 8), 8);
+    a_unit_at(&mut world, camp, WATCHER);
+    world.step(1).expect("the step runs");
+    if let Some(wanted) = rival {
+        let far = ground_near(&world, wanted, 6);
+        assert!(
+            !world.faction_has_seen(WATCHER, far),
+            "the fixture must name ground the watcher never saw"
+        );
+        let raised = a_unit_at(&mut world, far, FactionId(1));
+        assert!(
+            world.soldier_faction(raised).is_some(),
+            "the fixture must raise the rival unit"
+        );
+    }
+    world.step(1).expect("the step runs");
+    observation_of(&world, WATCHER)
 }
 
 /// The confidence statistic tells an unobserved estimate from a real zero.

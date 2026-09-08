@@ -42,16 +42,18 @@
 //! # What a reserved field means
 //!
 //! **A reserved field reads zero in every position, and the schema says so.**
-//! Its declared bounds are zero and zero. A field is reserved for one of
-//! three reasons: the engine keeps no aggregate that answers it, the value
-//! needs a window of past frames that the engine does not carry, or another
-//! layout revision owns the block. A reserved field is not a zero that states
-//! a real quantity of zero.
+//! Its declared bounds are zero and zero. A field is reserved for one of two
+//! reasons: the engine keeps no aggregate that answers it, or the value needs
+//! a window of past frames that the engine does not carry. A reserved field
+//! is not a zero that states a real quantity of zero.
 //!
-//! Three blocks of the layout are reserved whole: the egocentric ring stack,
-//! the frontier by sector, and the entity tokens. They hold their declared
-//! positions, so every later block starts where the design puts it and a
-//! builder fills them without moving anything.[^5]
+//! A reserved field holds its declared positions, so every later field starts
+//! where the design puts it and a builder fills the reserve without moving
+//! anything.[^5]
+//!
+//! The three spatial blocks are built. The egocentric ring stack, the
+//! frontier by sector and the entity tokens each take their width from the
+//! module that fills them.
 //!
 //! # What the array says about a place the faction has never seen
 //!
@@ -95,6 +97,9 @@ use crate::event_layout::ColumnKind;
 use crate::faction_view::{BlockMask, FactionViewError};
 use crate::hex::Axial;
 use crate::holding::Holder;
+use crate::obs_frontier::Frontier;
+use crate::obs_ring_stack::RingStack;
+use crate::obs_token::EntityTokens;
 use crate::position::WORK_COMMODITY;
 use crate::resource::ResourceKind;
 use crate::sim_math;
@@ -158,36 +163,21 @@ pub const POWER_STATISTIC_COUNT: u32 = 7;
 /// one reads zero, because the engine carries no window.
 pub const BOARD_STATISTIC_COUNT: u32 = 5;
 
-/// The channels that one cell of the egocentric ring stack holds.
+/// The widths of the three spatial blocks, taken from the modules that build
+/// them.
 ///
-/// **The spatial layout revision owns this value and the cell count beside
-/// it.** The two are declared here because the field list needs them to
-/// derive the start of every later block. Nothing else in this file states
-/// the product of them.
-pub(crate) const RING_STACK_CHANNELS: u32 = 25;
-
-/// The cells that the egocentric ring stack holds.
+/// The field list needs each width to derive the start of every later block.
+/// The module that fills a block is the one place that decides how wide it
+/// is, so this file takes the width rather than states it. A width stated
+/// twice is the defect shape this project names first, and neither copy
+/// would fail when they disagreed.[^1]
 ///
-/// The count comes from the ring cap, which is the bit length of the greatest
-/// hex distance in the largest world the project supports. One cell covers
-/// ring zero, six cells cover ring one, and twelve cells cover each ring
-/// above that.
+/// # References
 ///
-/// **The spatial layout revision owns this value.**
-pub(crate) const RING_STACK_CELLS: u32 = 151;
-
-/// The positions that the frontier and pressure block holds.
-///
-/// **The spatial layout revision owns this block.** The width does not follow
-/// the ring count, because the block samples the twelve sectors alone.
-pub(crate) const FRONTIER_SLOTS: u32 = 32;
-
-/// The positions that the entity token block holds.
-///
-/// **The spatial layout revision owns this block.** It holds four token sets:
-/// eight own settlements, six rivals, eight threat clusters and eight
-/// candidate sites.
-pub(crate) const TOKEN_SLOTS: u32 = 624;
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+pub(crate) use crate::obs_frontier::FRONTIER_SLOTS;
+pub(crate) use crate::obs_ring::{RING_STACK_CELLS, RING_STACK_CHANNELS};
+pub(crate) use crate::obs_token::TOKEN_SLOTS;
 
 /// The elements of the objective weight vector that the layout carries.
 ///
@@ -592,16 +582,19 @@ declare_observation_fields! {
     /// The engine keeps no volume account, and no window exists.
     PowerTradeVolume => "power_trade_volume", POWER_STATISTIC_COUNT, Reserved;
 
-    /// **Reserved.** Block E. The egocentric multi-resolution ring stack.
+    /// Block E. The egocentric multi-resolution ring stack.
     ///
     /// The block holds one group of channels for each ring-sector cell, in
-    /// ascending cell order. **The spatial layout revision owns it.**
-    RingStack => "ring_stack", RING_STACK_CHANNELS * RING_STACK_CELLS, Reserved;
+    /// ascending cell order. The ring module derives the cell count from the
+    /// ring cap, so the width of the block follows the cap and no number
+    /// here.
+    RingStack => "ring_stack", RING_STACK_CHANNELS * RING_STACK_CELLS, Statistic;
 
-    /// **Reserved.** Block F. The frontier and the pressure by sector.
+    /// Block F. The frontier and the pressure by sector.
     ///
-    /// **The spatial layout revision owns it.**
-    FrontierBySector => "frontier_by_sector", FRONTIER_SLOTS, Reserved;
+    /// The block samples the far sectors alone, so its width does not follow
+    /// the ring count.
+    FrontierBySector => "frontier_by_sector", FRONTIER_SLOTS, Statistic;
 
     /// Block G. The public trade board, by good class.
     ///
@@ -650,12 +643,13 @@ declare_observation_fields! {
     /// count.
     ContractShare => "contract_share", 1, Share;
 
-    /// **Reserved.** Block I. The entity tokens.
+    /// Block I. The entity tokens.
     ///
-    /// The block holds four token sets: the own settlements, the rivals, the
-    /// threat clusters and the candidate sites. **The spatial layout
-    /// revision owns it.**
-    EntityTokens => "entity_tokens", TOKEN_SLOTS, Reserved;
+    /// The block holds four token sets, in this order: the own settlements,
+    /// the rivals, the threat clusters and the candidate sites. Each set
+    /// holds a fixed number of tokens, and each token holds a fixed number
+    /// of channels.
+    EntityTokens => "entity_tokens", TOKEN_SLOTS, Statistic;
 
     /// **Reserved.** Block J. The observed ground under a storm.
     ///
@@ -1745,6 +1739,9 @@ struct Reading {
     power_upgrades: PowerVector,
     power_renown: PowerVector,
     power_wonder: PowerVector,
+    ring_stack: RingStack,
+    frontier: Frontier,
+    tokens: EntityTokens,
 }
 
 impl World {
@@ -1792,6 +1789,10 @@ impl World {
             .map_or(0, |row| i64::from(row.work));
         let renown_target = i64::from(self.balance().renown_target());
         let world_passable = world.open_tiles();
+
+        let ring_stack = self.faction_ring_stack(faction)?;
+        let frontier = self.faction_frontier(faction, &ring_stack)?;
+        let tokens = self.faction_entity_tokens(faction, &ring_stack, &frontier)?;
 
         let power_held = PowerVector {
             values: held.clone(),
@@ -1863,6 +1864,9 @@ impl World {
             settlement,
             upgrade,
             character,
+            ring_stack,
+            frontier,
+            tokens,
         })
     }
 }
@@ -1972,6 +1976,9 @@ impl World {
             let first = row.start as usize;
             let span = &mut out[first..first + row.positions as usize];
             match row.field {
+                ObsField::RingStack => span.copy_from_slice(read.ring_stack.slots()),
+                ObsField::FrontierBySector => span.copy_from_slice(read.frontier.slots()),
+                ObsField::EntityTokens => span.copy_from_slice(read.tokens.slots()),
                 ObsField::HeldTiles => span[0] = magnitude(read.held_tiles),
                 ObsField::HeldShareObserved => {
                     span[0] = share(read.held_tiles, ground.observed_passable);
@@ -2164,9 +2171,6 @@ impl World {
                 | ObsField::PowerTileGain
                 | ObsField::PowerReachArea
                 | ObsField::PowerTradeVolume
-                | ObsField::RingStack
-                | ObsField::FrontierBySector
-                | ObsField::EntityTokens
                 | ObsField::StormShareObserved
                 | ObsField::StormShareHeld
                 | ObsField::HazardShareChange
