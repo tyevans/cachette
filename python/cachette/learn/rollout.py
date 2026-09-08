@@ -36,7 +36,8 @@ against the built-in controller on a held-out seed set as well.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from collections.abc import Sequence
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -46,12 +47,12 @@ from .league import run_seated_population
 from .record import EpisodeRecord, PopulationRecord, episode_records
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
-    from collections.abc import Sequence
+    from collections.abc import Mapping
 
     from .config import TrainConfig
     from .env import EnvConfig
     from .policy import Policy
-    from .reward import Weighting
+    from .reward import Scoring
 
 # How often a long call says that it is still working. A generation of the
 # usual size takes several minutes, so a reader needs a line inside it. Thirty
@@ -62,13 +63,21 @@ HEARTBEAT_SECONDS = 30.0
 
 def run_population(
     config: EnvConfig,
-    weighting: Weighting,
+    scoring: Scoring | Sequence[Scoring],
     policies: Sequence[Policy],
     seeds: Sequence[int],
     workers: int,
     label: str = "",
 ) -> PopulationRecord:
     """Play every policy on every seed, and return one record of the batch.
+
+    The scoring entry is what the seat is rewarded for. **A caller may give
+    one scoring for each seed position, and it may not give one for each
+    candidate.** Every candidate then plays position zero under the same
+    objective, position one under the same objective, and so on, so two
+    candidates of one batch are always comparable. An evolution strategy
+    ranks the candidates against each other, and a rank over two objectives
+    carries no information about either policy.
 
     The label names what is playing, for example ``conquer generation  3``. A
     call that gives one reports progress while it runs. A call that gives none
@@ -85,7 +94,13 @@ def run_population(
     """
     ordered = [int(seed) for seed in seeds]
     pairs = [(c, s) for c in range(len(policies)) for s in range(len(ordered))]
-    vector = VectorEnv(config, weighting, count=len(pairs), workers=workers)
+    positions = _each_position(scoring, len(ordered))
+    vector = VectorEnv(
+        config,
+        [positions[position] for _, position in pairs],
+        count=len(pairs),
+        workers=workers,
+    )
     vector.reset([ordered[s] for _, s in pairs])
 
     returns = np.zeros(len(pairs))
@@ -155,6 +170,27 @@ def run_population(
     )
 
 
+def _each_position(
+    scoring: Scoring | Sequence[Scoring], seeds: int
+) -> tuple[Scoring, ...]:
+    """Return the scoring of each seed position of one batch.
+
+    One scoring answers for every position. A sequence answers for one
+    position each, and it holds exactly one entry for each seed.
+
+    **The result is indexed by the seed position and never by the
+    candidate.** The batch repeats it for every candidate, so a caller cannot
+    give one candidate an objective that another candidate did not play.
+    """
+    if isinstance(scoring, Sequence):
+        held = tuple(scoring)
+        if len(held) != seeds:
+            message = f"the batch plays {seeds} seeds and holds {len(held)} scorings"
+            raise ValueError(message)
+        return held
+    return (scoring,) * seeds
+
+
 @dataclass(frozen=True)
 class Generation:
     """What one generation of candidates scored.
@@ -169,6 +205,10 @@ class Generation:
     The episodes entry holds one record for each world the generation played.
     **It is empty for a generation that a seated league played**, because that
     path builds its own worlds and reports no episode.
+
+    The objectives entry holds the mean of each objective over the episodes.
+    It is empty for a generation scored by a weighting over single fields,
+    which holds no objective vector.
     """
 
     ranked: np.ndarray
@@ -178,11 +218,33 @@ class Generation:
     chosen: int = 0
     refused: int = 0
     episodes: tuple[EpisodeRecord, ...] = ()
+    objectives: Mapping[str, float] = field(default_factory=dict)
+
+
+def one_scoring(scoring: Scoring | Sequence[Scoring]) -> Scoring:
+    """Return the one scoring of a batch that admits no variation.
+
+    A seated league builds its own worlds, so it takes one scoring for the
+    whole batch. A caller that varies the scoring by seed position therefore
+    cannot use that path yet, and this says so rather than scoring the league
+    under the first entry of the schedule.
+    """
+    if not isinstance(scoring, Sequence):
+        return scoring
+    held = tuple(scoring)
+    if len(held) == 1:
+        return held[0]
+    message = (
+        "a seated league scores one batch under one objective, and this batch "
+        f"holds {len(held)}. A league builds its own worlds, so it has no seed "
+        "position to vary on."
+    )
+    raise ValueError(message)
 
 
 def score_generation(
     env_config: EnvConfig,
-    weighting: Weighting,
+    scoring: Scoring | Sequence[Scoring],
     candidates: Sequence[Policy],
     seeds: Sequence[int],
     train_config: TrainConfig,
@@ -197,7 +259,7 @@ def score_generation(
     """
     if not train_config.learner_seats:
         played = run_population(
-            env_config, weighting, candidates, seeds, train_config.workers, label
+            env_config, scoring, candidates, seeds, train_config.workers, label
         )
         absolute = played.returns.mean(axis=1)
         return Generation(
@@ -208,10 +270,11 @@ def score_generation(
             chosen=played.chosen,
             refused=played.refused,
             episodes=played.episodes,
+            objectives=played.objectives,
         )
     result = run_seated_population(
         env_config,
-        weighting,
+        one_scoring(scoring),
         candidates,
         list(seeds),
         train_config.learner_seats,
@@ -227,6 +290,7 @@ def score_generation(
 __all__ = [
     "HEARTBEAT_SECONDS",
     "Generation",
+    "one_scoring",
     "run_population",
     "score_generation",
 ]

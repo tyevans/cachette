@@ -101,7 +101,7 @@ import numpy as np
 from cachette._core import Batch, World
 
 from .env import EnvConfig
-from .reward import Reward, Weighting
+from .reward import Scorer, Scoring
 
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
@@ -229,14 +229,14 @@ class SeatedGame:
     """
 
     def __init__(
-        self, config: EnvConfig, weighting: Weighting, seats: Sequence[int]
+        self, config: EnvConfig, scoring: Scoring, seats: Sequence[int]
     ) -> None:
         """Build the game over one configuration and a list of learner seats."""
         self._config = config
-        self._weighting = weighting
+        self._scoring = scoring
         self._seats = list(seats)
         self._world: World | None = None
-        self._rewards: dict[int, Reward] = {}
+        self._rewards: dict[int, Scorer] = {}
         self._decisions = 0
         self._done = False
 
@@ -268,7 +268,7 @@ class SeatedGame:
             world.set_externally_controlled(seat, True)
         self._world = world
         self._rewards = {
-            seat: Reward(world, seat, self._weighting) for seat in self._seats
+            seat: self._scoring.scorer(world, seat) for seat in self._seats
         }
         self._decisions = 0
         self._done = False
@@ -349,7 +349,7 @@ class SeatedVector:
     def __init__(
         self,
         config: EnvConfig,
-        weighting: Weighting,
+        scoring: Scoring,
         seats: Sequence[int],
         count: int,
         workers: int = 1,
@@ -360,7 +360,7 @@ class SeatedVector:
             raise ValueError(message)
         self._config = config
         self._workers = max(1, workers)
-        self._games = [SeatedGame(config, weighting, seats) for _ in range(count)]
+        self._games = [SeatedGame(config, scoring, seats) for _ in range(count)]
         self._batch: Batch | None = None
         self._live: list[int] = []
         self.world_ticks = 0
@@ -459,7 +459,7 @@ class SeatedResult:
 
 def run_seated_population(
     config: EnvConfig,
-    weighting: Weighting,
+    scoring: Scoring,
     candidates: Sequence[Policy],
     seeds: Sequence[int],
     learner_seats: Sequence[int],
@@ -501,7 +501,7 @@ def run_seated_population(
         raise ValueError(message)
     assignments, world_seed = seat_matched_plan(pairs, len(seeds), learner_seats)
     vector = SeatedVector(
-        config, weighting, learner_seats, count=len(world_seed), workers=workers
+        config, scoring, learner_seats, count=len(world_seed), workers=workers
     )
     vector.reset([seeds[index] for index in world_seed])
 

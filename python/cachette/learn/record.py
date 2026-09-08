@@ -48,6 +48,11 @@ if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from .env import Env
 
 
+# What a column of an objective is called in a report row. One prefix keeps
+# an objective apart from a signal of the engine of the same name.
+OBJECTIVE_PREFIX = "objective."
+
+
 def outcome_columns(outcome: str) -> dict[str, float]:
     """Return one column for each outcome, with a one in the column that holds.
 
@@ -70,6 +75,18 @@ def outcome_columns(outcome: str) -> dict[str, float]:
     return columns
 
 
+def objective_columns(objectives: Mapping[str, float]) -> dict[str, float]:
+    """Return one column for each objective, under a name a reader can group.
+
+    A report holds one row for each episode, and the columns of a row come
+    from several sources. The prefix keeps an objective apart from a signal
+    of the engine that happens to carry the same name.
+    """
+    return {
+        f"{OBJECTIVE_PREFIX}{name}": float(value) for name, value in objectives.items()
+    }
+
+
 @dataclass(frozen=True)
 class EpisodeRecord:
     """What one candidate did on one seed.
@@ -82,6 +99,13 @@ class EpisodeRecord:
     refused entry is how many of those the verb did not take. The signals
     entry holds every one-position quantity the engine published at the end of
     the episode, under the name the engine gives it.
+
+    The objectives entry holds what the episode scored on each named
+    objective. **A run that stored only the return could not say what the
+    episode traded away**, because one number cannot separate a candidate
+    that won by taking ground from one that won by fighting. The entry is
+    empty for a run scored by a weighting over single fields, which holds no
+    objective vector.
     """
 
     candidate: int
@@ -92,6 +116,7 @@ class EpisodeRecord:
     chosen: int
     refused: int
     signals: Mapping[str, float] = field(default_factory=dict)
+    objectives: Mapping[str, float] = field(default_factory=dict)
 
     @classmethod
     def of_env(
@@ -120,6 +145,7 @@ class EpisodeRecord:
             chosen=chosen,
             refused=refused,
             signals=env.signals.read_scalars(np.asarray(env.observation())),
+            objectives=dict(env.objectives),
         )
 
     @property
@@ -151,6 +177,7 @@ class EpisodeRecord:
         row = {name: float(value) for name, value in self.signals.items()}
         row.update(outcome_columns(self.outcome))
         row["end_tick"] = float(self.signals.get("tick", 0.0))
+        row.update(objective_columns(self.objectives))
         return row
 
     def as_dict(self) -> dict[str, object]:
@@ -164,6 +191,7 @@ class EpisodeRecord:
             "chosen": self.chosen,
             "refused": self.refused,
             "signals": dict(self.signals),
+            "objectives": dict(self.objectives),
         }
 
 
@@ -219,6 +247,16 @@ class PopulationRecord:
             return 0.0
         return self.refused / self.chosen
 
+    @property
+    def objectives(self) -> dict[str, float]:
+        """The mean of each objective over every episode of the batch.
+
+        A batch of no episode holds no objective. A batch scored by a
+        weighting over single fields holds none either, because such a
+        weighting has no objective vector.
+        """
+        return mean_objectives(self.episodes)
+
     def rows(self) -> list[dict[str, float]]:
         """Return the reading of every episode, in index order."""
         return [row.as_row() for row in self.episodes]
@@ -265,6 +303,7 @@ class GenerationRecord:
     chosen: int
     refused: int
     episodes: tuple[EpisodeRecord, ...] = ()
+    objectives: Mapping[str, float] = field(default_factory=dict)
 
     @property
     def refusal_share(self) -> float:
@@ -307,6 +346,7 @@ class GenerationRecord:
             "refusal_share": self.refusal_share,
             "validation": validation,
             "yardstick": yardstick,
+            **objective_columns(self.objectives),
             "above_controller": (
                 None
                 if validation is None or yardstick is None
@@ -330,8 +370,37 @@ class GenerationRecord:
             "chosen": self.chosen,
             "refused": self.refused,
             "refusal_share": self.refusal_share,
+            "objectives": dict(self.objectives),
             "episodes": [row.as_dict() for row in self.episodes],
         }
+
+
+def mean_objectives(episodes: Sequence[EpisodeRecord]) -> dict[str, float]:
+    """Return the mean of each objective over a set of episodes.
+
+    **The objectives come from the episodes and never from a list written
+    here.** A list of objective names in this module would be a second
+    declaration of the objective vector of the run, and nothing would fail
+    when a researcher added an objective and this did not.
+
+    An episode that holds a different objective set than another is refused,
+    because a mean over a name that only some episodes carry reads a missing
+    value as nothing.
+    """
+    held = [row for row in episodes if row.objectives]
+    if not held:
+        return {}
+    names = tuple(held[0].objectives)
+    for row in held:
+        if tuple(row.objectives) != names:
+            message = (
+                f"these episodes hold different objectives: {names} against "
+                f"{tuple(row.objectives)}"
+            )
+            raise ValueError(message)
+    return {
+        name: float(np.mean([row.objectives[name] for row in held])) for name in names
+    }
 
 
 def episode_records(
@@ -363,9 +432,12 @@ def episode_records(
 
 
 __all__ = [
+    "OBJECTIVE_PREFIX",
     "EpisodeRecord",
     "GenerationRecord",
     "PopulationRecord",
     "episode_records",
+    "mean_objectives",
+    "objective_columns",
     "outcome_columns",
 ]
