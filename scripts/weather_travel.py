@@ -125,7 +125,7 @@ def storm_run(factions: int, seed: int) -> dict:
         stormy.step(threads=THREADS)
         calm.step(threads=THREADS)
 
-    wide = stormy.cells_wide
+    wide = stormy.weather_cells_wide
     calm_air = int(stormy.weather_totals()["air"])
 
     # The storm gate refuses a place whose cell holds no ground of the
