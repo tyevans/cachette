@@ -72,33 +72,76 @@ def store_of(world: cachette.World, site: int) -> int:
 
 
 def test_a_production_rate_set_from_python_fills_the_store(seed: int) -> None:
-    """The knob to hunt: one that accepts a value and changes nothing."""
+    """The knob to hunt: one that accepts a value and changes nothing.
+
+    **The rate a site stores is a base rate.** The pass applies the base
+    scaled by the production pipeline, which reads the ground the site
+    reaches, the moisture over it, the terraces on it and the residents in
+    it.[^1] A settlement founded a moment ago holds no residents, so its
+    scale stands below one and the store gains less than the base. The
+    boundary publishes the base, the scale and the effective rate, so this
+    test states the store against the effective rate.
+
+    References
+    ----------
+    [^1]: ADR-0062, production and upkeep are rates attached to a site,
+    decisions D1 and D2.
+    ``docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md``
+    """
     world = a_world(seed)
     site = a_site(world)
     world.set_economy_schedule(period=1, phase=0)
     world.set_settlement_store([site], 0)
     world.set_production_rate([site], 2 * ONE)
     assert world.site_economy(site)["production"] == 2 * ONE
+    assert world.site_production(site)["base"] == 2 * ONE
 
+    earned = world.site_production(site)["effective"]
+    assert 0 < earned, "the pipeline left the site nothing to earn"
     before = store_of(world, site)
     world.step(threads=2)
     after = store_of(world, site)
 
-    # The rate is what one tick earns and the period is one, so one step adds
-    # exactly two units.
-    assert after - before == 2 * ONE
+    assert after - before == earned
 
 
-def test_a_production_rate_of_zero_leaves_the_store_where_it_was(seed: int) -> None:
+def test_a_production_rate_of_zero_adds_nothing_to_the_store(seed: int) -> None:
+    """A rate of zero earns nothing, so the store cannot rise.
+
+    **A store pays a share of itself to keep.** The upkeep a site stores is a
+    base, and the pass adds a holding term derived from what the store holds
+    at the application.[^1] A site that earns nothing therefore falls, and
+    the store it was given is a ceiling rather than a resting place.
+
+    The comparison is against a site that earns. The holding term reads the
+    store before the application, and both sites hold the same store then, so
+    the earning site ends exactly one effective rate above the idle one.
+
+    References
+    ----------
+    [^1]: ADR-0062, production and upkeep are rates attached to a site,
+    decisions D1 and D2.
+    ``docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md``
+    """
     world = a_world(seed)
     site = a_site(world)
     world.set_economy_schedule(period=1, phase=0)
     world.set_settlement_store([site], 5 * ONE)
     world.set_production_rate([site], 0)
 
-    world.step(threads=2)
+    earning = a_world(seed)
+    other = a_site(earning)
+    earning.set_economy_schedule(period=1, phase=0)
+    earning.set_settlement_store([other], 5 * ONE)
+    earning.set_production_rate([other], 2 * ONE)
+    earned = earning.site_production(other)["effective"]
+    assert 0 < earned, "the pipeline left the site nothing to earn"
 
-    assert store_of(world, site) == 5 * ONE
+    world.step(threads=2)
+    earning.step(threads=2)
+
+    assert store_of(world, site) < 5 * ONE
+    assert store_of(earning, other) - store_of(world, site) == earned
 
 
 def test_one_command_sets_the_production_rate_of_a_set_of_sites(seed: int) -> None:
@@ -109,15 +152,34 @@ def test_one_command_sets_the_production_rate_of_a_set_of_sites(seed: int) -> No
     world.set_settlement_store(sites, 0)
 
     world.set_production_rate(sites, ONE)
+    earned = [world.site_production(site)["effective"] for site in sites]
+    assert all(rate > 0 for rate in earned), "a site was left nothing to earn"
     world.step(threads=2)
 
-    assert [store_of(world, site) for site in sites] == [ONE] * 4
+    assert [store_of(world, site) for site in sites] == earned
 
 
 # -------------------------------------------------------------------- upkeep
 
 
 def test_an_upkeep_rate_set_from_python_empties_the_store(seed: int) -> None:
+    """The upkeep a caller writes is spent on top of what the pass derives.
+
+    **The stored upkeep is a base, and two derived terms add to it.** One
+    reads what the store holds and one counts the residents.[^1] A test that
+    asserted the store against the base alone would measure the derived terms
+    as well.
+
+    The comparison is against a site whose base upkeep is zero. Both sites
+    hold the same store at the application, so both pay the same derived
+    terms, and the difference between them is the base this test wrote.
+
+    References
+    ----------
+    [^1]: ADR-0062, production and upkeep are rates attached to a site,
+    decisions D1 and D2.
+    ``docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md``
+    """
     world = a_world(seed)
     site = a_site(world)
     world.set_economy_schedule(period=1, phase=0)
@@ -125,22 +187,44 @@ def test_an_upkeep_rate_set_from_python_empties_the_store(seed: int) -> None:
     world.set_upkeep_rate([site], 3 * ONE)
     assert world.site_economy(site)["upkeep"] == 3 * ONE
 
-    world.step(threads=2)
+    free = a_world(seed)
+    other = a_site(free)
+    free.set_economy_schedule(period=1, phase=0)
+    free.set_settlement_store([other], 10 * ONE)
 
-    assert store_of(world, site) == 7 * ONE
+    world.step(threads=2)
+    free.step(threads=2)
+
+    assert store_of(free, other) - store_of(world, site) == 3 * ONE
+    assert store_of(world, site) < 7 * ONE
 
 
 def test_production_pays_the_upkeep_of_the_same_application(seed: int) -> None:
+    """Production runs first, so a site that earns what it owes stays solvent.
+
+    **The upkeep is written against the effective rate and not the base.**
+    The pass spends the derived upkeep out of the store the derived production
+    just filled, and an empty store owes no holding term, so a base upkeep
+    equal to the effective production balances the application exactly. A
+    test that wrote the base rate on both sides would leave the site short,
+    and the store would stop at zero for want of goods rather than for
+    balance.[^1]
+
+    References
+    ----------
+    [^1]: ADR-0062, production and upkeep are rates attached to a site,
+    decisions D1 and D2.
+    ``docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md``
+    """
     world = a_world(seed)
     site = a_site(world)
     world.set_economy_schedule(period=1, phase=0)
     world.set_settlement_store([site], 0)
     world.set_production_rate([site], 4 * ONE)
-    world.set_upkeep_rate([site], 4 * ONE)
+    world.set_upkeep_rate([site], world.site_production(site)["effective"])
 
     world.step(threads=2)
 
-    # Production runs first, so a site that earns what it owes stays solvent.
     assert store_of(world, site) == 0
 
 
@@ -161,12 +245,35 @@ def test_the_economy_schedule_decides_which_ticks_move_the_store(seed: int) -> N
     assert store_of(world, site) == 0
 
     world.set_economy_schedule(period=1, phase=0)
+    earned = world.site_production(site)["effective"]
+    assert 0 < earned, "the pipeline left the site nothing to earn"
     world.step(threads=2)
-    assert store_of(world, site) == ONE
+    assert store_of(world, site) == earned
 
 
-def test_the_period_does_not_change_what_a_site_earns_over_a_span(seed: int) -> None:
-    """A rate is what one tick earns, so the period cancels out."""
+def test_the_period_scales_an_application_and_not_the_rate(seed: int) -> None:
+    """A rate is what one tick earns, so a span earns about the same either way.
+
+    **The period no longer cancels exactly.** The upkeep holds a term derived
+    from what the store holds at the application, and a longer period takes
+    that term from a store read fewer times.[^1] Two runs over one span
+    therefore differ by the coarseness of that reading, and the equality this
+    test once asserted cannot hold.
+
+    What survives is the statement the equality was written to protect: the
+    rate is what one tick earns and the period says how many ticks an
+    application pays for. The two defects that statement excludes both move
+    the answer by a factor of four. A rate spent once for each application
+    would earn a quarter over a period of four, and a rate paid for the period
+    twice would earn four times as much. The bounds below are a factor of two
+    on either side, so each defect fails and the holding term does not.
+
+    References
+    ----------
+    [^1]: ADR-0062, production and upkeep are rates attached to a site,
+    decisions D1 and D2.
+    ``docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md``
+    """
     earned = []
     for period in (1, 4):
         world = a_world(seed)
@@ -178,7 +285,8 @@ def test_the_period_does_not_change_what_a_site_earns_over_a_span(seed: int) -> 
             world.step(threads=2)
         earned.append(store_of(world, site))
 
-    assert earned[0] == earned[1]
+    assert 0 < earned[0]
+    assert earned[0] < earned[1] < 2 * earned[0]
 
 
 # ----------------------------------------------------------------- the store
