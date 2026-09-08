@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-668**
+**Next number: FND-669**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -17229,9 +17229,73 @@ inside a generation is sound and the gradient is not affected. Only the
 reported number is noise. Read the fixed-seed score instead, and read it at
 the episode count the register states.
 
+### FND-668 — How well one generation points the right way is set by the population against the trainable count, and by nothing else the trainer chooses
+
+**Believed.** Two things, and both were wrong.
+
+**The first.** A generation whose candidates score close together carries less
+information than one whose candidates spread wide, so the length of the summed
+gradient measures the quality of the step, and the trainer should scale the
+step by it. The code held the opposite claim in a comment and the comment was
+doubted.
+
+**The second.** The network policy is the larger of the two search shapes,
+because it adds a hidden layer, so it needs more samples than the linear
+policy to find a direction in.
+
+**True.** The comment was right. The perturbations of one generation are drawn
+in a space of several hundred to several thousand dimensions, and drawn
+directions in such a space are near orthogonal. The squared length of the
+weighted sum is then the sum of the squared weights, whatever the ranking is.
+Measured against a known direction, the ratio of the length to that floor is
+one within a few parts in a hundred for a generation of pure noise, for a
+generation of perfect signal, and for a generation whose candidates all score
+the same. **The length carries nothing, so no threshold and no scaling built on
+it can separate a strong generation from a weak one.**
+
+The network policy is the smaller shape, not the larger. **Its first layer is a
+fixed random projection and the trainer never touches it.** Only the readout
+from the hidden layer to the action rows is trainable. The linear policy trains
+one weight for each feature and each action row. At the training layout the
+network trains hundreds of weights and the linear policy trains thousands.
+
+What does govern a step is the population against the trainable count. Sampling
+a fixed number of directions in a space of higher dimension estimates the
+direction of steepest ascent to an accuracy that falls as the dimension rises.
+**The cosine between the step the trainer takes and the direction it is trying
+to find is near the square root of the pair count divided by the trainable
+count.** Rank shaping costs a little against that, and the noise of scoring on
+one world costs more.
+
+**Evidence.** A sweep against a known direction, at seven population sizes and
+at six trainable counts, reproduces the square root law across two orders of
+magnitude. The same sweep measures the cost of scoring noise, which halves the
+cosine at the noise level of a single world. A second sweep tests the direction
+selection of the published augmented random search, which keeps only the best
+directions of a generation: **it is worse at every noise level measured here**,
+because discarding directions in a space this large loses more than the
+selection gains. The commit message holds each figure.[^F668A]
+
+**What follows.** The two search shapes of a dense run were not two rungs of one
+ladder. The network reached in about twenty generations the level the linear
+policy reached in about ninety, and the law states why: its step points nearly
+three times as well for the same cost per generation.
+
+**A linear cell of a run at the training population spends most of each step on
+noise.** Doubling the alignment of a step needs four times the population, and
+the cost of a generation rises with the population. Cutting the trainable count
+buys the same factor for nothing. Neither knob is free of a cost elsewhere: a
+smaller readout states fewer rules, and the register does not yet say where the
+best point between them lies.
+
+**Do not read this as a reason to shrink the observation.** The projection is
+fixed, so the trainable count follows the hidden width and the action count,
+and not the length of the observation.
+
 ## References
 
-[^F667A]: The commit that recorded this finding. Read `git log` for the figures.
+[^F668A]: The commit `Measure what sets how well one generation points the right way`. Read its message for the figures.
+[^F667A]: The commit `Measure what water does to a training world, and free two colliding numbers`. Read its message for the figures.
 [^F667B]: Findings register, FND-666. `docs/FINDINGS.md`
 [^F643A]: ADR-0192, a window of controller commands is one label distribution over the action table, decision D2. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
 [^F643B]: Findings register, FND-634. `docs/FINDINGS.md`
