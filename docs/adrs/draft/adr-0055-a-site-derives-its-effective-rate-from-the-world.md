@@ -157,6 +157,16 @@ the relaxation time takes more than the store holds. The pass stops at zero and
 logs a shortfall, so the outcome stays defined, and the accepted record already
 requires every consumer of the store to handle a shortfall.[^16]
 
+**Two worlds on different periods no longer reach the same total.** The
+reserving record states, as a consequence, that they do over a whole number of
+periods, because the amount of one application is the rate times the
+period.[^18] The rate is still what one tick earns and an application still
+pays for the period. What is gone is the exact cancellation: the holding term
+reads the store at the application, so a longer period takes that term from a
+store read fewer times, and two runs over one span part company. The finding
+holds the measurement and states which record is now wrong on that
+point.[^19]
+
 **A second commodity needs a decision that nobody has made.** Both upkeep terms
 apply to every commodity, and the engine holds one commodity, so this record
 states no rule about which good a person needs.
@@ -185,3 +195,5 @@ reasoning of that record, and the registry has moved.[^17]
 [^15]: Backlog item 0512, add the temperature term to the production pipeline. `docs/backlog/proposed/0512-add-the-temperature-term-to-the-production-pipeline.md`
 [^16]: ADR-0062, production and upkeep are rates attached to a site, decision D3. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
 [^17]: ADR Registry, repairing a fact a record imported from a register. `docs/adrs/REGISTRY.md`
+[^18]: ADR-0062, production and upkeep are rates attached to a site, the consequences. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+[^19]: Findings register, FND-675. `docs/FINDINGS.md`
