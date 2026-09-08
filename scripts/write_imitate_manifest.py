@@ -16,11 +16,33 @@ import json
 import sys
 from pathlib import Path
 
+from cachette._core import World
 from cachette.learn.__main__ import WORLD
 
 REPORT = Path(sys.argv[1])
 ROOT = Path(sys.argv[2])
 RUN = sys.argv[3]
+
+
+
+def _probe() -> World:
+    """Build the smallest world of the trained shape, to read its declarations."""
+    return World(
+        width=WORLD.width,
+        height=WORLD.height,
+        seed=1,
+        faction_count=WORLD.faction_count,
+    )
+
+
+def _schema() -> dict:
+    """Return the observation schema the engine publishes for that shape."""
+    return _probe().observation_schema()
+
+
+def _action_version() -> int:
+    """Return the action schema version the engine publishes."""
+    return int(_probe().action_schema()["version"])
 
 
 def main() -> int:
@@ -52,8 +74,8 @@ def main() -> int:
             "controller_return": report["play"]["controller"]["return"],
             "controller_won": report["play"]["controller"]["won"],
             "beats_controller": False,
-            "observation_version": 3,
-            "action_version": 1,
+            "observation_version": _schema()["version"],
+            "action_version": _action_version(),
             "decision_interval": WORLD.decision_interval,
             "tick_limit": WORLD.tick_limit,
             "width": WORLD.width,
