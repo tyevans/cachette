@@ -33,7 +33,7 @@ import pytest
 
 from cachette import World
 from cachette.learn import env as env_module
-from cachette.learn import train as train_module
+from cachette.learn import search as search_module
 from cachette.learn.env import EnvConfig, seats_every_faction, viable_seeds
 from cachette.learn.policy import load_policy
 from cachette.learn.reward import Weighting
@@ -252,7 +252,7 @@ def test_the_old_trainer_moves_the_centre_from_an_equal_generation(
     that behaviour back through one name and asserts that the centre then
     moves on a generation where no candidate scored differently.
     """
-    monkeypatch.setattr(train_module, "carries_information", lambda spread: True)
+    monkeypatch.setattr(search_module, "carries_information", lambda spread: True)
     centres, rows = run_on_one_seed(tmp_path, SMALL_ONE_SEAT_SEED)
 
     assert [row["history"][-1]["spread"] for row in rows] == [0.0, 0.0]
