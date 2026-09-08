@@ -179,6 +179,74 @@ class SettlementFoundedColumns(TypedDict):
     faction: npt.NDArray[np.uint16]
     # End of the generated block.
 
+class SiteTakenColumns(TypedDict):
+    """One column for each field of the site taking event.
+
+    The site column holds the whole identity of the settlement. The kind
+    column says whether the site changed hands or was razed.
+
+    A faction that takes a site takes the upgrades that stand on the ground.
+    """
+
+
+    # Generated from the engine by scripts/generate_event_stubs.py.
+    tick: npt.NDArray[np.uint64]
+    site: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    from_faction: npt.NDArray[np.uint16]
+    to_faction: npt.NDArray[np.uint16]
+    kind: npt.NDArray[np.uint8]
+    # End of the generated block.
+class FactionEliminatedColumns(TypedDict):
+    """One column for each field of the faction elimination event.
+
+    The released column counts the tiles the faction stopped holding.
+    """
+
+
+    # Generated from the engine by scripts/generate_event_stubs.py.
+    tick: npt.NDArray[np.uint64]
+    released: npt.NDArray[np.uint64]
+    faction: npt.NDArray[np.uint16]
+    # End of the generated block.
+class FireStartedColumns(TypedDict):
+    """One column for each field of the fire starting event.
+
+    The cause column says what lit the tile.
+    """
+
+
+    # Generated from the engine by scripts/generate_event_stubs.py.
+    tick: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    cause: npt.NDArray[np.uint8]
+    # End of the generated block.
+class FireEndedColumns(TypedDict):
+    """One column for each field of the fire ending event.
+
+    The cause column says why the fire stopped.
+    """
+
+
+    # Generated from the engine by scripts/generate_event_stubs.py.
+    tick: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    cause: npt.NDArray[np.uint8]
+    # End of the generated block.
+class UnitBurnedColumns(TypedDict):
+    """One column for each field of the unit burning event.
+
+    The tile column holds the tile the unit stood on when the fire reached it.
+    """
+
+
+    # Generated from the engine by scripts/generate_event_stubs.py.
+    tick: npt.NDArray[np.uint64]
+    unit: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    faction: npt.NDArray[np.uint16]
+    unit_type: npt.NDArray[np.uint8]
+    # End of the generated block.
 class Storm(TypedDict):
     """What one call to ``World.inflict_weather`` did.
 

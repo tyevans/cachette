@@ -28,9 +28,11 @@ from cachette import World, _core
 ROOT = Path(__file__).resolve().parents[1]
 GENERATOR = ROOT / "scripts" / "generate_event_stubs.py"
 
-# The schema names an event. The world names a method that returns its
-# columns. This pairing is the only thing the test states, because the method
-# names are not part of the declaration.
+# The schema names an event. Some events also carry a named method that
+# returns their columns, beside the general reader every event has. This
+# pairing is the only thing the test states, because a method name is not part
+# of the declaration, and it covers the events that have one rather than the
+# whole schema.
 METHODS = {
     "tile_changed": "event_log_columns",
     "resource_taken": "gather_log_columns",
@@ -47,8 +49,14 @@ METHODS = {
 
 
 def test_the_module_reports_a_schema_for_every_event() -> None:
+    # Compare the schema against the register of logs the engine offers, and
+    # not against a list this file holds. A list here would be a second
+    # declaration of the thing under test.
+    world = World(width=8, height=8, seed=7)
     schema = _core.event_schema()
-    assert set(schema) == set(METHODS), "the pairing and the schema disagree"
+    assert set(schema) == set(world.log_names()), (
+        "the schema and the register of logs disagree"
+    )
     for event, fields in schema.items():
         assert fields, f"{event} declares no column"
         names = [column for column, _ in fields]
@@ -57,19 +65,41 @@ def test_the_module_reports_a_schema_for_every_event() -> None:
             assert not dtype.startswith("float"), f"{event} crosses a float"
 
 
+def _check_columns(
+    columns: dict[str, object], fields: list[tuple[str, str]], reader: str
+) -> None:
+    """Check one reading against the fields the schema declares for it."""
+    for column, dtype in fields:
+        assert column in columns, f"{reader} gives no {column} column"
+        assert columns[column].dtype == np.dtype(dtype)
+    lengths = {len(array) for array in columns.values()}
+    assert len(lengths) == 1, f"{reader} gives columns of unequal length"
+
+
 def test_every_log_gives_the_columns_the_schema_declares() -> None:
     # Drive the engine, not the declaration. A method that dropped a column
-    # would pass a test of the declaration alone.
+    # would pass a test of the declaration alone. Every event is reached
+    # through the general reader, so no event escapes this by having no named
+    # method.
+    world = World(width=8, height=8, seed=7)
+    world.step(threads=1)
+    schema = _core.event_schema()
+    for event in world.log_names():
+        _check_columns(world.log(event), schema[event], f"log({event!r})")
+
+
+def test_a_named_method_gives_what_the_general_reader_gives() -> None:
+    # A named method is a second way to reach one log. The two must agree,
+    # or a caller reads a different thing depending on which it picked.
     world = World(width=8, height=8, seed=7)
     world.step(threads=1)
     schema = _core.event_schema()
     for event, method in METHODS.items():
         columns = getattr(world, method)()
-        for column, dtype in schema[event]:
-            assert column in columns, f"{method} gives no {column} column"
-            assert columns[column].dtype == np.dtype(dtype)
-        lengths = {len(array) for array in columns.values()}
-        assert len(lengths) == 1, f"{method} gives columns of unequal length"
+        _check_columns(columns, schema[event], method)
+        assert set(columns) == set(world.log(event)), (
+            f"{method} and log({event!r}) give different columns"
+        )
 
 
 def test_the_type_stub_follows_the_engine() -> None:
