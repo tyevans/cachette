@@ -3233,6 +3233,44 @@ impl CycloneSetting {
         life: 320,
     };
 
+    /// A low on a front, shallower than a tropical cyclone.
+    ///
+    /// **This is the storm of the middle latitudes.** A real low there runs
+    /// to more than a thousand kilometres and lives some days, and it forms
+    /// on a temperature gradient rather than over a warm sea.[^1]
+    ///
+    /// The radius here is the reach on a lattice of the reference pitch. The
+    /// genesis pass replaces it with the reach that its own lattice asks
+    /// for.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Research report 30, the published atmospheric math, section 5.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+    /// [^2]: The reach of a storm. [`storm_reach`]
+    pub const FRONTAL: Self = Self {
+        depth: 32,
+        radius: 3,
+        life: 320,
+    };
+
+    /// Returns the setting with the radius replaced.
+    ///
+    /// **A storm has one size on the ground, and the lattice decides how many
+    /// cells that is.** So the reach is not a property of the setting, and a
+    /// caller that knows the lattice replaces it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: The reach of a storm. [`storm_reach`]
+    #[must_use]
+    pub const fn with_reach(self, reach: i32) -> Self {
+        Self {
+            depth: self.depth,
+            radius: reach,
+            life: self.life,
+        }
+    }
+
     /// Reports whether the setting is inside the range that the field
     /// carries.
     #[must_use]
@@ -3320,7 +3358,16 @@ pub const CYCLONE_DEPTH_CEILING: i32 = 96;
 pub const CYCLONE_DEPTH_FLOOR: i32 = 8;
 
 /// The widest storm that the field carries, in cells from the eye.
-pub const CYCLONE_RADIUS_CEILING: i32 = 8;
+///
+/// **A storm has one size in degrees of latitude, so its size in cells
+/// follows the lattice.** A fine lattice therefore asks for a larger radius
+/// than a coarse one for the same storm, and this ceiling must reach what the
+/// finest lattice asks.[^1]
+///
+/// # References
+///
+/// [^1]: The reach of a storm. [`storm_reach`]
+pub const CYCLONE_RADIUS_CEILING: i32 = 32;
 
 /// The longest life that the field carries, in solves.
 pub const CYCLONE_LIFE_CEILING: u32 = 4096;
@@ -3331,10 +3378,17 @@ pub const CYCLONE_LIFE_CEILING: u32 = 4096;
 /// ceiling is what bounds that cost. It is a content constant that no
 /// measurement chose.[^1]
 ///
+/// **The ceiling does not follow the lattice, because a storm count is a
+/// count of things on the ground rather than a density over cells.** A world
+/// spans the same latitudes at every pitch, so it holds the same weather at
+/// every pitch. A finer lattice draws each storm with more cells, and the
+/// reach in cells carries that.[^2]
+///
 /// # References
 ///
 /// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
-pub const CYCLONE_CEILING: usize = 8;
+/// [^2]: The reach of a storm. [`storm_reach`]
+pub const CYCLONE_CEILING: usize = 32;
 
 /// What turns a wind into the sub-cell steps that a storm travels.
 ///
@@ -3410,12 +3464,29 @@ const CYCLONE_LAND_WHOLE: i64 = 2;
 /// [^1]: Research report 30, the published atmospheric math. `docs/research/reports/30-the-published-atmospheric-math.md`
 const CYCLONE_WARM_MARK: i32 = 3 * HEAT_CEILING / 5;
 
-/// One in this many solves, the field tries to raise a storm.
+/// One in this many solves, one genesis attempt goes ahead.
 ///
 /// **The attempt is a keyed draw, and the gates below it decide the rest.**
-/// So the rate that a world sees is the product of this period and of how
-/// much warm wet sea the world holds, rather than this number alone.
-const CYCLONE_GENESIS_PERIOD: u64 = 24;
+/// So the rate that a world sees is the product of this period, of the
+/// attempts each solve makes, and of how much ground the gates admit.
+const CYCLONE_GENESIS_PERIOD: u64 = 4;
+
+/// The genesis attempts that one solve makes.
+///
+/// **One attempt each solve cannot fill a world.** A storm ends when its
+/// depth falls under the floor, which takes tens of solves, so the standing
+/// population is the genesis rate multiplied by that life. One attempt per
+/// period, on one drawn cell, against gates that most cells fail, gave a
+/// planet that stood empty most of the time.[^1]
+///
+/// Each attempt keys its two draws on an entity of its own, so the attempts
+/// of one solve name different cells.[^2]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+/// [^2]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+const CYCLONE_GENESIS_ATTEMPTS: u32 = 8;
 
 /// The share of its capacity that the air over a cell must hold before a
 /// storm may be raised there.
@@ -3436,21 +3507,111 @@ const WANDER_Q_DRAW: u32 = 3;
 /// The draw index of the second axis of the wander.
 const WANDER_R_DRAW: u32 = 4;
 
-/// The entity that the two genesis draws key on.
+/// The entity that the genesis draws of the first attempt key on.
 ///
 /// **Genesis has no entity, so it names one that no cell can name.** A cell
 /// key is a 32-bit index, so this value collides with none of them.[^1]
+///
+/// Each attempt counts down from this value, so the attempts of one solve
+/// hold different keys and the whole run of them stays clear of every cell
+/// key and of every storm identity.[^1]
 ///
 /// # References
 ///
 /// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 const GENESIS_ENTITY: u64 = u64::MAX;
 
-/// Reports whether the field tries to raise a storm on one frame.
+/// Returns the entity that one genesis attempt keys its draws on.
+const fn genesis_entity(attempt: u32) -> u64 {
+    GENESIS_ENTITY - attempt as u64
+}
+
+/// The temperature difference across one whole degree of latitude that admits
+/// a storm on a front.
 ///
-/// The answer is a keyed draw on the world seed, the weather system and the
-/// frame. It holds no state, and it does not depend on which thread
-/// asked.[^1]
+/// **A storm grows on a temperature gradient, and a gradient is a difference
+/// over a distance.** The gate therefore reads the difference between two
+/// neighbours against the latitude that one cell spans, so one mark serves
+/// every lattice pitch. A mark stated as a difference between neighbours
+/// would admit storms everywhere on a coarse lattice and nowhere on a fine
+/// one.[^1]
+///
+/// The unit is the unit of the temperature plane, and one step of that plane
+/// is half a degree Celsius.[^2]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 5.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+/// [^2]: The temperature scale. [`WARMTH_FINE`]
+const FRONT_MARK_FOR_EACH_DEGREE: i64 = 1;
+
+/// The degrees of latitude that a storm reaches from its eye.
+///
+/// **A storm has one size on the ground, and the lattice decides how many
+/// cells that is.** A tropical cyclone runs to some hundreds of kilometres
+/// and an extratropical low to more than a thousand, so a reach of this many
+/// degrees covers both at the fidelity this field carries.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 5.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+const STORM_REACH_FINE: i64 = 11 * LATITUDE_FINE as i64;
+
+/// Returns the cells that a storm reaches from its eye, on one lattice.
+///
+/// **The reach is a size on the ground, so the answer follows the latitude
+/// that one row of the lattice spans.** A lattice of few rows spans many
+/// degrees in each row and needs a small reach. A lattice of many rows needs
+/// a large one for the same storm. A fixed reach in cells would draw a storm
+/// of a different size on every world, and the picture would then depend on
+/// the extent.[^1]
+///
+/// The answer is never zero, so a lattice too coarse to resolve a storm still
+/// carries one cell of it.
+///
+/// # References
+///
+/// [^1]: Research report 30, the published atmospheric math, section 5.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+#[must_use]
+pub fn storm_reach(latitudes: Latitudes, height: u32) -> i32 {
+    if height == 0 || latitudes.span() <= 0 {
+        return 1;
+    }
+    let cells = sim_math::share(
+        Accum(STORM_REACH_FINE * i64::from(height)),
+        Accum(1),
+        Accum(i64::from(latitudes.span())),
+    )
+    .map_or(1, |value| value.0);
+    cells.clamp(1, i64::from(CYCLONE_RADIUS_CEILING)) as i32
+}
+
+/// Returns the temperature difference between two neighbours that admits a
+/// storm on a front, on one lattice.
+///
+/// **The mark is a gradient, so it follows the latitude that one row spans.**
+/// A coarse lattice holds a large difference between two rows and needs a
+/// large mark. The answer is never zero, so no lattice admits a front across
+/// two cells of the same temperature.
+#[must_use]
+pub fn front_mark(latitudes: Latitudes, height: u32) -> i32 {
+    if height == 0 || latitudes.span() <= 0 {
+        return 1;
+    }
+    let steps = sim_math::share(
+        Accum(FRONT_MARK_FOR_EACH_DEGREE * i64::from(latitudes.span())),
+        Accum(1),
+        Accum(i64::from(height) * i64::from(LATITUDE_FINE)),
+    )
+    .map_or(1, |value| value.0);
+    steps.clamp(1, i64::from(HEAT_CEILING)) as i32
+}
+
+/// Reports whether one genesis attempt of one frame goes ahead.
+///
+/// The answer is a keyed draw on the world seed, the weather system, the
+/// frame and the attempt. It holds no state, and it does not depend on which
+/// thread asked.[^1]
 ///
 /// **This is public so that a test can change one field of the key and watch
 /// the answer move.**[^2]
@@ -3460,12 +3621,12 @@ const GENESIS_ENTITY: u64 = u64::MAX;
 /// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 /// [^2]: Testing rules, section 2. `.agents/rules/testing.md`
 #[must_use]
-pub fn cyclone_forms(seed: u64, tick: Tick) -> bool {
+pub fn cyclone_forms(seed: u64, tick: Tick, attempt: u32) -> bool {
     rng::draw_below(
         seed,
         rng::SYSTEM_WEATHER,
         tick.0,
-        GENESIS_ENTITY,
+        genesis_entity(attempt),
         GENESIS_DRAW,
         CYCLONE_GENESIS_PERIOD,
     ) == 0
@@ -3479,7 +3640,7 @@ pub fn cyclone_forms(seed: u64, tick: Tick) -> bool {
 /// **This is public so that a test can change one field of the key and watch
 /// the answer move.**
 #[must_use]
-pub fn cyclone_genesis_cell(seed: u64, tick: Tick, cells: u32) -> u32 {
+pub fn cyclone_genesis_cell(seed: u64, tick: Tick, attempt: u32, cells: u32) -> u32 {
     if cells == 0 {
         return 0;
     }
@@ -3487,7 +3648,7 @@ pub fn cyclone_genesis_cell(seed: u64, tick: Tick, cells: u32) -> u32 {
         seed,
         rng::SYSTEM_WEATHER,
         tick.0,
-        GENESIS_ENTITY,
+        genesis_entity(attempt),
         GENESIS_CELL_DRAW,
         u64::from(cells),
     ) as u32
@@ -4435,7 +4596,7 @@ impl WeatherField {
         //
         // [^5]: A cyclone. [`Cyclone`]
         self.drift_cyclones(tick, seed, ground);
-        self.raise_from_the_sea(tick, seed, ground);
+        self.raise_storms(tick, seed, ground);
         self.stamp_cyclones();
         // The temperature of every cell moves before anything reads it. Four
         // readers follow: the pressure that drives the wind, the lift, the
@@ -4672,70 +4833,140 @@ impl WeatherField {
         }
     }
 
-    /// Tries to raise one storm out of the warm sea.
+    /// Tries to raise storms, over the warm sea and on the fronts.
     ///
     /// **Nothing emerges here, and nothing can.** A single-layer field grows
     /// no baroclinic eddies, so a low cannot form out of it. This pass places
-    /// one, and the gates below only decide where a placed one is
+    /// each low, and the gates below only decide where a placed one is
     /// plausible.[^1]
     ///
-    /// The gates are the published conditions for a tropical cyclone that
-    /// this field can read: a sea rather than land, a warm sea, and air that
-    /// already holds a share of what it can carry. **The latitude gate is not
-    /// modelled.** A real cyclone does not form within about five degrees of
-    /// the equator, because the deflection vanishes there; the deflection of
-    /// this field is the same at every latitude, so there is nothing for that
-    /// gate to read.[^2]
+    /// **The pass imposes the eddies for the same reason the field imposes
+    /// the belts.** A latitude-only forcing gives a field that is constant
+    /// along every row, and the only term of this model that varies along a
+    /// row and moves is a storm. So a field with too few storms holds three
+    /// belts and nothing else, whatever else it does.[^5]
     ///
-    /// The pass takes two keyed draws, whatever the field holds, so it costs
-    /// the same on every frame and it takes no branch that a thread could
-    /// change.[^3]
+    /// Two gates admit a storm, and each states a published condition that
+    /// this field can read.
+    ///
+    /// The first gate is a tropical cyclone: a sea rather than land, a warm
+    /// sea, and air that already holds a share of what it can carry. **The
+    /// latitude gate is not modelled.** A real cyclone does not form within
+    /// about five degrees of the equator, because the deflection vanishes
+    /// there; the deflection of this field is the same at every latitude, so
+    /// there is nothing for that gate to read.[^2]
+    ///
+    /// The second gate is a storm on a front: a temperature gradient across
+    /// the cell above the mark that the lattice sets. This is where the
+    /// travelling weather of the middle latitudes lives, and the first gate
+    /// admits none of it, because the middle latitudes are neither warm
+    /// enough nor all sea.[^4] [^5]
+    ///
+    /// The pass makes a fixed count of attempts and each takes two keyed
+    /// draws, whatever the field holds. So it costs the same on every frame
+    /// and it takes no branch that a thread could change.[^3]
+    ///
+    /// The attempts run in ascending order and each reads the storms that the
+    /// ones before it placed, so the order is fixed.[^6]
     ///
     /// # References
     ///
     /// [^1]: The banded circulation. [`band_pressure_at`]
     /// [^2]: The deflection. [`deflect`]
     /// [^3]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
-    fn raise_from_the_sea(&mut self, tick: Tick, seed: u64, ground: &[CellGround]) {
+    /// [^4]: The front mark. [`front_mark`]
+    /// [^5]: Research report 30, the published atmospheric math, section 5.3. `docs/research/reports/30-the-published-atmospheric-math.md`
+    /// [^6]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn raise_storms(&mut self, tick: Tick, seed: u64, ground: &[CellGround]) {
         let cells = self.cells();
-        let cell = cyclone_genesis_cell(seed, tick, cells.tile_count());
-        if !cyclone_forms(seed, tick) {
-            return;
+        let reach = storm_reach(self.latitudes, self.lattice.inner().height());
+        let mark = front_mark(self.latitudes, self.lattice.inner().height());
+        for attempt in 0..CYCLONE_GENESIS_ATTEMPTS {
+            let cell = cyclone_genesis_cell(seed, tick, attempt, cells.tile_count());
+            if !cyclone_forms(seed, tick, attempt) {
+                continue;
+            }
+            if self.cyclones.len() >= CYCLONE_CEILING {
+                continue;
+            }
+            let Some(setting) = self.genesis_at(cell, ground, reach, mark) else {
+                continue;
+            };
+            let Some(address) = cells.address_of(TileIdx(cell)) else {
+                continue;
+            };
+            self.place_cyclone(address, setting);
         }
-        if self.cyclones.len() >= CYCLONE_CEILING {
-            return;
-        }
+    }
+
+    /// Returns the storm that one cell admits, if it admits one.
+    ///
+    /// The first gate is a warm sea holding wet air, and the second is a
+    /// temperature gradient across the cell. A cell that passes neither
+    /// carries no storm.
+    fn genesis_at(
+        &self,
+        cell: u32,
+        ground: &[CellGround],
+        reach: i32,
+        mark: i32,
+    ) -> Option<CycloneSetting> {
         let index = cell as usize;
-        let Some(under) = ground.get(index) else {
-            return;
-        };
-        // A sea cell, and not a coast. Water is the only ground that admits
-        // no unit.
-        if under.tiles() <= 0 || under.open_tiles() * CYCLONE_LAND_WHOLE > under.tiles() {
-            return;
+        let under = *ground.get(index)?;
+        if under.tiles() <= 0 {
+            return None;
         }
         let heat = self.warmth.get(index).copied().unwrap_or(0);
-        if heat < CYCLONE_WARM_MARK {
-            return;
-        }
+        // A sea cell, and not a coast. Water is the only ground that admits
+        // no unit.
+        let is_sea = under.open_tiles() * CYCLONE_LAND_WHOLE <= under.tiles();
         // The air must already hold a share of what it can carry. A dry sky
         // has nothing for a storm to rain out, and a storm over one would be
         // a low with no weather under it.
         let air = self.air.get(index).copied().unwrap_or(Drops::ZERO);
-        let capacity = capacity_at(heat);
         let asked = sim_math::share(
-            Accum(capacity.0),
+            Accum(capacity_at(heat).0),
             Accum(CYCLONE_GENESIS_AIR_NUMERATOR),
             Accum(CYCLONE_GENESIS_AIR_DENOMINATOR),
         )
         .map_or(0, |value| value.0);
-        if air.0 < asked {
-            return;
+        if is_sea && heat >= CYCLONE_WARM_MARK && air.0 >= asked {
+            return Some(CycloneSetting::TROPICAL.with_reach(reach));
         }
+        if self.front_at(cell) >= mark {
+            return Some(CycloneSetting::FRONTAL.with_reach(reach));
+        }
+        None
+    }
+
+    /// Returns the largest temperature difference between one cell and its
+    /// neighbours.
+    ///
+    /// **This is the baroclinicity that the field can read.** A neighbour
+    /// outside the lattice is left out, so a cell at the edge reads the
+    /// neighbours it has. The walk is in direction order.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    fn front_at(&self, cell: u32) -> i32 {
+        let cells = self.cells();
         let Some(address) = cells.address_of(TileIdx(cell)) else {
-            return;
+            return 0;
         };
-        self.place_cyclone(address, CycloneSetting::TROPICAL);
+        let here = self.warmth.get(cell as usize).copied().unwrap_or(0);
+        let mut widest = 0;
+        for direction in 0..NEIGHBOUR_COUNT {
+            let Some(beside) = cells.neighbour(address, direction) else {
+                continue;
+            };
+            let Some(at) = cells.index_of(beside) else {
+                continue;
+            };
+            let there = self.warmth.get(at.0 as usize).copied().unwrap_or(0);
+            widest = widest.max((there - here).abs());
+        }
+        widest
     }
 
     /// Rebuilds the deficit plane from the storms.
