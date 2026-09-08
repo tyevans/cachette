@@ -8,7 +8,7 @@ use super::World;
 use crate::hex::Axial;
 use crate::holding::FactionMask;
 use crate::observation::{Observation, SightRules};
-use crate::types::FactionId;
+use crate::types::{FactionId, Tick};
 
 impl World {
     /// Returns how far a unit sees, and what stops it seeing.
@@ -101,6 +101,76 @@ impl World {
     #[must_use]
     pub fn cell_seen_ever(&self, cell: u32) -> FactionMask {
         self.observation.block_seen_ever(cell)
+    }
+
+    /// Returns the cell of the summary lattice that covers one tile.
+    ///
+    /// The fog layers and the summary level divide the world over one
+    /// lattice, so this one number names the fog block and the summary cell
+    /// together.[^1]
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    #[must_use]
+    pub fn cell_covering(&self, address: Axial) -> Option<u32> {
+        let layout = self.observation.layout();
+        let tile = self.grid.index_of(address)?;
+        Some(layout.block_of_key(layout.key_of(tile)?))
+    }
+
+    /// Returns the tick on which one faction last saw one cell of the
+    /// summary lattice.
+    ///
+    /// Returns `None` when the faction has never seen a tile of the cell. A
+    /// caller tells a memory of tick zero from no memory at all.
+    ///
+    /// **The engine records a tick for each observed cell and not for each
+    /// observed tile.** A tick for each tile for each faction is a field of
+    /// the world indexed by the faction, and the record refuses one.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D2. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    #[must_use]
+    pub fn faction_cell_last_seen(&self, faction: FactionId, cell: u32) -> Option<Tick> {
+        self.observation.block_last_seen(faction, cell)
+    }
+
+    /// Returns the ticks that have passed since one faction last saw one cell
+    /// of the summary lattice.
+    ///
+    /// A cell the faction sees now reports zero, because the observation pass
+    /// stamped it on the tick that just ran. A cell it saw once and does not
+    /// see now reports the ticks between then and now. A cell it has never
+    /// seen reports `None`.
+    ///
+    /// **This is the reader that separates knowledge from memory.** A
+    /// remembered cell from five hundred ticks ago is not current knowledge,
+    /// and a caller that reads only the two fog layers cannot tell the
+    /// difference.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Research report 42, what a policy should be able to see, section 5.3. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+    #[must_use]
+    pub fn faction_cell_age(&self, faction: FactionId, cell: u32) -> Option<u64> {
+        self.observation.block_age(faction, cell, self.tick)
+    }
+
+    /// Returns the ticks that have passed since one faction last saw the cell
+    /// that covers one tile.
+    ///
+    /// The answer is the age of the cell, because the engine records no tick
+    /// finer than a cell. Two tiles of one cell therefore report one age.
+    ///
+    /// Returns `None` when the address lies outside the world, and when the
+    /// faction has never seen a tile of the cell that covers it.
+    #[must_use]
+    pub fn faction_tile_age(&self, faction: FactionId, address: Axial) -> Option<u64> {
+        self.faction_cell_age(faction, self.cell_covering(address)?)
     }
 
     /// Returns what each faction sees and what each faction remembers.

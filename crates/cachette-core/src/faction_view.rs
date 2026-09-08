@@ -341,6 +341,8 @@ struct FactionSplit {
     other_units: i64,
     own_held_tiles: i64,
     other_held_tiles: i64,
+    own_strength: Accum,
+    other_strength: Accum,
 }
 
 impl FactionSplit {
@@ -359,9 +361,21 @@ impl FactionSplit {
     /// [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     fn take(&mut self, world: &World, faction: FactionId, address: Axial, tile: TileIdx) {
         for unit in world.bridge().on_tile_unguarded(tile) {
+            let strength = world
+                .soldiers()
+                .unit_type(*unit)
+                .map_or(Fix32::ZERO, |unit_type| {
+                    world.unit_types().strength(unit_type)
+                });
             match world.soldiers().faction(*unit) {
-                Some(owner) if owner == faction => self.own_units += 1,
-                Some(_) => self.other_units += 1,
+                Some(owner) if owner == faction => {
+                    self.own_units += 1;
+                    self.own_strength = sim_math::accumulate(self.own_strength, strength);
+                }
+                Some(_) => {
+                    self.other_units += 1;
+                    self.other_strength = sim_math::accumulate(self.other_strength, strength);
+                }
                 None => {}
             }
         }
@@ -396,6 +410,8 @@ pub struct MaskedSummary {
     other_units: i64,
     own_held_tiles: i64,
     other_held_tiles: i64,
+    own_strength: Accum,
+    other_strength: Accum,
 }
 
 impl MaskedSummary {
@@ -462,6 +478,37 @@ impl MaskedSummary {
     #[must_use]
     pub const fn own_held_tiles(self) -> i64 {
         self.own_held_tiles
+    }
+
+    /// Returns the military strength of the units of the reading faction that
+    /// stand on the admitted tiles it sees now.
+    ///
+    /// The strength of one unit is the attack of its type plus the armour of
+    /// its type.[^1] The total widens, because a strength summed over a
+    /// population passes the range of the fixed-point type.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D3. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    #[must_use]
+    pub const fn own_strength(self) -> Accum {
+        self.own_strength
+    }
+
+    /// Returns the military strength of the units of every other faction that
+    /// stand on the admitted tiles the reading faction sees now.
+    ///
+    /// **A tile the faction only remembers contributes nothing here.** A unit
+    /// is a fact of the present frame, so a memory carries no unit and no
+    /// strength.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    #[must_use]
+    pub const fn other_strength(self) -> Accum {
+        self.other_strength
     }
 
     /// Returns the admitted tiles another faction holds, over the tiles the
@@ -593,6 +640,8 @@ impl World {
                 other_units: 0,
                 own_held_tiles: 0,
                 other_held_tiles: 0,
+                own_strength: Accum(0),
+                other_strength: Accum(0),
             });
         }
 
@@ -649,6 +698,8 @@ impl World {
             other_units: split.other_units,
             own_held_tiles: split.own_held_tiles,
             other_held_tiles: split.other_held_tiles,
+            own_strength: split.own_strength,
+            other_strength: split.other_strength,
         })
     }
 
@@ -748,7 +799,13 @@ impl World {
             .resources()
             .original(address, ResourceKind::Food)
             .ok_or(FactionViewError::NoTile(address))?;
-        let mut summary = CellSummary::of_ground(ground.kind.is_passable(), ground.height, food);
+        let deposit = ResourceKind::ALL.iter().any(|kind| {
+            self.resources()
+                .original_of_ground(address, ground.kind, *kind)
+                .is_some_and(|stock| stock.0 > 0)
+        });
+        let mut summary =
+            CellSummary::of_ground(ground.kind.is_passable(), ground.height, food, deposit);
         if !sees_now {
             return Ok(summary);
         }

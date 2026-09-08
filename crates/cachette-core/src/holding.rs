@@ -1185,6 +1185,7 @@ impl Holding {
                     address: grid.address_of(tiles[slot])?,
                     faction: factions[slot],
                     reach: self.rules.reach_of(finished[slot]),
+                    finished: finished[slot],
                 })
             })
             .collect()
@@ -1570,6 +1571,18 @@ pub struct City {
     pub faction: FactionId,
     /// How many hex steps the city reaches.
     pub reach: u32,
+    /// How many finished upgrades stand on the ground this city is nearest
+    /// to, of the faction that holds that ground.
+    ///
+    /// **The reach rules turn this count into the reach, and the count is
+    /// what a caller needs in order to read the headroom.** The reach alone
+    /// cannot say how far a city stands from its next step, because the reach
+    /// stops at the bound and the count does not.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    pub finished: u32,
 }
 
 /// What the holder decision reads of the lease.

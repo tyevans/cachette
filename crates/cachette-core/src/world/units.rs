@@ -9,8 +9,10 @@ use super::World;
 use crate::bridge::{BridgeError, UnitTileBridge};
 use crate::hex::Axial;
 use crate::resource::{CarryLoad, ResourceKind};
+use crate::sim_math;
 use crate::soldier::{SoldierArena, SoldierError};
-use crate::types::{Entity, FactionId, FACTION_CEILING};
+use crate::types::{Accum, Entity, FactionId, FACTION_CEILING};
+use crate::unit_type::{UnitTypeId, UNIT_TYPE_COUNT};
 
 impl World {
     /// Returns the faction of one soldier.
@@ -213,6 +215,74 @@ impl World {
     #[must_use]
     pub const fn population_by_faction(&self) -> &[u32; FACTION_CEILING as usize] {
         self.soldiers.population_by_faction()
+    }
+
+    /// Returns the live soldier count of one faction, of each type.
+    #[must_use]
+    pub fn population_by_type(&self, faction: FactionId) -> [u32; UNIT_TYPE_COUNT] {
+        self.soldiers.population_by_type(faction)
+    }
+
+    /// Returns the military strength of every live unit of one faction.
+    ///
+    /// The strength of one unit is the attack of its type plus the armour of
+    /// its type, and the type table holds both columns.[^1] The strength of a
+    /// faction is that value multiplied by the count of each type and summed
+    /// over the types.
+    ///
+    /// **This is a fold over the type count, not a pass over the
+    /// population.** The arena maintains a count for each faction and type,
+    /// so the cost is the type count whatever the population.[^2]
+    ///
+    /// The result widens, because a strength summed over the population of
+    /// the target world passes the range of the fixed-point type.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D5. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+    /// [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D3. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    #[must_use]
+    pub fn faction_strength(&self, faction: FactionId) -> Accum {
+        let counts = self.soldiers.population_by_type(faction);
+        let mut total = Accum(0);
+        for (index, count) in counts.iter().enumerate() {
+            let Some(unit_type) = UnitTypeId::from_u8(index as u8) else {
+                continue;
+            };
+            total = sim_math::combine(total, self.unit_types.group_strength(unit_type, *count));
+        }
+        total
+    }
+
+    /// Returns the military strength of the units that stand on one tile.
+    ///
+    /// The walk is bounded by the units of the tile, and the tile capacity
+    /// bounds that.[^1] The units are visited in the order the derived
+    /// structure holds them, and addition of integers gives one answer
+    /// whatever the order.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the derived unit structure does not describe the
+    /// arena.
+    ///
+    /// Returns `Ok(Accum(0))` for an address outside the world, because no
+    /// unit stands there.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0074, a spawn may over-fill a tile, and only admission enforces the capacity, decision D1. `docs/adrs/accepted/adr-0074-a-spawn-may-over-fill-a-tile-and-only-admission-enforces-the-capacity.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    pub fn tile_strength(&self, address: Axial) -> Result<Accum, BridgeError> {
+        let mut total = Accum(0);
+        for unit in self.soldiers_on(address)? {
+            let Some(unit_type) = self.soldiers.unit_type(*unit) else {
+                continue;
+            };
+            total = sim_math::accumulate(total, self.unit_types.strength(unit_type));
+        }
+        Ok(total)
     }
 
     /// Rebuilds the unit-to-tile bridge from the soldier columns.

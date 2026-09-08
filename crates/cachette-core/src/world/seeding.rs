@@ -383,7 +383,7 @@ impl World {
         // [^3]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
         world
             .observation
-            .rebuild(&world.soldiers, world.terrain, 1)?;
+            .rebuild(&world.soldiers, world.terrain, 1, world.tick)?;
         Ok(world)
     }
     /// Seeds the world: founds one run for every faction and places the

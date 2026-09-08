@@ -475,6 +475,24 @@ pub struct SoldierArena {
     /// [^2]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
     /// [^3]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     by_faction: [u32; FACTION_CEILING as usize],
+    /// The number of live soldiers of each faction, of each type.
+    ///
+    /// **A caller that wants an aggregate over the types of a faction reads
+    /// this and never the population.** The military strength of a faction is
+    /// the strength of each type multiplied by the count of that type, and
+    /// the type table holds the strength.[^4] A pass over the population
+    /// would give the same answer at a cost that follows the population, and
+    /// a bounded observation may not pay that.[^5]
+    ///
+    /// The row of a faction sums to the population of that faction, so this
+    /// holds one fact in two places. The arena check recounts both and
+    /// compares them against each other.[^3]
+    ///
+    /// # References
+    ///
+    /// [^4]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^5]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D5. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+    by_faction_type: [[u32; UNIT_TYPE_COUNT]; FACTION_CEILING as usize],
     /// The number of retired slots.
     retired_count: u32,
     /// The number of structural changes that the arena has taken.
@@ -538,6 +556,7 @@ impl Clone for SoldierArena {
             free,
             live_count: self.live_count,
             by_faction: self.by_faction,
+            by_faction_type: self.by_faction_type,
             retired_count: self.retired_count,
             revision: self.revision,
             identity: self.identity,
@@ -593,6 +612,7 @@ impl SoldierArena {
             free: VecDeque::with_capacity(slots),
             live_count: 0,
             by_faction: [0; FACTION_CEILING as usize],
+            by_faction_type: [[0; UNIT_TYPE_COUNT]; FACTION_CEILING as usize],
             retired_count: 0,
             revision: 0,
             identity: next_arena_identity(),
@@ -679,6 +699,28 @@ impl SoldierArena {
         &self.by_faction
     }
 
+    /// Returns the live soldier count of one faction, of each type.
+    ///
+    /// **This is one read, not a pass.** The arena maintains the counts where
+    /// a slot becomes live, where it stops being live, where it changes
+    /// faction and where it changes type.
+    ///
+    /// A caller that aggregates a type column over a faction reads this and
+    /// multiplies. The cost is the type count and never the population.[^1]
+    ///
+    /// Returns a row of zeroes for a faction at or above the ceiling.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D5. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+    #[must_use]
+    pub fn population_by_type(&self, faction: FactionId) -> [u32; UNIT_TYPE_COUNT] {
+        self.by_faction_type
+            .get(faction.0 as usize)
+            .copied()
+            .unwrap_or([0; UNIT_TYPE_COUNT])
+    }
+
     /// Returns the number of slots that the arena has retired.
     #[must_use]
     pub const fn retired_count(&self) -> u32 {
@@ -750,6 +792,7 @@ impl SoldierArena {
         // The faction is below the ceiling, because the guard above refused
         // every other value, so the index is inside the array.
         self.by_faction[faction.0 as usize] += 1;
+        self.by_faction_type[faction.0 as usize][DEFAULT_UNIT_TYPE.index()] += 1;
         // A reused slot starts empty because the despawn emptied it, and the
         // arena invariant fails when a dead slot carries anything. A second
         // reset here would be one fact in two places, and it would read back
@@ -840,6 +883,7 @@ impl SoldierArena {
         // faction the slot held. The spawn refused a faction above the
         // ceiling, so the index is inside the array.
         self.by_faction[self.factions[index].0 as usize] -= 1;
+        self.by_faction_type[self.factions[index].0 as usize][self.types[index].index()] -= 1;
         // The load leaves with the soldier. The caller reads it before the
         // despawn and records where it went, because what leaves a tile must
         // arrive somewhere exactly.[^3]
@@ -960,7 +1004,11 @@ impl SoldierArena {
         let Some(slot) = self.slot_of(entity) else {
             return false;
         };
-        self.types[slot as usize] = unit_type;
+        let index = slot as usize;
+        let faction = self.factions[index].0 as usize;
+        self.by_faction_type[faction][self.types[index].index()] -= 1;
+        self.by_faction_type[faction][unit_type.index()] += 1;
+        self.types[index] = unit_type;
         true
     }
 
@@ -1080,6 +1128,9 @@ impl SoldierArena {
         // the faction it held is at least one.
         self.by_faction[held.0 as usize] -= 1;
         self.by_faction[faction.0 as usize] += 1;
+        let unit_type = self.types[index].index();
+        self.by_faction_type[held.0 as usize][unit_type] -= 1;
+        self.by_faction_type[faction.0 as usize][unit_type] += 1;
         self.factions[index] = faction;
         self.revision = self.revision.wrapping_add(1);
         true
@@ -1656,6 +1707,24 @@ impl SoldierArena {
         }
         if counted != self.by_faction {
             return false;
+        }
+        let mut by_type = [[0u32; UNIT_TYPE_COUNT]; FACTION_CEILING as usize];
+        for index in 0..slots {
+            if self.live[index] == 1 {
+                let faction = self.factions[index].0 as usize;
+                if faction >= by_type.len() {
+                    return false;
+                }
+                by_type[faction][self.types[index].index()] += 1;
+            }
+        }
+        if by_type != self.by_faction_type {
+            return false;
+        }
+        for (faction, row) in by_type.iter().enumerate() {
+            if row.iter().sum::<u32>() != counted[faction] {
+                return false;
+            }
         }
         // A dead slot carries no deeds and no character. A stale link there
         // would name a character for a unit that no longer exists.

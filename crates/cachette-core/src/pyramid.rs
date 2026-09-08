@@ -95,6 +95,8 @@ pub struct CellSummary {
     value_total: Accum,
     height_total: Accum,
     food_total: Accum,
+    height_square_total: Accum,
+    deposit_tiles: i64,
 }
 
 impl CellSummary {
@@ -115,6 +117,8 @@ impl CellSummary {
         value_total: Accum(0),
         height_total: Accum(0),
         food_total: Accum(0),
+        height_square_total: Accum(0),
+        deposit_tiles: 0,
     };
 
     /// Combines two summaries.
@@ -142,6 +146,11 @@ impl CellSummary {
             value_total: sim_math::combine(self.value_total, other.value_total),
             height_total: sim_math::combine(self.height_total, other.height_total),
             food_total: sim_math::combine(self.food_total, other.food_total),
+            height_square_total: sim_math::combine(
+                self.height_square_total,
+                other.height_square_total,
+            ),
+            deposit_tiles: self.deposit_tiles.saturating_add(other.deposit_tiles),
         }
     }
 
@@ -165,6 +174,12 @@ impl CellSummary {
             value_total: Accum(self.value_total.0.saturating_sub(other.value_total.0)),
             height_total: Accum(self.height_total.0.saturating_sub(other.height_total.0)),
             food_total: Accum(self.food_total.0.saturating_sub(other.food_total.0)),
+            height_square_total: Accum(
+                self.height_square_total
+                    .0
+                    .saturating_sub(other.height_square_total.0),
+            ),
+            deposit_tiles: self.deposit_tiles.saturating_sub(other.deposit_tiles),
         }
     }
 
@@ -177,7 +192,12 @@ impl CellSummary {
     /// # References
     ///
     /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-    pub(crate) const fn of_ground(passable: bool, height: Fix32, food: Amount) -> Self {
+    pub(crate) const fn of_ground(
+        passable: bool,
+        height: Fix32,
+        food: Amount,
+        deposit: bool,
+    ) -> Self {
         Self {
             tiles: 1,
             open_tiles: if passable { 1 } else { 0 },
@@ -186,6 +206,8 @@ impl CellSummary {
             value_total: Accum(0),
             height_total: sim_math::accumulate(Accum(0), height),
             food_total: food.to_accum(),
+            height_square_total: sim_math::accumulate(Accum(0), sim_math::mul(height, height)),
+            deposit_tiles: if deposit { 1 } else { 0 },
         }
     }
 
@@ -212,6 +234,8 @@ impl CellSummary {
             value_total,
             height_total: Accum(0),
             food_total: Accum(-food_taken),
+            height_square_total: Accum(0),
+            deposit_tiles: 0,
         }
     }
 
@@ -353,6 +377,107 @@ impl CellSummary {
         mean_of(self.height_total, self.tiles)
     }
 
+    /// Returns the sum of the squares of the tile heights. Extensive.
+    ///
+    /// **The field is fixed by the ground, so the rebuild never touches it.**
+    /// The height of a tile is a pure function of the seed and the address,
+    /// so this total is computed once when the world is built and never
+    /// again.[^1] It costs nothing on a tick.
+    ///
+    /// Each term is the product of a height with itself in the fixed-point
+    /// scale, and the product truncates toward negative infinity.[^2] Every
+    /// cell truncates every term the same way, so the sum is exact and it
+    /// combines in any order.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    /// [^3]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    #[must_use]
+    pub const fn height_square_total(self) -> Accum {
+        self.height_square_total
+    }
+
+    /// Returns how much the height of the cell varies. Intensive.
+    ///
+    /// The value is the mean of the squares less the square of the mean. Both
+    /// terms come from stored extensive totals, so the reading is exact
+    /// integer arithmetic and it needs no second pass over the tiles.
+    ///
+    /// **The mean absolute difference from the cell mean is not this value,
+    /// and this project cannot hold that one.** An absolute difference reads
+    /// the mean of the cell, so it is not a function of one tile, and a sum
+    /// of such terms does not combine over two cells.[^1] The square is the
+    /// widest spread measure that combines exactly.
+    ///
+    /// A summary that covers no tile returns no value.[^2] A truncated term
+    /// can put the difference below zero by one unit of the last place, and
+    /// the reading clamps it to zero, because a spread is never negative.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^2]: ADR-0024, every summary field is declared extensive or intensive, decision D5. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+    #[must_use]
+    pub fn height_spread(self) -> Option<Fix32> {
+        let mean = mean_of(self.height_total, self.tiles)?;
+        let square = mean_of(self.height_square_total, self.tiles)?;
+        let spread = square.0.saturating_sub(sim_math::mul(mean, mean).0);
+        Some(Fix32(spread.max(0)))
+    }
+
+    /// Returns the tiles that the ground gave a deposit of any kind.
+    /// Extensive.
+    ///
+    /// **The field is fixed by the ground, so the rebuild never touches it.**
+    /// The stock a tile starts with is a pure function of the seed and the
+    /// address, so this count is computed once when the world is built.[^1]
+    /// It costs nothing on a tick.
+    ///
+    /// **A tile that somebody has emptied still counts here.** The field says
+    /// where the ground put a deposit, not what stands in it now. The food
+    /// total says what the food deposits still hold, and the depletion ledger
+    /// holds the take of every kind.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    /// [^2]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D4. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
+    #[must_use]
+    pub const fn deposit_tiles(self) -> i64 {
+        self.deposit_tiles
+    }
+
+    /// Returns the share of the ground that carries a deposit. Intensive.
+    #[must_use]
+    pub fn deposit_share(self) -> Option<Fix32> {
+        ratio_of(self.deposit_tiles, self.tiles)
+    }
+
+    /// Returns the tiles that no unit stands on because they are water.
+    /// Extensive.
+    ///
+    /// **The count is derived and never stored.** Open water is the only
+    /// ground that admits no unit without a crossing, so the water tiles are
+    /// the tiles the ground does not open.[^1] A stored water count would be
+    /// one fact in two places.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn water_tiles(self) -> i64 {
+        self.tiles - self.open_tiles
+    }
+
+    /// Returns the share of the ground that is water. Intensive.
+    #[must_use]
+    pub fn water_share(self) -> Option<Fix32> {
+        ratio_of(self.water_tiles(), self.tiles)
+    }
+
     /// Returns the share of the ground that admits a unit. Intensive.
     #[must_use]
     pub fn open_share(self) -> Option<Fix32> {
@@ -383,6 +508,8 @@ impl CellSummary {
             .write_u64(self.value_total.0 as u64)
             .write_u64(self.height_total.0 as u64)
             .write_u64(self.food_total.0 as u64)
+            .write_u64(self.height_square_total.0 as u64)
+            .write_u64(self.deposit_tiles as u64)
     }
 }
 
@@ -703,10 +830,16 @@ fn ground_of_block(layout: BlockLayout, resources: ResourceField, block: u32) ->
         let food = resources
             .original(address, ResourceKind::Food)
             .unwrap_or(Amount::ZERO);
+        let deposit = ResourceKind::ALL.iter().any(|kind| {
+            resources
+                .original_of_ground(address, ground.kind, *kind)
+                .is_some_and(|stock| stock.0 > 0)
+        });
         summary = summary.combine(CellSummary::of_ground(
             ground.kind.is_passable(),
             ground.height,
             food,
+            deposit,
         ));
     }
     summary
@@ -1851,4 +1984,145 @@ fn inside_of(layout: BlockLayout, block: u32, address: Axial) -> Option<usize> {
         return None;
     }
     Some(inside_of_key(layout, key))
+}
+
+#[cfg(test)]
+mod ground_field_tests {
+    use super::CellSummary;
+    use crate::resource::Amount;
+    use crate::types::Fix32;
+
+    /// The tile count of the target world.
+    ///
+    /// A one-byte tile field summed over this count reaches 4,258,500,000,
+    /// which is inside a 32-bit accumulator by less than one percent. The
+    /// height square term is far wider than a one-byte field.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D3. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    const TARGET_TILES: i64 = 16_777_216;
+
+    /// Builds the ground part of one tile.
+    fn ground(height: i32, deposit: bool, passable: bool) -> CellSummary {
+        CellSummary::of_ground(passable, Fix32(height), Amount::ZERO, deposit)
+    }
+
+    /// Folds a list of parts in the order given.
+    fn fold(parts: &[CellSummary]) -> CellSummary {
+        parts
+            .iter()
+            .fold(CellSummary::IDENTITY, |total, part| total.combine(*part))
+    }
+
+    #[test]
+    fn the_ground_fields_combine_in_any_order_and_any_grouping() {
+        let parts: Vec<CellSummary> = (0..17)
+            .map(|ordinal| ground(ordinal * 3_851, ordinal % 3 == 0, ordinal % 4 != 0))
+            .collect();
+        let forward = fold(&parts);
+        let mut reversed = parts.clone();
+        reversed.reverse();
+        let backward = fold(&reversed);
+        assert_eq!(
+            forward.height_square_total(),
+            backward.height_square_total()
+        );
+        assert_eq!(forward.deposit_tiles(), backward.deposit_tiles());
+        assert_eq!(forward.water_tiles(), backward.water_tiles());
+
+        let (left, right) = parts.split_at(5);
+        let halved = fold(left).combine(fold(right));
+        assert_eq!(forward.height_square_total(), halved.height_square_total());
+        assert_eq!(forward.deposit_tiles(), halved.deposit_tiles());
+        assert_eq!(forward.water_tiles(), halved.water_tiles());
+        assert!(
+            forward.height_square_total().0 > 0 && forward.deposit_tiles() > 0,
+            "the fixture must reach a height above zero and a deposit"
+        );
+    }
+
+    #[test]
+    fn the_identity_leaves_the_ground_fields_alone() {
+        let part = ground(40_000, true, true);
+        assert_eq!(
+            part.combine(CellSummary::IDENTITY).height_square_total(),
+            part.height_square_total()
+        );
+        assert_eq!(
+            CellSummary::IDENTITY.combine(part).deposit_tiles(),
+            part.deposit_tiles()
+        );
+    }
+
+    #[test]
+    fn a_removed_part_undoes_its_own_combine() {
+        let base = ground(20_000, true, true);
+        for height in [0, 1, 32_768, 65_536] {
+            for deposit in [false, true] {
+                let part = ground(height, deposit, false);
+                let back = base.combine(part).remove(part);
+                assert_eq!(back.height_square_total(), base.height_square_total());
+                assert_eq!(back.deposit_tiles(), base.deposit_tiles());
+                assert_eq!(back.water_tiles(), base.water_tiles());
+            }
+        }
+    }
+
+    #[test]
+    fn the_widest_ground_field_carries_the_target_tile_count() {
+        let one = ground(Fix32::ONE.0, true, true).height_square_total().0;
+        assert!(one > 0, "the widest term must not be zero");
+        assert!(
+            one.checked_mul(TARGET_TILES).is_some(),
+            "the widest term over the target tile count must not overflow the accumulator"
+        );
+        assert!(
+            one.saturating_mul(TARGET_TILES) > i64::from(u32::MAX),
+            "the same sum overflows a 32-bit accumulator, which is why the field widens"
+        );
+    }
+
+    /// **The flat height is not one.** The square of one is one, so a cell of
+    /// unit heights reports the same spread whether the field squares the
+    /// height or carries it as it stands. A fixture at one therefore measures
+    /// nothing.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+    #[test]
+    fn a_flat_cell_reports_no_spread_and_a_broken_cell_reports_one() {
+        let half = Fix32::ONE.0 / 2;
+        let flat = fold(&[
+            ground(half, false, true),
+            ground(half, false, true),
+            ground(half, false, true),
+        ]);
+        assert_eq!(flat.height_spread(), Some(Fix32::ZERO));
+
+        let broken = fold(&[ground(0, false, true), ground(Fix32::ONE.0, false, true)]);
+        let spread = broken.height_spread().expect("the cell covers two tiles");
+        assert!(spread.0 > 0, "a cell of two heights must report a spread");
+        assert_eq!(CellSummary::IDENTITY.height_spread(), None);
+    }
+
+    #[test]
+    fn the_water_count_is_the_tiles_the_ground_does_not_open() {
+        let cell = fold(&[
+            ground(0, false, false),
+            ground(0, false, false),
+            ground(0, false, true),
+        ]);
+        assert_eq!(cell.tiles(), 3);
+        assert_eq!(cell.open_tiles(), 1);
+        assert_eq!(cell.water_tiles(), 2);
+        let water = cell.water_share().expect("the cell covers three tiles").0;
+        let open = cell.open_share().expect("the cell covers three tiles").0;
+        assert_eq!(
+            water + open,
+            Fix32::ONE.0 - 1,
+            "the two shares sum to one, less the truncation of a third"
+        );
+    }
 }

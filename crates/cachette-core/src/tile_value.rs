@@ -103,6 +103,31 @@ const GENERATED_DRAW: u32 = 0;
 /// is what the eager column held before the field became generated.
 const GENERATED_SHIFT: u32 = 40;
 
+/// The lowest value a tile ever holds.
+///
+/// A tile value is a magnitude, so it is never below zero. A reader that
+/// publishes a value as a share of its range divides by the ceiling, and a
+/// share of a negative numerator states nothing.
+pub const TILE_VALUE_FLOOR: Fix32 = Fix32(0);
+
+/// The highest value a tile ever holds.
+///
+/// **The bound is structural and no measurement chose it.** The generated
+/// part of a tile value is one draw reduced by the shift above, so it lies
+/// below two raised to the width the shift leaves. The ceiling is that
+/// width, so the generated world already fits inside it and the bound is
+/// derived from the one declaration of the shift.
+///
+/// **The bound is also what makes a tile value publishable as a share.** The
+/// field carries a stored delta that a pass adds to on every tick. Without a
+/// bound that sum is a walk with no end, so a value on tick one million
+/// stands in no range that a reader can name.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D2. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+pub const TILE_VALUE_CEILING: Fix32 = Fix32(1 << (u64::BITS - GENERATED_SHIFT));
+
 /// The tile stub value field.
 ///
 /// The field holds the seed, the extent, and one delta for every tile once
@@ -382,6 +407,12 @@ impl TileValues {
     /// as the array is written, which is a second place that one fact
     /// lives, and this is what fails when the two disagree.[^1]
     ///
+    /// **No tile holds a value outside the declared range.** The write path
+    /// clamps the value it stores, and this is what fails when a value
+    /// reaches the field by another path. The walk visits the tiles that hold
+    /// a change and no others, so a world that changed nothing pays for
+    /// nothing.
+    ///
     /// # References
     ///
     /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
@@ -393,8 +424,20 @@ impl TileValues {
         if self.deltas.is_empty() {
             return self.changed == 0;
         }
-        self.deltas.len() == self.grid.tile_count() as usize
-            && self.changed == self.deltas.iter().filter(|delta| delta.0 != 0).count()
+        if self.deltas.len() != self.grid.tile_count() as usize
+            || self.changed != self.deltas.iter().filter(|delta| delta.0 != 0).count()
+        {
+            return false;
+        }
+        self.deltas
+            .iter()
+            .enumerate()
+            .filter(|(_, delta)| delta.0 != 0)
+            .all(|(index, _)| {
+                self.at(TileIdx(index as u32)).is_some_and(|value| {
+                    value.0 >= TILE_VALUE_FLOOR.0 && value.0 <= TILE_VALUE_CEILING.0
+                })
+            })
     }
 }
 
@@ -505,19 +548,36 @@ impl TileValueChunk<'_> {
     /// Returns `None` when the tile is outside the range. The field cannot
     /// see that case, because the range is the whole of what this chunk owns,
     /// so the caller is the one that must not ignore it.
+    ///
+    /// **The value it then holds stands between the floor and the ceiling,
+    /// and this is the only write path that reaches the field.** The pass
+    /// adds to the stored delta on every tick, so an unbounded sum walks with
+    /// no end and a value on a late tick stands in no range that a reader can
+    /// name.[^1] The clamp applies to the value and the stored delta follows
+    /// it, so the two never disagree.
+    ///
+    /// A caller that adds past a bound reads the bound back. It receives no
+    /// refusal, because a bound is not a caller error.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D2. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
     #[must_use]
     pub fn add(&mut self, tile: TileIdx, delta: Fix32) -> Option<Fix32> {
         let at = tile.0.checked_sub(self.start)? as usize;
+        let generated = TileValues::generated(self.seed, tile);
         let slot = self.deltas.get_mut(at)?;
         let before = *slot;
-        let after = sim_math::add(before, delta);
+        let wanted = sim_math::add(generated, sim_math::add(before, delta));
+        let held = Fix32(wanted.0.clamp(TILE_VALUE_FLOOR.0, TILE_VALUE_CEILING.0));
+        let after = sim_math::sub(held, generated);
         *slot = after;
         match (before.0 == 0, after.0 == 0) {
             (true, false) => self.changed += 1,
             (false, true) => self.changed -= 1,
             _ => {}
         }
-        Some(sim_math::add(TileValues::generated(self.seed, tile), after))
+        Some(held)
     }
 
     /// Returns the net change this chunk made to the count of changed tiles.
