@@ -1,0 +1,16 @@
+{
+  "file": "conquer-obs3-cellB-gen5.npz",
+  "run": "cellB-seeds32",
+  "search": "population 16, 32 seeds, 8 directions",
+  "generation": 5,
+  "validation_score": -973.953125,
+  "validation_seeds": 32,
+  "wins_of_thirtytwo": 8,
+  "controller_wins_of_thirtytwo": 12,
+  "beats_controller": false,
+  "observation_version": 3,
+  "action_version": 1,
+  "decision_interval": 10,
+  "policy_kind": "linear",
+  "sha256": "9a8a86957324fa5b74327a7408d458bb1779689bffe8228ea937b55001d0d8e0"
+}
