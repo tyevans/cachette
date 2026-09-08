@@ -824,18 +824,57 @@ for name in $names; do
         # finish, and the run reports done while a fifth of it is missing.
         # The status comes from the trainer and not from the tee after it.
         set +e
-        uv run python -u -m cachette.learn --only "$name" \
-            --out "runs/learn/$name" --workers "$each" $TRAIN_ARGS 2>&1 \
-            | tee -a runs/learn/train.log > "runs/learn/$name.log"
-        printf '%s exited %s\n' "$name" "${PIPESTATUS[0]}" >> runs/learn/status
+        # **A strategy that dies takes its share of the machine with it.** Two
+        # runs have lost a strategy to a fault in native code, once with a
+        # segmentation fault and once with a bus error, and each left a machine
+        # of sixty four cores at half load for hours while it kept billing.
+        # The trainer writes a resume point every generation, so a restart
+        # costs one generation and never the run.
+        attempt=1
+        extra=""
+        while :; do
+            started="$(date +%s)"
+            uv run python -u -m cachette.learn --only "$name" \
+                --out "runs/learn/$name" --workers "$each" $TRAIN_ARGS $extra 2>&1 \
+                | tee -a runs/learn/train.log >> "runs/learn/$name.log"
+            code="${PIPESTATUS[0]}"
+            ran=$(( $(date +%s) - started ))
+            printf '%s attempt %s exited %s after %ss\n' \
+                "$name" "$attempt" "$code" "$ran" >> runs/learn/status
+            [ "$code" -eq 0 ] && break
+            [ "$attempt" -ge 5 ] && break
+            # **A strategy that dies at once dies for a reason a restart cannot
+            # fix.** A bad argument or a missing module fails in seconds, and
+            # retrying it only fills the log. A fault in a long run is the case
+            # a restart is for, so only a run that lasted a while earns one.
+            if [ "$ran" -lt 120 ]; then
+                printf '%s failed in %ss, which is too fast to be a fault worth retrying\n' \
+                    "$name" "$ran" >> runs/learn/status
+                break
+            fi
+            attempt=$(( attempt + 1 ))
+            # The resume point carries the centre, so the restart continues the
+            # search instead of starting it again.
+            extra="--resume"
+            printf '  %s restarting from its resume point, attempt %s\n' \
+                "$name" "$attempt" | tee -a runs/learn/train.log >> "runs/learn/$name.log"
+            sleep 15
+        done
     ) &
 done
 wait
 printf '=== how each strategy ended ===\n'
 cat runs/learn/status 2>/dev/null
-# The run failed if any strategy failed. A marker that says done over a
-# dead strategy is worse than no marker.
-! grep -qv 'exited 0$' runs/learn/status
+# The run failed if any strategy ended on a failure. A marker that says done
+# over a dead strategy is worse than no marker.
+#
+# **A strategy may hold several attempts, and only its last one decides.** An
+# earlier attempt that died and was restarted is a fault the run recovered
+# from, so it must not fail the run. The reduction below keeps the last line
+# of each strategy and asks whether every one of those ended at zero.
+awk '/attempt/ { last[$1] = $5 }
+     END { for (n in last) if (last[n] != 0) bad = 1; exit bad }' \
+    runs/learn/status
 REMOTE
 
 say "Building and measuring on the instance. It runs detached"
