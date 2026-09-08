@@ -1,17 +1,17 @@
 """A stored policy refuses a world it was not trained against.
 
-**The case this file exists for is the silent one.** The observation length
-counts the cells of the block lattice, and a block is a fixed number of tiles
-on a side. Every world from one block to two blocks on each axis therefore
-holds four cells and an observation length of 176 at three factions. A policy
-trained on a world 48 tiles on a side loads on one 64 tiles on a side, reads an
-array of the length it expects, and plays a world 78 per cent larger. Nothing
-raised before this check existed, because no array had a shape to disagree
-about.
+**The case this file exists for is the silent one, and it is now the only
+case.** The observation array holds one length for every world shape and every
+faction count, so no world can disagree with a stored policy about the shape of
+its input. A policy trained on a world 48 tiles on a side loads on one 96 tiles
+on a side, reads an array of exactly the length it expects, and plays a world
+four times larger. Nothing raises.
 
-A world of another band raises without this check, but it raises from inside a
-matrix product and the message names neither world. That is the loud half of
-the same defect.
+Before the layout became scale-free, the length counted the cells of a block
+lattice, so a world of another band raised from inside a matrix product. That
+was the loud half of the same defect, and it is gone. The matrix product now
+accepts every world, and this check is the only thing between a stored file and
+the wrong world.
 
 The tests below drive the real callers. The trainer resumes, and the report
 pass plays a stored file.
@@ -50,13 +50,13 @@ WEIGHTING = Weighting(terms={"held_tiles": 1.0}, won=1.0, lost=-1.0, drawn=0.0)
 # The world the training runs use.
 TRAINED = EnvConfig(width=48, height=48, faction_count=3, tick_limit=40, horizon=4)
 
-# A world of the same lattice band. It holds four cells and the same
-# observation length, and it holds 4096 tiles against 2304.
-SAME_BAND = EnvConfig(width=64, height=64, faction_count=3, tick_limit=40, horizon=4)
+# A larger world. It holds 4096 tiles against 2304, and it holds the same two
+# lengths, so a matrix product accepts it.
+LARGER = EnvConfig(width=64, height=64, faction_count=3, tick_limit=40, horizon=4)
 
-# A world of another lattice band. It holds nine cells, so its observation
-# length differs and a matrix product would refuse it on its own.
-OTHER_BAND = EnvConfig(width=96, height=96, faction_count=3, tick_limit=40, horizon=4)
+# A larger world again, four times the trained area. It also holds the same two
+# lengths, because no length of the layout follows the world shape.
+LARGEST = EnvConfig(width=96, height=96, faction_count=3, tick_limit=40, horizon=4)
 
 
 def fit_of(config: EnvConfig) -> PolicyFit:
@@ -71,23 +71,23 @@ def store(path: Path, config: EnvConfig) -> None:
     policy.save(path, PolicyFit.of_env(env).as_meta())
 
 
-def test_the_two_bands_are_the_case_this_check_exists_for() -> None:
-    """The trained world and the same-band world share both lengths.
+def test_every_world_shares_both_lengths_and_so_hides_the_mismatch() -> None:
+    """No world of any extent disagrees with another about either length.
 
     **This test is the fixture, not the assertion.** It states the condition
-    that makes the silent case possible. A change to the block edge or to the
-    field list can end that condition, and this test then fails and says so,
-    rather than letting the refusal test pass against a world that any matrix
-    product would have refused anyway.
+    that makes the silent case possible, and that condition now holds for
+    every world rather than for one band of them. If a field of the layout
+    ever followed the world shape again, a matrix product would catch some
+    mismatches on its own, and this test would fail and say so.
     """
     trained = fit_of(TRAINED)
-    same = fit_of(SAME_BAND)
-    other = fit_of(OTHER_BAND)
+    larger = fit_of(LARGER)
+    largest = fit_of(LARGEST)
 
-    assert trained.observation_length == same.observation_length
-    assert trained.action_length == same.action_length
-    assert (trained.width, trained.height) != (same.width, same.height)
-    assert trained.observation_length != other.observation_length
+    for other in (larger, largest):
+        assert trained.observation_length == other.observation_length
+        assert trained.action_length == other.action_length
+        assert (trained.width, trained.height) != (other.width, other.height)
 
 
 def test_a_policy_plays_the_world_it_was_trained_against(tmp_path: Path) -> None:
@@ -111,7 +111,7 @@ def test_a_policy_refuses_a_world_of_the_same_length(tmp_path: Path) -> None:
     store(path, TRAINED)
 
     with pytest.raises(PolicyFitError) as caught:
-        load_policy(path, fit_of(SAME_BAND))
+        load_policy(path, fit_of(LARGER))
 
     message = str(caught.value)
     assert "width" in message
@@ -121,18 +121,22 @@ def test_a_policy_refuses_a_world_of_the_same_length(tmp_path: Path) -> None:
     assert "observation_length: the file says" not in message
 
 
-def test_a_policy_refuses_a_world_of_another_length(tmp_path: Path) -> None:
-    """A file refuses a world of another lattice band, and names both lengths."""
+def test_a_policy_refuses_a_world_of_four_times_the_area(tmp_path: Path) -> None:
+    """A file refuses a much larger world, and the refusal names the extent.
+
+    The extent is the only thing left to refuse on. The message must not
+    claim the lengths differ, because they do not, and a reader who went
+    looking for a length mismatch would find nothing and doubt the check.
+    """
     path = tmp_path / "trained.npz"
     store(path, TRAINED)
 
     with pytest.raises(PolicyFitError) as caught:
-        load_policy(path, fit_of(OTHER_BAND))
+        load_policy(path, fit_of(LARGEST))
 
     message = str(caught.value)
-    assert "observation_length" in message
-    assert str(fit_of(TRAINED).observation_length) in message
-    assert str(fit_of(OTHER_BAND).observation_length) in message
+    assert "width: the file says 48 and the world says 96" in message
+    assert "observation_length: the file says" not in message
 
 
 def test_a_policy_refuses_a_world_of_another_faction_count(tmp_path: Path) -> None:
@@ -194,7 +198,7 @@ def test_a_network_policy_carries_the_same_fit(tmp_path: Path) -> None:
     assert isinstance(loaded, MLPPolicy)
 
     with pytest.raises(PolicyFitError):
-        load_policy(path, fit_of(SAME_BAND))
+        load_policy(path, fit_of(LARGER))
 
 
 def test_the_engine_owns_the_version_the_file_states(tmp_path: Path) -> None:
@@ -230,7 +234,7 @@ def test_a_policy_trained_on_one_world_misplays_the_other_without_the_check(
     store(path, TRAINED)
     policy, _ = load_policy(path)
 
-    wrong = Env(SAME_BAND, WEIGHTING)
+    wrong = Env(LARGER, WEIGHTING)
     observation = wrong.reset(1)
     action = policy.choose(observation, wrong.action_mask())
 
@@ -248,7 +252,7 @@ def test_the_trainer_refuses_a_checkpoint_from_another_world(tmp_path: Path) -> 
 
     out = tmp_path / "run"
     out.mkdir()
-    store(out / "s-latest.npz", SAME_BAND)
+    store(out / "s-latest.npz", LARGER)
 
     with pytest.raises(PolicyFitError) as caught:
         train(

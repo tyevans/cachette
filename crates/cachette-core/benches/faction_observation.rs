@@ -33,6 +33,7 @@
 use std::hint::black_box;
 use std::time::Instant;
 
+use cachette_core::faction_observation::observation_schema;
 use cachette_core::faction_view::Admit;
 use cachette_core::{Axial, FactionId, SightRules, World, WorldConfig};
 
@@ -113,7 +114,7 @@ fn measure(extent: u32, camp: i32, radius: u32) {
     let world = a_world(extent, camp, radius);
     let layout = world.observation().layout();
     let cells = layout.block_count();
-    let length = world.observation_schema().length();
+    let length = observation_schema().length();
     println!(
         "A world of {} tiles, {} cells of {} tiles, and an array of {} positions",
         world.grid().tile_count(),
