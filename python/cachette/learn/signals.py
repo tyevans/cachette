@@ -8,9 +8,10 @@ reads the schema and states no position of its own.[^1]
 
 The project held the set of readable quantities in three places. The reward
 accepted a term for any field of one position and refused the rest. The
-trainer reported a fixed tuple of seven names. The schema declared thirty
-fields of which twelve hold one position. Nothing compared the three, and they
-disagreed in two ways that cost a measurement each.
+trainer reported a fixed tuple of names. The schema declared the whole set,
+and how many of its fields hold one position depends on the world. Nothing
+compared the three, and they disagreed in two ways that cost a measurement
+each.
 
 The trainer reports the tick of the end under the name ``end_tick`` while a
 reward must ask for ``tick``, so a caller that carried a reported name into a
@@ -25,12 +26,18 @@ publishes, and reads a value through it.
 
 # A quantity of many positions needs an aggregation
 
-Twelve of the thirty fields hold one position. The relation of a faction holds
-one position for each faction, the trade board holds one for each row it
-carries, and each summary of the block lattice holds one for each cell. A
-reward that accepts one position alone can therefore not score trade and can
-not score diplomacy, and no weighting reaches those fields however it is
-written.
+Some fields hold one position and the rest hold several. The relation of a
+faction holds one position for each faction, the trade board holds one for
+each row it carries, and each summary of the block lattice holds one for each
+cell. A reward that accepts one position alone can therefore not score trade
+and can not score diplomacy, and no weighting reaches those fields however it
+is written.
+
+**Which fields hold one position is a property of the world and not of the
+engine.** A lattice of one cell makes every summary of that lattice a scalar,
+and a world of two factions makes the relation a scalar. A caller that holds a
+count of the scalars is therefore right for one world shape and wrong for the
+next, and this module states the rule rather than the count.[^3]
 
 A signal of many positions becomes a scalar through an aggregation, and the
 caller chooses which. The aggregation is part of the objective and not a
@@ -42,6 +49,7 @@ property of the engine, so it belongs to the caller that states the weighting.
 schema-declared bounded tables the engine owns, decision D1.
 ``docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md``
 [^2]: Findings register, FND-669. ``docs/FINDINGS.md``
+[^3]: Findings register, FND-670. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
