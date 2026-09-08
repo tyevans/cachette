@@ -9,7 +9,15 @@ is then dominated by that world. The direction the trainer estimates is the
 direction that wins that world, and the next generation draws another world.
 The run therefore walks, and the measured record shows a walk.
 
-Three further answers follow from that one.
+**One map for each generation is not by itself the defect.** A map-specific
+direction averages away across generations, so long as the objective the
+ranking uses stays the same objective. It does not. In 38 percent of the
+generations of the measured run, every candidate shared one outcome, so the
+ranking fell to the shaping term and the generation optimised held ground
+instead of winning. **That is a bias, and no number of generations removes
+it.**
+
+Four further answers follow.
 
 **The reward weights changed nothing, because only the order of the scores
 reaches the update.** The trainer ranks the scores and takes a step of fixed
@@ -26,13 +34,19 @@ compares mean returns under different weightings, which are not comparable.
 The one comparable quantity is the win share, the baseline for it is exactly
 one third, and it needs no measurement at all.
 
+**The four settings to change are a population of 64, two seeds per
+generation, a hidden width of 8, and a survival term in the reward.** All four
+are settings rather than code. A simulation of the trainer places that point a
+quarter above the present one for the same episodes, and section 2.5 states
+what the simulation assumes and how to falsify it.
+
 ## 0 Provenance, and what this report could not verify
 
 The author read the code in this repository, read the logs of one completed
 training run, and computed figures from those logs. The author started no
 instance, ran no training, and changed no code.
 
-The report holds four kinds of claim, and each one is marked.
+The report holds five kinds of claim, and each one is marked.
 
 **Read.** The author read the source and states what it does.
 
@@ -44,6 +58,12 @@ figure states its arithmetic and its assumptions.
 
 **Reasoning.** The author argues from the code and from published work. No
 measurement supports it yet. Each such passage says so.
+
+**Simulated.** The author wrote a model of the trainer, ran it, and reports
+what it produced. **A simulated figure is not a measurement of this engine.**
+Section 2.5 states the model, names the two quantities it guesses, and reports
+every result at two values of the larger guess. Experiment 3 of section 11
+tests the model against the engine.
 
 **The author could not verify three things.**
 
@@ -141,6 +161,12 @@ generation estimates the direction that wins a different map.
 precision.** That is what the record shows. The validation figure oscillates
 by about 70 and improves by about 68 over 120 generations.
 
+**A walk of that kind still converges, so this is not the whole defect.** A
+map-specific direction that is unbiased for the true direction averages away
+across generations. Section 2.5 measures what the trade between seeds and
+generations is really worth, and section 2.3 names the part that does not
+average away.
+
 ### 2.3 The ranked objective also changes shape between generations
 
 **Measured.** In 46 of 132 generations no candidate won, and in 4 every
@@ -158,27 +184,145 @@ inside one outcome class is a few hundred.
 generations it maximises held ground. In 62 percent it maximises winning one
 map. Nothing in the run holds those two together.
 
-### 2.4 The fix, and what it costs
+### 2.4 A hostile world is not a world to take out of the pool
 
-**Reasoning.** Raise the seed count of a generation and lower the population.
-The score of a candidate then averages over several maps, and the interaction
-with any one map falls as the seed count rises. The win term also takes more
-levels, so a generation rarely ties on it.
+**Measured, by the project owner during a live run.** One generation drew seed
+1007. All 256 candidates scored exactly -2000.0, so the guard refused the
+step. The built-in controller also loses that world from seat 0, after 207
+decisions. Two neighbouring seeds behave differently. The controller loses
+seed 1000 at decision 250, and it wins seed 1001 at decision 144.
 
-The cost is exact, because the cost of a generation is the product of the
-population and the seed count. The measured rate is 5036 episodes per
-cell-hour.
+| Seed | Water fraction | Founding filter | Controller in seat 0 |
+|---|---|---|---|
+| 1000 | 0.069 | passes | lost after 250 decisions |
+| 1001 | 0.332 | passes | won after 144 decisions |
+| 1007 | 0.223 | passes | lost after 207 decisions |
 
-| Population | Seeds | Episodes per generation | Minutes per generation | 60 generations |
+**The world is hostile to the seat, and no cheap static test finds it.** All
+three pass the founding filter. The water fraction orders them 1000, 1007,
+1001 and the outcome orders them differently. An earlier measurement already
+established that the water fraction does not predict how an episode ends.[^22]
+
+**Do not filter the seed pool on whether the controller wins from seat 0.**
+Two reasons, and the author agrees with the project owner on both.
+
+The holdout is unfiltered, so a filtered training pool optimises a different
+distribution of worlds from the one the acceptance test measures. That is a
+bias in the estimator, and no length of run removes it.
+
+The filter would remove the hardest worlds. Those are the worlds where a
+difference in skill has the most room to show.
+
+**The zero-spread guard is the right mechanism, and it has the right shape.**
+It removes one step, not one world. It fires only when the score did not
+depend on the candidate at all, which is the only case that carries no
+information. It fired in 10 of 132 generations of the measured run.
+
+**The cost of a hostile world is smaller than it looks, and section 3.4 makes
+it smaller still.** A survival term orders the candidates of a generation
+where nobody won, so long as two episodes end at different ticks.
+
+### 2.5 The seed count against the generation count, resolved by simulation
+
+The project owner asked for this trade to be resolved against the alignment
+law rather than by preference. **The author gave two wrong answers before the
+right one, and states both, because each is the answer a reader would reach
+unaided.**
+
+**The first wrong answer.** Raise the seed count to eight. It buys direction
+quality and the cost is arithmetic.
+
+**The second wrong answer.** Carry the alignment law through to the
+accumulated progress of the walk. Take the step as a fixed length along a
+direction of alignment `cos`. Then after `G` generations the signal grows as
+`G` times `cos` and the wander grows as the square root of `G`. The ratio is
+the square root of `G` times `cos`, which is the square root of the budget
+divided by the seed count and by the trainable count. **The population cancels
+out, and one seed wins.** That derivation looks clean and it is wrong. It
+assumes the centre never approaches the direction it is chasing, so it misses
+the point at which per-step quality sets the level and more generations buy
+nothing.
+
+**The simulation.** The author wrote the model out and ran it. The objective
+is linear. One direction is the true one. Each world gives that direction plus
+a world-specific direction, scaled by a ratio the model calls the world
+variance. Some share of generations rank a third direction instead, which is
+the tie of section 2.3, and that share falls as the seed count rises, because
+a generation ties on the outcome only when every one of its worlds ties. The
+trainer draws the pairs, ranks the scores, sums the perturbations, normalises
+the sum, steps by a fixed fraction, and returns the centre to unit length, in
+the way the code does. The budget is a fixed episode count.
+
+**Simulated, not measured.** The model is not the engine. It states a linear
+objective and it guesses two quantities the engine has never measured: the
+world variance, and how well the tied objective aligns with winning. The
+author therefore reports each result at two world variances, and takes only
+the conclusions that hold at both.
+
+The trainable count is 696, the learning rate is 0.08, the tie share is 0.38
+raised to the seed count, and the budget is 33,280 episodes. That budget is
+exactly what the measured run spent: 130 generations of 256 candidates on one
+seed. The figure is the cosine between the final centre and the true
+direction, over eight repeats.
+
+| Pairs | Seeds | Generations | Cosine at world variance 9 | Cosine at variance 25 |
 |---|---|---|---|---|
-| 256 | 1 | 256 | 3.0 | 3.0 cell-hours |
-| 128 | 4 | 512 | 6.1 | 6.1 cell-hours |
-| 64 | 8 | 512 | 6.1 | 6.1 cell-hours |
-| 256 | 8 | 2048 | 24.4 | 24.4 cell-hours |
+| 128 | 1 | 130 | 0.581 | 0.412 |
+| 128 | 2 | 65 | 0.570 | 0.390 |
+| 128 | 4 | 32 | 0.450 | 0.304 |
+| 128 | 8 | 16 | 0.299 | 0.211 |
+| 32 | 1 | 520 | 0.622 | 0.483 |
+| **32** | **2** | **260** | **0.730** | **0.574** |
+| 32 | 4 | 130 | 0.703 | 0.537 |
 
-**A run at 256 candidates and 8 seeds costs 24 cell-hours for 60
-generations.** One box holds two cells, so one box-day runs two such arms.
-That is affordable and nobody has run it.
+**Three conclusions, and all three hold at both world variances.**
+
+**Eight seeds is much worse than one at this budget.** The author's first
+answer loses about half the level the centre reaches. The generation count is
+the binding constraint at the budget these runs spend, and eight seeds cuts
+that count by eight.
+
+**The best point is a small population and two seeds, not a large population
+and one.** Thirty-two pairs at two seeds reaches 0.730 against 0.581 for the
+present setting of 128 pairs at one seed. That is a gain of a quarter for the
+same episodes. The population is close to neutral at one seed, and it stops
+being neutral once a second seed removes most of the tie.
+
+**The trade turns with the budget.** At four times this budget, and at 128
+pairs, two seeds reach 0.868 and four reach 0.891, against 0.745 for one seed.
+**Reach that point by running longer, not by paying for seeds now.**
+
+### 2.6 What therefore to change, and what it costs
+
+The cost of a generation is the product of the population and the seed count.
+The measured rate is 5036 episodes per cell-hour. **A population is twice a
+pair count**, because each pair is tried in both directions, so the 32 pairs
+of section 2.5 are a population of 64.
+
+| Population | Seeds | Episodes per generation | Minutes | 400 generations |
+|---|---|---|---|---|
+| 256 | 1 | 256 | 3.0 | 20.4 cell-hours |
+| 64 | 2 | 128 | 1.5 | 10.2 cell-hours |
+| 128 | 2 | 256 | 3.0 | 20.4 cell-hours |
+| 256 | 2 | 512 | 6.1 | 40.7 cell-hours |
+
+**The recommended setting is a population of 64, two seeds, and several
+hundred generations.** It costs 10.2 cell-hours for 400 generations. The
+measured run spent 6.7 cell-hours for 130 generations. **This setting
+therefore buys three times the generations for one and a half times the
+cost.** One box runs two such arms at once.
+
+**Two cautions, and both are reasoning rather than measurement.**
+
+The model holds a linear objective, so it cannot see a step that destroys a
+policy. A population of 64 takes a noisier step than one of 256, and a real
+landscape may punish that. Watch the validation trace of the first fifty
+generations before committing a long run.
+
+The model has no guard. A population of 64 ties more often than one of 256,
+because fewer candidates give fewer chances to differ. The survival term of
+section 3.4 is therefore a prerequisite of the small population, not an
+independent change.
 
 ## 3 Only the order of the scores reaches the update
 
@@ -254,15 +398,52 @@ warns that a rise in held ground need not be a rise in wins.[^5]
 
 **The score must place the shaping below the outcome.** A tile weight of 1
 over a 2304 tile map can outrank an outcome, which section 3.2 shows. A tile
-weight of 0.1 cannot. **Prefer the smaller weight**, and add seeds rather than
-weight to remove the ties.
+weight of 0.1 cannot. **Prefer the smaller weight.**
 
-The concrete recommendation is one weighting, not six. Weigh the outcome at
-plus and minus one. Weigh held ground at a value small enough that no tile
-term can cross an outcome boundary, which on this map means below 1/2304.
-Then raise the seed count until a generation rarely ties on the outcome. Eight
-seeds give nine levels of win share, and section 2.3 shows that one seed gives
-two.
+### 3.4 Break the tie with the survival time, which costs nothing
+
+**Read.** The observation carries the tick. The reward weighs the change of
+any field of the schema that holds one position, and the tick holds one.[^4]
+The sum of that weighted change over an episode telescopes to the weighted end
+tick, in the way section 3.2 describes for held ground.
+
+**Read.** A faction cannot be eliminated. A faction that loses every unit and
+every person keeps its ground and its seat, and it may still win at the tick
+limit.[^21] An episode therefore ends early only when some faction wins.
+
+**Reasoning.** The end tick measures how long the faction denied every rival a
+win. It takes 250 levels over an episode of 250 decisions, against the two
+levels of the outcome on one world. **It is dense, it never ties while any two
+episodes end at different ticks, and it is monotone toward the tick limit
+path**, because the territory reader compares held ground at the limit and a
+faction must reach the limit to be compared.
+
+Keep the weight below the outcome gap, by the rule of section 3.2. The end
+tick reaches 2500, so a weight below 0.8 cannot cross an outcome boundary at a
+win weight of 2000. A weight of 0.2 gives a spread up to 500 inside one
+outcome class.
+
+**Derived.** In the measured run, 46 of 132 generations had no winner and 10
+of those had a score spread of exactly zero. The zero-spread ten ended every
+episode at the same tick, so no term can order them. **The survival term can
+order the other 36**, which is 27 percent of all generations.
+
+**This is a weighting, not a code change.** The trainer already accepts it.
+
+### 3.5 The one weighting to run
+
+The concrete recommendation is one weighting, not six.
+
+| Term | Weight | Why |
+|---|---|---|
+| `won` | +2000 | The outcome dominates, as it should |
+| `lost` | -2000 | |
+| `drawn` | 0 | |
+| `tick` | 0.2 | Dense, 250 levels, cannot cross the outcome gap |
+| `held_tiles` | 0.1 | A proxy for strength, and it cannot cross the gap |
+
+**Report the win share beside every return this weighting produces.** Section
+9 holds the protocol.
 
 ## 4 Is an evolution strategy the right family here?
 
@@ -507,6 +688,8 @@ field says the work alone is the wrong quantity.[^14]
 
 ## 8 The parameter budget
 
+### 8.1 What one step buys, and what the whole budget buys
+
 **Measured.** The alignment law and its sweep are recorded.[^3] The cosine
 between the step and the direction being estimated is about the square root of
 the pair count divided by the trainable count. Scoring on one world roughly
@@ -523,27 +706,80 @@ halves it.
 | Hidden 8 | 232 |
 | Hidden 4 | 116 |
 
-**Derived.** The table below gives the alignment before scoring noise, and the
-cost of one generation at the measured rate of 5036 episodes per cell-hour.
+**Derived.** The table below gives the alignment of one step before scoring
+noise, at 32 and at 128 pairs.
 
-| Shape | Pairs | Seeds | Alignment | Episodes per generation | Minutes per generation |
-|---|---|---|---|---|---|
-| Linear | 128 | 1 | 0.154 | 256 | 3.0 |
-| Hidden 24 | 128 | 1 | 0.429 | 256 | 3.0 |
-| Hidden 24 | 128 | 8 | 0.429 | 2048 | 24.4 |
-| Hidden 16 | 128 | 8 | 0.525 | 2048 | 24.4 |
-| Hidden 8 | 128 | 8 | 0.743 | 2048 | 24.4 |
-| Hidden 8 | 32 | 8 | 0.371 | 512 | 6.1 |
+| Shape | Trainable | Alignment at 32 pairs | Alignment at 128 pairs |
+|---|---|---|---|
+| Linear | 5365 | 0.077 | 0.154 |
+| Hidden 24 | 696 | 0.214 | 0.429 |
+| Hidden 16 | 464 | 0.263 | 0.525 |
+| Hidden 8 | 232 | 0.371 | 0.743 |
+| Hidden 4 | 116 | 0.525 | 1.000 |
 
-**The recommended operating point is a hidden width of 8 to 16, 128 pairs, and
-8 seeds.** It costs 24 minutes for one generation on one cell. Sixty
-generations cost 24 cell-hours, and one box runs two such arms at once.
+**Simulated.** The alignment of one step is not the quantity to maximise. The
+quantity to maximise is where the centre ends after the whole budget. The
+model of section 2.5 answers that, at 128 pairs, one seed, a tie share of
+0.38, a world variance of 9, and the budget the measured run spent.
+
+| Trainable | Shape | Final cosine of the centre |
+|---|---|---|
+| 116 | Hidden 4 | 0.766 |
+| 232 | Hidden 8 | 0.743 |
+| 464 | Hidden 16 | 0.655 |
+| 696 | Hidden 24 | 0.581 |
+| 5365 | Linear | 0.286 |
+
+**Cutting the trainable count helps monotonically, and it flattens below
+232.** The linear policy ends at less than half the level of the hidden 24
+policy on the same budget, which is why the linear cell of the measured run
+needed about ninety generations to reach what the network cell reached in
+about twenty.[^3] Between hidden 4 and hidden 8 the gain is 3 points, so
+**take hidden 8 and keep the extra width**, because a narrower projection
+states fewer rules.
+
+**The recommended operating point is a hidden width of 8, a population of 64,
+two seeds, and several hundred generations.** Section 2.6 holds the cost.
 
 **Do not raise the population to buy alignment.** Four times the population
-buys twice the alignment and costs four times as much. Cutting the trainable
-count buys the same factor for nothing. That trade is already measured.[^3]
+buys twice the alignment of one step and costs four times as much, so it buys
+nothing at a fixed budget. Cutting the trainable count buys the same factor
+for nothing.[^3] **Treat the population as a wall-clock parallelism knob and
+not as a learning knob.** A cell holds 32 engine workers, so a generation of
+128 worlds already fills one.
 
-### 8.1 The fixed random projection
+### 8.2 The learning rate is unresolved, and the model says 0.04 is too small
+
+**Measured, by the project owner.** A pair of live runs compares 0.04 against
+0.08 at matched generations. The 0.08 arm leads at every validation point so
+far: -1167 against -1195 at generation 3, -1170 against -1294 at generation 7,
+and -1110 against -1143 at generation 11. **Every gap is inside the plus or
+minus 200 noise band, and the two arms drew different seed pools.** Treat the
+learning rate as unresolved, not as tuned. The author states this correction
+because an earlier brief called the halving diagnosis-driven, and it was not.
+
+**Simulated.** The model of section 2.5 was run over the learning rate, at 128
+pairs, one seed, a world variance of 9, and the budget the measured run spent.
+
+| Learning rate | Final cosine, no tie | Final cosine, tie share 0.38 |
+|---|---|---|
+| 0.02 | 0.290 | 0.208 |
+| 0.04 | 0.526 | 0.390 |
+| 0.08 | 0.738 | 0.581 |
+| 0.16 | 0.720 | 0.584 |
+| 0.32 | 0.552 | 0.420 |
+
+**The model reproduces the owner's observation and explains it.** The optimum
+is a broad plateau between 0.08 and 0.16, and 0.04 is on the falling side of
+it. A rate below the plateau cannot cross the sphere inside the budget. A rate
+above it overshoots and the centre wanders.
+
+**Keep 0.08 and test 0.16. Do not test below 0.08 again.** The author's own
+earlier reasoning, that the learning rate cancels out of the signal-to-wander
+ratio and is therefore neutral, is wrong for the same reason the second wrong
+answer of section 2.5 is wrong: it ignores the saturation of the centre.
+
+### 8.3 The fixed random projection
 
 **Read.** The first layer of the network policy is a random projection from a
 fixed seed. The trainer never touches it. Only the readout is trainable.
@@ -696,23 +932,33 @@ preference wins clearly less than the best trained policy. *Kills the search
 hypothesis if:* the best fixed preference matches or beats it. *Cost:* 2.9
 cell-hours. **This is the cheapest decisive experiment and it comes first.**
 
-**Experiment 2. Seeds against population, at constant cost.** Two arms at 512
-episodes per generation, for 60 generations: 128 pairs at one seed, and 32
-pairs at eight seeds. Both at hidden 24. Measure the holdout win share of the
-best centre by the protocol of section 9. *Tests:* the primary finding of
-section 2. *Kills it if:* the eight seed arm does no better than the one seed
-arm. *Cost:* 6.1 cell-hours for each arm, and 0.6 for the two holdouts. About
-13 cell-hours in total, which is one box-day for both arms with room to spare.
+**Experiment 2. The recommended setting, run long.** One arm at a population
+of 64, two seeds, a hidden width of 8, a learning rate of 0.08, and the
+weighting of section 3.5 including the survival term. Run 400 generations.
+Validate on 512 fixed seeds every 20 generations. *Tests:* every change this
+report recommends, together. *Kills it if:* the validation trace is flat
+between generation 100 and generation 400. *Cost:* 10.2 cell-hours for the
+run and 3.4 for the twenty validations, so about 14 cell-hours. **Run it
+beside experiment 1 on one box.**
 
-**Experiment 3. The parameter budget and the projection.** Three arms at 128
-pairs and 8 seeds, for 40 generations: the fixed projection at hidden 24, a
-fully trained network at hidden 8 over the full array, and a fully trained
-network at hidden 8 over an array trimmed to the positions that move. *Tests:*
-section 8.1. *Kills the trimming if:* the trimmed arm does worse than the full
-arm. *Cost:* 16.3 cell-hours for each arm, so about 50 cell-hours. Run it only
-after experiment 2 has fixed the seed count.
+**Experiment 3. The seed count, at equal budget.** Two arms of 200
+generations at 256 episodes per generation: 128 pairs at one seed, and 64
+pairs at two seeds. Everything else matched to experiment 2. *Tests:* the
+simulation of section 2.5, which predicts that the two seed arm ends
+clearly higher. *Kills the simulation if:* the one seed arm matches or beats
+it. *Cost:* 10.2 cell-hours for each arm, so about 22 cell-hours with the
+validations. **This is the experiment that makes the simulation falsifiable,
+so run it even if experiment 2 succeeds.**
 
-**Experiment 4. The decision interval.** Two arms at the settings experiment 2
+**Experiment 4. The parameter budget and the projection.** Three arms at the
+setting experiment 3 chose, for 200 generations: the fixed projection at
+hidden 24, a fully trained network at hidden 8 over the full array, and a
+fully trained network at hidden 8 over an array trimmed to the positions that
+move. *Tests:* section 8.3. *Kills the trimming if:* the trimmed arm does
+worse than the full arm. *Cost:* about 11 cell-hours for each arm, so about 35
+cell-hours.
+
+**Experiment 5. The decision interval.** Two arms at the settings experiment 3
 chose: interval 10, and interval 2. Measure the boundary cost first, on one
 generation, before committing the run. *Tests:* the cadence hypothesis.
 *Kills it if:* the win share does not move. *Cost:* the interval 2 arm runs
@@ -722,7 +968,7 @@ cost is unchanged, and an earlier report measured that the simulation holds 96
 to 99 percent of the clock.[^6] The author expects a small rise and states
 that as reasoning.
 
-**Experiment 5. A policy-gradient learner.** Build the stochastic policy, the
+**Experiment 6. A policy-gradient learner.** Build the stochastic policy, the
 value head, the advantage estimate and the clipped objective. Run it on 512
 parallel worlds against the same holdout protocol. *Tests:* section 4.2.
 *Kills it if:* it does not beat the evolution strategy control at equal
@@ -730,7 +976,7 @@ episode budget. *Cost:* the build is a few hundred lines and its tests. The
 run costs what experiment 2 costs, because the episode count sets the cost and
 not the method.
 
-**Experiment 6. The spatial observation.** Raise the resolution of the level 1
+**Experiment 7. The spatial observation.** Raise the resolution of the level 1
 picture the array carries, or add a spatial argument to the verbs that resolve
 a place. *Tests:* sections 5.3 and 6.1. *Cost:* this is engine work, it moves
 the observation version, and it retires every stored policy. Do it last, and
@@ -738,13 +984,20 @@ do it with a decision record, because it changes a schema the engine owns.
 
 ### 11.1 What to do this week
 
-Run experiment 1 and experiment 2 together on one box. They fit inside one
-box-day. Add the score vector log of section 3.2 and the progress watchdog of
-section 10 before the box starts, because both are cheap and both make the
-result readable.
+Change four things before any box starts. Each is a setting or one line, and
+none is engineering.
 
-Stop paying for the yardstick pass. Replace every validation of 128 seeds with
-one of 512. Report a win share.
+Add the survival term of section 3.4 to the weighting. Set the population to
+64 and the seeds to two. Set the hidden width to 8. Log the score vector of
+each generation.
+
+Then run experiment 1 and experiment 2 together on one box. They fit inside
+one box-day, and between them they test the interface and every setting this
+report changes.
+
+Stop paying for the yardstick pass, because the chance line is exactly one
+third. Replace every validation of 128 seeds with one of 512. Report a win
+share.
 
 ## References
 
@@ -768,3 +1021,5 @@ one of 512. Report a win share.
 [^18]: Findings register, FND-651. `docs/FINDINGS.md`
 [^19]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/draft/adr-0041-a-crate-split-enforces-the-boundary-at-compile-time.md`
 [^20]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+[^21]: Findings register, FND-583. `docs/FINDINGS.md`
+[^22]: Findings register, FND-667. `docs/FINDINGS.md`
