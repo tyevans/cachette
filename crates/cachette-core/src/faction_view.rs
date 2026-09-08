@@ -51,6 +51,7 @@
 //! [^6]: Decisions register, DEC-276. `docs/DECISIONS.md`
 //! [^7]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 
+use crate::bridge::BridgeError;
 use crate::hex::Axial;
 use crate::holding::Holder;
 use crate::observation::BlockForm;
@@ -61,6 +62,55 @@ use crate::terrain::TileKind;
 use crate::types::{Accum, Entity, FactionId, Fix32, TileIdx};
 use crate::upgrade::UpgradeSite;
 use crate::world::World;
+
+/// The reason that a faction reader could not answer.
+///
+/// **A refusal names its cause.** A reader that answered nothing at all left
+/// the caller with the fact of a refusal and none of the reason, and the
+/// reason is the whole of the diagnosis: a derived structure that the arena
+/// has moved past says which revision it holds and which revision the arena
+/// holds.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+/// [^2]: Findings register, FND-647. `docs/FINDINGS.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FactionViewError {
+    /// The number names no faction of this world.
+    NoSuchFaction(FactionId),
+    /// The derived unit structure refused, and the bridge says why.
+    Bridge(BridgeError),
+    /// The world holds no tile at an address that a reader reached.
+    NoTile(Axial),
+}
+
+impl core::fmt::Display for FactionViewError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::NoSuchFaction(faction) => {
+                write!(formatter, "{} names no faction of this world", faction.0)
+            }
+            Self::Bridge(error) => write!(
+                formatter,
+                "the world cannot describe its own units: {error}"
+            ),
+            Self::NoTile(address) => write!(
+                formatter,
+                "the world holds no tile at ({}, {})",
+                address.q, address.r
+            ),
+        }
+    }
+}
+
+impl std::error::Error for FactionViewError {}
+
+impl From<BridgeError> for FactionViewError {
+    fn from(error: BridgeError) -> Self {
+        Self::Bridge(error)
+    }
+}
 
 /// How a faction came by what it reads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -464,22 +514,30 @@ impl World {
     /// The reader combines only the tiles the rule admits, so a cell cannot
     /// state what its tiles hide.[^2]
     ///
-    /// Returns `None` when the address lies outside the world, or when the
-    /// derived unit structure does not describe the units.
+    /// # Errors
+    ///
+    /// Returns an error when the address lies outside the world, and when the
+    /// derived unit structure does not describe the units. The error names
+    /// which of the two happened.
     ///
     /// # References
     ///
     /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
     /// [^2]: ADR-0059, fog storage grows with observed area, not with world area, decision D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
-    #[must_use]
     pub fn faction_summary_covering(
         &self,
         faction: FactionId,
         address: Axial,
         admit: Admit,
-    ) -> Option<MaskedSummary> {
+    ) -> Result<MaskedSummary, FactionViewError> {
         let layout = self.observation().layout();
-        let key = layout.key_of(self.grid().index_of(address)?)?;
+        let tile = self
+            .grid()
+            .index_of(address)
+            .ok_or(FactionViewError::NoTile(address))?;
+        let key = layout
+            .key_of(tile)
+            .ok_or(FactionViewError::NoTile(address))?;
         let block = layout.block_of_key(key);
         self.masked_block(&BlockMask::of(self, faction, block), faction, block, admit)
     }
@@ -500,8 +558,12 @@ impl World {
     /// all. The mask answers for the whole block, and the reader returns the
     /// identity.
     ///
-    /// Returns `None` when the derived unit structure does not describe the
-    /// units.
+    /// # Errors
+    ///
+    /// Returns an error when the derived unit structure does not describe the
+    /// units, and when the world holds no tile at an address of the block.
+    /// The error names which of the two happened, and a stale structure
+    /// names both revisions.
     ///
     /// # References
     ///
@@ -512,7 +574,7 @@ impl World {
         faction: FactionId,
         block: u32,
         admit: Admit,
-    ) -> Option<MaskedSummary> {
+    ) -> Result<MaskedSummary, FactionViewError> {
         let layout = self.observation().layout();
         let grid = self.grid();
         let tiles = i64::from(self.observation().tiles_in_block(block));
@@ -522,7 +584,7 @@ impl World {
         // a corner of it, so the walk below runs over the observed area and
         // never over the world.
         if mask.is_empty() {
-            return Some(MaskedSummary {
+            return Ok(MaskedSummary {
                 admit,
                 admitted: 0,
                 withheld: tiles,
@@ -578,7 +640,7 @@ impl World {
                 }
             }
         }
-        Some(MaskedSummary {
+        Ok(MaskedSummary {
             admit,
             admitted,
             withheld,
@@ -672,27 +734,47 @@ impl World {
     /// # References
     ///
     /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
-    fn tile_summary(&self, address: Axial, tile: TileIdx, sees_now: bool) -> Option<CellSummary> {
-        let ground = self.terrain().tile(address)?;
-        let food = self.resources().original(address, ResourceKind::Food)?;
+    fn tile_summary(
+        &self,
+        address: Axial,
+        tile: TileIdx,
+        sees_now: bool,
+    ) -> Result<CellSummary, FactionViewError> {
+        let ground = self
+            .terrain()
+            .tile(address)
+            .ok_or(FactionViewError::NoTile(address))?;
+        let food = self
+            .resources()
+            .original(address, ResourceKind::Food)
+            .ok_or(FactionViewError::NoTile(address))?;
         let mut summary = CellSummary::of_ground(ground.kind.is_passable(), ground.height, food);
         if !sees_now {
-            return Some(summary);
+            return Ok(summary);
         }
         let taken = self
             .taken_from(address, ResourceKind::Food)
             .unwrap_or(Amount::ZERO);
-        let units = self.bridge().count_on_tile(self.soldiers(), address).ok()?;
+        // **The refusal carries the reason.** The bridge names a stale
+        // revision pair, a bridge that was never built, and a bridge built
+        // from another arena. A reader that dropped that reason left the
+        // caller a sentence that named none of it.[^2]
+        //
+        // [^2]: Findings register, FND-647. `docs/FINDINGS.md`
+        let units = self.bridge().count_on_tile(self.soldiers(), address)?;
         let held = i64::from(
             self.tile_holder(address)
                 .is_some_and(|holder| !holder.is_nobody()),
         );
+        let value = self
+            .tile_value_at(tile)
+            .ok_or(FactionViewError::NoTile(address))?;
         summary = summary.combine(CellSummary::of_frame(
             units as i64,
             held,
-            sim_math::accumulate(Accum(0), self.tile_value_at(tile)?),
+            sim_math::accumulate(Accum(0), value),
             taken.to_accum().0,
         ));
-        Some(summary)
+        Ok(summary)
     }
 }
