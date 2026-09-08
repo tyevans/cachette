@@ -93,11 +93,32 @@ class Aggregation(Enum):
 
 @dataclass(frozen=True)
 class Signal:
-    """One named quantity of the observation, and where it sits."""
+    """One named quantity of the observation, and where it sits.
+
+    The name, the start and the position count are the reading contract, and
+    every schema states all three. The four entries after them describe the
+    shape of the quantity, and a schema may state none of them.
+
+    The space entry says that the positions of the signal are places in the
+    world rather than separate quantities. A drawing of the observation needs
+    that to lay the positions out, and a reader of one value does not. The
+    block entry names the group the layout puts the signal in. The gate entry
+    names another signal that says which positions carry a value at all, so
+    that a reader tells an empty position from a position that holds zero. The
+    channels entry names the quantities of a signal that holds several of them
+    over one set of places.
+
+    Each of the four defaults to absent, so a schema that states none of them
+    gives the same catalogue it gave before they existed.
+    """
 
     name: str
     start: int
     positions: int
+    space: str | None = None
+    block: str | None = None
+    gate: str | None = None
+    channels: tuple[str, ...] = ()
 
     @property
     def scalar(self) -> bool:
@@ -132,6 +153,26 @@ class Signal:
         return aggregation.apply(window)
 
 
+def _text_or_none(value: object) -> str | None:
+    """Read one optional text entry of a schema row."""
+    if value is None:
+        return None
+    return str(value)
+
+
+def _names(value: object) -> tuple[str, ...]:
+    """Read one optional list of names of a schema row."""
+    if value is None:
+        return ()
+    if isinstance(value, str):  # pragma: no cover - schema contract
+        message = "a channel list holds names, and this row holds one string"
+        raise TypeError(message)
+    if not isinstance(value, list | tuple):  # pragma: no cover - schema contract
+        message = f"a channel list must be a list, and this row holds {value!r}"
+        raise TypeError(message)
+    return tuple(str(entry) for entry in value)
+
+
 class SignalCatalogue:
     """Every signal one world shape publishes, read from its own schema.
 
@@ -140,11 +181,24 @@ class SignalCatalogue:
     catalogue of either answers for both.
     """
 
-    def __init__(self, signals: Sequence[Signal], length: int) -> None:
-        """Hold the signals of one layout, in the order the schema gives."""
+    def __init__(
+        self,
+        signals: Sequence[Signal],
+        length: int,
+        geometry: Mapping[str, object] | None = None,
+    ) -> None:
+        """Hold the signals of one layout, in the order the schema gives.
+
+        The geometry argument carries every entry of the schema that is not a
+        field and is not the length. A drawing of the spatial part of the
+        observation needs the shape of that part, and the schema is the only
+        place that can state it. The argument defaults to empty, so a caller
+        that builds a catalogue by hand builds the same one it built before.
+        """
         self._signals = tuple(signals)
         self._by_name = {signal.name: signal for signal in self._signals}
         self._length = length
+        self._geometry = dict(geometry or {})
 
     @classmethod
     def of_world(cls, world: WorldLike) -> SignalCatalogue:
@@ -159,6 +213,10 @@ class SignalCatalogue:
                 name=str(row["name"]),
                 start=int(row["start"]),
                 positions=int(row["positions"]),
+                space=_text_or_none(row.get("space")),
+                block=_text_or_none(row.get("block")),
+                gate=_text_or_none(row.get("gate")),
+                channels=_names(row.get("channels")),
             )
             for row in fields
         ]
@@ -166,7 +224,17 @@ class SignalCatalogue:
         if not isinstance(length, int):  # pragma: no cover - schema contract
             message = "the schema of the observation states no length"
             raise TypeError(message)
-        return cls(signals, length)
+        geometry = {
+            key: value
+            for key, value in schema.items()
+            if key not in {"fields", "length"}
+        }
+        return cls(signals, length, geometry)
+
+    @property
+    def geometry(self) -> Mapping[str, object]:
+        """Every schema entry that is not a field and is not the length."""
+        return dict(self._geometry)
 
     def __len__(self) -> int:
         """How many signals the layout holds."""
