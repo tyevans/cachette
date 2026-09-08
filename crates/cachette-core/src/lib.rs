@@ -150,7 +150,9 @@ pub use sort::{SortError, SortKey};
 pub use stage::{FrameCosts, Stage, StageCost, STAGES, STAGE_COUNT};
 pub use terrain::{Terrain, TerrainTile, TileKind};
 pub use tier::{EntityTier, Shape, CHARACTER_CEILING};
-pub use tile_value::{TileValueChunk, TileValueRange, TileValues};
+pub use tile_value::{
+    TileValueChunk, TileValueRange, TileValues, TILE_VALUE_CEILING, TILE_VALUE_FLOOR,
+};
 pub use trade::{
     Advert, Consideration, MarketTable, TradeError, TradeRow, TradeSpoken, TradeTable, ACT_ACCEPT,
     ACT_CLOSE, ACT_COUNT, ACT_COUNTER, ACT_DEFAULT, ACT_OFFER, ACT_REFUSE, ACT_REOPEN, ACT_SETTLE,
