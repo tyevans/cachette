@@ -3,6 +3,19 @@
 This is an index. Each policy has a manifest beside it that states what it
 scored, what it was fitted on, and the schema versions it needs.
 
+## Every policy here is retired
+
+**These files state observation version 3, and the engine now writes version
+4.** The loader refuses them and names the disagreement. The layout changed
+because an observation named another faction by an absolute seat number, and
+the reader now names a rival by a position relative to itself.[^C3]
+
+The length did not change, so nothing here would fail loudly if the check
+were removed. That is what the check is for.
+
+The table below records what these policies reached, because the numbers are
+still the measurement of those runs. Do not expect to load one.
+
 ## Watch one play
 
 Every policy here was trained on a 48 by 48 world of three factions. The
@@ -73,3 +86,4 @@ policy asks for an observation after a game ends.[^C2]
 
 [^C1]: Findings register, FND-645. `docs/FINDINGS.md`
 [^C2]: Findings register, FND-644. `docs/FINDINGS.md`
+[^C3]: ADR-0193, an observation names another faction by a position relative to the reader. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
