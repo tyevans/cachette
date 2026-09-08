@@ -62,9 +62,16 @@ import numpy as np
 from .config import TrainConfig
 from .env import Env, EnvConfig, viable_seeds
 from .policy import LinearPolicy, MLPPolicy, Policy, PolicyFit, load_policy
+from .presets import ObjectiveSchedule
 from .record import EpisodeRecord, GenerationRecord, PopulationRecord
-from .reward import Weighting
-from .rollout import HEARTBEAT_SECONDS, Generation, run_population, score_generation
+from .reward import Scoring, Weighting
+from .rollout import (
+    HEARTBEAT_SECONDS,
+    Generation,
+    one_scoring,
+    run_population,
+    score_generation,
+)
 from .search import (
     EvolutionStrategy,
     Optimiser,
@@ -237,7 +244,7 @@ class Validator:
 
     name: str
     env_config: EnvConfig
-    weighting: Weighting
+    scoring: Scoring
     workers: int
     seeds: list[int]
     best_policy: Trainable
@@ -277,7 +284,7 @@ class Validator:
         """
         return run_population(
             env_config or self.env_config,
-            self.weighting,
+            self.scoring,
             [current],
             self.seeds,
             self.workers,
@@ -311,7 +318,7 @@ def generation_seeds(
 def train(
     name: str,
     env_config: EnvConfig,
-    weighting: Weighting,
+    scoring: Scoring | ObjectiveSchedule,
     train_config: TrainConfig,
     out_dir: Path,
     seed_pool: list[int],
@@ -327,8 +334,22 @@ def train(
     each action row from a weighted sum of the features. A network policy
     puts one hidden layer between them, which lets it state a rule that two
     features must hold together.
+
+    The scoring entry is what the seat is rewarded for. One scoring holds for
+    the whole run. A schedule moves between several, either at each
+    generation or at each position of the seed set, and **every candidate of
+    one generation plays the same objective at the same position.** An
+    evolution strategy ranks the candidates of a generation against each
+    other, so two candidates scored under two objectives give a rank that
+    says nothing about either policy.
+
+    **The validation pass holds one objective for the whole run.** The run
+    keeps the centre that scored highest on the validation seeds, and two
+    scores taken under two objectives cannot be compared. The pass therefore
+    takes the first scoring of the schedule and holds it.
     """
-    probe = Env(env_config, weighting)
+    fixed = first_scoring(scoring)
+    probe = Env(env_config, fixed)
     checkpoint = Checkpoint(
         name=name,
         out_dir=out_dir,
@@ -359,7 +380,7 @@ def train(
     judge = Validator(
         name=name,
         env_config=env_config,
-        weighting=weighting,
+        scoring=fixed,
         workers=train_config.workers,
         seeds=list(validation or []),
         best_policy=policy,
@@ -405,7 +426,7 @@ def train(
             label = f"{name} generation {generation:2d}"
             played = play_generation(
                 env_config,
-                weighting,
+                scorings_of(scoring, generation, len(seeds)),
                 train_config,
                 optimiser,
                 centre,
@@ -471,9 +492,37 @@ def train(
     }
 
 
+def first_scoring(scoring: Scoring | ObjectiveSchedule) -> Scoring:
+    """Return the one scoring a run measures its centre against.
+
+    A run keeps the centre that scored highest on the validation seeds. Two
+    scores taken under two objectives cannot be compared, so the validation
+    pass holds one objective for the whole run. A schedule gives its first
+    scoring, which is the one the run started under.
+    """
+    if isinstance(scoring, ObjectiveSchedule):
+        return scoring.scorings[0]
+    return scoring
+
+
+def scorings_of(
+    scoring: Scoring | ObjectiveSchedule, generation: int, episodes: int
+) -> Scoring | Sequence[Scoring]:
+    """Return what scores each episode position of one generation.
+
+    **The result is indexed by the seed position and never by the
+    candidate.** A schedule takes the generation and the episode count, and
+    it has no argument for a candidate, so a run cannot be configured to
+    score two candidates of one generation under two objectives.
+    """
+    if isinstance(scoring, ObjectiveSchedule):
+        return scoring.for_generation(generation, episodes)
+    return scoring
+
+
 def play_generation(
     env_config: EnvConfig,
-    weighting: Weighting,
+    scoring: Scoring | Sequence[Scoring],
     train_config: TrainConfig,
     optimiser: Optimiser,
     centre: np.ndarray,
@@ -489,11 +538,15 @@ def play_generation(
     **A worker process builds its own candidates from the centre and the
     generation number.** Only the centre crosses to it, so this process builds
     the population only when it plays the population itself.
+
+    A sharded generation scores one batch under one objective. A run that
+    varies the objective by seed position therefore fails here rather than
+    scoring the shards under the first entry of its schedule.
     """
     if pool is None:
         return score_generation(
             env_config,
-            weighting,
+            scoring,
             optimiser.propose(centre, generation),
             seeds,
             train_config,
@@ -501,7 +554,7 @@ def play_generation(
         )
     return run_sharded_generation(
         env_config,
-        weighting,
+        one_scoring(scoring),
         train_config,
         seeds,
         generation,
@@ -535,6 +588,7 @@ def generation_record(
         chosen=played.chosen,
         refused=played.refused,
         episodes=played.episodes,
+        objectives=played.objectives,
     )
 
 
@@ -626,7 +680,7 @@ def report_candidate(
 
 def evaluate(
     env_config: EnvConfig,
-    weighting: Weighting,
+    scoring: Scoring,
     policy: Policy,
     seeds: list[int],
     workers: int,
@@ -647,7 +701,7 @@ def evaluate(
     episodes: list[EpisodeRecord] = []
     values: list[float] = []
     for _ in range(max(1, repeats)):
-        played = run_population(env_config, weighting, [policy], seeds, workers)
+        played = run_population(env_config, scoring, [policy], seeds, workers)
         values.append(played.mean())
         rows.extend(played.rows())
         episodes.extend(played.episodes)
@@ -689,6 +743,7 @@ __all__ = [
     "Policy",
     "PolicyFit",
     "PopulationRecord",
+    "Scoring",
     "TrainConfig",
     "TrainResult",
     "Trainable",

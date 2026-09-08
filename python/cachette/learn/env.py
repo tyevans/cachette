@@ -41,6 +41,7 @@ positions each verb declares, decision D1.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
@@ -48,11 +49,11 @@ import numpy as np
 
 from cachette._core import Batch, World
 
-from .reward import Reward, RewardStep, Weighting
+from .reward import RewardStep, Scorer, Scoring
 from .signals import SignalCatalogue
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping
 
     import numpy.typing as npt
 
@@ -191,8 +192,14 @@ class Env:
     that knows this project.
     """
 
-    def __init__(self, config: EnvConfig, weighting: Weighting) -> None:
+    def __init__(self, config: EnvConfig, scoring: Scoring) -> None:
         """Build the environment. This builds no world; ``reset`` does that.
+
+        The scoring entry is what the seat is rewarded for. A weighting over
+        single fields of the observation is one such thing, and an objective
+        vector under a play style is the other. **The environment tells them
+        apart by nothing.** It asks either one for the scorer of a world, so
+        a new way to score a run needs no change here.
 
         The signal catalogue names every quantity the engine publishes about
         the seat, and it comes from the schema of a probe world. **A caller
@@ -201,9 +208,9 @@ class Env:
         what the engine publishes, and nothing fails when the two disagree.
         """
         self._config = config
-        self._weighting = weighting
+        self._scoring = scoring
         self._world: World | None = None
-        self._reward: Reward | None = None
+        self._reward: Scorer | None = None
         self._decisions = 0
         self._terminated = False
         self._truncated = False
@@ -276,7 +283,7 @@ class Env:
         episode.** A reused world would carry the state of the run before it.
         """
         self._world = self._build(seed)
-        self._reward = Reward(self._world, self._config.seat, self._weighting)
+        self._reward = self._scoring.scorer(self._world, self._config.seat)
         self._decisions = 0
         self._terminated = False
         self._truncated = False
@@ -314,7 +321,7 @@ class Env:
         this is the only place that widens it.
         """
         self._world = cast(World, world)
-        self._reward = Reward(self._world, self._config.seat, self._weighting)
+        self._reward = self._scoring.scorer(self._world, self._config.seat)
         self._decisions = 0
         self._terminated = False
         self._truncated = False
@@ -417,6 +424,7 @@ class Env:
                 "terminal": reading.terminal,
                 "terms": dict(reading.terms),
                 "changes": dict(reading.changes),
+                "objectives": dict(reading.objectives),
                 "decisions": self._decisions,
             },
         )
@@ -450,6 +458,36 @@ class Env:
         if self._reward is None:
             return "running"
         return self._reward.outcome
+
+    @property
+    def objectives(self) -> Mapping[str, float]:
+        """What each objective scored over the episode so far.
+
+        A run that scores by a weighting over single fields holds no
+        objective vector, and this is then empty. A run that scores by an
+        objective vector holds one value for each objective, so a report says
+        which objective moved and which did not.
+        """
+        if self._reward is None:
+            return {}
+        return self._reward.objectives
+
+
+def _each_scoring(
+    scoring: Scoring | Sequence[Scoring], count: int
+) -> tuple[Scoring, ...]:
+    """Return one scoring for each index of a batch of this size.
+
+    One scoring answers for every index. A sequence answers for one index
+    each, and it must hold exactly one entry for each environment.
+    """
+    if isinstance(scoring, Sequence):
+        held = tuple(scoring)
+        if len(held) != count:
+            message = f"the vector holds {count} environments and {len(held)} scorings"
+            raise ValueError(message)
+        return held
+    return (scoring,) * count
 
 
 def seats_every_faction(reports: Sequence[FoundingReport], factions: int) -> bool:
@@ -536,19 +574,27 @@ class VectorEnv:
     def __init__(
         self,
         config: EnvConfig,
-        weighting: Weighting,
+        scoring: Scoring | Sequence[Scoring],
         count: int,
         workers: int = 1,
     ) -> None:
-        """Build a vector of environments over one configuration."""
+        """Build a vector of environments over one configuration.
+
+        The scoring entry is one scoring for every environment, or one
+        scoring for each environment in index order. **A caller that varies
+        the scoring gives one entry for each index and never one entry for
+        each candidate.** Two candidates scored under two objectives are not
+        comparable, so a rank over them carries no information.
+        """
         if count < 1:
             message = "a vector holds at least one environment"
             raise ValueError(message)
+        scorings = _each_scoring(scoring, count)
         self._config = config
-        self._weighting = weighting
+        self._scorings = scorings
         self._count = count
         self._workers = max(1, workers)
-        self._envs = [Env(config, weighting) for _ in range(count)]
+        self._envs = [Env(config, held) for held in scorings]
         self._batch: Batch | None = None
         self._live: list[int] = []
         # How many world-ticks this vector has run. One world stepped one

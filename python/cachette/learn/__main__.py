@@ -68,8 +68,9 @@ from .policy import (
     RandomPolicy,
     load_policy,
 )
-from .reward import Weighting
-from .train import TrainConfig, evaluate, train, write_report
+from .presets import ObjectiveSchedule, load_library, schedule_of
+from .reward import Scoring, Weighting
+from .train import TrainConfig, evaluate, first_scoring, train, write_report
 
 # How many ticks one decision covers. The engine changes little in five
 # ticks, and a decision costs one boundary crossing for every world of the
@@ -122,10 +123,55 @@ def use_decision_interval(interval: int) -> None:
     STRATEGIES = {
         name: (
             replace(config, decision_interval=interval, horizon=horizon),
-            weighting,
+            scoring,
             kind,
         )
-        for name, (config, weighting, kind) in STRATEGIES.items()
+        for name, (config, scoring, kind) in STRATEGIES.items()
+    }
+
+
+def use_play_styles(
+    names: list[str],
+    variation: str,
+    library_path: Path | None,
+    kind: str,
+) -> None:
+    """Replace the strategy table with the named play styles.
+
+    A play style weights the objective vector of the run, and the table of
+    styles is data a researcher edits.[^1] This reads that table, binds every
+    objective to the world the strategies play, and gives one strategy for
+    each style.
+
+    A variation other than the fixed one gives one strategy that cycles
+    through every named style. **Every candidate of one generation then plays
+    the same objective**, because a schedule answers for a generation and for
+    a seed position and has no argument for a candidate.
+
+    References
+    ----------
+    [^1]: Report 42, what a policy should be able to see, section 10.3.
+    ``docs/research/reports/42-what-a-policy-should-be-able-to-see.md``
+    """
+    global STRATEGIES
+    library = load_library(library_path)
+    chosen = names or list(library.names)
+    # The catalogue comes from the schema of a probe world, and the probe
+    # needs a scoring that states nothing. A weighting with no term and no
+    # outcome weight scores every reading at zero, which is what a probe
+    # wants: it reads the layout and plays nothing.
+    probe = Env(WORLD, Weighting(terms={}, won=0.0, lost=0.0, drawn=0.0))
+    if variation == "fixed":
+        STRATEGIES = {
+            name: (WORLD, library.scoring(name, probe.signals), kind) for name in chosen
+        }
+        return
+    STRATEGIES = {
+        "-".join(chosen): (
+            WORLD,
+            schedule_of(library, chosen, probe.signals, variation),
+            kind,
+        )
     }
 
 
@@ -141,7 +187,7 @@ STORE_SCALE = 1.0e-5
 WIN = 2000.0
 
 
-STRATEGIES: dict[str, tuple[EnvConfig, Weighting, str]] = {
+STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
     # Win, and almost nothing else. The small territory term is the only
     # thing that separates two candidates that both lost, and without it the
     # first generations hold no signal at all.
@@ -217,11 +263,11 @@ def report_behaviour(names: list[str], out: Path, holdout: int, workers: int) ->
     from .inspect import behaviour
 
     seeds = viable_seeds(WORLD, holdout, 50_000)
-    probe = Env(WORLD, STRATEGIES[names[0]][1])
+    probe = Env(WORLD, first_scoring(STRATEGIES[names[0]][1]))
     rows: dict[str, dict[str, object]] = {}
 
     for index, name in enumerate(names):
-        env_config, weighting, kind = STRATEGIES[name]
+        env_config, scoring, kind = STRATEGIES[name]
         path = out / f"{name}.npz"
         if not path.exists():
             print(f"  {name}: no stored policy at {path}", flush=True)
@@ -230,20 +276,21 @@ def report_behaviour(names: list[str], out: Path, holdout: int, workers: int) ->
         # The strategy table names a world for each policy, and a table that
         # moves after a run leaves files that read the right length and mean
         # something else.
-        policy, meta = load_policy(path, PolicyFit.of_env(Env(env_config, weighting)))
+        fixed = first_scoring(scoring)
+        policy, meta = load_policy(path, PolicyFit.of_env(Env(env_config, fixed)))
         rows[name] = {
             "kind": str(meta["kind"]),
-            **behaviour(env_config, weighting, policy, seeds, workers),
+            **behaviour(env_config, fixed, policy, seeds, workers),
         }
         print(f"  {name}: {rows[name]['verbs']}", flush=True)
         del index, kind
 
-    weighting = STRATEGIES[names[0]][1]
-    rows["random"] = behaviour(WORLD, weighting, RandomPolicy(seed=0), seeds, workers)
+    scoring = first_scoring(STRATEGIES[names[0]][1])
+    rows["random"] = behaviour(WORLD, scoring, RandomPolicy(seed=0), seeds, workers)
     print(f"  random: {rows['random']['verbs']}", flush=True)
     rows["untrained"] = behaviour(
         WORLD,
-        weighting,
+        scoring,
         LinearPolicy.zeros(probe.action_length, probe.observation_length),
         seeds,
         workers,
@@ -333,6 +380,42 @@ def main() -> int:
     )
     parser.add_argument("--only", type=str, default="")
     parser.add_argument(
+        "--styles",
+        type=str,
+        default="",
+        help=(
+            "train against the play styles of the style table rather than "
+            "against the built-in weightings, named as a comma separated "
+            "list. An empty value with --style-variation set takes every "
+            "style of the table"
+        ),
+    )
+    parser.add_argument(
+        "--style-variation",
+        type=str,
+        default="fixed",
+        help=(
+            "how the objective moves inside one run: fixed holds one style, "
+            "generation moves to the next style at each generation, and "
+            "episode gives each seed position its own style. A run cannot "
+            "vary the objective between the candidates of one generation, "
+            "because an evolution strategy ranks them against each other"
+        ),
+    )
+    parser.add_argument(
+        "--style-table",
+        type=Path,
+        default=None,
+        help="read the play styles from this file rather than the shipped one",
+    )
+    parser.add_argument(
+        "--style-kind",
+        type=str,
+        default="linear",
+        choices=("linear", "mlp"),
+        help="which policy each play style trains",
+    )
+    parser.add_argument(
         "--league",
         type=str,
         default="",
@@ -366,6 +449,18 @@ def main() -> int:
     # The interval is set before anything reads a world, so every strategy,
     # the controller world and the report all state the same one.
     use_decision_interval(arguments.decision_interval)
+
+    # The play styles replace the strategy table, so they are chosen before
+    # anything reads the table. A run that names none keeps the built-in
+    # weightings.
+    styles = [name for name in arguments.styles.split(",") if name]
+    if styles or arguments.style_variation != "fixed":
+        use_play_styles(
+            styles,
+            arguments.style_variation,
+            arguments.style_table,
+            arguments.style_kind,
+        )
 
     names = [name for name in arguments.only.split(",") if name] or list(STRATEGIES)
     learner_seats = tuple(
@@ -417,7 +512,7 @@ def main() -> int:
     # The schema states the lengths, and this module states none of its own.
     # A second declaration of a length that the engine already declares is
     # the defect shape this project names first.
-    probe = Env(WORLD, STRATEGIES[names[0]][1])
+    probe = Env(WORLD, first_scoring(STRATEGIES[names[0]][1]))
     actions, features = probe.action_length, probe.observation_length
 
     def no_op(kind: str) -> Policy:
@@ -429,11 +524,11 @@ def main() -> int:
     # The controller baseline does not depend on the strategy, so the run
     # measures it once and every strategy is reported against it. The
     # weighting only scores the reading, and the reading is the same play.
-    controller_weighting = STRATEGIES[names[0]][1]
+    controller_scoring = first_scoring(STRATEGIES[names[0]][1])
     print("\n=== controller baseline ===", flush=True)
     report["controller"] = evaluate(
         CONTROLLER_WORLD,
-        controller_weighting,
+        controller_scoring,
         no_op("linear"),
         holdout,
         arguments.workers,
@@ -442,7 +537,7 @@ def main() -> int:
     write_report(out / "report.json", report)
 
     for index, name in enumerate(names):
-        env_config, weighting, kind = STRATEGIES[name]
+        env_config, scoring, kind = STRATEGIES[name]
         print(f"\n=== {name} ({kind}) ===", flush=True)
         train_config = TrainConfig(
             generations=arguments.generations,
@@ -460,7 +555,7 @@ def main() -> int:
         result = train(
             name,
             env_config,
-            weighting,
+            scoring,
             train_config,
             out,
             pool,
@@ -472,23 +567,27 @@ def main() -> int:
         )
         trained, _ = load_policy(Path(result["weights"]))
         untrained = no_op(kind)
+        # **The holdout measurement holds one objective for the whole
+        # strategy.** A schedule moves the objective between generations, and
+        # two numbers taken under two objectives cannot be compared. The pass
+        # therefore takes the first scoring, which is what the run started
+        # under and what the validation pass held.
+        fixed = first_scoring(scoring)
         measured = {
-            "trained": evaluate(
-                env_config, weighting, trained, holdout, arguments.workers
-            ),
+            "trained": evaluate(env_config, fixed, trained, holdout, arguments.workers),
             "untrained": evaluate(
-                env_config, weighting, untrained, holdout, arguments.workers
+                env_config, fixed, untrained, holdout, arguments.workers
             ),
             "random": evaluate(
                 env_config,
-                weighting,
+                fixed,
                 RandomPolicy(seed=index),
                 holdout,
                 arguments.workers,
                 repeats=3,
             ),
             "controller": evaluate(
-                CONTROLLER_WORLD, weighting, untrained, holdout, arguments.workers
+                CONTROLLER_WORLD, fixed, untrained, holdout, arguments.workers
             ),
         }
         result["holdout"] = measured

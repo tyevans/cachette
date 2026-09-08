@@ -1,0 +1,217 @@
+description = """
+The objectives of a run and the play styles that weight them.
+
+An objective names one bounded quantity built from the signals the engine
+publishes about one faction. A play style names a weight for each objective it
+rewards, and it names every objective it refuses to reward. A style must
+mention every objective, because a style that rewards everything trains what
+every other style trains.
+
+A term names its signal, and the engine owns that name. A term that names a
+signal the world does not publish fails when a run binds this file to a
+world, and the failure lists what the world does publish.
+
+Every weight in this file is a starting value that a researcher edits. One
+blocker holds the rules of the downstream game, so no weight here is a
+proposal about the game.
+
+The kind entry of a term says how the raw signal becomes bounded. A share
+divides by the signal named in the against entry. A compressed magnitude maps
+the signal through a base-two logarithm against a fixed cap, and it needs no
+denominator. A signed relation divides the difference of two signals by the
+sum of their magnitudes. A fixed-point term divides by the Q16.16 unit.
+
+The measure entry says whether a term reads the level of a signal or its
+change. A level term integrated over the episode gives a dense signal under
+an evolution strategy. A change term telescopes under that optimiser, so it
+gives one number for the whole episode. Every term in this file reads a
+level.
+"""
+
+[objective.territory]
+description = "The share of the world this faction holds."
+terms = [{ signal = "held_tiles", kind = "share", against = "cell_tiles" }]
+
+[objective.settlements]
+description = "How many seats this faction holds."
+terms = [{ signal = "seats_held", kind = "magnitude" }]
+
+[objective.military]
+description = "How many units this faction keeps alive."
+terms = [{ signal = "live_units", kind = "magnitude" }]
+
+[objective.population]
+description = "How many people this faction feeds."
+terms = [{ signal = "population", kind = "magnitude" }]
+
+[objective.wealth]
+description = "What this faction holds in its stores."
+terms = [{ signal = "store_total", kind = "magnitude" }]
+
+[objective.renown]
+description = "The best renown this faction has reached."
+terms = [{ signal = "best_renown", kind = "magnitude" }]
+
+[objective.wonder]
+description = "The work this faction has put into a wonder."
+terms = [{ signal = "wonder_progress", kind = "magnitude" }]
+
+[objective.trade]
+description = """
+How much quantity stands on the trade board this faction can see. The board
+holds one position for each row it carries, so the term sums the rows.
+"""
+terms = [
+  { signal = "board_quantity", kind = "magnitude", aggregation = "sum" },
+]
+
+[objective.diplomacy]
+description = """
+The mean standing between this faction and the other factions. The relation
+holds one position for each other faction, so the term takes the mean.
+"""
+terms = [{ signal = "relation", kind = "magnitude", aggregation = "mean" }]
+
+[style.aggressive]
+description = """
+Field an army and take ground with it. This style refuses wealth, trade and
+diplomacy, so a candidate that buys its way to a win scores nothing for the
+buying.
+"""
+rewards = { military = 3.0, territory = 1.0 }
+refuses = [
+  "settlements",
+  "population",
+  "wealth",
+  "renown",
+  "wonder",
+  "trade",
+  "diplomacy",
+]
+won = 100.0
+lost = -100.0
+drawn = 0.0
+
+[style.defensive_expansionist]
+description = """
+Take ground, plant seats on it, and keep both. This style refuses the army
+count, so a candidate cannot score by massing units that hold nothing. It
+refuses population as well, because a style that rewards growth and ground
+together cannot be told apart from the growth style.
+"""
+rewards = { territory = 3.0, settlements = 2.0 }
+refuses = [
+  "military",
+  "population",
+  "wealth",
+  "renown",
+  "wonder",
+  "trade",
+  "diplomacy",
+]
+won = 100.0
+lost = -100.0
+drawn = 0.0
+
+[style.trade_led]
+description = """
+Put goods on the board and fill the stores from it. This style refuses
+territory and the army count, so a candidate that conquers a neighbour scores
+nothing for the conquest.
+"""
+rewards = { trade = 3.0, wealth = 2.0 }
+refuses = [
+  "territory",
+  "settlements",
+  "military",
+  "population",
+  "renown",
+  "wonder",
+  "diplomacy",
+]
+won = 100.0
+lost = -100.0
+drawn = 0.0
+
+[style.diplomatic]
+description = """
+Raise the standing with every other faction, and gather renown. This style
+refuses territory and the army count, so a candidate cannot raise a standing
+by removing the faction that held it.
+"""
+rewards = { diplomacy = 3.0, renown = 1.0 }
+refuses = [
+  "territory",
+  "settlements",
+  "military",
+  "population",
+  "wealth",
+  "wonder",
+  "trade",
+]
+won = 100.0
+lost = -100.0
+drawn = 0.0
+
+[style.population_growth]
+description = """
+Grow the people, and nothing else. This style refuses territory, so ground is
+worth taking only for the people it feeds. That is the point of the style: it
+rewards the end and not the means.
+"""
+rewards = { population = 3.0 }
+refuses = [
+  "territory",
+  "settlements",
+  "military",
+  "wealth",
+  "renown",
+  "wonder",
+  "trade",
+  "diplomacy",
+]
+won = 100.0
+lost = -100.0
+drawn = 0.0
+
+[style.wealth_hoarding]
+description = """
+Fill the stores and keep them full. This style rewards one objective and
+refuses the other eight. It also pays nothing for a win, so a candidate that
+hoards through a loss outscores a candidate that wins with empty stores. That
+is the one style in this file that does not want to win.
+"""
+rewards = { wealth = 1.0 }
+refuses = [
+  "territory",
+  "settlements",
+  "military",
+  "population",
+  "renown",
+  "wonder",
+  "trade",
+  "diplomacy",
+]
+won = 0.0
+lost = 0.0
+drawn = 0.0
+
+[style.wonder_rush]
+description = """
+Put every hour into a wonder. This style refuses the army count and the
+stores, so a candidate scores for the work and not for the strength that
+protects it.
+"""
+rewards = { wonder = 3.0, territory = 1.0 }
+refuses = [
+  "settlements",
+  "military",
+  "population",
+  "wealth",
+  "renown",
+  "trade",
+  "diplomacy",
+]
+won = 100.0
+lost = -100.0
+drawn = 0.0

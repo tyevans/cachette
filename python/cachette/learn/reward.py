@@ -129,10 +129,10 @@ decisions D1 and D2.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Protocol
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
 
     from cachette import World
 
@@ -242,11 +242,153 @@ class Weighting:
         unset.extend(name for name in TERMINAL_ROWS if getattr(self, name) is None)
         return tuple(unset)
 
+    def scorer(self, world: World, faction: int) -> Reward:
+        """Build the scorer of one faction of one world under this weighting.
+
+        This makes a weighting one of the two things a run may be scored by.
+        The other is an objective vector under a play style, and an
+        environment tells them apart by nothing: it asks either one for a
+        scorer.
+        """
+        return Reward(world, faction, self)
+
 
 # The weighting the register states. Every row is present and every row is
 # unset, so a caller that takes it and builds a reward is told which weights
 # it must supply, by name.
 UNSET_WEIGHTING: Final[Weighting] = Weighting(terms=dict.fromkeys(SHAPED_ROWS))
+
+
+class Scorer(Protocol):
+    """What an environment needs of the thing that scores its seat.
+
+    Two scorers satisfy this. The weighted reward of this module gives one
+    scalar and no objective vector. The objective scorer gives both.[^1]
+
+    An environment holds one of these for one episode. It resets before the
+    first decision and reads after each one.
+
+    References
+    ----------
+    [^1]: Report 42, what a policy should be able to see, section 10.2.
+    ``docs/research/reports/42-what-a-policy-should-be-able-to-see.md``
+    """
+
+    @property
+    def outcome(self) -> str:
+        """Name the state of the run: running, won, lost or drawn."""
+
+    @property
+    def done(self) -> bool:
+        """Whether the run has ended."""
+
+    @property
+    def objectives(self) -> Mapping[str, float]:
+        """What each objective scored over the episode so far."""
+
+    def reset(self, world: World) -> None:
+        """Take the first reading of a run, and pay nothing for it."""
+
+    def read(self, world: World) -> RewardStep:
+        """Return what the decision before this reading earned."""
+
+
+class Scoring(Protocol):
+    """How a run builds the scorer of one faction of one world.
+
+    An environment builds a new world for each episode, so it needs a way to
+    build a new scorer for it. This is that way, and it is the one seam
+    between a run and what the run rewards.
+    """
+
+    def scorer(self, world: World, faction: int) -> Scorer:
+        """Build the scorer of one faction of one world."""
+
+
+@dataclass(frozen=True)
+class Outcome:
+    """The state of one run, read from the observation of one faction.
+
+    The name entry is one of the outcomes this module declares. The done
+    entry is true once the run has ended. The alive entry is true while the
+    faction holds a unit or a person, which is what a faction needs in order
+    to act at all.
+    """
+
+    name: str
+    done: bool
+    alive: bool
+
+
+class OutcomeReader:
+    """Whether the run has ended, how it ended, and whether the faction acts.
+
+    **This is the one declaration of how a run ends.** Two scorers need the
+    answer, and a second copy of the rule would be one fact stored twice with
+    nothing that fails when the copies disagree.
+
+    The reader reads the observation array of the faction, and it reads the
+    winner of a game that has already ended.[^1] It reads nothing a player of
+    that faction could not see.
+
+    References
+    ----------
+    [^1]: ADR-0148, a game end is recorded once and stops the controllers,
+    decision D1.
+    ``docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md``
+    """
+
+    def __init__(self, world: World, faction: int) -> None:
+        """Find the positions this reader needs in the layout of one world."""
+        self._faction = faction
+        self._starts = _field_starts(
+            world, (_GAME_OVER, _TICK, _TICK_LIMIT, *_ACTING_FIELDS)
+        )
+        self._outcome = RUNNING
+        self._done = False
+
+    @property
+    def outcome(self) -> str:
+        """Return the outcome the last reading reported."""
+        return self._outcome
+
+    @property
+    def done(self) -> bool:
+        """Return whether the run has ended."""
+        return self._done
+
+    def reset(self) -> None:
+        """Forget the end of the previous run."""
+        self._outcome = RUNNING
+        self._done = False
+
+    def read(self, world: World) -> Outcome:
+        """Name the state of the run, and keep it.
+
+        A run that has already ended keeps the outcome it ended with. The
+        first terminal reading is the one that pays, and every later reading
+        reports the same end.
+        """
+        values = world.faction_observation(self._faction)
+        reading = {name: int(values[start]) for name, start in self._starts.items()}
+        alive = any(reading[name] > 0 for name in _ACTING_FIELDS)
+        if self._done:
+            return Outcome(name=self._outcome, done=True, alive=alive)
+        self._outcome = self._name_of(world, reading)
+        self._done = self._outcome != RUNNING
+        return Outcome(name=self._outcome, done=self._done, alive=alive)
+
+    def _name_of(self, world: World, reading: Mapping[str, int]) -> str:
+        """Name the state of the run after one reading."""
+        if reading[_GAME_OVER] == 1:
+            end = world.game_end()
+            if end is None:
+                return "drawn"
+            return "won" if end["winner"] == self._faction else "lost"
+        limit = reading[_TICK_LIMIT]
+        if limit > 0 and reading[_TICK] >= limit:
+            return "drawn"
+        return RUNNING
 
 
 @dataclass(frozen=True)
@@ -264,6 +406,10 @@ class RewardStep:
     The outcome entry names the state of the run. The done entry is true once
     the run has ended. The alive entry is true while the faction holds a unit
     or a person.
+
+    The objectives entry gives what each named objective scored on this
+    decision. It is empty for a scorer that holds no objective vector, which
+    is the single-scalar weighting of this module.
     """
 
     value: float
@@ -274,6 +420,7 @@ class RewardStep:
     alive: bool
     terms: Mapping[str, float]
     changes: Mapping[str, int]
+    objectives: Mapping[str, float] = field(default_factory=dict)
 
 
 class Reward:
@@ -302,7 +449,8 @@ class Reward:
         """
         self._faction = faction
         self._weighting = weighting
-        self._starts = _term_starts(world, weighting.terms)
+        self._starts = _field_starts(world, tuple(weighting.terms))
+        self._outcomes = OutcomeReader(world, faction)
         unset = weighting.unset_names()
         if unset:
             message = (
@@ -314,8 +462,6 @@ class Reward:
             )
             raise UnsetWeightError(message)
         self._previous: dict[str, int] = {}
-        self._outcome = RUNNING
-        self._done = False
         self.reset(world)
 
     @property
@@ -326,12 +472,22 @@ class Reward:
     @property
     def outcome(self) -> str:
         """Return the outcome the last reading reported."""
-        return self._outcome
+        return self._outcomes.outcome
+
+    @property
+    def objectives(self) -> Mapping[str, float]:
+        """Return no objective, because this scorer holds no objective vector.
+
+        A weighting collapses every term into one scalar, so there is nothing
+        for a report to break down. An objective scorer answers this with one
+        value for each objective it holds.
+        """
+        return {}
 
     @property
     def done(self) -> bool:
         """Return whether the run has ended."""
-        return self._done
+        return self._outcomes.done
 
     def reset(self, world: World) -> None:
         """Take the first reading of a run, and pay nothing for it.
@@ -341,8 +497,7 @@ class Reward:
         baseline and not a reward.
         """
         self._previous = self._read(world)
-        self._outcome = RUNNING
-        self._done = False
+        self._outcomes.reset()
 
     def read(self, world: World) -> RewardStep:
         """Return what the decision before this reading earned.
@@ -351,16 +506,17 @@ class Reward:
         weighted change of each term since the previous reading. The terminal
         part is the weight of the outcome, and it is paid once.
         """
+        ended = self.done
         reading = self._read(world)
-        alive = _can_act(reading)
-        if self._done:
+        state = self._outcomes.read(world)
+        if ended:
             return RewardStep(
                 value=0.0,
                 shaped=0.0,
                 terminal=0.0,
-                outcome=self._outcome,
+                outcome=state.name,
                 done=True,
-                alive=alive,
+                alive=state.alive,
                 terms=dict.fromkeys(self._weighting.terms, 0.0),
                 changes=dict.fromkeys(self._weighting.terms, 0),
             )
@@ -373,38 +529,20 @@ class Reward:
             for name, change in changes.items()
         }
         shaped = sum(terms.values())
-
-        outcome = self._outcome_of(world, reading)
-        terminal = self._weighting.terminal(outcome)
+        terminal = self._weighting.terminal(state.name)
 
         self._previous = reading
-        self._outcome = outcome
-        self._done = outcome != RUNNING
 
         return RewardStep(
             value=shaped + terminal,
             shaped=shaped,
             terminal=terminal,
-            outcome=outcome,
-            done=self._done,
-            alive=alive,
+            outcome=state.name,
+            done=state.done,
+            alive=state.alive,
             terms=terms,
             changes=changes,
         )
-
-    def _outcome_of(self, world: World, reading: Mapping[str, int]) -> str:
-        """Name the state of the run after one reading."""
-        if reading[_GAME_OVER] == 1:
-            end = world.game_end()
-            if end is None:
-                # The array says the engine recorded an end and the record
-                # is absent. Report a draw rather than invent a winner.
-                return "drawn"
-            return "won" if end["winner"] == self._faction else "lost"
-        limit = reading[_TICK_LIMIT]
-        if limit > 0 and reading[_TICK] >= limit:
-            return "drawn"
-        return RUNNING
 
     def _read(self, world: World) -> dict[str, int]:
         """Read every position this reward needs from the observation array."""
@@ -421,13 +559,8 @@ def _weight_of(weighting: Weighting, name: str) -> float:
     return float(weight)
 
 
-def _can_act(reading: Mapping[str, int]) -> bool:
-    """Return whether the faction holds a unit or a person."""
-    return any(reading[name] > 0 for name in _ACTING_FIELDS)
-
-
-def _term_starts(world: World, terms: Mapping[str, float | None]) -> dict[str, int]:
-    """Return the array position of every field this reward reads.
+def _field_starts(world: World, names: Sequence[str]) -> dict[str, int]:
+    """Return the array position of every named field of one layout.
 
     The schema of the world is the only declaration of the layout, so this
     function states no position of its own.[^1]
@@ -440,9 +573,8 @@ def _term_starts(world: World, terms: Mapping[str, float | None]) -> dict[str, i
     """
     schema = world.observation_schema()
     rows = {row["name"]: row for row in schema["fields"]}
-    wanted = (*terms, _GAME_OVER, _TICK, _TICK_LIMIT, *_ACTING_FIELDS)
     starts: dict[str, int] = {}
-    for name in wanted:
+    for name in names:
         row = rows.get(name)
         if row is None:
             message = (

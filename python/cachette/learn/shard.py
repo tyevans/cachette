@@ -62,7 +62,7 @@ if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
 
     from .config import TrainConfig
     from .env import EnvConfig
-    from .reward import Weighting
+    from .reward import Scoring
 
 # The variables that hold a matrix library to one thread. Each library reads
 # its own, and a library that reads none starts one thread for each core.
@@ -95,7 +95,7 @@ class ShardTask:
     """
 
     env_config: EnvConfig
-    weighting: Weighting
+    scoring: Scoring
     train_config: TrainConfig
     generation: int
     seeds: list[int]
@@ -181,7 +181,7 @@ def play_shard(task: ShardTask) -> ShardScore:
         message = f"the fault switch failed the shard at pair {task.first_pair}"
         raise RuntimeError(message)
     config = task.train_config
-    probe = Env(task.env_config, task.weighting)
+    probe = Env(task.env_config, task.scoring)
     shell = shell_policy(task.kind, probe, task.hidden)
     noise = generation_noise(
         config.seed, task.generation, config.pairs, task.centre.size
@@ -190,7 +190,7 @@ def play_shard(task: ShardTask) -> ShardScore:
         shell, task.centre, noise, config.sigma, task.first_pair, task.last_pair
     )
     played = score_generation(
-        task.env_config, task.weighting, candidates, task.seeds, config, task.label
+        task.env_config, task.scoring, candidates, task.seeds, config, task.label
     )
     # A candidate plays one world for each seed, whether it plays that world
     # alone or beside another learner seat. The games of a shard are
@@ -320,7 +320,7 @@ class ShardPool:
 
 def run_sharded_generation(
     env_config: EnvConfig,
-    weighting: Weighting,
+    scoring: Scoring,
     train_config: TrainConfig,
     seeds: list[int],
     generation: int,
@@ -342,7 +342,7 @@ def run_sharded_generation(
     tasks = [
         ShardTask(
             env_config=env_config,
-            weighting=weighting,
+            scoring=scoring,
             train_config=train_config,
             generation=generation,
             seeds=list(seeds),

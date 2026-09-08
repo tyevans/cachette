@@ -254,7 +254,7 @@ def test_the_trainer_refuses_a_checkpoint_from_another_world(tmp_path: Path) -> 
         train(
             name="s",
             env_config=TRAINED,
-            weighting=WEIGHTING,
+            scoring=WEIGHTING,
             train_config=TrainConfig(generations=1, population=2),
             out_dir=out,
             seed_pool=[0, 1],

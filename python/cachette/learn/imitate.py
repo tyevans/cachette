@@ -58,7 +58,7 @@ import numpy as np
 from .env import Env, EnvConfig, viable_seeds
 from .inspect import verb_of
 from .policy import LinearPolicy, MLPPolicy, encode_many
-from .reward import Weighting
+from .reward import Scoring
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Sequence
@@ -247,7 +247,7 @@ class _WindowReader:
 
 def record(
     config: EnvConfig,
-    weighting: Weighting,
+    scoring: Scoring,
     seeds: Sequence[int],
     progress: bool = False,
 ) -> Dataset:
@@ -269,7 +269,7 @@ def record(
         )
         raise ValueError(message)
 
-    env = Env(config, weighting)
+    env = Env(config, scoring)
     seat = config.seat
     observations: list[np.ndarray] = []
     masks: list[np.ndarray] = []
@@ -438,7 +438,7 @@ def main() -> int:
 
     from .__main__ import CONTROLLER_WORLD, STRATEGIES, WORLD
     from .policy import PolicyFit
-    from .train import evaluate
+    from .train import evaluate, first_scoring
 
     parser = argparse.ArgumentParser(
         description="Fit a policy to what the built-in controller does."
@@ -457,7 +457,7 @@ def main() -> int:
     )
     arguments = parser.parse_args()
 
-    weighting = STRATEGIES["conquer"][1]
+    scoring = first_scoring(STRATEGIES["conquer"][1])
     seeds = viable_seeds(
         CONTROLLER_WORLD, arguments.record_seeds, arguments.record_start
     )
@@ -468,10 +468,10 @@ def main() -> int:
         data = Dataset.load(store)
     else:
         print(f"recording {len(seeds)} episodes from seed {seeds[0]}", flush=True)
-        data = record(CONTROLLER_WORLD, weighting, seeds, progress=True)
+        data = record(CONTROLLER_WORLD, scoring, seeds, progress=True)
         data.save(store)
     fitting, held = data.split(seeds[-arguments.fit_holdout :])
-    probe = Env(WORLD, weighting)
+    probe = Env(WORLD, scoring)
     probe.reset(int(seeds[0]))
     schema = probe.world.action_schema()
 
@@ -522,13 +522,13 @@ def main() -> int:
         play: dict[str, dict[str, float]] = {
             "controller": evaluate(
                 CONTROLLER_WORLD,
-                weighting,
+                scoring,
                 LinearPolicy.zeros(probe.action_length, probe.observation_length),
                 played,
                 arguments.workers,
             ),
             **{
-                name: evaluate(WORLD, weighting, policy, played, arguments.workers)
+                name: evaluate(WORLD, scoring, policy, played, arguments.workers)
                 for name, policy in fits.items()
             },
         }

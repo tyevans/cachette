@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from .env import Env, EnvConfig, VectorEnv
-from .reward import Weighting
+from .reward import Scoring
 
 if TYPE_CHECKING:
     # The shape of the dictionary the engine returns. It lives in the stub
@@ -35,7 +35,7 @@ def verb_of(schema: ActionSchema, action: int) -> str:
 
 def behaviour(
     config: EnvConfig,
-    weighting: Weighting,
+    scoring: Scoring,
     policy: object,
     seeds: list[int],
     workers: int = 1,
@@ -45,7 +45,7 @@ def behaviour(
     The report gives the share of decisions each verb took, the share the
     engine actually applied, and the outcome of each episode.
     """
-    vector = VectorEnv(config, weighting, count=len(seeds), workers=workers)
+    vector = VectorEnv(config, scoring, count=len(seeds), workers=workers)
     vector.reset(seeds)
     schema = vector.envs[0].world.action_schema()
 
