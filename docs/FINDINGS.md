@@ -11648,9 +11648,10 @@ rate reads the ground.
 
 **True.** No failure of the thirteen was an engine regression. Eleven stated
 behaviour that a deliberate change had replaced. One restated a list that the
-engine declares. One used an instrument that could not measure what it
-asserted, and it never could. Five changes, one stale list and one bad
-instrument account for all thirteen:
+engine declares. One used an instrument that cannot measure what it asserts;
+whether it once could was not established, because the weather module has
+changed by 1847 lines since that test landed and no older tree was built.
+Five changes, one stale list and one bad instrument account for all thirteen:
 
     six  economy tests    the production pipeline scales the stored rate,
                           and the upkeep gained a holding term
