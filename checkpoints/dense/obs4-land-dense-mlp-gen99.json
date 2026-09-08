@@ -1,0 +1,16 @@
+{
+  "file": "obs4-land-dense-mlp-gen99.npz",
+  "run": "dense-depth",
+  "strategy": "land-net",
+  "generation": 99,
+  "validation_score": -1043.71875,
+  "validation_seeds": 128,
+  "held_tiles_weight": 1.0,
+  "note": "a score weighing held ground at 1.0 is not comparable with one weighing it at 0.1",
+  "observation_version": 4,
+  "action_version": 1,
+  "decision_interval": 10,
+  "policy_kind": "mlp",
+  "hidden": 24,
+  "sha256": "0be8617bc5d06f5481cadee20def3f4a56a81a993aaa9171df04d5cd0f9ef46c"
+}
