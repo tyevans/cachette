@@ -67,7 +67,7 @@ during its life.
 **Conflict surface.** `crates/cachette-core/src/assign.rs` is new.
 `crates/cachette-core/src/site.rs`, `crates/cachette-core/src/soldier.rs` at a
 job column and a position back-reference, and
-`crates/cachette-core/src/world.rs` at the step. **It cannot run beside item
+`crates/cachette-core/src/world/step.rs` at the step. **It cannot run beside item
 0065**, which reads the job to drive behaviour, and it shares `soldier.rs` with
 items 0056, 0057, 0059 and 0060.
 
@@ -137,4 +137,4 @@ Filled in when the item moves to `complete/`.
 [^8]: Testing Rules, section 3. `.claude/rules/testing.md`
 [^9]: Findings register, FND-051. `docs/FINDINGS.md`
 [^A1]: The seating pass, its key and its scan. `crates/cachette-core/src/position.rs`
-[^A2]: The seating call and its schedule. `crates/cachette-core/src/world.rs`
+[^A2]: The seating call and its schedule. `crates/cachette-core/src/world/positions.rs`
