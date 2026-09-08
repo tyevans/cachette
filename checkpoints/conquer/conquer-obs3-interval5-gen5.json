@@ -1,0 +1,17 @@
+{
+  "file": "conquer-obs3-interval5-gen5.npz",
+  "run": "the run that scored a generation in four shards and ended early",
+  "search": "population 16, 32 seeds, 8 directions",
+  "generation": 5,
+  "validation_score": -1349.396875,
+  "validation_seeds": 32,
+  "wins_of_thirtytwo": 5,
+  "chance_of_thirtytwo": 10.7,
+  "yardstick_of_thirtytwo": 13,
+  "note": "the yardstick plays the controller in every seat, so it is the chance line",
+  "observation_version": 3,
+  "action_version": 1,
+  "decision_interval": 5,
+  "policy_kind": "linear",
+  "sha256": "c5bcd6c335315337fd380f0db06bd27bbfe518f6add21b838b97ba0da75f0d81"
+}
