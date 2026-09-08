@@ -128,6 +128,7 @@ def use_decision_interval(interval: int) -> None:
         for name, (config, weighting, kind) in STRATEGIES.items()
     }
 
+
 # The store total crosses as a raw Q16.16 integer, so its numbers are about
 # five orders of magnitude above a tile count. This weight brings one store
 # into the range of one territory.
@@ -266,7 +267,20 @@ def main() -> int:
             "order, so the weights do not depend on this number"
         ),
     )
-    parser.add_argument("--holdout", type=int, default=24)
+    # **The holdout decides whether a run achieved anything, so its size
+    # sets what the run can claim.** A win share is a proportion, and the
+    # error of a proportion near one third over n worlds is the square root
+    # of 0.333 times 0.667 over n. Over twenty-four worlds that is 9.6
+    # points, so two policies must differ by about nineteen points before
+    # the holdout can separate them. The gap between a trained policy and
+    # the built-in controller was measured at about seventeen, and a report
+    # of twenty-four worlds therefore called four different policies the
+    # same thing while reading as though it had measured them.
+    #
+    # Two hundred and fifty-six worlds bring the error to 2.9 points. The
+    # holdout runs once, at the end, so the whole cost is a few minutes
+    # against a run of hours.
+    parser.add_argument("--holdout", type=int, default=256)
     parser.add_argument("--hidden", type=int, default=24)
     # Sigma is a relative size, and its working range was measured rather
     # than guessed. On the real decisions of a trained policy, a

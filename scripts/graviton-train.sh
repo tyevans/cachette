@@ -154,7 +154,7 @@ esac
 # worlds as it has seeds, and one hundred and twenty-eight worlds on
 # sixty-four workers takes about two minutes against the ten minutes of a
 # generation.
-default_args="--generations 20 --population 24 --seeds 6 --holdout 24 \
+default_args="--generations 20 --population 24 --seeds 6 --holdout 256 \
 --hidden 24 --sigma 1.5 --learning-rate 0.3 --validation 128 --validate-every 2"
 train_args="${CACHETTE_TRAIN_ARGS:-$default_args}"
 
