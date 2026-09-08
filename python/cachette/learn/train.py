@@ -85,6 +85,7 @@ from .search import (
     unit,
 )
 from .shard import ShardPool, run_sharded_generation
+from .structured import layout_of
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Mapping, Sequence
@@ -205,7 +206,9 @@ class Checkpoint:
         missing a key, so each read names the type it needs and falls back
         to the value a fresh run would start at.
         """
-        stored, meta = load_policy(self.latest_path, PolicyFit.of_env(self.probe))
+        stored, meta = load_policy(
+            self.latest_path, PolicyFit.of_env(self.probe), layout_of(shell)
+        )
         policy = shell.rebuild(np.asarray(stored.flat()))
         first_generation = 0
         written = meta.get("generation")

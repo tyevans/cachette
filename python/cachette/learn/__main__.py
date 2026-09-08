@@ -70,6 +70,7 @@ from .policy import (
 )
 from .presets import ObjectiveSchedule, load_library, schedule_of
 from .reward import Scoring, Weighting
+from .structured import StructuredPolicy
 from .train import TrainConfig, evaluate, first_scoring, train, write_report
 
 # How many ticks one decision covers. The engine changes little in five
@@ -412,7 +413,7 @@ def main() -> int:
         "--style-kind",
         type=str,
         default="linear",
-        choices=("linear", "mlp"),
+        choices=("linear", "mlp", "structured"),
         help="which policy each play style trains",
     )
     parser.add_argument(
@@ -516,7 +517,13 @@ def main() -> int:
     actions, features = probe.action_length, probe.observation_length
 
     def no_op(kind: str) -> Policy:
-        """Return the untrained policy of one kind, which takes the no-op."""
+        """Return the untrained policy of one kind, which takes the no-op.
+
+        The structured kind reads the whole layout, so it takes the signal
+        catalogue of the probe rather than the two lengths.
+        """
+        if kind == "structured":
+            return StructuredPolicy.of_catalogue(actions, probe.signals)
         if kind == "mlp":
             return MLPPolicy.zeros(actions, features, arguments.hidden)
         return LinearPolicy.zeros(actions, features)
