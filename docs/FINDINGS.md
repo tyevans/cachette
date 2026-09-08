@@ -16948,6 +16948,33 @@ Run longer than thirty generations before reading a plateau. Nothing before
 this had run past thirty, and the rise that matters here began at
 fifty-seven.
 
+### FND-651 — A strategy process can stop making progress while its process stays alive
+
+**Believed.** A run that stops is a run that failed. The two failures on the
+target platform so far ended a process: one exited 139, which is the
+segmentation signal, and one lost a worker of its pool.
+
+**A third shape exists and nothing reports it.** A strategy process can stay
+alive, hold its workers, write no heartbeat and advance no generation. The
+run continues, the other strategy of the same instance continues, and the
+dashboard shows the last line the stopped process wrote.
+
+**Evidence.** One instance ran two strategies for about seven hours. One
+reached generation 133 and wrote 688 lines. The other wrote 27 lines, and its
+last line is a heartbeat inside generation 4 at 92 seconds, at decision 129
+of 250, with 255 of 256 worlds live. Both processes were present in the
+process table at the end. The instance therefore spent about seven hours at
+half its capacity and nothing said so.
+
+**What follows.** The run reports progress and does not report the absence of
+progress. A heartbeat that stops carries no signal, because the reader has no
+expectation of when the next one is due. **A watch that reads the last line
+cannot tell a slow generation from a stopped one.**
+
+The three failures now recorded are a segmentation fault, a lost worker
+process, and a live process that stops advancing. Nothing yet connects them,
+and the third one is the one that costs the most, because it is silent.
+
 ### FND-647 — The observation named a rival by its seat, and one seat of a test agreed with it
 
 **Believed.** The observation array of a faction was correct. It reported the
