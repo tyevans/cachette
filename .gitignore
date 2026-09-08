@@ -50,3 +50,8 @@ runs/learn/night2/
 # A running job writes here. A checkout must not manage a path a job writes,
 # and a run directory holds its own private key while its instance lives.
 runs/
+
+# The coverage report of the control plane.
+htmlcov/
+.coverage
+.coverage.*

@@ -50,6 +50,7 @@ dev = [
     "mypy>=1.11",
     "numpy>=1.26",
     "pytest>=8.2",
+    "pytest-cov>=5.0",
     "ruff>=0.6",
 ]
 # The documentation site builder and the handler that reads the compiled

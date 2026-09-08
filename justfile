@@ -59,6 +59,25 @@ test-python:
     uv sync
     uv run pytest
 
+# Report which lines of the control plane no test reaches.
+#
+# The engine measures its own coverage through its Rust tooling. This recipe
+# covers the Python side, where the learner lives and where clarity is worth
+# more than speed.
+#
+# It names the lines a test never runs, so a reader can tell a mechanism that
+# is checked from one that only exists. It sets no floor. A floor turns a
+# number into a target and a target invites a test that raises the number and
+# checks nothing.
+coverage:
+    uv sync
+    uv run pytest --cov=cachette --cov-report=term-missing --cov-report=html
+
+# The same, for one package. Give it a dotted name, such as `cachette.learn`.
+coverage-of package:
+    uv sync
+    uv run pytest --cov={{package}} --cov-report=term-missing
+
 # Prove that the batch order test can fail.
 #
 # The batch fixes the order of its results by sorting on the index of the
