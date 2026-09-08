@@ -16939,6 +16939,34 @@ trained across seats learned a function of two meanings at once.
 **The shape.** A test of a per-reader field must read more than one reader. One
 reader agrees with a defect whenever that reader is the one the defect is
 indexed from.
+### FND-649 — A rebuild that is free in training costs five percent of a frame at the target
+
+**Believed.** A verb that restores the derived unit to tile structure after it
+moves the arena is cheap, because the measurement of a training tick puts the
+four refresh stages of a step at 310 nanoseconds early and 2014 nanoseconds
+late, which is 0.013 percent of a frame.
+
+**True at the training shape and false at the target.** The register of the
+target platform puts one refresh at the step barrier at 41.8 milliseconds,
+which is 5.0 percent of a frame at 16.7 million tiles. The rebuild orders on
+one thread, so it does not divide over the workers of a batch.
+
+**Evidence.** The two figures come from the same stage table, read at two
+world sizes. The ratio between them is about four orders of magnitude, and
+the tile count between the two shapes is about seven thousand.
+
+**What follows.** Five caller-facing verbs now restore the structure when the
+arena moved, which is the repair for a reader that was refused between a verb
+and the next step. The repair is correct and its cost is a function of the
+world size. One of those verbs is the verb the learner calls for each
+decision.
+
+**A profile of the training shape cannot price this defect.** Anyone who
+reads the training table alone concludes the rebuild does not matter. The
+same table at the target says it is the fifth largest stage of a frame. Take
+a cost from the shape it will run at, and not from the shape that is
+convenient to measure.
+
 ### FND-648 — A verb the control plane runs between two steps left the world unreadable, and the refusal named none of its cause
 
 **Believed.** The observation reader refused once three seated policies had
