@@ -41,7 +41,7 @@ property of the engine, so it belongs to the caller that states the weighting.
 [^1]: ADR-0154, the observation and the action of a faction are
 schema-declared bounded tables the engine owns, decision D1.
 ``docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md``
-[^2]: Findings register, FND-670. ``docs/FINDINGS.md``
+[^2]: Findings register, FND-669. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations

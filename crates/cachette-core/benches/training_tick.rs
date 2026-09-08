@@ -133,7 +133,10 @@ fn number<T: std::str::FromStr>(arguments: &[String], index: usize, fallback: T)
 fn preamble(shape: &Shape) {
     println!("# recording\t{}", stage::is_recording());
     println!("# extent\t{}x{}", shape.width, shape.height);
-    println!("# tiles\t{}", u64::from(shape.width) * u64::from(shape.height));
+    println!(
+        "# tiles\t{}",
+        u64::from(shape.width) * u64::from(shape.height)
+    );
     println!("# faction_count\t{}", shape.faction_count);
     println!("# unit_capacity\t{}", shape.unit_capacity);
     println!("# threads\t{}", shape.threads);

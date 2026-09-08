@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-669**
+**Next number: FND-670**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -17292,8 +17292,46 @@ best point between them lies.
 fixed, so the trainable count follows the hidden width and the action count,
 and not the length of the observation.
 
+### FND-669 — The set of readable quantities was declared three times, and a caller that crossed the boundary got silence
+
+**Believed.** A caller that wants to read a quantity of the world names it, and
+the name is the same wherever it is used. The reward takes a term by name. The
+trainer reports a value by name. The engine declares the layout by name.
+
+**True.** The three names were three sets. The reward accepted a term for any
+field that holds one position, which is twelve of the thirty the schema
+declares. The trainer reported a fixed tuple of seven. And the trainer reported
+the tick of the end as `end_tick` while a reward must ask for `tick`.
+
+Nothing compared the three. **A caller that carried a reported name into a
+weighting got an error, and a caller that carried a weighed name into a reading
+got zero.** The second is the expensive direction. A measurement of which
+quantity orders candidates the way winning does read the missing name as zero
+for every candidate, so every candidate tied, and a tie scores as exactly the
+value of a coin. The measurement reported that the tick of the end predicts
+nothing, when it had never been read at all.
+
+The same three sets hid a capability nobody could reach. The relation of a
+faction holds one position for each faction and the five trade board fields
+hold twenty four each, so no weighting could score diplomacy or trade however
+it was written. The fields exist and the observation carries them.
+
+**Evidence.** The three declarations, and a run of the measurement that reported
+a coin for a field it never read. A catalogue now reads the schema and states no
+position of its own, and a compound field becomes a scalar through an
+aggregation the caller names. The measurement asks the catalogue what the engine
+publishes and fails when a name is absent instead of defaulting it.[^F669A]
+
+**What follows.** A missing name must fail rather than default. The default is
+what turned an unread field into a believable measurement, and the same shape
+had already cost this project a table of win shares that read the first seeds of
+one policy as though they were thirty one policies.
+
+The trainer still holds its own reported tuple. Replacing it is the work that
+follows, and until it is replaced the two sets can disagree again.
 ## References
 
+[^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
 [^F668A]: The commit `Measure what sets how well one generation points the right way`. Read its message for the figures.
 [^F667A]: The commit `Measure what water does to a training world, and free two colliding numbers`. Read its message for the figures.
 [^F667B]: Findings register, FND-666. `docs/FINDINGS.md`
