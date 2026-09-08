@@ -16911,6 +16911,43 @@ rather than a number. Do not read the shard path as the cause of the first
 failure.
 
 
+### FND-650 — A nearly ternary score goes flat in five generations and a dense one still rises at sixty-seven
+
+**Believed.** The learner plateaued because the search was too narrow, or
+because the observation carries too little, or because the learner acts far
+less often than the built-in controller. Each of those was measured and none
+of them accounts for the plateau on its own.
+
+**The score is the difference that shows.** Two strategies play the same
+world with the same optimiser, the same population and the same seed count.
+They differ in one number: the weight on held ground. The conquest strategy
+weighs it at a tenth, so the win term of plus or minus the win weight carries
+almost the whole score. The ground strategy weighs it at one.
+
+**Evidence.** The conquest strategy over a policy with one hidden layer, one
+hundred and twenty-eight directions, twenty-five generations: the validation
+figure rose over five generations and then held between 18 and 26 wins of one
+hundred and twenty-eight for the next eighteen, with no trend. The ground
+strategy, sixty-seven generations, rose from -1530.6 to -1113.3 and was still
+rising, with a step at generation fifty-seven.
+
+**Two readings, and this finding does not separate them.** The score of the
+ground strategy holds a large shaping term, so a rise in it may be a policy
+that holds more ground and wins no more often. The holdout of that run
+reports a win share and will say which. **Do not read the rise as a policy
+that learned to win** until it does.
+
+**What follows.** Two things a run must do from here.
+
+Weigh the shaping term high enough that a generation of unresolved games
+still ranks. Two thirds of games reach the tick limit without a winner, so a
+score that is almost only the win term ranks two thirds of its population by
+almost nothing.
+
+Run longer than thirty generations before reading a plateau. Nothing before
+this had run past thirty, and the rise that matters here began at
+fifty-seven.
+
 ### FND-647 — The observation named a rival by its seat, and one seat of a test agreed with it
 
 **Believed.** The observation array of a faction was correct. It reported the

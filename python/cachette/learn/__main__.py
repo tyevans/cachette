@@ -163,6 +163,19 @@ STRATEGIES: dict[str, tuple[EnvConfig, Weighting, str]] = {
         Weighting(terms={"held_tiles": 1.0}, won=WIN, lost=-WIN, drawn=0.0),
         "linear",
     ),
+    # The same scoring as the ground strategy, over a policy with one hidden
+    # layer. **The pair measures depth against a dense score.** The conquest
+    # pair measures depth against a nearly ternary one, and that pair went
+    # flat after five generations while the ground strategy was still rising
+    # at sixty-seven. Neither pair alone says whether the depth or the
+    # density carried it.[^1]
+    #
+    # [^1]: Findings register, FND-650. `docs/FINDINGS.md`
+    "land-net": (
+        WORLD,
+        Weighting(terms={"held_tiles": 1.0}, won=WIN, lost=-WIN, drawn=0.0),
+        "mlp",
+    ),
     # Fill the stores. Ground scores a little, for the same reason.
     "wealth": (
         WORLD,
