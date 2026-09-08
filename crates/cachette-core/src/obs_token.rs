@@ -61,16 +61,159 @@ use crate::obs_ring::{
     hex_distance_from_origin, ring_of_distance, ring_position, shared_sector_of, FAR_SECTORS,
     RING_CAP,
 };
-use crate::obs_ring_stack::RingStack;
+use crate::obs_ring_stack::{same_name, RingStack};
 use crate::sim_math;
 use crate::types::{Entity, FactionId, Fix32};
 use crate::world::World;
+
+/// The name a schema gives to the space a token set lays its tokens out in.
+///
+/// A token position is not a place in the world and it is not a scalar. A
+/// reader must treat the set as a set, so the schema marks it.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D4. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+pub const TOKEN_SPACE: &str = "token";
+
+/// The channels of one settlement token, in the order the token stores them.
+///
+/// **This list is the one declaration of the channel order of the set.** The
+/// builder of a token writes through the name of a channel, and the schema
+/// publishes the same list, so the two cannot disagree.[^1]
+///
+/// A channel that the engine holds no source for reads zero in every token.
+/// The builder names each one.
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+pub const SETTLEMENT_CHANNEL_NAMES: &[&str] = &[
+    "validity",
+    "ring_index",
+    "sector_first",
+    "sector_second",
+    "distance",
+    "population_share",
+    "population",
+    "garrison_strength",
+    "food_coverage_ticks",
+    "store_share",
+    "store",
+    "own_upgrades_near",
+    "upgrades_underway",
+    "wonder_progress",
+    "hazard_share",
+    "rival_settlement_distance",
+    "reach_boundary_distance",
+    "rival_units_near",
+    "own_units_near",
+    "unclaimed_passable_share",
+    "tiles_lost",
+    "population_change",
+    "siege",
+    "settlement_age",
+];
+
+/// The channels of one rival token, in the order the token stores them.
+///
+/// The first twelve channels after the validity flag are the relative ratio
+/// of one power quantity against the own value of it. The fog admits an
+/// estimate of the settlement ratio alone, so the other eleven read zero.
+pub const RIVAL_CHANNEL_NAMES: &[&str] = &[
+    "validity",
+    "settlement_ratio",
+    "held_tile_ratio",
+    "population_ratio",
+    "unit_ratio",
+    "strength_ratio",
+    "upgrade_ratio",
+    "renown_ratio",
+    "wonder_ratio",
+    "store_ratio",
+    "tile_gain_ratio",
+    "reach_area_ratio",
+    "trade_ratio",
+    "relation_to_rival",
+    "relation_from_rival",
+    "war",
+    "shared_border_share",
+    "rival_settlement_distance",
+    "rival_settlement_distance_trend",
+    "trade_volume_share",
+    "power_share_trend",
+    "observation_confidence",
+    "unit_mix_distance",
+    "relation_to_leader",
+];
+
+/// The channels of one threat cluster token, in the order the token stores
+/// them.
+pub const THREAT_CHANNEL_NAMES: &[&str] = &[
+    "validity",
+    "ring_index",
+    "sector_first",
+    "sector_second",
+    "distance",
+    "strength",
+    "strength_share",
+    "rival_units",
+    "largest_unit_class_share",
+    "own_settlement_distance",
+    "closing_rate",
+    "sighting_staleness",
+    "inside_own_reach",
+    "inside_owner_reach",
+    "owner_power_share",
+    "owner_relation",
+    "hazard_share",
+    "passable_share",
+    "own_strength",
+    "strength_balance",
+];
+
+/// The channels of one candidate site token, in the order the token stores
+/// them.
+pub const SITE_CHANNEL_NAMES: &[&str] = &[
+    "validity",
+    "ring_index",
+    "sector_first",
+    "sector_second",
+    "distance",
+    "food_mean",
+    "water_mean",
+    "value_mean",
+    "resource_share",
+    "passable_share",
+    "inside_own_reach",
+    "own_settlement_distance",
+    "rival_settlement_distance",
+    "rival_strength",
+    "hazard_share",
+    "site_score",
+];
+
+/// Returns the position of one channel inside one token.
+///
+/// The channel list of the set is the one place that pairs a name with a
+/// position, so a builder reads the position from the list. A name the list
+/// does not hold fails the build.
+const fn channel_index(names: &[&str], wanted: &str) -> usize {
+    let mut index = 0usize;
+    while index < names.len() {
+        if same_name(names[index], wanted) {
+            return index;
+        }
+        index += 1;
+    }
+    panic!("the channel list of the token set holds no channel of that name");
+}
 
 /// The settlement tokens the block holds.
 pub const SETTLEMENT_TOKENS: u32 = 8;
 
 /// The channels of one settlement token.
-pub const SETTLEMENT_CHANNELS: u32 = 24;
+pub const SETTLEMENT_CHANNELS: u32 = SETTLEMENT_CHANNEL_NAMES.len() as u32;
 
 /// The rival tokens the block holds.
 ///
@@ -80,25 +223,126 @@ pub const SETTLEMENT_CHANNELS: u32 = 24;
 pub const RIVAL_TOKENS: u32 = 6;
 
 /// The channels of one rival token.
-pub const RIVAL_CHANNELS: u32 = 24;
+pub const RIVAL_CHANNELS: u32 = RIVAL_CHANNEL_NAMES.len() as u32;
 
 /// The threat cluster tokens the block holds.
 pub const THREAT_TOKENS: u32 = 8;
 
 /// The channels of one threat cluster token.
-pub const THREAT_CHANNELS: u32 = 20;
+pub const THREAT_CHANNELS: u32 = THREAT_CHANNEL_NAMES.len() as u32;
 
 /// The candidate site tokens the block holds.
 pub const SITE_TOKENS: u32 = 8;
 
 /// The channels of one candidate site token.
-pub const SITE_CHANNELS: u32 = 16;
+pub const SITE_CHANNELS: u32 = SITE_CHANNEL_NAMES.len() as u32;
+
+/// One token set of the entity token block.
+///
+/// **This list is the one declaration of the order of the sets.** The builder
+/// walks it, the schema publishes one field for each entry of it, and the
+/// start of a set follows the sets before it. A second statement of the order
+/// would let the published layout and the written bytes disagree.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TokenSet {
+    /// The settlements the reader holds.
+    Settlements,
+    /// The rivals the reader ranks by threat.
+    Rivals,
+    /// The clusters of rival units the reader remembers.
+    Threats,
+    /// The places a founding survey scored.
+    Sites,
+}
+
+impl TokenSet {
+    /// Every token set, in the order the block holds them.
+    pub const ALL: &'static [Self] = &[Self::Settlements, Self::Rivals, Self::Threats, Self::Sites];
+
+    /// Returns the name of the set.
+    ///
+    /// The schema publishes one field of this name for each set.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Settlements => "token_own_settlements",
+            Self::Rivals => "token_rivals",
+            Self::Threats => "token_threat_clusters",
+            Self::Sites => "token_candidate_sites",
+        }
+    }
+
+    /// Returns how many tokens the set holds.
+    #[must_use]
+    pub const fn tokens(self) -> u32 {
+        match self {
+            Self::Settlements => SETTLEMENT_TOKENS,
+            Self::Rivals => RIVAL_TOKENS,
+            Self::Threats => THREAT_TOKENS,
+            Self::Sites => SITE_TOKENS,
+        }
+    }
+
+    /// Returns the channels of one token of the set, in store order.
+    #[must_use]
+    pub const fn channel_names(self) -> &'static [&'static str] {
+        match self {
+            Self::Settlements => SETTLEMENT_CHANNEL_NAMES,
+            Self::Rivals => RIVAL_CHANNEL_NAMES,
+            Self::Threats => THREAT_CHANNEL_NAMES,
+            Self::Sites => SITE_CHANNEL_NAMES,
+        }
+    }
+
+    /// Returns how many channels one token of the set holds.
+    #[must_use]
+    pub const fn channels(self) -> u32 {
+        self.channel_names().len() as u32
+    }
+
+    /// Returns how many positions the whole set holds.
+    #[must_use]
+    pub const fn slots(self) -> u32 {
+        self.tokens() * self.channels()
+    }
+
+    /// Returns the position of the set inside the entity token block.
+    ///
+    /// The start is the sum of the sets before it, so it follows the order of
+    /// the set list and no number of its own.
+    #[must_use]
+    pub const fn start(self) -> u32 {
+        let mut start = 0u32;
+        let mut index = 0usize;
+        while index < Self::ALL.len() {
+            let set = Self::ALL[index];
+            if set as u32 == self as u32 {
+                return start;
+            }
+            start += set.slots();
+            index += 1;
+        }
+        start
+    }
+}
+
+/// Returns the positions that every token set holds together.
+const fn total_token_slots() -> u32 {
+    let mut total = 0u32;
+    let mut index = 0usize;
+    while index < TokenSet::ALL.len() {
+        total += TokenSet::ALL[index].slots();
+        index += 1;
+    }
+    total
+}
 
 /// The positions that the entity token block holds.
-pub const TOKEN_SLOTS: u32 = SETTLEMENT_TOKENS * SETTLEMENT_CHANNELS
-    + RIVAL_TOKENS * RIVAL_CHANNELS
-    + THREAT_TOKENS * THREAT_CHANNELS
-    + SITE_TOKENS * SITE_CHANNELS;
+pub const TOKEN_SLOTS: u32 = total_token_slots();
 
 /// The radius of the disc that a token reads around its subject.
 ///
@@ -123,6 +367,16 @@ impl EntityTokens {
     #[must_use]
     pub fn slots(&self) -> &[i64] {
         &self.slots
+    }
+
+    /// Returns the positions of one token set, in ascending token order.
+    ///
+    /// The channels of one token are adjacent. The set states its own start
+    /// and its own width, so the caller states neither.
+    #[must_use]
+    pub fn set_slots(&self, set: TokenSet) -> &[i64] {
+        let start = set.start() as usize;
+        &self.slots[start..start + set.slots() as usize]
     }
 
     /// Returns the level 0 tiles the token discs read.
@@ -211,7 +465,7 @@ impl World {
         }
         let centre = stack.centre();
         let mut tokens = EntityTokens {
-            slots: vec![0i64; TOKEN_SLOTS as usize],
+            slots: Vec::new(),
             disc_tiles: 0,
             scanned_settlements: 0,
             scanned_blocks: 0,
@@ -221,20 +475,20 @@ impl World {
         let rivals = self.select_rivals(faction, &mut tokens);
         let threats = self.select_threats(faction, &mut tokens)?;
 
-        let mut at = 0usize;
+        let mut written = vec![0i64; TOKEN_SLOTS as usize];
         for slot in 0..SETTLEMENT_TOKENS as usize {
             let channels = match settlements.get(slot) {
                 Some(entry) => self.settlement_token(faction, centre, *entry, &mut tokens),
                 None => [Fix32::ZERO; SETTLEMENT_CHANNELS as usize],
             };
-            write_token(&mut tokens.slots, &mut at, &channels);
+            write_token(&mut written, TokenSet::Settlements, slot, &channels);
         }
         for slot in 0..RIVAL_TOKENS as usize {
             let channels = match rivals.get(slot) {
                 Some(entry) => self.rival_token(faction, *entry, &settlements),
                 None => [Fix32::ZERO; RIVAL_CHANNELS as usize],
             };
-            write_token(&mut tokens.slots, &mut at, &channels);
+            write_token(&mut written, TokenSet::Rivals, slot, &channels);
         }
         for slot in 0..THREAT_TOKENS as usize {
             let channels = match threats.get(slot) {
@@ -243,7 +497,7 @@ impl World {
                 }
                 None => [Fix32::ZERO; THREAT_CHANNELS as usize],
             };
-            write_token(&mut tokens.slots, &mut at, &channels);
+            write_token(&mut written, TokenSet::Threats, slot, &channels);
         }
         let sites = frontier.best_sites();
         for slot in 0..SITE_TOKENS as usize {
@@ -251,8 +505,9 @@ impl World {
                 Some(site) => self.site_token(faction, centre, *site, &settlements, &mut tokens),
                 None => [Fix32::ZERO; SITE_CHANNELS as usize],
             };
-            write_token(&mut tokens.slots, &mut at, &channels);
+            write_token(&mut written, TokenSet::Sites, slot, &channels);
         }
+        tokens.slots = written;
         Ok(tokens)
     }
 
@@ -565,10 +820,11 @@ impl World {
         nearest
     }
 
-    /// Writes the 24 channels of one settlement token.
+    /// Writes the channels of one settlement token.
     ///
-    /// Fourteen channels of the design have no source in the engine and read
-    /// zero. They are the population share, the population, the finished
+    /// The channel list of the set names every channel, and this fills the
+    /// ones the engine holds a source for. The rest read zero. They are the
+    /// population share, the population, the finished
     /// upgrade count of the settlement, the upgrades under construction, the
     /// garrison share, the garrison strength, the food coverage in ticks, the
     /// distance to the reach boundary, the rival strength within the disc,
@@ -593,28 +849,38 @@ impl World {
             .map_or(0, |standing| standing.store_total);
         let (first, second) = sector_pair(delta);
         let mut channels = [Fix32::ZERO; SETTLEMENT_CHANNELS as usize];
-        channels[0] = Fix32::ONE;
-        channels[1] =
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "validity") }] = Fix32::ONE;
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "ring_index") }] =
             sim_math::bounded_share(i64::from(ring_of_distance(distance)), i64::from(RING_CAP));
-        channels[2] = first;
-        channels[3] = second;
-        channels[4] = sim_math::compressed_magnitude(i64::from(distance));
-        channels[9] = sim_math::bounded_share(entry.store, own_total);
-        channels[10] = sim_math::compressed_magnitude(entry.store);
-        channels[11] = sim_math::compressed_magnitude(disc.own_upgrades);
-        channels[14] = sim_math::bounded_share(disc.hazard_tiles, disc.observed);
-        channels[15] = distance_share(
-            grid,
-            self.nearest_seen_rival_settlement(faction, entry.address),
-        );
-        channels[17] = sim_math::compressed_magnitude(disc.rival_units);
-        channels[18] = sim_math::compressed_magnitude(disc.own_units);
-        channels[19] = sim_math::bounded_share(disc.unclaimed_passable, disc.passable);
-        channels[22] = siege_share(self.siege_of(entry.settlement));
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "sector_first") }] = first;
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "sector_second") }] = second;
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "distance") }] =
+            sim_math::compressed_magnitude(i64::from(distance));
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "store_share") }] =
+            sim_math::bounded_share(entry.store, own_total);
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "store") }] =
+            sim_math::compressed_magnitude(entry.store);
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "own_upgrades_near") }] =
+            sim_math::compressed_magnitude(disc.own_upgrades);
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "hazard_share") }] =
+            sim_math::bounded_share(disc.hazard_tiles, disc.observed);
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "rival_settlement_distance") }] =
+            distance_share(
+                grid,
+                self.nearest_seen_rival_settlement(faction, entry.address),
+            );
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "rival_units_near") }] =
+            sim_math::compressed_magnitude(disc.rival_units);
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "own_units_near") }] =
+            sim_math::compressed_magnitude(disc.own_units);
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "unclaimed_passable_share") }] =
+            sim_math::bounded_share(disc.unclaimed_passable, disc.passable);
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "siege") }] =
+            siege_share(self.siege_of(entry.settlement));
         channels
     }
 
-    /// Writes the 24 channels of one rival token.
+    /// Writes the channels of one rival token.
     ///
     /// The design gives twelve relative ratios, one for each power quantity.
     /// The fog admits an estimate of two of them, which are the settlements
@@ -636,15 +902,19 @@ impl World {
     ) -> [Fix32; RIVAL_CHANNELS as usize] {
         let grid = self.grid();
         let mut channels = [Fix32::ZERO; RIVAL_CHANNELS as usize];
-        channels[0] = Fix32::ONE;
-        channels[1] = sim_math::signed_relation(entry.seen_settlements, own.len() as i64);
-        channels[13] = Fix32(self.relation(faction, entry.faction).unwrap_or(0));
-        channels[14] = Fix32(self.relation(entry.faction, faction).unwrap_or(0));
-        channels[17] = distance_share(grid, entry.nearest);
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "validity") }] = Fix32::ONE;
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "settlement_ratio") }] =
+            sim_math::signed_relation(entry.seen_settlements, own.len() as i64);
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "relation_to_rival") }] =
+            Fix32(self.relation(faction, entry.faction).unwrap_or(0));
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "relation_from_rival") }] =
+            Fix32(self.relation(entry.faction, faction).unwrap_or(0));
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "rival_settlement_distance") }] =
+            distance_share(grid, entry.nearest);
         channels
     }
 
-    /// Writes the 20 channels of one threat cluster token.
+    /// Writes the channels of one threat cluster token.
     ///
     /// The strength, the strength share, the largest unit type class, the
     /// closing rate, the sighting staleness, the owner reach flag, the owner
@@ -665,23 +935,29 @@ impl World {
         let disc = self.read_disc(faction, entry.address, DISC_RADIUS, tokens);
         let (first, second) = sector_pair(delta);
         let mut channels = [Fix32::ZERO; THREAT_CHANNELS as usize];
-        channels[0] = Fix32::ONE;
-        channels[1] =
+        channels[const { channel_index(THREAT_CHANNEL_NAMES, "validity") }] = Fix32::ONE;
+        channels[const { channel_index(THREAT_CHANNEL_NAMES, "ring_index") }] =
             sim_math::bounded_share(i64::from(ring_of_distance(distance)), i64::from(RING_CAP));
-        channels[2] = first;
-        channels[3] = second;
-        channels[4] = sim_math::compressed_magnitude(i64::from(distance));
-        channels[7] = sim_math::compressed_magnitude(entry.rival_units);
-        channels[9] = distance_share(grid, nearest_of(own, entry.address));
-        channels[12] = flag(self.holds(faction, entry.address) == Some(true));
-        channels[16] =
+        channels[const { channel_index(THREAT_CHANNEL_NAMES, "sector_first") }] = first;
+        channels[const { channel_index(THREAT_CHANNEL_NAMES, "sector_second") }] = second;
+        channels[const { channel_index(THREAT_CHANNEL_NAMES, "distance") }] =
+            sim_math::compressed_magnitude(i64::from(distance));
+        channels[const { channel_index(THREAT_CHANNEL_NAMES, "rival_units") }] =
+            sim_math::compressed_magnitude(entry.rival_units);
+        channels[const { channel_index(THREAT_CHANNEL_NAMES, "own_settlement_distance") }] =
+            distance_share(grid, nearest_of(own, entry.address));
+        channels[const { channel_index(THREAT_CHANNEL_NAMES, "inside_own_reach") }] =
+            flag(self.holds(faction, entry.address) == Some(true));
+        channels[const { channel_index(THREAT_CHANNEL_NAMES, "hazard_share") }] =
             sim_math::bounded_share(disc.hazard_tiles, entry.observed.max(disc.observed));
-        channels[17] = sim_math::bounded_share(disc.passable, disc.observed);
-        channels[19] = sim_math::signed_relation(disc.own_units, disc.rival_units);
+        channels[const { channel_index(THREAT_CHANNEL_NAMES, "passable_share") }] =
+            sim_math::bounded_share(disc.passable, disc.observed);
+        channels[const { channel_index(THREAT_CHANNEL_NAMES, "strength_balance") }] =
+            sim_math::signed_relation(disc.own_units, disc.rival_units);
         channels
     }
 
-    /// Writes the 16 channels of one candidate site token.
+    /// Writes the channels of one candidate site token.
     ///
     /// The rival strength channel reads zero, because the engine holds no
     /// military strength quantity.
@@ -699,25 +975,36 @@ impl World {
         let disc = self.read_disc(faction, site.address, SITE_DISC_RADIUS, tokens);
         let (first, second) = sector_pair(delta);
         let mut channels = [Fix32::ZERO; SITE_CHANNELS as usize];
-        channels[0] = Fix32::ONE;
-        channels[1] =
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "validity") }] = Fix32::ONE;
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "ring_index") }] =
             sim_math::bounded_share(i64::from(ring_of_distance(distance)), i64::from(RING_CAP));
-        channels[2] = first;
-        channels[3] = second;
-        channels[4] = sim_math::compressed_magnitude(i64::from(distance));
-        channels[5] = sim_math::compressed_magnitude(mean(disc.food_total, disc.observed));
-        channels[6] = sim_math::compressed_magnitude(mean(disc.water_total, disc.observed));
-        channels[7] = sim_math::compressed_magnitude(mean(disc.value_total, disc.observed));
-        channels[8] = sim_math::bounded_share(disc.resource_tiles, disc.observed);
-        channels[9] = sim_math::bounded_share(disc.passable, disc.observed);
-        channels[10] = flag(self.holds(faction, site.address) == Some(true));
-        channels[11] = distance_share(grid, nearest_of(own, site.address));
-        channels[12] = distance_share(
-            grid,
-            self.nearest_seen_rival_settlement(faction, site.address),
-        );
-        channels[14] = sim_math::bounded_share(disc.hazard_tiles, disc.observed);
-        channels[15] = sim_math::compressed_magnitude(site.score);
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "sector_first") }] = first;
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "sector_second") }] = second;
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "distance") }] =
+            sim_math::compressed_magnitude(i64::from(distance));
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "food_mean") }] =
+            sim_math::compressed_magnitude(mean(disc.food_total, disc.observed));
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "water_mean") }] =
+            sim_math::compressed_magnitude(mean(disc.water_total, disc.observed));
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "value_mean") }] =
+            sim_math::compressed_magnitude(mean(disc.value_total, disc.observed));
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "resource_share") }] =
+            sim_math::bounded_share(disc.resource_tiles, disc.observed);
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "passable_share") }] =
+            sim_math::bounded_share(disc.passable, disc.observed);
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "inside_own_reach") }] =
+            flag(self.holds(faction, site.address) == Some(true));
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "own_settlement_distance") }] =
+            distance_share(grid, nearest_of(own, site.address));
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "rival_settlement_distance") }] =
+            distance_share(
+                grid,
+                self.nearest_seen_rival_settlement(faction, site.address),
+            );
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "hazard_share") }] =
+            sim_math::bounded_share(disc.hazard_tiles, disc.observed);
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "site_score") }] =
+            sim_math::compressed_magnitude(site.score);
         channels
     }
 }
@@ -798,12 +1085,15 @@ fn mean(total: i64, count: i64) -> i64 {
     total / count
 }
 
-/// Writes one token into the block and advances the cursor.
-fn write_token(slots: &mut [i64], at: &mut usize, channels: &[Fix32]) {
-    for value in channels {
-        if let Some(place) = slots.get_mut(*at) {
+/// Writes one token of one set into the block.
+///
+/// The set states where it starts and how wide one token is, so this states
+/// neither.
+fn write_token(slots: &mut [i64], set: TokenSet, token: usize, channels: &[Fix32]) {
+    let start = set.start() as usize + token * set.channels() as usize;
+    for (offset, value) in channels.iter().enumerate() {
+        if let Some(place) = slots.get_mut(start + offset) {
             *place = i64::from(value.0);
         }
-        *at += 1;
     }
 }

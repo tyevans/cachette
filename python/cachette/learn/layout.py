@@ -517,13 +517,13 @@ def _tokens_of_catalogue(catalogue: SignalCatalogue) -> tuple[TokenBlock, ...]:
 def token_blocks(
     name: str, start: int, shapes: Sequence[tuple[str, int, int]]
 ) -> tuple[TokenBlock, ...]:
-    """Cut one published field into the token sets it holds, in order.
+    """Cut one field into the token sets it holds, in order.
 
-    The engine publishes the four sets as one field today, and the schema
-    states no shape for them. A caller that knows the shapes states them
-    here, as a name, a token count and a channel count for each set. The
-    sets follow one another in the order given, and each set holds every
-    channel of one token adjacent.
+    The engine publishes one field for each set, so a reader of the engine
+    needs none of this. A caller that holds one field of several sets states
+    the shapes here, as a name, a token count and a channel count for each
+    set. The sets follow one another in the order given, and each set holds
+    every channel of one token adjacent.
 
     The name argument names the field the sets came from, so a failure says
     where the caller was reading.

@@ -92,17 +92,47 @@ pub const NEAR_SECTORS: u32 = 6;
 /// The sectors that every ring above ring 1 holds.
 pub const FAR_SECTORS: u32 = 12;
 
-/// The cells the frame holds.
+/// The cells of each ring, in ring order.
 ///
 /// Ring 0 holds one cell, because the centre tile has no direction. Ring 1
 /// holds six. Every ring above holds twelve. **This is the only statement of
-/// the cell count.** A field over the frame reads it here rather than holding
-/// a second copy of the number.[^1]
+/// the cell count of a ring.** The sector rule of the frame states it, and
+/// this list reads that rule rather than repeating it.[^1]
+///
+/// A reader of the observation needs the list. A cell index says nothing
+/// about its ring and its sector without it, so the schema publishes it.
 ///
 /// # References
 ///
 /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
-pub const RING_STACK_CELLS: u32 = 1 + NEAR_SECTORS + (RING_COUNT - 2) * FAR_SECTORS;
+#[must_use]
+pub const fn ring_cell_counts() -> [u32; RING_COUNT as usize] {
+    let mut counts = [0u32; RING_COUNT as usize];
+    let mut ring = 0usize;
+    while ring < RING_COUNT as usize {
+        counts[ring] = ring_sectors(ring as u32);
+        ring += 1;
+    }
+    counts
+}
+
+/// Returns the cells of the whole frame.
+const fn total_cells() -> u32 {
+    let counts = ring_cell_counts();
+    let mut total = 0u32;
+    let mut ring = 0usize;
+    while ring < counts.len() {
+        total += counts[ring];
+        ring += 1;
+    }
+    total
+}
+
+/// The cells the frame holds.
+///
+/// The count is the sum of the cells of every ring, so it follows the sector
+/// rule and no number of its own.
+pub const RING_STACK_CELLS: u32 = total_cells();
 
 /// The channels that one cell of the ring stack holds.
 pub const RING_STACK_CHANNELS: u32 = 25;

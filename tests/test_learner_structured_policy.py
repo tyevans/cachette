@@ -35,7 +35,7 @@ from cachette.learn.layout import (
     TokenBlock,
     token_blocks,
 )
-from cachette.learn.picture import RingStack, ring_stack_of
+from cachette.learn.picture import RingStack
 from cachette.learn.policy import PolicyFit, PolicyFitError, encode_many, load_policy
 from cachette.learn.reward import Weighting
 from cachette.learn.search import shell_policy
@@ -59,22 +59,11 @@ FACTIONS = 3
 SEED = 7
 READER = 0
 
-# The geometry the engine publishes today and the schema does not yet state.
-# **The policy holds none of these numbers.** The test states them, and the
-# layout then checks them against the field widths the schema declares, so a
-# wrong statement fails rather than reading a plausible observation that does
-# not exist.
+# The field the engine marks as ring space. **The tests here hold no ring
+# count, no sector count and no channel count.** The schema states every one of
+# them, and a test that stated one would be a second declaration of the thing
+# under test.
 RING_FIELD = "ring_stack"
-TOKEN_FIELD = "entity_tokens"
-RINGS = 14
-SECTORS = 12
-RING_CHANNELS = 25
-TOKEN_SHAPES = (
-    ("own_settlements", 8, 24),
-    ("rivals", 6, 24),
-    ("threat_clusters", 8, 20),
-    ("candidate_sites", 8, 16),
-)
 
 
 def _world() -> World:
@@ -82,43 +71,15 @@ def _world() -> World:
     return World(width=WIDTH, height=HEIGHT, faction_count=FACTIONS, seed=SEED)
 
 
-def _stated_layout(catalogue: SignalCatalogue) -> ObservationLayout:
-    """State the geometry the schema does not, and let the layout check it.
-
-    The schema declares the start and the width of each field. It does not
-    yet declare which field is ring space, how many rings the stack holds,
-    how many sectors a ring holds, or how the four token sets divide one
-    field. This function states those and asserts the widths agree, so the
-    test fails loudly when the engine changes the shape.
-    """
-    stack = ring_stack_of({"rings": RINGS, "sectors": SECTORS}, [RING_FIELD])
-    ring_field = catalogue.signal(RING_FIELD)
-    assert stack.cells * RING_CHANNELS == ring_field.positions
-    token_field = catalogue.signal(TOKEN_FIELD)
-    assert (
-        sum(tokens * channels for _, tokens, channels in TOKEN_SHAPES)
-        == token_field.positions
-    )
-    return ObservationLayout(
-        length=catalogue.observation_length,
-        ring=RingBlock.contiguous(ring_field.start, stack, RING_CHANNELS),
-        tokens=token_blocks(TOKEN_FIELD, token_field.start, TOKEN_SHAPES),
-    )
-
-
 def _layout_of(world: World) -> ObservationLayout:
-    """Read the layout from the schema, and state it when the schema cannot.
+    """Read the layout from the schema the world publishes.
 
-    The schema is the one declaration of the layout, so this asks it first.
-    The engine does not yet publish the ring geometry, so this falls back to
-    the stated geometry until it does. The fallback disappears on its own
-    when the schema carries the entries.
+    The schema is the one declaration of the layout, so this asks it and
+    states nothing of its own. It marks the ring stack, names the channels of
+    every field, states the cells of each ring, states which axis runs first,
+    and publishes one field for each token set.
     """
-    catalogue = SignalCatalogue.of_world(world)
-    try:
-        return ObservationLayout.of_catalogue(catalogue)
-    except LayoutError:
-        return _stated_layout(catalogue)
+    return ObservationLayout.of_catalogue(SignalCatalogue.of_world(world))
 
 
 def _small_layout() -> ObservationLayout:
