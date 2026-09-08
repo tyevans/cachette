@@ -293,11 +293,19 @@ fn a_reserved_field_reads_zero() {
     world.step(1).expect("the step runs");
     let values = observation_of(&world, WATCHER);
     let schema = observation_schema();
+    let spatial = ObsField::RingStack.positions()
+        + ObsField::FrontierBySector.positions()
+        + ObsField::EntityTokens.positions();
     let mut reserved = 0u32;
     for row in schema.rows() {
         if !row.field.value_kind().is_reserved() {
             continue;
         }
+        assert!(
+            row.positions > 0,
+            "the reserved field {} holds a position, so filling it moves no later field",
+            row.name()
+        );
         reserved += row.positions;
         assert_eq!(
             (row.low, row.high),
@@ -315,8 +323,12 @@ fn a_reserved_field_reads_zero() {
         }
     }
     assert!(
-        reserved > ObsField::RingStack.positions(),
-        "the fixture must find the reserved blocks"
+        reserved > spatial,
+        "the reserve holds positions beyond the three blocks another revision owns"
+    );
+    assert!(
+        reserved < schema.length(),
+        "the array holds a position that is not reserved"
     );
 }
 
