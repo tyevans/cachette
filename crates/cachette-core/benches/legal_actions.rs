@@ -38,6 +38,7 @@
 use std::hint::black_box;
 use std::time::Instant;
 
+use cachette_core::faction_observation::observation_schema;
 use cachette_core::{Axial, FactionId, SightRules, World, WorldConfig};
 
 /// The seed that every world in this benchmark takes.
@@ -124,7 +125,7 @@ fn measure(extent: u32, factions: u16, camp: i32, radius: u32) {
     println!(
         "The asker holds {} live units. The observation array holds {} positions",
         standing.live_units,
-        world.observation_schema().length()
+        observation_schema().length()
     );
     println!("Each reader row runs {READS} times, and the step row runs {STEPS} times");
     println!();
