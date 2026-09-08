@@ -11647,9 +11647,10 @@ regression from the weather: weather moves tile water, and a site's production
 rate reads the ground.
 
 **True.** No failure of the thirteen was an engine regression. Eleven stated
-behaviour that a deliberate change had replaced, and two used an instrument
-that could not measure what they asserted. Five changes and one stale list
-account for all thirteen, and only one of the five is weather:
+behaviour that a deliberate change had replaced. One restated a list that the
+engine declares. One used an instrument that could not measure what it
+asserted, and it never could. Five changes, one stale list and one bad
+instrument account for all thirteen:
 
     six  economy tests    the production pipeline scales the stored rate,
                           and the upkeep gained a holding term
@@ -11661,14 +11662,19 @@ account for all thirteen, and only one of the five is weather:
                           readable, so the refusal it asserted is repaired
     one  controller test  the census table grew and the list in the test
                           did not
-    two  weather tests    a cropped array read as the whole account
+    one  weather test     the lattice gained a margin that the totals hold
+                          and the arrays crop away
+    one  wind test        the centre of a cropped array measured what left
+                          the world
 
 **Evidence.** Each failure was traced to the commit that changed the
 behaviour, and each change carries its own reasoning in its commit message or
 in a record. The economy and trade group is 17227805 and 60c33a2a, the land
 group is 62fefa40, the readable-world group is the repair that FND-648
-records, and the weather group is 4fc66047.[^F672A] The weather wave named in
-the lead is not the cause of any of them.
+records, and the weather group is 4fc66047.[^F672A] **None of the five
+commits the reading named is the cause of any failure.** Weather is involved
+in one of the thirteen, and through the margin rather than through the water
+it moves.
 
 **The record predicted the work and nobody did it.** The draft record for the
 derived rate states in its own consequences that every test which sets a
