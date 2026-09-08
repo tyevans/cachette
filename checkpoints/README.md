@@ -35,7 +35,14 @@ policies play each other like this:
 
 ## What is here
 
-The win share is on the validation seed worlds, which never move.
+The win share is on the validation seed worlds of the run that measured it.
+
+**Those worlds moved, so no number below is comparable with a number of a
+later run.** The seed filter refused only a world that seated nobody, and it
+now refuses a world that seats fewer factions than the run asked for, and a
+world with a seat that reaches no food. Four of the first thirty-two
+validation seeds went that way, and every seed after the first refusal
+shifted. A run measured after the change plays a different set.[^C4]
 
 | Policy | Wins | Search |
 |---|---|---|
@@ -87,3 +94,4 @@ policy asks for an observation after a game ends.[^C2]
 [^C1]: Findings register, FND-645. `docs/FINDINGS.md`
 [^C2]: Findings register, FND-644. `docs/FINDINGS.md`
 [^C3]: ADR-0193, an observation names another faction by a position relative to the reader. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
+[^C4]: Findings register, FND-666. `docs/FINDINGS.md`

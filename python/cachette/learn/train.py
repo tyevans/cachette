@@ -172,6 +172,7 @@ class TrainResult(TypedDict):
     best_generation: int
     best_validation: float | None
     validation_seeds: list[int]
+    degenerate_generations: list[int]
     holdout: NotRequired[dict[str, dict[str, float]]]
 
 
@@ -417,6 +418,26 @@ def unit(vector: np.ndarray) -> np.ndarray:
     return vector / length
 
 
+def carries_information(spread: float) -> bool:
+    """Say whether a generation of this spread can move the centre.
+
+    The spread is the highest score of the generation minus the lowest one. A
+    spread of zero means the score did not depend on the candidate, so the
+    ranking ranks a set of equal numbers and the update carries nothing.
+
+    **A ranking of equal numbers is not a ranking of ties.** The rank of a
+    score comes from the order of the sort, and the sort is stable, so an
+    equal set ranks by candidate index. Every plus half then ranks below its
+    own minus half by the same amount, and the update becomes a fixed step
+    along a direction the noise alone chose.
+
+    A world where no policy can matter produces exactly this. One faction of
+    three holds a seat, or a seat reaches no food, and the game ends the same
+    way whatever any candidate does.
+    """
+    return spread > 0.0
+
+
 def rank_shape(scores: np.ndarray) -> np.ndarray:
     """Turn raw scores into centred ranks in the range minus a half to a half.
 
@@ -554,6 +575,13 @@ def train(
         )
     pairs = train_config.population // 2
     history: list[dict[str, float | None]] = []
+    # The generations whose candidates all scored the same number. **A run
+    # that reported only a mean and a best could not say that a generation
+    # carried no information**, because a mean that equals the best reads the
+    # same as a population that agreed by luck. The list names the
+    # generations, so a reader of the report counts them without reading
+    # every row.
+    degenerate: list[int] = []
     started = time.time()
 
     # **The last generation is not the best generation.** An evolution
@@ -689,25 +717,44 @@ def train(
                     label,
                 )
             scores, ticks, won = played.ranked, played.ticks, played.won
-            shaped = rank_shape(scores)
-            gradient = np.zeros_like(centre)
-            for index in range(pairs):
-                weight = shaped[2 * index] - shaped[2 * index + 1]
-                gradient += weight * noise[index]
-            # The rank shaping already threw away the scale of the reward, so the
-            # length of this sum carries no information worth keeping. The
-            # trainer therefore takes a step of a fixed size along the direction,
-            # and the learning rate is the fraction of the centre that one
-            # generation moves.
-            policy = policy.rebuild(
-                unit(centre + train_config.learning_rate * unit(gradient))
-            )
-
             # The spread of a generation is what the ranking ranks. A spread of
-            # zero means every candidate chose the same actions, and the update
-            # that follows it carries no information. The run reports it, so the
-            # failure that killed the first attempt is visible while it happens.
+            # zero means the score of a candidate did not depend on the
+            # candidate, and the update that follows it carries no
+            # information. The run reports it, so the failure that killed the
+            # first attempt is visible while it happens.
             spread = float(scores.max() - scores.min())
+            informative = carries_information(spread)
+            if informative:
+                shaped = rank_shape(scores)
+                gradient = np.zeros_like(centre)
+                for index in range(pairs):
+                    weight = shaped[2 * index] - shaped[2 * index + 1]
+                    gradient += weight * noise[index]
+                # The rank shaping already threw away the scale of the reward, so
+                # the length of this sum carries no information worth keeping. The
+                # trainer therefore takes a step of a fixed size along the
+                # direction, and the learning rate is the fraction of the centre
+                # that one generation moves.
+                policy = policy.rebuild(
+                    unit(centre + train_config.learning_rate * unit(gradient))
+                )
+            else:
+                # **A generation of equal scores must not move the centre.** The
+                # rank of an equal score is the index of the candidate, so the
+                # ranking gives every plus half a lower rank than its own minus
+                # half. The weighted sum of the perturbations is then a direction
+                # drawn from the noise alone, and the trainer would take a step
+                # of the full learning rate along it. The centre would move as
+                # far as an informed generation moves it, in a direction no
+                # episode chose.
+                degenerate.append(generation)
+                print(
+                    f"  {name} generation {generation:2d} carried no information: "
+                    f"every candidate scored {float(scores.max()):9.1f} on seeds "
+                    f"{seeds}. The centre does not move",
+                    flush=True,
+                )
+                policy = policy.rebuild(centre)
             # The spread of the raw return is reported beside the spread of the
             # ranked score, because the two answer different questions and a run
             # that reported one of them could not be compared with the other.
@@ -783,6 +830,10 @@ def train(
                     "mean": float(scores.mean()),
                     "worst": float(scores.min()),
                     "spread": spread,
+                    # One when the generation carried no information and the
+                    # centre did not move. A reader of the report finds the
+                    # wasted generations by this field alone.
+                    "degenerate": 0.0 if informative else 1.0,
                     "absolute_spread": absolute_spread,
                     "absolute_mean": float(played.absolute.mean()),
                     "world_ticks": ticks,
@@ -821,6 +872,7 @@ def train(
         "best_generation": best_generation,
         "best_validation": None if best_score == -np.inf else best_score,
         "validation_seeds": list(validation or []),
+        "degenerate_generations": list(degenerate),
     }
 
 

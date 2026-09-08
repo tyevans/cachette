@@ -199,14 +199,19 @@ def test_the_vector_gives_what_the_single_environments_give() -> None:
 
 
 # A world small enough to run to the end of the game in a test, and wide
-# enough that the games end at different ticks. The seeds below resolve by
-# domination at ticks 1, 1, 150 and 589, and by the territory comparison at
-# the tick limit twice.
+# enough that the games end at different ticks.
 #
 # **The spread is the point.** The vector drops a world from the batch when
 # its episode ends, and a fixture whose episodes all end together never
 # reaches that path. A fixture that models the typical case supplies no
 # extreme, and the test then measures the fixture.
+#
+# **The base of the search is part of the fixture.** The spread of the first
+# base this test used came from two worlds that seated one faction of three,
+# and each of those ended on the first tick. The seed filter refuses such a
+# world now, so the base moved to one whose worlds end apart on their own.
+# The test asserts the spread rather than naming the ticks, because a tick
+# named here goes stale on the next change to the engine.
 ENDING = EnvConfig(
     width=24,
     height=24,
@@ -217,6 +222,10 @@ ENDING = EnvConfig(
     decision_interval=8,
 )
 
+# Where the search for the ending worlds starts. One name, so the two tests
+# below cannot disagree about which worlds they play.
+ENDING_START = 1100
+
 
 def test_the_vector_matches_the_singles_when_the_episodes_end_apart() -> None:
     """Six episodes that end at six different decisions still agree.
@@ -225,7 +234,7 @@ def test_the_vector_matches_the_singles_when_the_episodes_end_apart() -> None:
     later decisions of this run go through a batch that is smaller than the
     vector. The rewards and the outcomes must not move.
     """
-    seeds = viable_seeds(ENDING, 6, 900)
+    seeds = viable_seeds(ENDING, 6, ENDING_START)
     plan = [
         [int(value) for value in np.random.default_rng(index).integers(0, 29, 75)]
         for index in range(len(seeds))
@@ -277,7 +286,7 @@ def test_the_controller_baseline_plays_the_seat_and_the_learner_does_not() -> No
     measures a faction that does nothing, and the other measures the
     built-in controller. The two must not end in the same place.
     """
-    seeds = viable_seeds(ENDING, 4, 900)
+    seeds = viable_seeds(ENDING, 4, ENDING_START)
     held: dict[bool, list[int]] = {}
     for controlled in (True, False):
         config = replace(ENDING, controlled=controlled)

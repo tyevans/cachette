@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-666**
+**Next number: FND-667**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -17137,6 +17137,60 @@ from 3.85 to 3.51 milliseconds.[^F664B]
 the case of one thread. The two conditions read the numbers the caller
 supplied, and they hold no constant of their own.
 
+### FND-666 — The seed filter of a training run checked that a world built, not that a policy could decide it
+
+**Believed.** The seed filter gives a training run worlds that every faction
+can sit in. Its own name and its own docstring said so. It built a world,
+seeded it, and kept the seed when the seeding did not raise.
+
+**True.** The seeding raises only when it seats nobody. A world that seats one
+faction of three is a world the engine accepts, and that world is over on the
+first tick, because the seated faction holds every settlement and the engine
+records a domination win. A seat whose site reaches no food is also accepted,
+and that faction starves inside about a hundred ticks. **The score of such a
+world is the same number for every candidate of a generation**, so the
+generation ranks a set of equal numbers.
+
+An equal set does not rank as a set of ties. The rank comes from the order of
+a stable sort, so an equal set ranks by candidate index, and each plus half
+ranks below its own minus half by the same amount. The weighted sum of the
+perturbations is then a direction that the noise alone chose, and the trainer
+took a step of the full learning rate along it. The centre moved as far as an
+informed generation moves it, in a direction no episode chose. Nothing in the
+log said so.
+
+**Evidence.** A sweep of 300 seeds of the training pool played nine policies
+on each seed that ended inside 25 decisions. Eleven seeds gave nine equal
+returns, which is 3.7 percent of the pool. Five of the eleven ended in one
+decision. Nine of the eleven are named by the founding report that the filter
+already received and discarded: five seat one faction of three, and four hold
+a seat that reaches no food. The remaining two seat every faction and feed
+every seat, and the two rival factions collapse on their own near tick 200.
+A test names one seed of each shape and asserts what the world is.[^F666A]
+
+The filter now reads the founding report and keeps a seed only when every
+faction holds a seat that feeds it. The trainer refuses the step of a
+generation whose spread is zero, and it names the generation on its own line
+and in the run report.
+
+**Precedent.** FND-544 measured the seating at a range of extents, and it
+records that the world of the training extent is short of a full seat count at
+a share of its seeds. It states three tests of what a playable world is, and
+those tests hold inside the engine. **Nobody carried the measurement across to
+the seed filter of the training run**, so the filter kept a world that the
+engine's own definition of playable refuses.[^F666B]
+
+**What follows.** **Every figure a training run stored before this change came
+from a different pool.** The filter refuses about nine percent of the raw
+seeds above the base the runs use, so every generation from the first refused
+seed onward draws a different world. No score of an earlier run can be
+compared with a score of a later one.
+
+A filter that removes the degenerate worlds also removes some worlds where a
+policy did matter. A world that seats two factions of three is a different
+game rather than a harder one, and the run asks for three. That is the reason
+to refuse it, and it is not free.
+
 ## References
 
 [^F643A]: ADR-0192, a window of controller commands is one label distribution over the action table, decision D2. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
@@ -17162,3 +17216,5 @@ supplied, and they hold no constant of their own.
 [^F664D]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
 [^F664E]: The test that the step derives the destination field after the controller. `crates/cachette-core/tests/the_step_derives_the_destination_field_after_the_controller.rs`
 [^F665A]: Report 39, the second defect, section 4.4. `docs/research/reports/39-what-one-tick-of-the-training-world-costs.md`
+[^F666A]: The degenerate world test of the learner. `tests/test_learner_degenerate.py`
+[^F666B]: Findings register, FND-544. `docs/FINDINGS.md`
