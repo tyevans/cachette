@@ -35,8 +35,8 @@ the four variables before it starts a process, so a worker inherits them.
 
 [^1]: Target platform costs, the trainer process measurement.
 ``docs/reference/graviton-costs.md``
-[^2]: ADR-0192, a generation is scored in shards and combined in candidate
-order, decision D2. ``docs/adrs/draft/adr-0192-a-generation-is-scored-in-shards.md``
+[^2]: ADR-0194, a generation is scored in shards and combined in candidate
+order, decision D2. ``docs/adrs/draft/adr-0194-a-generation-is-scored-in-shards.md``
 [^3]: ADR-0001, one binary gives one answer at any thread count, decision D2.
 ``docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md``
 """

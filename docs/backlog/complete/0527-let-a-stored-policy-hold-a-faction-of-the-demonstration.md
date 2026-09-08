@@ -96,4 +96,4 @@ it.[^10]
 [^7]: Decision Record Scope, section 1. `.agents/rules/adr-scope.md`
 [^8]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^9]: Findings register, FND-644. `docs/FINDINGS.md`
-[^10]: Backlog item 0528, let a stored policy play a demonstration to the end of a game. `docs/backlog/proposed/0528-let-a-stored-policy-play-a-demonstration-to-the-end-of-a-game.md`
+[^10]: Backlog item 0528, let a stored policy play a demonstration to the end of a game. `docs/backlog/complete/0528-let-a-stored-policy-play-a-demonstration-to-the-end-of-a-game.md`

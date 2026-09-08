@@ -1773,4 +1773,4 @@ commit what changed. Do not edit a row to make a later run agree with it.
 
 [^DECIDE309]: Findings register, FND-309. `docs/FINDINGS.md`
 
-[^SHARD]: ADR-0192, a generation is scored in shards and combined in candidate order, decision D1. `docs/adrs/draft/adr-0192-a-generation-is-scored-in-shards.md`
+[^SHARD]: ADR-0194, a generation is scored in shards and combined in candidate order, decision D1. `docs/adrs/draft/adr-0194-a-generation-is-scored-in-shards.md`

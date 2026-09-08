@@ -1,4 +1,4 @@
-# ADR-0192: A generation is scored in shards and combined in candidate order
+# ADR-0194: A generation is scored in shards and combined in candidate order
 
 ## Context
 

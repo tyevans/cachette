@@ -1,5 +1,5 @@
 ---
-id: 0526
+id: 0531
 title: Shard one generation across worker processes
 status: complete
 created: 2026-09-07
@@ -29,7 +29,7 @@ worker process still sends one action integer for one faction.
 
 **Changes.** None. No record changes.
 
-**Creates.** ADR-0192, a generation is scored in shards and combined in
+**Creates.** ADR-0194, a generation is scored in shards and combined in
 candidate order. The registry row is allocated.
 
 **Blockers.** BLK-007 governs every cost figure. The two throughput figures in

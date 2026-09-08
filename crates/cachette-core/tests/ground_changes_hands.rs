@@ -29,7 +29,7 @@
 //! [^4]: Testing rules, section 2a. `.agents/rules/testing.md`
 //! [^5]: Testing rules, section 5. `.agents/rules/testing.md`
 //! [^6]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
-//! [^7]: ADR-0125, one plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-one-plane-names-the-seed-set-of-a-destination-field.md`
+//! [^7]: ADR-0125, one plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 
 use cachette_core::campaign;
 use cachette_core::holding::{Holder, LeaseRules, ReachRules};

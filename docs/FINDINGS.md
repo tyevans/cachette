@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-667**
+**Next number: FND-668**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -17191,8 +17191,64 @@ policy did matter. A world that seats two factions of three is a different
 game rather than a harder one, and the run asks for three. That is the reason
 to refuse it, and it is not free.
 
+### FND-667 — How much water a training world holds does not predict how the episode ends
+
+**Believed.** A training world that holds a lot of water destroys a faction at
+once. The immediate losses of a training run come from that shape, and a
+filter that refuses the wet worlds recovers the lost generations.
+
+**True.** The share of water in a training world carries almost no
+information about the outcome. Over the generations of one run, the
+correlation between the water share of the world and the mean return of the
+generation is near zero, and the correlation with the win share of the
+generation is nearly as small and of the opposite sign to the belief: a wetter
+world gives a slightly **higher** win share, not a lower one. The generations
+that won almost nothing hold the median water share of the pool.
+
+The distribution is also not what a watcher of the demonstration binary sees.
+The median world holds about a third water at every extent measured. The
+demonstration binary opens a world of a much larger extent than the training
+run, and at that extent almost no world passes half water. The training extent
+carries the fat tail: about one world in six passes seven tenths water there,
+against almost none at the demonstration extent. **One generator gives two
+different distributions at two extents**, so a spot check at one extent does
+not describe the other.
+
+**Evidence.** The built-in controller played every seat of each world of a
+sample, which is the baseline the runs are judged against. **The wettest band
+is the band the controller wins most often, and its episodes run the longest.**
+The driest band is where it wins least. A world that holds a lot of water is
+therefore not a world that ends at once; it is a world where fewer rivals
+reach the seat. The win share of the whole sample agrees with the win share
+the run recorded over its own fixed seeds, which says the sample is the same
+population.
+
+A sweep of the raw seed range measured the water share of each
+world from the tile kinds, and a second pass tied the water share of each
+generation's world to the mean return and the win share that the run recorded
+for it. A third pass split the seeds the founding filter keeps from the seeds
+it refuses. The refused seeds are wet, and that part of the belief holds: the
+median refused seed is far above the median kept seed. The refused share of
+the raw range is small. The commit message holds each figure.[^F667A]
+
+**What follows.** The immediate losses of a training run have another cause,
+and the water share does not name it. Do not tighten the seed filter against
+water. The filter that reads the founding report stands on its own reasoning,
+which is that a world must seat and feed every faction the run asks for.[^F667B]
+
+A per-generation win share is not evidence about a policy when a generation
+plays one world. Two neighbouring generations of one run recorded win shares
+that differ by more than the whole distance between chance and certainty, on
+one centre that moved by one step. **The world chooses that number, not the
+policy.** The candidates of one generation share the world, so the comparison
+inside a generation is sound and the gradient is not affected. Only the
+reported number is noise. Read the fixed-seed score instead, and read it at
+the episode count the register states.
+
 ## References
 
+[^F667A]: The commit that recorded this finding. Read `git log` for the figures.
+[^F667B]: Findings register, FND-666. `docs/FINDINGS.md`
 [^F643A]: ADR-0192, a window of controller commands is one label distribution over the action table, decision D2. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
 [^F643B]: Findings register, FND-634. `docs/FINDINGS.md`
 [^F638B]: Backlog item 0525, build the stage workers of a world once. `docs/backlog/proposed/0525-build-the-stage-workers-of-a-world-once.md`

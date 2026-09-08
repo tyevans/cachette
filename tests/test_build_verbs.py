@@ -106,8 +106,7 @@ def test_a_terrace_is_a_different_upgrade_from_a_road(seed: int) -> None:
     #
     # [^1]: ADR-0152, a faction plans its roads and zones with one solver,
     # decisions D3 and D4.
-    # `docs/adrs/accepted/
-    # adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+    # `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
     #
     # A unit builds anything only on ground its own faction holds, and a
     # faction holds the ground its cities reach. A terrace needs a city.

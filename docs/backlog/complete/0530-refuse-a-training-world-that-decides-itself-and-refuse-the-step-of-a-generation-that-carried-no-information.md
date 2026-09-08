@@ -97,7 +97,7 @@ real.
 ## References
 
 [^1]: Findings register, FND-666. `docs/FINDINGS.md`
-[^2]: ADR-0192, a generation is scored in shards and combined in candidate order. `docs/adrs/draft/adr-0192-a-generation-is-scored-in-shards.md`
+[^2]: ADR-0194, a generation is scored in shards and combined in candidate order. `docs/adrs/draft/adr-0194-a-generation-is-scored-in-shards.md`
 [^3]: PRD-0056, a learner plays one faction against the controllers. `docs/product/accepted/prd-0056-a-learner-plays-one-faction-against-the-controllers.md`
 [^4]: Decision Record Scope, section 1. `.agents/rules/adr-scope.md`
 [^5]: Stored policies index. `checkpoints/README.md`

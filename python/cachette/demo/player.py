@@ -20,7 +20,7 @@ crosses back as one whole number.
 References
 ----------
 ADR-0176, the action table is flat and bounded.
-``docs/adrs/draft/adr-0176-the-action-table-is-flat-and-bounded.md``
+``docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md``
 """
 
 from __future__ import annotations

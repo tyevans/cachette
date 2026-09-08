@@ -64,8 +64,8 @@ sends it is one action integer.
 
 # References
 
-[^1]: ADR-0192, a generation is scored in shards and combined in candidate
-order. ``docs/adrs/draft/adr-0192-a-generation-is-scored-in-shards.md``
+[^1]: ADR-0194, a generation is scored in shards and combined in candidate
+order. ``docs/adrs/draft/adr-0194-a-generation-is-scored-in-shards.md``
 """
 
 from __future__ import annotations
