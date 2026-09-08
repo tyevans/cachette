@@ -171,7 +171,7 @@ def main() -> None:
     pending = [(index, name) for index, name in enumerate(names) if name not in done]
     for start in range(0, len(pending), arguments.batch):
         batch = pending[start : start + arguments.batch]
-        _, readings, _ = run_population(
+        returns, readings, _ = run_population(
             WORLD,
             weighting,
             [policies[index] for index, _ in batch],
@@ -179,8 +179,26 @@ def main() -> None:
             arguments.workers,
             label=f"batch {start // arguments.batch + 1}",
         )
-        for (index, name), reading in zip(batch, readings, strict=True):
-            share = float(reading.get("won", 0.0))
+        # **The returns arrive shaped one row for each policy, and the readings
+        # arrive flat with one entry for each policy and seed together.** Under
+        # this weighting an episode returns one for a win and nothing
+        # otherwise, so the mean of a row is the win share of that policy. The
+        # readings are averaged the same way and the two must agree, because
+        # reading the flat list as one entry for each policy is the mistake
+        # this comment exists to prevent.
+        shares = returns.mean(axis=1)
+        for position, (index, name) in enumerate(batch):
+            share = float(shares[position])
+            first = position * len(seeds)
+            counted = [
+                float(row["won"]) for row in readings[first : first + len(seeds)]
+            ]
+            if abs(sum(counted) / len(counted) - share) > 1e-9:
+                message = (
+                    f"the return of {name} says {share:.4f} and its readings "
+                    f"say {sum(counted) / len(counted):.4f}"
+                )
+                raise AssertionError(message)
             table.append(
                 Result(
                     name=name,
