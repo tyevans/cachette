@@ -194,7 +194,6 @@ declare_stages! {
     RebuildReturns,           "rebuild_returns",            false, 1, true;
     RebuildHomeApproaches,    "rebuild_home_approaches",    false, 1, true;
     RebuildStock,             "rebuild_stock",              false, 1, true;
-    RebuildDestinations,      "rebuild_destinations",       false, 1, true;
     InfluenceSolve,           "influence_solve",            true,  1, false;
     Convert,                  "convert",                    true,  1, false;
     WeatherSolve,             "weather_solve",              true,  1, false;
@@ -216,6 +215,7 @@ declare_stages! {
     ControllerCross,          "controller_cross",           false, 0, true;
     ControllerRelation,       "controller_relation",        false, 0, true;
     SendDeriveDestinations,   "send_derive_destinations",   false, 0, true;
+    RebuildDestinations,      "rebuild_destinations",       false, 1, false;
     BridgeRefreshClosing,     "bridge_refresh_closing",     false, 1, false;
 }
 

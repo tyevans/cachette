@@ -142,6 +142,11 @@ probe:
     # backwards. The sort by (faction, sequence) is what restores the order,
     # so this test must pass under the probe and fails when the sort goes.
     cargo test --package cachette-core --features probe-nondeterminism --test controller the_commands_apply_in_faction_then_sequence_order
+    # The stale-destination build removes the one derivation of the
+    # destination field that a frame makes. Nothing else in a frame derives
+    # it, so a sent unit reads a field that describes a seed set the world no
+    # longer holds. The two tests below must fail under it.
+    ! cargo test --package cachette-core --features probe-stale-destinations --test the_step_derives_the_destination_field_after_the_controller
 
 # Check the unsafe code with Miri. ADR-0097 D4.
 #

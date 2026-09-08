@@ -471,10 +471,17 @@ impl InfluenceField {
     /// A plane of one faction is read only by that faction, so relaxing one
     /// plane before another does not change either of them.
     ///
-    /// **A plane with fewer cells than the caller has threads is filled on
-    /// one thread.** Starting a thread for one cell costs more than the cell
-    /// does. The rule reads the two numbers the caller already supplied and
-    /// holds no constant of its own.
+    /// **A caller that asks for one thread gets no thread, and a plane with
+    /// fewer cells than the caller has threads is filled on one thread.**
+    /// Starting a thread for one cell costs more than the cell does. The rule
+    /// reads the two numbers the caller already supplied and holds no
+    /// constant of its own.
+    ///
+    /// **The one-thread case is the first half of that rule and not a second
+    /// rule.** A guard that compared the cells against the threads alone read
+    /// four against one on a small world and spawned one thread to do the
+    /// work of four cells, for each faction and each pass. The trainer runs
+    /// one thread for each world, so every training frame paid it.[^5]
     ///
     /// Returns whether the pass changed anything. The ordinary build ignores
     /// the answer and the perturbed build stops on it.
@@ -485,6 +492,7 @@ impl InfluenceField {
     /// [^2]: Influence maps, section 6.5. `docs/research/reports/09-influence-maps.md`
     /// [^3]: ADR-0060, an influence map is stored as a shared basis, decision D4. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
     /// [^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+    /// [^5]: Findings register, FND-665. `docs/FINDINGS.md`
     fn relax(&mut self, threads: usize) -> bool {
         let cells = self.cells;
         let cell_count = cells.tile_count() as usize;
@@ -500,7 +508,7 @@ impl InfluenceField {
                 sources: &self.sources[first..last],
             };
 
-            if cell_count <= threads {
+            if threads <= 1 || cell_count <= threads {
                 pass.fill(0, cell_count, &mut self.scratch);
             } else {
                 let chunk_len = cell_count.div_ceil(threads).max(1);
