@@ -9,10 +9,18 @@ the alignment law, the trade between seeds and generations, and the acceptance
 protocol. **This report does not repeat it.** Read that report for the settings
 and this one for the objective.
 
-**The headline is that the reward is misspecified, and the measurement is
-plain.** The trained policies grow, build, and expand. They found no city and
-they fight little. That is not a failure of the search. It is the policy doing
-what the score asked for, and the score asked for held ground.
+**The headline is that the shaped term is the objective, and that the shaped
+term is a good one.** Held ground decided 87.6 percent of the pairwise
+comparisons of the last run. **That is measured, and it is not by itself a
+defect.** A later measurement, taken while this report was written, puts held
+ground at 0.871 on the test of section 4.2. Optimising it is a sound route to
+winning.
+
+**So the reward is not the defect, and this report asserted that it was.** The
+author recommended replacing it, and a one-cell-hour measurement refuted the
+recommendation the same day. Section 4.4 holds the correction and section 8.1
+holds it as precedent. **The suspect returns to the observation and the action
+table, which the companion report named first.**
 
 ## 0 Provenance, and what this report could not verify
 
@@ -33,6 +41,12 @@ arithmetic.
 
 **Reasoning.** The author argues from the code or from published work. No
 measurement supports it. Each such passage says so.
+
+**One claim of this report was refuted after it was written.** The author
+recommended a survival term as the primary shaped term. A larger run of the
+measurement in section 4.2 shows that the tick of the end orders candidates
+backwards. Section 4.4 states the correction, and the recommendation is
+withdrawn.
 
 **Three things the author could not verify.**
 
@@ -128,12 +142,16 @@ percent of the renown target in a mean episode. **Neither path can fire in an
 episode of 2500 ticks.** The live game is domination or territory, and territory
 is exactly held ground compared at the tick limit.
 
-**What follows, and it reframes the whole diagnosis.** The policies did not learn
-a proxy instead of the objective. They learned one of the two live win
-conditions. The reward reinforced it, and the game rewarded it as well. **The
-reward is still wrong.** It pays for territory continuously. The game pays for
-territory only at the tick limit, and only to the faction that holds more than
-both rivals.
+**What follows.** The policies did not learn a proxy instead of the objective.
+They learned one of the two live win conditions. The reward reinforced it, and
+the game rewarded it as well. **That is why held ground scores 0.871 on the test
+of section 4.2, and it is why the reward is not the defect.**
+
+**One thing about the reward is still questionable, and it is smaller than this
+report first claimed.** The reward pays for territory continuously. The game pays
+for territory only at the tick limit, and only to the faction that holds more
+than both rivals. Whether the schedule matters is unmeasured.
+
 ## 2 The mechanics as training material
 
 A mechanic is training material when three things hold. The policy can observe
@@ -402,19 +420,49 @@ order anything, and every figure rests on 7 pairs.
 | `end_tick` | 0.000 | 0.500 |
 
 **Read this table as a demonstration of the confound and not as an answer.**
-Seven pairs cannot separate 0.429 from 0.643. What the table does show is that
-the correction changes the sign of the reading. Held ground reads below a coin as
-a total, and above a coin as a rate. **Run the script at a size that can
-answer**, and section 9 places it.
+Seven pairs cannot separate 0.429 from 0.643. Section 4.4 holds a larger run
+that answers.
 
-**One refinement of the companion report follows from the last row.** The
-survival term reads 0.000 as a total, and that is arithmetic rather than noise.
-A winner ends its episode the moment it wins. So within one world the winner
-holds the lowest end tick of any candidate. The companion report calls the term
-monotone toward the tick-limit path. That is true, and it does not claim the term
-orders winning. **Do not read
-it as ordering winning. It orders survival, and the bound of section 5 is what
-keeps it from outranking a win.**
+### 4.4 The larger run, and the recommendation it withdrew
+
+**Measured, by a second session on the same day.** A run of 28 candidates over 8
+worlds gave 249 winner-and-loser pairs from 3 maps.[^22]
+
+| Field | Orders like winning |
+|---|---|
+| `held_tiles` | 0.871 |
+| `seats_held` | 0.827 |
+| `store_total` | 0.771 |
+| `live_units` | 0.735 |
+| `population` | 0.735 |
+| `wonder_progress` | 0.528 |
+| `best_renown` | 0.500 |
+| `end_tick` | 0.444 |
+
+**Two things follow, and both correct this report.**
+
+**Held ground is the best proxy measured.** At 0.871 it orders candidates almost
+as winning does. **A reward that weighs it is not misspecified.** This report
+opened by claiming that it was, and the claim does not survive.
+
+**The tick of the end orders candidates backwards.** The companion report derived
+a survival term, the author of this report endorsed it, and a third session
+shipped it. **All three missed the same thing.** An episode also ends early when
+the reading seat itself wins, by domination. So a long episode is evidence of not
+winning, and weighing the tick teaches the search to lose. The strategy and its
+bound test are removed from the tree.[^22]
+
+**The figures are narrow and the direction is not.** Only 11 of 224 episodes were
+won, and all 249 pairs come from 3 maps. The candidates are random rather than
+trained, and a proxy that orders random candidates need not order good ones. **The
+gap between 0.871 and 0.444 is wide enough to act on. The exact figures are
+not.**
+
+**One measurement is still missing, and it is now cheap.** That run used the
+script before the rate column existed, so every figure in it is a total. Held
+ground at 0.871 as a total shows the length confound is not binding for that
+field. **Rerun with the rate column** to see which of the middle rows the
+episode length was hiding.
 
 ## 5 Integrating scoring across mechanics
 
@@ -508,7 +556,7 @@ learns to lose slowly.
 **Worked example.** The world holds 2304 tiles and the tick limit is 2500. The
 win weight is 2000, so the gap is 4000. This is the weighting one commit added
 and another session was removing while this report was written, so read the
-arithmetic and not the shipped state.[^22]
+arithmetic and not the shipped state.[^23]
 
 | Term | Weight | Ceiling | Contribution |
 |---|---|---|---|
@@ -523,7 +571,7 @@ bound can fail.
 
 **Note the ceiling is an episode ceiling and not the schema bound.** The schema
 declares the tick bound as the whole range of a 64-bit integer. A tighter bound
-would be a measured figure, and a blocker governs those.[^23] The right
+would be a measured figure, and a blocker governs those.[^24] The right
 ceiling for the tick is the tick limit, which the run sets.
 
 **Two gaps in that check, and both are real.**
@@ -567,41 +615,49 @@ rather than a measurement of it.
 
 ### 5.6 The integration this report recommends
 
-**Recommendation. Replace the reward with a two-term score: the outcome, and
-survival. Drop held ground entirely for the first arm.**
+**The author's first recommendation was to replace the reward with the outcome
+and a survival term, and to drop held ground.** Section 4.4 refutes it. Held
+ground orders candidates at 0.871 and the tick of the end orders them at 0.444.
+**The recommendation is withdrawn, and the arithmetic that supported it is left
+in section 5.4, because the arithmetic is right and the term choice was wrong.**
 
-| Term | Weight | Ceiling | Why |
-|---|---|---|---|
-| `won` | +2000 | | The outcome should decide every pair it can |
-| `lost` | -2000 | | |
-| `drawn` | 0 | | |
-| `tick` | 0.5 | 2500 | Never ties while two episodes end at different ticks. Pays 1250 of the 4000 gap |
+**Recommendation. Keep held ground, weigh it at 0.1, and add no survival
+term.**
 
-**Four reasons, and the fourth is the one that decides it.**
+| Term | Weight | Ceiling | Contribution | Why |
+|---|---|---|---|---|
+| `won` | +2000 | | | The outcome decides every pair it can |
+| `lost` | -2000 | | | |
+| `drawn` | 0 | | | |
+| `held_tiles` | 0.1 | 2304 | 230 | The best proxy measured, at 0.871 |
+| `seats_held` | 20 | 3 | 60 | The second best, at 0.827, and it never ties on a world where a seat changed hands |
 
-**Held ground is already a win path.** Territory at the tick limit compares held
-ground. Paying for it continuously pays twice for the same thing, and it pays for
-it on a schedule the game does not use.
+**The sum is 290 against a gap of 4000, so the outcome dominates by a wide
+margin.**
 
-**Held ground is the term that captured the run.** It decided 87.6 percent of the
-pairs of 136 generations. Removing it is the smallest change that removes the
-bias.
+**Three reasons for the smaller tile weight, and the third is the one that
+matters.**
 
-**Survival never ties while two episodes end at different ticks.** It has 250
-levels over an episode of 250 decisions, against the two levels of an outcome.
-That is what makes the ranking express one objective in every generation, which
-is section 5.3.
+**A weight of 1.0 cannot cross the outcome gap, and 0.1 cannot come near it.**
+Both are safe by section 5.4. So this is not a safety choice.
 
-**Survival is monotone toward the win condition the game can actually
-resolve.** A faction cannot be eliminated, so an episode ends before the limit
-only when a rival wins.[^24] A faction that reaches the limit is compared on
-held ground. **So surviving to the limit is the precondition of the territory
-path, and it is a precondition rather than a proxy.**
+**The measured run's ranking was almost entirely the shaped term.** Section 1.1
+puts it at 87.6 percent of the pairs. A weight of 0.1 moves that share toward
+the outcome without removing the term that orders the population when nobody
+wins.
 
-**Then, and only then, add held ground back at 0.1 as a second arm.** Two arms
-that differ in one weight, run at the same population and the same seeds, tell
-you what the term is worth. **Log the score vector of each generation**, or
-neither arm can be read.[^1]
+**Nothing has measured what the weight is worth, because no run logged the score
+vector.** Two arms at 1.0 and 0.1 sorted their populations identically in every
+generation where nobody won.[^1] **Log the score vector of each generation.**
+Until that lands, every reward experiment in this project is unreadable, and
+that is a larger obstacle than the choice of weight.
+
+**What to do about the tie instead of a survival term.** Section 5.3 says the
+ranking must express one objective in every generation. Held ground at 0.1 does
+that in the 34.6 percent of generations where nobody won, and the seats term
+adds a second level where a seat changed hands. **Neither term needs a
+quantity that orders backwards.**
+
 ## 6 Model tiers
 
 **The tier ladder of this project is a ladder of methods and not of sizes.**
@@ -824,6 +880,35 @@ converting it to a pair share.
 decides.** Compute that share from the win share of each generation, before the
 run and again after it.
 
+*And the correction this report needed.* **A term that decides the ranking is
+not thereby the wrong term.** The author read the 87.6 percent as a defect and
+recommended replacing the reward. Held ground then measured 0.871 on the proxy
+test. **A high pair share says the term is the objective. Only a proxy
+measurement says whether that is bad.**
+
+**1a. Two independent derivations agreed on a survival term, and both were
+wrong. Source: tree. This is the most valuable entry of the section.**
+
+*Believed.* A faction cannot be eliminated, so an episode that ends before the
+tick limit ended because a rival won.[^37] The tick a seat reached therefore
+measures how long it denied a win. Weighing it turns two classes of a loss into
+250 classes.
+
+*True.* **An episode also ends early when the reading seat itself wins**, by
+domination. So a long episode is evidence of not winning. Measured over 249
+pairs, the tick of the end orders candidates at 0.444, which is below a coin.
+**Weighing it teaches the search to lose.**
+
+*Caught by* a run of the proxy quality script at 28 candidates over 8 worlds,
+one day after the term shipped.[^22]
+
+*Rule.* **Two derivations agreeing is not the same as being right.** The
+companion report derived the term, this report endorsed it, and a session
+shipped it with three tests. **Every one of the three checked the bound and none
+of them checked the sign.** A bound test asks whether a term can outrank the
+outcome. **Ask first whether the term orders the outcome the right way**, and
+that measurement costs about one cell-hour.
+
 **2. A nearly ternary score gave a whole run nothing to rank. Source: register,
 FND-637.**
 
@@ -850,7 +935,7 @@ answered by a term that never ties and cannot cover the outcome gap.**
 companion report and the main session took the gap for the win weight.
 
 *Caught by* writing the derivation down and by three tests, one of which proves
-the bound can fail.[^22]
+the bound can fail.[^23]
 
 *Rule.* **The gap is twice the win weight.** The safe condition is that the sum
 of weight times episode ceiling over every shaped term stays below it. **A
@@ -860,7 +945,7 @@ comment cannot hold this, because nothing fails when someone raises a weight.**
 
 *Believed.* The bound is checked.
 
-*True.* The test was parametrised over one strategy name.[^22] Six weightings
+*True.* The test was parametrised over one strategy name.[^23] Six weightings
 were unchecked, and three of those weigh a term whose episode ceiling the test
 does not state. **Derived:** the population weighting covers the gap at a net
 gain of 1334 people. Measured population is a single digit, so nothing has met
@@ -931,7 +1016,7 @@ run report.
 register, FND-668.**
 
 *Believed.* Keeping only the best directions of a generation improves the step,
-as the published method reports.[^37]
+as the published method reports.[^38]
 
 *True.* It is worse at every noise level measured on this problem. Discarding
 directions in a space this large loses more than the selection gains.
@@ -1099,7 +1184,7 @@ tree.**
 *True.* Six run directories hold a status file, and between them they record
 seven faults. Five exited 135 and two exited 139. **Exit 139 is a segmentation
 signal and exit 135 is a bus signal, so they are two different faults.** The
-register names only the first.[^38] The status files recorded each one
+register names only the first.[^39] The status files recorded each one
 correctly.
 
 *Caught by* the author reading the status files.
@@ -1145,7 +1230,7 @@ entry.
 **26. A hard kill on a launcher strands billing resources. Source: tree.**
 
 *True.* The launcher traps three signals and terminates the instance and deletes
-the security group in the trap.[^39] A kill that cannot be trapped skips
+the security group in the trap.[^40] A kill that cannot be trapped skips
 all of it, and the instance keeps billing.
 
 *Rule.* **Stop a launcher through its own stop path.** A trap is not a guarantee.
@@ -1229,61 +1314,71 @@ Run down these ten lines. Each one is an entry above.
     decides.
 ## 9 What to do next
 
-**Replace the reward before any further tuning. That is the answer to the
-project owner's question, and it is not close.**
+**Do not replace the reward. Log the score vector, then move to the observation
+and the action table.**
 
-Three reasons. The reward decided 87.6 percent of the pairs of the last run, so
-it is the objective and not a hint. Every setting the companion report tunes is
-tuned against whatever objective the ranking expresses, so tuning first tunes the
-wrong thing. And the replacement is a weighting, so it costs nothing to make.
+**That answers the project owner's question, and it is the opposite of what this
+report first said.** The author recommended replacing the reward. Section 4.4
+refutes it: held ground orders candidates at 0.871 and is the best proxy
+measured. The reward is not the binding constraint.
+
+**The binding constraint is that no run has been readable.** No run logged the
+score vector of a generation, so no reward experiment of this project can be
+read afterwards. That is one line of code and one file.
 
 The list below is consistent with the companion report's plan and it reorders
 it.[^1] A step marked new is not in that plan.
 
-**Step 1. Change four settings and one weighting. Cost: none.**
+**Step 1. Log the score vector and the per-seed outcome. Cost: none. New in its
+ordering.**
 
-Set the weighting to the outcome plus survival at 0.5, and drop held ground.
-**New: dropping held ground is a change to that plan, which keeps it at 0.1.**
-Set the population to 64 and the seeds to 2. Set the hidden width to 8. Log the
-score vector of each generation and the outcome of each seed.
+Every later step is unreadable without it. This report and the companion report
+both had to reason around its absence.
 
-**Step 2. Run the best constant-preference policy. Cost: 2.9 cell-hours.**
+**Step 2. Change three settings and keep the weighting. Cost: none.**
+
+Set the population to 64, the seeds to 2, and the hidden width to 8. Keep the
+outcome at plus or minus 2000 and held ground at 0.1, and add no survival term.
+Section 5.6 states the weighting.
+
+**Step 3. Run the best constant-preference policy. Cost: 2.9 cell-hours.**
 
 Play the 29 policies that always prefer one verb over the holdout, and report the
 win share of each. This is the cheapest decisive experiment available. If the
 best fixed preference matches the best trained policy, then search has bought
 nothing and the interface is the binding constraint.
 
-**Step 3. Measure the proxy quality of every scoreable field. Cost: about 1
+**Step 4. Rerun the proxy measure with the rate column. Cost: about 1
 cell-hour. New.**
 
-Run the corrected script at a size that can answer: about 64 candidates over 32
-worlds, which is 2048 episodes.[^20] Report the total column and the rate
-column together. **This tells you which field to weigh, and it is the
-measurement this report could not take.**
+The 249-pair run used the script before the rate column existed, so every figure
+in it is a total.[^21] Run about 64 candidates over 32 worlds, which is 2048
+episodes, and report both columns. **The direction of the existing answer is
+firm. The exact figures are not, and three of the middle rows may be hidden by
+episode length.**
 
-**Step 4. Run the recommended setting long. Cost: about 14 cell-hours.**
+**Step 5. Run the recommended setting long. Cost: about 14 cell-hours.**
 
-One arm at the settings of step 1, for 400 generations, validated on 512 fixed
-seeds every 20 generations. Run it beside step 2 on one box.
+One arm at the settings of step 2, for 400 generations, validated on 512 fixed
+seeds every 20 generations. Run it beside step 3 on one box.
 
-**Step 5. Trim the array and train both layers. Cost: about 11 cell-hours for
+**Step 6. Trim the array and train both layers. Cost: about 11 cell-hours for
 each of three arms. New in its ordering.**
 
-Run three arms at the setting step 4 chose. The first is the present fixed
+Run three arms at the setting step 5 chose. The first is the present fixed
 projection at hidden 24. The second is a fully trained network at hidden 8 over
 the whole array. The third is the same network over the trimmed array. **This
 is the starter tier of section 6, and it needs no engine change.** The
 companion report places this fourth; the author places it here because it is
 the cheapest change that raises what the policy can represent.
 
-**Step 6. Test the seed count at equal budget. Cost: about 22 cell-hours.**
+**Step 7. Test the seed count at equal budget. Cost: about 22 cell-hours.**
 
 Two arms of 200 generations at 256 episodes each: 128 pairs on one seed, and 64
 pairs on two. This is what makes the companion report's simulation falsifiable,
-so run it even if step 4 succeeds.
+so run it even if step 5 succeeds.
 
-**Step 7. Add the missing single-position fields, in one change. New.**
+**Step 8. Add the missing single-position fields, in one change. New.**
 
 The renown target, the wonder threshold, the count of finished upgrades in own
 ground, a settled-contract count, a goods-moved total, and a relation summary.
@@ -1292,32 +1387,34 @@ scoreable, and they let the policy see the quantity that decides its own
 territory. **Write a decision record, because this moves the observation version
 and retires every stored policy.**[^14]
 
-**Step 8. Raise the spatial resolution and add a spatial argument, together.**
+**Step 9. Raise the spatial resolution and add a spatial argument, together.**
 
-Section 7.2 says why neither alone buys much. Do this with step 7 if the two can
+Section 7.2 says why neither alone buys much. Do this with step 8 if the two can
 share one version bump.
 
-**Step 9. Build the policy gradient learner.**
+**Step 10. Build the policy gradient learner.**
 
 Section 6.3 states the case and the four missing parts. Keep the evolution
 strategy as the control, and make the new method beat it on the acceptance
 protocol of the companion report.
 
-**Step 10. Test the decision interval.**
+**Step 11. Test the decision interval.**
 
 Measure the boundary cost of an interval of 2 on one generation before committing
 a run. Choose the interval and the method together.
 
 ### 9.1 The three things to do first
 
-**Replace the reward.** It is free, and it is the finding of this report.
-
-**Measure the proxy quality of every scoreable field.** One cell-hour buys the
-answer to "which field should the reward weigh", and the project has been
-guessing.
+**Log the score vector of every generation and the outcome of every seed.** It
+is free, and without it no reward experiment of this project can be read.
 
 **Run the constant-preference baseline.** Until it runs, nobody knows whether
-this project has a search problem or an interface problem.
+this project has a search problem or an interface problem. It costs 2.9
+cell-hours.
+
+**Stop treating the reward as the suspect.** Held ground measures 0.871 as a
+proxy for winning. The observation and the action table are where the remaining
+work is, and sections 6 and 7 say what to change in each.
 
 ## References
 
@@ -1342,9 +1439,9 @@ this project has a search problem or an interface problem.
 [^19]: Amodei and others, Concrete Problems in AI Safety, 2016, section on reward hacking. https://arxiv.org/abs/1606.06565
 [^20]: The proxy quality script. `scripts/proxy_quality.py`
 [^21]: Recurring Defect Shapes, shapes 1 and 5. `.agents/rules/recurring-defects.md`
-[^22]: The commit `Pay a seat for how long it denied a win, and bound the weight by a test`. Read its message for the derivation and the two corrections.
-[^23]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-[^24]: Findings register, FND-583. `docs/FINDINGS.md`
+[^22]: The commit `Remove the survival term, because the tick of the end predicts losing`. Read its message for the 249-pair table.
+[^23]: The commit `Pay a seat for how long it denied a win, and bound the weight by a test`. Read its message for the derivation and the two corrections.
+[^24]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^25]: Findings register, FND-668. `docs/FINDINGS.md`
 [^26]: The policy module and its fixed projection. `python/cachette/learn/policy.py`
 [^27]: The throughput reading of the target platform. `runs/graviton/dense-depth/throughput.txt`
@@ -1357,6 +1454,7 @@ this project has a search problem or an interface problem.
 [^34]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decisions D1 and D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^35]: Sun and others, TStarBots: Defeating the Cheating Level Builtin AI in StarCraft II in the Full Game, 2018. https://arxiv.org/abs/1809.07193
 [^36]: Findings register, FND-582. `docs/FINDINGS.md`
-[^37]: Mania, Guy and Recht, Simple random search provides a competitive approach to reinforcement learning, 2018. https://arxiv.org/abs/1803.07055
-[^38]: Findings register, FND-646. `docs/FINDINGS.md`
-[^39]: The training launcher and its teardown trap. `scripts/graviton-train.sh`
+[^37]: Findings register, FND-583. `docs/FINDINGS.md`
+[^38]: Mania, Guy and Recht, Simple random search provides a competitive approach to reinforcement learning, 2018. https://arxiv.org/abs/1803.07055
+[^39]: Findings register, FND-646. `docs/FINDINGS.md`
+[^40]: The training launcher and its teardown trap. `scripts/graviton-train.sh`
