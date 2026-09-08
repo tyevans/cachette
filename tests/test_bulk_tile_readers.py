@@ -170,12 +170,20 @@ def _a_struck_world() -> tuple[cachette.World, tuple[int, int]]:
 
 
 def _air_centre(world: cachette.World) -> tuple[float, float]:
-    """Return the column and the row of the centre of the water in the air."""
+    """Return the column and the row of the centre of the water in the air.
+
+    The reading covers the world alone. The caller must therefore prove that
+    the whole plume is still inside the world before it trusts the answer.
+    """
     across = world.weather_cells_wide
-    plane = world.weather_air().astype(float).reshape(across, across)
+    down = world.weather_cell_count // across
+    plane = world.weather_air().astype(float).reshape(down, across)
     total = plane.sum()
     assert total > 0
-    rows, columns = np.mgrid[0:across, 0:across]
+    assert total == world.weather_totals()["air"], (
+        "water has reached the margin, and the centre no longer reads the plume"
+    )
+    rows, columns = np.mgrid[0:down, 0:across]
     return float((plane * columns).sum() / total), float((plane * rows).sum() / total)
 
 
@@ -186,6 +194,18 @@ def test_the_wind_column_points_the_way_the_air_travels() -> None:
     first wind the boundary publishes. It agrees instead with what the wind
     does: the engine carries the water in the air along it. A reader that swaps
     the two axes, or that negates one, fails here.
+
+    **The span is one step, and it cannot be longer.** The engine steps a
+    margin of cells outside the world, a weather array crops the margin away,
+    and the plume of one strike reaches both borders of this world on the
+    second step. From there the centre of the cropped array measures what left
+    the world and not what the wind carried. The helper asserts that the whole
+    plume is still inside the world, so a longer span fails loudly rather than
+    reading a number that means nothing.
+
+    One step is also the whole of what this test can claim. It reads the wind
+    of one cell, and the plume moves on the wind of every cell it reaches, so
+    a span of several steps integrates a field that this test never read.
     """
     world, place = _a_struck_world()
     winds = world.tile_winds()
@@ -194,8 +214,7 @@ def test_the_wind_column_points_the_way_the_air_travels() -> None:
     along_r = int(winds["r"][index])
     assert (along_q, along_r) != (0, 0), "the fixture must hold a moving wind"
     first = _air_centre(world)
-    for _ in range(8):
-        world.step(1)
+    world.step(1)
     last = _air_centre(world)
     moved_q = last[0] - first[0]
     moved_r = last[1] - first[1]
