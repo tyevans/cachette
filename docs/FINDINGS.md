@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-679**
+**Next number: FND-680**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -17614,6 +17614,57 @@ of another is comparing area for the most part. The cell tile count is present,
 so the division is available to a reader that performs it, and the array does
 not perform it.
 
+### FND-679 — A symmetric outcome weight makes a draw the rational play, so the policy learned to survive rather than to win
+
+**Believed.** The trained policy did not learn. It grew, then held still, and it
+took no settler and started no war. The observation was inadequate and the
+learner could not tell whether it was winning, so it learned little.
+
+**True.** The policy learned the objective it was given, and that objective
+prefers a draw to an attempt at a win. The reward weighted the held tile count
+at 0.1, the win at 2000, the loss at minus 2000 and the draw at zero.
+
+The shaped term telescopes to the difference between the last reading and the
+first, so it contributes about 0.1 times the final held count over a whole
+episode.[^F679A] The outcome contributes 2000. The objective is therefore an
+outcome objective with a small dense term beside it.
+
+A faction that plays for a draw scores zero from the outcome. A faction that
+plays for a win scores `p` times 2000 less `1 - p` times 2000, where `p` is its
+chance of winning. That is positive only when `p` is above one half. One seat
+of a symmetric game of three factions holds one third of the wins whatever the
+players do, so the attempt loses about 667 points against a draw.
+
+**Evidence.** The weights are in the run entry points.[^F679B] The expected
+score of an attempt at a win is negative for every win rate below one half:
+one third gives minus 667, and two fifths gives minus 400. A draw with the
+observed final held count of about 190 tiles gives about 19.
+
+The behaviour the project owner observed matches this exactly: growth, then
+stability, no settler, a ring of the faction's own units around its city, and
+upgrades inside the ring. That is the cheapest way to reach the tick limit
+alive.
+
+**What follows.** The reward selected survival. Two conclusions the project drew
+from the behaviour were therefore wrong.
+
+The first is that the policy was not learning. It was, and the behaviour is
+state-dependent and sequenced in a way a policy that ignores its observation
+cannot produce. A constant-preference policy repeats one action row and does
+none of this.
+
+The second is that the optimiser or the observation was the binding constraint.
+Neither was, for this defect. A better observation and a better step direction
+both let a policy pursue the objective more effectively, and the objective
+still ranks a draw above an attempt at a win.
+
+A loss must cost less than a win pays, by the ratio the chance line sets. With
+`drawn` at zero, an attempt at a win is preferred only when the loss weight is
+smaller in magnitude than the win weight times `p` over `1 - p`. At one third
+that means the loss must cost less than half of what the win pays. A symmetric
+pair of outcome weights is the defect, and it is arithmetic rather than
+learning.
+
 ## References
 
 [^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
@@ -17622,6 +17673,8 @@ not perform it.
 [^F676A]: The commit `Record that a difference reward telescopes, and what the array does not carry`. Read its message for the measurement.
 [^F676B]: Report 42, what a policy should be able to see, section 10.4. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
 [^F677A]: The commit `Merge the tool that draws what a policy sees`. Read its message for the figures.
+[^F679A]: Findings register, FND-676. `docs/FINDINGS.md`
+[^F679B]: The commit `Record that the outcome weights prefer a draw to an attempt at a win`. Read its message for the weights and the arithmetic.
 [^F668A]: The commit `Measure what sets how well one generation points the right way`. Read its message for the figures.
 [^F667A]: The commit `Measure what water does to a training world, and free two colliding numbers`. Read its message for the figures.
 [^F667B]: Findings register, FND-666. `docs/FINDINGS.md`
