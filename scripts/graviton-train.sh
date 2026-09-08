@@ -384,14 +384,15 @@ connect() {
 # fetch yet, so this stays quiet until there is something to take.
 fetch_wheel() {
     [ -n "${wheel_key:-}" ] || return 0
-    local target="$WHEEL_CACHE/$wheel_key.whl"
-    [ -f "$target" ] && return 0
-    mkdir -p "$WHEEL_CACHE"
-    if scp "${ssh_options[@]}" "$remote:cachette.whl" "$target.part" >/dev/null 2>&1; then
+    local target="$WHEEL_CACHE/$wheel_key"
+    compgen -G "$target/*.whl" >/dev/null && return 0
+    mkdir -p "$target.part"
+    if scp "${ssh_options[@]}" "$remote:wheelhouse/*.whl" "$target.part/" >/dev/null 2>&1; then
+        rm -rf "$target"
         mv "$target.part" "$target"
         say "Kept the wheel for build $wheel_key. The next run with these sources skips the compiler"
     else
-        rm -f "$target.part"
+        rm -rf "$target.part"
     fi
 }
 
@@ -669,10 +670,11 @@ rm -f "$out_dir/tree.tgz"
 # does. The follower fetches the wheel a build produces, so the next run with
 # the same inputs pays nothing for it.
 wheel_key="$(build_key)"
-cached_wheel="$WHEEL_CACHE/$wheel_key.whl"
-if [ -f "$cached_wheel" ]; then
+cached_wheel="$WHEEL_CACHE/$wheel_key"
+if compgen -G "$cached_wheel/*.whl" >/dev/null; then
     say "Sending the cached wheel for build $wheel_key. The instance skips the compiler"
-    scp "${ssh_options[@]}" "$cached_wheel" "$remote:cachette.whl" >/dev/null
+    ssh "${ssh_options[@]}" "$remote" "mkdir -p wheelhouse" >/dev/null
+    scp "${ssh_options[@]}" "$cached_wheel"/*.whl "$remote:wheelhouse/" >/dev/null
 else
     say "No cached wheel for build $wheel_key. The instance compiles once, and the run keeps the result"
 fi
@@ -700,7 +702,7 @@ tar -xzf tree.tgz -C cachette
 # toolchain and building the extension is most of the time between boot and
 # the first episode, and the bytes it produces are a function of the sources
 # alone. A run that received a wheel skips both.
-if [ -f "$HOME/cachette.whl" ]; then
+if ls "$HOME"/wheelhouse/*.whl >/dev/null 2>&1; then
     printf 'a wheel arrived for this build. Skipping the compiler\n'
 else
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
@@ -722,7 +724,7 @@ uv sync --frozen --no-install-project 2>&1 | tail -5 \
 # The extension is a compiled module, so the learner needs a build and not
 # only an install. This is the step that fails first if the target platform
 # cannot build it, and it fails before anything long has run.
-if [ ! -f "$HOME/cachette.whl" ]; then
+if ! ls "$HOME"/wheelhouse/*.whl >/dev/null 2>&1; then
     # The toolchain manifest at the root pins the channel, so rustup installs
     # the version the project states and this script names none.
     rustup show active-toolchain
@@ -731,9 +733,8 @@ if [ ! -f "$HOME/cachette.whl" ]; then
     # the next run.
     uv run --no-project --with maturin maturin build --release \
         --out "$HOME/wheelhouse" 2>&1 | tail -5
-    cp "$HOME"/wheelhouse/*.whl "$HOME/cachette.whl"
 fi
-uv pip install --reinstall "$HOME/cachette.whl" 2>&1 | tail -3
+uv pip install --reinstall "$HOME"/wheelhouse/*.whl 2>&1 | tail -3
 
 # **The module must import before anything long runs.** A wheel built for
 # another platform or another Python installs without a word and fails at the
