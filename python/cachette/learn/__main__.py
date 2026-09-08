@@ -301,6 +301,22 @@ def main() -> int:
             f"learner more of the say. Default {DECISION_INTERVAL}"
         ),
     )
+    # **The candidate pass answers one question, and it has answered it.**
+    # The highest candidate of a generation is the highest of many draws on
+    # a few worlds, so it is usually the luckiest and not the best. Playing
+    # it on the validation worlds says which. It was measured three times
+    # and gave the same answer each time: the candidate scores no better
+    # than the centre, and once it scored well below it. The pass costs one
+    # validation set for each validating generation, so it is off unless a
+    # caller asks for it again.
+    parser.add_argument(
+        "--validate-candidate",
+        action="store_true",
+        help=(
+            "play the highest candidate of a generation on the validation "
+            "worlds as well as the centre. Off by default"
+        ),
+    )
     parser.add_argument("--only", type=str, default="")
     parser.add_argument(
         "--league",
@@ -425,6 +441,7 @@ def main() -> int:
             seed=index,
             learner_seats=learner_seats,
             relative=not arguments.absolute_scoring,
+            validate_candidate=arguments.validate_candidate,
         )
         result = train(
             name,

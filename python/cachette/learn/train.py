@@ -143,6 +143,12 @@ class TrainConfig:
     # Whether a seated generation ranks the margin against the other seats of
     # one world, or the raw return. This has no meaning without seated play.
     relative: bool = True
+    # Whether a validating generation also plays the highest candidate on the
+    # validation worlds. The centre is what the run keeps, so this measures
+    # nothing the run acts on. It answers one question: whether the highest
+    # of many draws on a few worlds is a real gain or the luckiest draw. That
+    # question has been answered, so the pass is off unless a caller asks.
+    validate_candidate: bool = False
 
 
 class TrainResult(TypedDict):
@@ -722,7 +728,12 @@ def train(
             # This chooses nothing. The stored best centre is decided by
             # `validate` above and by nothing here.
             candidate_checked: float | None = None
-            if validating and validation and checked is not None:
+            if (
+                train_config.validate_candidate
+                and validating
+                and validation
+                and checked is not None
+            ):
                 highest = int(np.argmax(played.absolute))
                 candidate_checked = score_on_validation(
                     pair_candidates(
