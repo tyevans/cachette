@@ -16845,16 +16845,41 @@ eleven wins of thirty-two when it was measured again on thirty-two worlds,
 against the yardstick's thirteen. Eight worlds quantise the win share into
 eighths, and 3/8 is 0.375. The claim was an artefact of a coarse instrument.
 
-**What follows.** Two things.
+**A correction inside this finding, made the same day it was written.** The
+first version said that a policy which reaches the yardstick has reached
+chance. **That does not follow, and it is wrong.** The yardstick is one third
+because three copies of one controller share the wins of a symmetric game.
+The learner does not play a symmetric game. It holds one seat against two
+built-in controllers, and a policy weaker than a controller takes less than
+one third of that game. **A learner that reaches one third there is as strong
+as a controller**, which is the thing the yardstick was meant to say.
 
-Read the yardstick as the chance line of a three-faction game. A policy that
-reaches it has reached chance, which is a real distance from where a run
-starts, and is not a policy that plays well.
+What the yardstick cannot say is whether the controller plays well. It
+reports the number of factions. A project that wants to know how good the
+standard is must measure the controller against something else.
 
-Measure against a target that a policy cannot reach by accident. The next
-milestone is a win share above one third by more than the error of the
-measurement, and thirty-two worlds cannot show it. One hundred and twenty-eight
-worlds bring the standard error near 0.04.
+**A second correction.** The first version of this finding read win shares
+from a report of twenty-four worlds and drew conclusions from the order of
+its rows. The error of a proportion near one third over twenty-four worlds is
+9.6 points, so no two of those rows were separated. The claims that a trained
+policy beats a random legal action, and that it sits below chance, were both
+withdrawn. The computed values were a z of 0.29 and an interval from 4.6 to
+37.1 percent against a chance line of 33.3.
+
+**What follows.** Three things.
+
+Read the yardstick as the level at which a learner matches the built-in
+controller, and not as a statement about the quality of play.
+
+Size the measurement to the claim. A win share is a proportion, and a
+comparison needs an error smaller than the difference it reports. Eight
+worlds quantise the share into eighths and cannot report anything finer.
+Twenty-four worlds separate nineteen points. One hundred and twenty-eight
+worlds bring the error near 4 points, and two hundred and fifty-six bring it
+near 3.
+
+Do not draw a conclusion from the order of rows in a table without the error
+of each row beside them. This finding did exactly that, twice, in one day.
 
 ### FND-646 — The trainer takes a native fault under load, and it is not the shard path
 
