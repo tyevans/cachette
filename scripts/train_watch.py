@@ -277,7 +277,7 @@ def render(
         yard = strategy.yardstick
         lines.append(
             f"  --- {name}: the validation seeds, which never move"
-            + (f"   the controller reaches {yard:.1f}" if yard is not None else "")
+            + (f"   chance reaches {yard:.1f}" if yard is not None else "")
         )
         lines.append(
             "      "
@@ -286,8 +286,8 @@ def render(
         if len(series) >= 2:
             first, last = series[0][1], series[-1][1]
             moved = last - first
-            way = "toward the controller" if moved > 0 else "away from the controller"
-            gap = f", {yard - last:.0f} short" if yard is not None else ""
+            way = "up" if moved > 0 else "down"
+            gap = f", {yard - last:.0f} from chance" if yard is not None else ""
             lines.append(
                 f"      moved {moved:+.0f} over {len(series)} validations, {way}{gap}"
             )
@@ -296,10 +296,21 @@ def render(
         strategy = strategies[name]
         if strategy.validations and strategy.yardstick is not None:
             best = max(strategy.validations)
-            verdict = "BEATS" if best > strategy.yardstick else "below"
+            # **The yardstick is the chance line, not a measure of skill.** The
+            # yardstick world gives the learner seat back to the built-in
+            # controller, so every faction of that game is the same controller.
+            # One seat of a symmetric game takes one share of the wins for each
+            # faction, whatever the controller does. A screen that reads
+            # "beats the controller" invites a reader to take chance for
+            # quality, and it did.
+            verdict = "above" if best > strategy.yardstick else "below"
             lines.append(
                 f"  {name:<14}validation best {best:9.1f} "
-                f"{verdict} the controller yardstick {strategy.yardstick:9.1f}"
+                f"{verdict} the yardstick {strategy.yardstick:9.1f}"
+            )
+            lines.append(
+                f"  {'':<14}the yardstick plays the controller in every seat, "
+                f"so it is the chance line and not a standard of play"
             )
     return "\n".join(lines)
 

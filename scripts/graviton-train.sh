@@ -139,14 +139,23 @@ esac
 # generations**, so they carry the resolution of the whole run. A win moves
 # the return by the win weight divided by the seed count, so eight seeds can
 # only report a whole eighth and a policy that improves inside an eighth
-# looks flat. Thirty-two seeds report a thirty-second, and they halve the
-# error of the figure the trainer uses to choose the centre it keeps.
+# looks flat.
+#
+# The seed count also sets the error of that figure, and the error decides
+# whether a gain is visible at all. The yardstick gives the learner seat back
+# to the built-in controller, so every faction of that game is the same
+# controller and its win share is one third. A policy that reaches the
+# yardstick has reached chance. Over thirty-two worlds the standard error of
+# a win share near one third is 0.083, which is larger than the advantage the
+# yardstick shows over chance, so thirty-two worlds cannot separate the two.
+# Over one hundred and twenty-eight worlds the error is near 0.04.
 #
 # They are nearly free. Validation plays one policy, so it runs as many
-# worlds as it has seeds, and thirty-two worlds on sixty-four workers takes
-# about a minute against the ten minutes of a generation.
+# worlds as it has seeds, and one hundred and twenty-eight worlds on
+# sixty-four workers takes about two minutes against the ten minutes of a
+# generation.
 default_args="--generations 20 --population 24 --seeds 6 --holdout 24 \
---hidden 24 --sigma 1.5 --learning-rate 0.3 --validation 32 --validate-every 2"
+--hidden 24 --sigma 1.5 --learning-rate 0.3 --validation 128 --validate-every 2"
 train_args="${CACHETTE_TRAIN_ARGS:-$default_args}"
 
 # How many generations the whole run takes, read out of the arguments and

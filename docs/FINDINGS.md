@@ -16818,6 +16818,74 @@ that does not hold the deciding quantity looks like.
 compare a policy that acts once for each window against a controller that acts
 many times, and the action rate alone accounts for a large part of the gap.
 
+### FND-645 — The controller yardstick is a symmetric game, so it measures one third and not skill
+
+**Believed.** The built-in controller is the standard a learned policy must
+reach. A run that scores what the controller scores has reached the quality of
+the built-in opponent.
+
+**True that it is the standard. False that it measures skill.** The yardstick
+world gives the learner seat back to the built-in controller, so all three
+factions of the yardstick game are the same controller. The win share of one
+seat of a symmetric three-faction game is one third, whatever the controller
+does. The yardstick therefore measures the number of factions and not the
+quality of the opponent.
+
+**Evidence.** The yardstick scored -354.2 on the thirty-two seed worlds. A win
+moves the return by the win weight divided by the seed count, so that score is
+thirteen wins of thirty-two, or 0.406. Chance is 10.7 of thirty-two, or 0.333.
+The difference is 2.3 wins. The standard error of a win share near one third
+over thirty-two worlds is 0.083, which is 2.7 wins. The measured advantage of
+the controller over chance is smaller than the error of the measurement.
+
+**A reading that this cost.** A run reported -469.3 against a yardstick of
+-474.2 on eight seed worlds, and the run was reported as beating the
+controller. The same centre of the same generation of the same seed scored
+eleven wins of thirty-two when it was measured again on thirty-two worlds,
+against the yardstick's thirteen. Eight worlds quantise the win share into
+eighths, and 3/8 is 0.375. The claim was an artefact of a coarse instrument.
+
+**What follows.** Two things.
+
+Read the yardstick as the chance line of a three-faction game. A policy that
+reaches it has reached chance, which is a real distance from where a run
+starts, and is not a policy that plays well.
+
+Measure against a target that a policy cannot reach by accident. The next
+milestone is a win share above one third by more than the error of the
+measurement, and thirty-two worlds cannot show it. One hundred and twenty-eight
+worlds bring the standard error near 0.04.
+
+### FND-646 — The trainer takes a native fault under load, and it is not the shard path
+
+**Believed.** A run that ended with a broken process pool failed because the
+shard path is new and untested. The generation scoring was split across worker
+processes for the first time that day.
+
+**False.** A later run that used no shards at all ended the same way. The
+process exited 139, which is the segmentation fault signal, after it had
+written the summary line of a generation. The strategy log holds no traceback,
+because a native fault raises no Python exception. The machine reported no
+kill for memory, and it held 121 free gigabytes of 123.
+
+**Evidence.** Two runs of the same day ended without finishing. The first
+scored its generations in four shards and ended at generation eleven with a
+broken process pool, which is what a shard that dies without a message looks
+like. The second used one process of sixty-four workers and ended at generation
+nine with exit 139. Both had run for over an hour first.
+
+**What is not the cause.** The shard path is one candidate the second run
+removes. A leak of worker threads is another: the surviving run of the pair
+held eighty-three threads at generation fourteen, which is the sixty-four
+workers of one batch and the overhead, and it did not grow.
+
+**What follows.** The fault is intermittent and it takes over an hour to
+appear, so a reproduction is expensive. Both machines of the pair now write a
+core file, and a debugger is installed on each, so the next fault gives a stack
+rather than a number. Do not read the shard path as the cause of the first
+failure.
+
+
 ## References
 
 [^F643A]: ADR-0192, a window of controller commands is one label distribution over the action table, decision D2. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
