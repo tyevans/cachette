@@ -1081,7 +1081,7 @@ and the callers ask it. The rule is written once, beside the drag.
 directly, with no turn taken out. The sketch renderer stands the page at an
 angle, so a press for right scrolled the map along the axis of the flat map and
 the drawing went somewhere that is not right. The mouse was correct the whole
-time, which is why the rule looked like it was applied.[^F628A]
+time, which is why the rule looked like it was applied.[^F590A]
 
 **Evidence.** The two call sites, one calling the renderer and one not. A
 quarter turn sends a sideways press down the map, and the camera moved along
@@ -2362,7 +2362,7 @@ writer wrote for the same world and camera.[^F497D]
 layout. A read-only audit reported the item done. It searched the Python
 package for the three ways a layout gets repeated, which are a buffer read, a
 structure unpack and a structured array type, and it found none of
-them.[^F526A] It concluded that no second declaration site remained.
+them.[^F590A] It concluded that no second declaration site remained.
 
 **True.** The negative result is correct and the conclusion does not follow.
 No Python module reads a byte of an event, and the runtime path was and is
@@ -3806,7 +3806,7 @@ another item's number.
 **Read the tree before you start a refined item.** The item states a need at
 the moment it was written, and the tree is the current statement of what
 exists. Reading the item alone leads to a second implementation of a thing that
-already works, which is one fact in two places.[^F526A]
+already works, which is one fact in two places.[^F590A]
 
 **An item is not done until it moves.** A directory is a status, and a status
 that nobody sets is a register that decays.
@@ -11959,7 +11959,6 @@ index against the set of open items and never against what an item says.
 [^F287C]: The exit locality benchmark, the frame row. `crates/cachette-core/benches/exit_locality.rs`
 [^F285A]: Findings register, FND-269, in this document.
 [^F525A]: The frame and step costs the viewer measures. `crates/cachette-view/src/metrics.rs`
-[^F526A]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F286A]: Target platform costs, every stage of a frame after the candidate pass became a bit plane. `docs/reference/graviton-costs.md`
 [^F277B]: Findings register, FND-285, in this document.
 [^F277C]: Findings register, FND-286, in this document.
@@ -13431,7 +13430,7 @@ happened.
 **A total is folded where the per-tick count is emptied.** The world adds each
 per-tick count to a run total at the one site that clears it. The per-tick
 counter stays the only place that counts the act, so nothing counts one act
-twice.[^F526A]
+twice.[^F590A]
 
 **One table answers one question.** The queue rows are rows of the census, and
 the second dictionary is gone. Nothing outside its own tests called it, which
@@ -13858,7 +13857,7 @@ the engine no longer held, and every gate would have passed.
 constant and the two scripts. The commit body holds the search command.
 **What follows.** The binding now exposes the bar, and each script reads it.
 One declaration site remains. This is one more local instance of the first
-recurring defect shape.[^F526A]
+recurring defect shape.[^F590A]
 ### FND-552 — The offset space of a block is the square of the block edge, and a fixture over interior blocks alone hides that
 **Believed.** A block of the lattice holds as many tile offsets as it holds
 tiles. The first observation container therefore sized every scratch bitmap and
@@ -13919,7 +13918,7 @@ fixture exercises, and it says nothing about a row the fixture never moves.
 
 **A row that counts an act belongs to the subsystem that acts.** The storm
 count now lives beside the water totals, and the birth total is folded where
-the per-tick count is emptied. Each act is counted in one place.[^F526A]
+the per-tick count is emptied. Each act is counted in one place.[^F590A]
 
 **Two rows a reader adds must be disjoint.** A drop is now a drop and nothing
 else, and every other refusal is a refusal and nothing else. State the
@@ -14442,7 +14441,7 @@ every check and left a red test behind it.
 branch, before this work touched it. The engine constant and the test literal
 disagreed by a factor of ten.
 
-**What follows.** This is the redundant declaration site shape, in a test.[^F526A]
+**What follows.** This is the redundant declaration site shape, in a test.[^F590A]
 The repair was not to update the literal. It was to read the target back from the
 engine, which the boundary now exposes beside the setter. A test that states a
 value the engine also states goes stale, and a test is the place where that looks
@@ -14640,7 +14639,7 @@ there without the reason would take it for balance.
 control plane must stop the order itself. A destination field steers by the
 reach of a level 1 cell, and a field at block pitch cannot answer one tile. The
 decision record stated this and stated the consequence: a unit that reaches its
-cell keeps the order and walks about inside the block.[^F574A]
+cell keeps the order and walks about inside the block.[^F411A]
 
 **True.** The premise stopped holding when the same record gained a second
 field. The approach field answers at the pitch of one tile, and its seed offset
@@ -14788,7 +14787,7 @@ positions in the new encoding.
 **True.** The campaign declares none. The rule that decides how many positions a
 verb takes is D2 of that record: a verb whose content the engine resolves at the
 tick the action applies takes no argument position, and a position that carried
-that content would be a second declaration of one fact.[^F580A] The engine does
+that content would be a second declaration of one fact.[^F641B] The engine does
 resolve both the objective kind and the objective tile for a faction, with no
 draw, in the pass that plans the tick. The crossing verb is the same shape: the
 engine surveys the tile. The context of the record explains why the triple
@@ -14859,7 +14858,7 @@ table, and that table takes the water crossing column of the type that steps. A
 nonzero column means the type may stand on a water tile. The invariant called
 the reader that passes no crossing, so it refused every unit on water whatever
 its type. The offending unit was a mariner, whose row carries the
-crossing.[^F581B]
+crossing.[^F177B]
 
 **Evidence.** Measured on 6 September 2026 on one development machine
 (ty001-ubuntu, x86-64). A bisect over 110 revisions named the commit that sends
@@ -14877,7 +14876,7 @@ holds the bisect log.
 capability column landed in the terrain capacity table and in the movement pass.
 The invariant kept the older, narrower reader, and nothing failed until a unit
 reached the case. This is the shape the recurring defect rule names first, and
-this is a local instance of it.[^F581C]
+this is a local instance of it.[^F590A]
 
 **A check that states a stricter rule than the code is a defect in the check.**
 It reads back correctly, it passes every test that does not reach the case, and
@@ -14895,7 +14894,7 @@ engine rule that reads none of the inputs of the test makes that change. The
 relation drift moves every entry outside the peace band one step toward it, on a
 schedule, and it reads no speaker. The release frees a sent unit when its
 destination plane stops steering it, which is what lets an arrived carrier read
-its option row and deliver at all.[^F585B]
+its option row and deliver at all.[^F574C]
 
 **Evidence.** Measured on 6 September 2026 on one development machine
 (ty001-ubuntu, x86-64). A per-tick trace of the relation fixture showed the
@@ -14936,7 +14935,7 @@ empty.[^F542C]
 One assignment wrote it and the founding was its only caller, so no verb, no
 stage and no control-plane call could move a city from one faction to another.
 Held ground is decided by the reach of the city nearest a tile, so the ground
-of a faction returned to it as soon as the lease of an invader decayed.[^F586B]
+of a faction returned to it as soon as the lease of an invader decayed.[^F586A]
 A faction with no unit and no person kept its cities, kept its ground and kept
 its seat for ever, and its cities kept producing.
 
@@ -14973,7 +14972,7 @@ character the arena no longer held.
 
 **A second instance of the same shape appeared in the same work.** A faction
 claims ground through the holder column and through a lease that outranks the
-reach of every city.[^F587A] A release that cleared the holder and left the
+reach of every city.[^F586A] A release that cleared the holder and left the
 lease gave the tile straight back on the next spread, from a lease that nobody
 could raise or lower any more.
 
@@ -15058,7 +15057,7 @@ learning runs rather than ahead of them.[^F494F] [^DEC278]
 
 **The sentence above is history. The project owner gave authority to tune
 these two values on 6 September 2026, and a later finding records what the
-measurement said.**[^F591C]
+measurement said.**[^F599A]
 
 **Measure the branch that a rule does not take.** A test proved each branch
 works, and a run showed that one of them almost never happens. Neither answer
@@ -15106,7 +15105,7 @@ apart.[^F592A]
 
 **Believed.** The reach of a city or the distance the seeder places cities
 apart is the lever on whether a taker keeps a city or burns it, and one of the
-two would be enough.[^F593A]
+two would be enough.[^F601D]
 
 **True.** Both had to move. The base reach decides whether an undeveloped
 faction keeps what it takes, and the reach bound decides whether a developed
@@ -15153,7 +15152,7 @@ work that now takes more ticks than it lives for. The builder died partway and
 the assertion measured the hunger.
 
 The destination field of a campaign relaxes a fixed number of passes over level
-1 cells, so it steers a unit toward a seed a bounded number of cells away.[^F594A]
+1 cells, so it steers a unit toward a seed a bounded number of cells away.[^F544K]
 One fixture chose the far corner of the world as an unreachable objective. The
 unit read no direction, the engine released it, the cohort was empty, and the
 campaign closed as lost rather than as expired.
@@ -15191,7 +15190,7 @@ no unit and no site, and a siege rule added to the world moved it. The message
 then accused the weather of a move the weather did not make.
 
 That is one fact in two declaration sites, with nothing that says which to
-regenerate when they disagree.[^F595A] The golden state hash already pins the
+regenerate when they disagree.[^F487B] The golden state hash already pins the
 state of a world, it is a stored file, and it has an owner.
 
 **Evidence.** The suite failed at the tip of the integration branch with no
@@ -15205,14 +15204,13 @@ was taken on 7 September 2026 on one development machine (x86-64).
 
 ## References
 
-[^F591C]: Findings register, FND-601. `docs/FINDINGS.md`
+[^F599A]: Findings register, FND-601. `docs/FINDINGS.md`
 [^F592A]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
-[^F593A]: Findings register, FND-599. `docs/FINDINGS.md`
+[^F601D]: Findings register, FND-599. `docs/FINDINGS.md`
 [^F494F]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^DEC278]: Decisions register, DEC-278. `docs/DECISIONS.md`
 
-[^F579B]: ADR-0150, held ground is the ground within reach of a city its faction owns. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
-[^F580A]: ADR-0153, a tile's lease follows the units that stand on it, decision D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+[^F586A]: ADR-0153, a tile's lease follows the units that stand on it, decision D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
 [^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 
 [^F572A]: Backlog item 0495, build the observation plane and let every reader answer for one faction. `docs/backlog/complete/0495-build-the-observation-plane-and-let-every-reader-answer-for-one-faction.md`
@@ -15241,7 +15239,6 @@ was taken on 7 September 2026 on one development machine (x86-64).
 [^F548C]: The stock total of a faction, which the wealth reader compares. `crates/cachette-core/src/world.rs`
 [^F548D]: ADR-0165, the wealth bar stands above what one settlement can hold. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
 [^F548E]: Findings register, FND-542. `docs/FINDINGS.md`
-[^F574A]: ADR-0125, the control plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^F574B]: Findings register, FND-315. `docs/FINDINGS.md`
 [^F574C]: Findings register, FND-572. `docs/FINDINGS.md`
 [^F549B]: The sweep summary. `scripts/balance_summary.py`
@@ -15330,17 +15327,11 @@ was taken on 7 September 2026 on one development machine (x86-64).
 [^F568B]: ADR-0059, fog storage grows with observed area, not with world area, the context. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^F568C]: The observation module of the core crate. `crates/cachette-core/src/observation.rs`
 [^F568D]: Research report 31, the state of the learner surface, claim 1. `docs/research/reports/31-the-state-of-the-learner-surface.md`
-[^F580A]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^F580B]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the alternatives it rejects. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-[^F588A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F582A]: Backlog item 0516. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
-[^F585B]: The flat observation array and its schema. `crates/cachette-core/src/faction_observation.rs`
-[^F588B]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
-[^F588C]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
-[^F585B]: Findings register, FND-572. `docs/FINDINGS.md`
-[^F594A]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+[^F581A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^F582B]: The flat observation array and its schema. `crates/cachette-core/src/faction_observation.rs`
 [^F594B]: ADR-0180, a site changes hands or the taker destroys it, decisions D8 and D9. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
-[^F595A]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 
 ### FND-604 — The season is twice the published swing, and the oversized swing hides a cold pole
 
@@ -15874,7 +15865,7 @@ checked.
 **What the project believed.** The ground term of the temperature driver took
 the published lapse rate on the height of a cell above sea level. The record
 stated sea level as the zero, and gave a reason: the balance is a sea-level
-temperature, so a cell at sea level receives it unchanged.[^F614A]
+temperature, so a cell at sea level receives it unchanged.[^F612C]
 
 **What is true.** The balance constants are fitted to a planet that already has
 land above the sea. The temperature they give is therefore the temperature of
@@ -15888,7 +15879,7 @@ an anomaly about it.
 cloud twice, because the albedo already carried it. The ground term counted the
 mean land twice, because the balance already carried it. The rule that names
 both was written after the first and did not reach the second, although the two
-sit in the same record.[^F614A]
+sit in the same record.[^F612C]
 
 **Evidence.** The world mean replaced sea level as the reference, and the field
 was measured on 7 September 2026 on one development machine (x86-64). Both
@@ -15992,7 +15983,7 @@ arid, where the band at 37 degrees north holds 403 cells at 587 mm and grades
 project to fix the terrain generator by changing the physics.
 
 **Amended 7 September 2026. Read the conclusion of this finding and treat its
-precision as indicative.**[^F616B] The reweighting above was computed on a
+precision as indicative.**[^F618C] The reweighting above was computed on a
 128-row world whose two equatorial bands held 192 land cells between them, and
 the weighting gives those 192 cells 10.4 percent of the whole. A sample that
 small cannot carry that weight. The conclusion stands and is unchanged: the
@@ -16064,7 +16055,7 @@ times too high.**
 
 **What follows.** A poleward moisture flux must be imposed, in the shape and for
 the reason the pressure belts are imposed, and its amplitude is a tuning
-constant under the blocker that already governs the wind.[^F617B] **Do not read
+constant under the blocker that already governs the wind.[^F484E] **Do not read
 a normalised band figure as a statement about that band alone.** The normaliser
 couples every band to every other one, so a defect in the wettest band is
 reported as a defect in all the others.
@@ -16074,7 +16065,7 @@ reported as a defect in all the others.
 
 **What the project believed.** The rain figure of a latitude band describes the
 climate of that latitude, so the bands can be compared with each other and with
-Earth.[^F618A]
+Earth.[^F617A]
 
 **What is true.** The probe measures rain over the land of a band, and **the
 land fraction of a band varies from 6 percent to 66 percent in the probe
@@ -16124,7 +16115,7 @@ instrument rather than to the engine: a share read as its own complement, a
 contrast metric carrying a gradient the comparison did not, a probe building a
 different lattice from the test it explained, a normaliser coupling every band
 to the wettest one, and a land fraction varying from 6 to 66 percent across the
-bands being compared.[^F619A] [^F619B]
+bands being compared.[^F619A] [^F618C]
 
 The sixth residual was then explained the same way, and that explanation was
 wrong. The class table was reweighted onto Earth's land distribution, which
@@ -16376,17 +16367,12 @@ and the register already holds one instance of that mistake.[^F618C]
 
 [^F612A]: The motion probe. `crates/cachette-core/examples/weather_motion_probe.rs`
 [^F612C]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
-[^F614A]: ADR-0182, the temperature a cell is driven toward is a published energy balance, decisions D4 and D5. `docs/adrs/draft/adr-0182-the-temperature-a-cell-is-driven-toward-is-a-published-energy-balance.md`
 [^F615A]: Research report 32, zonal mean surface temperature, section 7. `docs/research/reports/32-zonal-mean-surface-temperature.md`
 [^F616A]: Peel, Finlayson and McMahon, updated world map of the Koppen-Geiger climate classification, 2007. Hydrology and Earth System Sciences 11, 1633 to 1644.
 [^F617A]: Blockers register, BLK-155. `docs/BLOCKERS.md`
-[^F617B]: Blockers register, BLK-130. `docs/BLOCKERS.md`
-[^F618A]: Blockers register, BLK-155. `docs/BLOCKERS.md`
 [^F618B]: Findings register, FND-617. `docs/FINDINGS.md`
 [^F618C]: Findings register, FND-618. `docs/FINDINGS.md`
-[^F616B]: Findings register, FND-618. `docs/FINDINGS.md`
 [^F619A]: Findings register, FND-605 and FND-606. `docs/FINDINGS.md`
-[^F619B]: Findings register, FND-618. `docs/FINDINGS.md`
 [^F624A]: Findings register, FND-610. `docs/FINDINGS.md`
 [^F624B]: The four bulk tile readers, and the test that holds them to the engine. `tests/test_bulk_tile_readers.py`
 
@@ -16469,7 +16455,7 @@ at several correct callers, the fault is upstream of all of them.
 
 **Believed.** A learner action and a built-in controller choice reach one
 encoding. The action table holds the controller's choice enumeration plus the
-no-op, and the world runs both through one set of verbs.[^F630A] [^F630B] A
+no-op, and the world runs both through one set of verbs.[^F634A] [^F634B] A
 reader takes from this that a learner and a controller reach the world alike,
 so a contest between the two measures policy.
 
@@ -16477,7 +16463,7 @@ so a contest between the two measures policy.
 
 The controller emits several commands for one faction on one tick. It makes a
 fixed number of evaluations, each of which emits one order, and it then emits
-up to nine further commands that its own draws and schedules gate.[^F630A]
+up to nine further commands that its own draws and schedules gate.[^F634A]
 
 The learner emits one action for one decision. The environment then runs the
 world for the decision interval, and the shipped interval is five ticks.[^F630C]
@@ -16503,7 +16489,7 @@ interface, check how often each one uses it.
 **Believed.** The observation length is a function of the cell count, and the
 cell count is a function of the world size. A research report took from this
 that a policy trained on one world size loads on another, succeeds, and
-computes the wrong answer.[^F631A]
+computes the wrong answer.[^F635A]
 
 **Half false.** The failure depends on which pair of worlds a caller names.
 
@@ -16556,7 +16542,7 @@ ground from a rival's.
 faction in seat zero read a held count of 44 tiles in the first cell and 184 in
 the second, against an own total of 165 held tiles over the whole world. The
 two cell numbers sum to 228, so most of what the faction read was somebody
-else's ground and nothing said so. A report holds the measurement.[^F632A]
+else's ground and nothing said so. A report holds the measurement.[^F636A]
 
 The split now reads, for the same world and the same tick, an own count of 0
 and 118 and an other count of 44 and 66. **The first cell is entirely a
@@ -16615,13 +16601,13 @@ seat turns by one position at each seed index. Two candidates in one game
 share the map, the weather and the opponents, so the difference between their
 returns holds almost none of the variance that either return holds alone. A
 decisions entry holds the formula and the four formulas rejected beside
-it.[^F630A]
+it.[^F637A]
 
 **A multi-seat harness for this already existed and nothing called it.** The
 module held the plan, the seated game, the vector and the runner, and it had
 its own tests. No trainer imported it. That is the inert capability shape the
 recurring defect rule names third, and its own test passed throughout because
-the test built the mechanism and drove it directly.[^F630B]
+the test built the mechanism and drove it directly.[^F484F]
 
 **What follows.** **A spread above zero is not a population worth ranking.**
 Read the spread against the size of one step of the outcome term, which is the
@@ -16653,20 +16639,18 @@ each candidate must play every seat.
 [^F626A]: Research report 25, defect 1. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
 [^F626B]: The one derivation of a way, and which categories draw as one. `crates/cachette-view/src/ways.rs`
 [^F627A]: ADR-0017, the world is a rhombus, so a tile index is raw axial, decision D2. `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
-[^F628A]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
-[^F630A]: The controller module, the plan of one tick. `crates/cachette-core/src/controller.rs`
-[^F630B]: ADR-0176, an action integer is a mixed radix over the positions a verb declares, decision D4. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+[^F634A]: The controller module, the plan of one tick. `crates/cachette-core/src/controller.rs`
+[^F634B]: ADR-0176, an action integer is a mixed radix over the positions a verb declares, decision D4. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^F630C]: The learner environment, the decision interval and the baselines. `python/cachette/learn/env.py`
 [^F630D]: Report 33, what a learner can see, say and be scored on, section 3. `docs/research/reports/33-what-a-learner-can-see-and-say.md`
-[^F631A]: Report 33, what a learner can see, say and be scored on, section 5. `docs/research/reports/33-what-a-learner-can-see-and-say.md`
+[^F635A]: Report 33, what a learner can see, say and be scored on, section 5. `docs/research/reports/33-what-a-learner-can-see-and-say.md`
 [^F631B]: The policy fit tests. `tests/test_learner_policy_fit.py`
 [^F631C]: The policy module, the fit and the reader. `python/cachette/learn/policy.py`
 [^F631D]: The trainer, the centre it writes. `python/cachette/learn/train.py`
-[^F632A]: Report 33, what a learner can see, say and be scored on, section 4.2. `docs/research/reports/33-what-a-learner-can-see-and-say.md`
+[^F636A]: Report 33, what a learner can see, say and be scored on, section 4.2. `docs/research/reports/33-what-a-learner-can-see-and-say.md`
 [^F632B]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
 [^F632C]: Findings register, FND-631. `docs/FINDINGS.md`
-[^F630A]: Decisions register, DEC-281. `docs/DECISIONS.md`
-[^F630B]: Recurring Defect Shapes, section 3. `.agents/rules/recurring-defects.md`
+[^F637A]: Decisions register, DEC-281. `docs/DECISIONS.md`
 
 ### FND-638 — The batch step owned about one thread build in forty, so the spawn and join of the batch was not the cause of the system time
 

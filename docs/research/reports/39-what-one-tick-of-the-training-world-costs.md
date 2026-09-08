@@ -623,7 +623,7 @@ of a training tick have no row in the only measurement this project has at the
 target extent.**
 
 **This is the gap, and it is the finding of this section.** Nobody has measured
-a world at the target extent that holds settlements, a controller and sends.
+a world at the target extent that holds settlements, a controller and sends.[^3]
 The stages that dominate the training tick are exactly the ones that no target
 measurement covers.
 
