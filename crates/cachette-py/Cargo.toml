@@ -20,7 +20,11 @@ cachette-core = { path = "../cachette-core", version = "0.0.0" }
 # `extension-module` is not enabled here. maturin adds it for the wheel
 # build. Enabling it in this file would break the link of a plain test
 # binary.
-pyo3 = { workspace = true, features = ["abi3-py311"] }
+# `multiple-pymethods` lets one class take its methods from several
+# `#[pymethods]` blocks, so the `World` surface splits by domain across the
+# `world` module tree instead of sitting in one file. The feature adds the
+# `inventory` crate, which collects the blocks at load time.
+pyo3 = { workspace = true, features = ["abi3-py311", "multiple-pymethods"] }
 numpy = "0.29.0"
 # ADR-0094 D4: the render core carries no window library and no display
 # connection. This crate takes the drawing without the demonstration window,
