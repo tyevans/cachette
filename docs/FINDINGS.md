@@ -566,7 +566,7 @@ a consequence, and one Python test asserted the equality.[^F675A]
 one tick earns and an application still pays for the period. The upkeep now
 carries a holding term derived from what the store holds at the application, so
 a longer period takes that term from a store read fewer times, and the two runs
-part company.[^F675B]
+part company.[^F672B]
 
 **Evidence.** One site on a world of 16 tiles a side, a base production of one
 unit, a store starting empty, eight ticks. A period of one earns 372374 in the
@@ -577,10 +577,10 @@ switched the upkeep sink on. Whether the equality ever passed in the suite was
 not established, because the suite was not run when that change landed.
 
 **What follows.** The draft record for the derived rate now carries this
-consequence.[^F675B] **The accepted record still states the equality as exact,
+consequence.[^F672B] **The accepted record still states the equality as exact,
 so it now says something false.** It has many dependents and the retcon window
 has passed, so the repair is a reviewer's call: either a superseding record or
-an in-place amendment under the registry rule.[^F675C] Nothing in the tree
+an in-place amendment under the registry rule.[^8] Nothing in the tree
 fails while it stands, because a record is prose.
 
 The statement that survives, and that a test may assert, is that the period
@@ -17655,5 +17655,3 @@ not perform it.
 [^F673A]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
 [^F674A]: The census table of the engine. `crates/cachette-core/src/world/census.rs`
 [^F675A]: ADR-0062, production and upkeep are rates attached to a site, the consequences. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
-[^F675B]: ADR-0055, a site derives its effective rate from the world at each application, the consequences. `docs/adrs/draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md`
-[^F675C]: ADR Registry, the retcon window. `docs/adrs/REGISTRY.md`
