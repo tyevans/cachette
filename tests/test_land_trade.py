@@ -223,8 +223,19 @@ def test_a_carrier_pays_no_land_debt() -> None:
     assert world.check_invariants()
 
 
-def test_an_upgrade_on_traded_ground_is_refused_and_names_the_blocker() -> None:
-    """The refusal text names BLK-036, so the commit that closes it finds this."""
+def test_an_upgrade_changes_hands_with_the_ground_it_stands_on() -> None:
+    """The taker of a tile takes what stands on it.
+
+    **The engine stores an upgrade against a tile and stores no owner beside
+    it**, so the ground already carried it. A record now makes that
+    binding.[^5] A land side whose tiles carry an upgrade was refused while
+    the question was open, and the answer arrived with the capture and the
+    raze: a faction that takes a city keeps its roads, its terraces, its
+    lodging and its walls.
+
+    The offer is therefore admitted, and the assertion is that the upgrade
+    stands after the tile has moved to the creditor.
+    """
     world = a_world()
     mine = tiles_held_by(world, 0)
     site = mine[len(mine) // 2]
@@ -238,14 +249,21 @@ def test_an_upgrade_on_traded_ground_is_refused_and_names_the_blocker() -> None:
         if world.tile_report(*site)["upgrade"] is not None:
             break
         world.step(threads=1)
-    assert world.tile_report(*site)["upgrade"] is not None, (
-        "the fixture raised no upgrade"
-    )
+    standing = world.tile_report(*site)["upgrade"]
+    assert standing is not None, "the fixture raised no upgrade"
     give_presence(world, 0, 1)
-    with pytest.raises(VerbError, match="BLK-036"):
-        world.offer_trade(
-            0, 1, 0, 0, 0, 1, 50, give_tag=LAND, give_tiles=[site], take_tag=RELATION
-        )
+    give_presence(world, 1, 0)
+
+    world.offer_trade(
+        0, 1, 0, 0, 0, 1, 50, give_tag=LAND, give_tiles=[site], take_tag=RELATION
+    )
+    world.accept_trade(1, 0)
+    world.step(threads=1)
+
+    after = world.tile_report(*site)
+    assert after["holder"] == 1, "the tile did not move to the creditor"
+    assert after["upgrade"] == standing, "the upgrade did not go with the ground"
+    assert world.check_invariants()
 
 
 def test_the_board_replaces_whole_and_refuses_more_rows_than_the_bound() -> None:

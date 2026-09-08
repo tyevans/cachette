@@ -785,8 +785,8 @@ evidence.[^BLK35H]
 
 **Resolved on 3 September 2026, and one question moved to its own row.** The
 project owner answered the building rule and both halves of the destruction
-rule. The question about an upgrade whose ground changes hands is now BLK-036,
-and it is open.
+rule. The question about an upgrade whose ground changes hands became BLK-036,
+and that row resolved on 6 September 2026.
 
 The engine stores an upgrade on a tile and lets a unit build it.[^BLK34A] It
 asked nothing about who holds the tile.
