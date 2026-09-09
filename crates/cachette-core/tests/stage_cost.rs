@@ -16,6 +16,12 @@
 //! holds here.[^2] The proof is direct: delete one `stage::open` line from the
 //! step and this test names that stage. That was checked by doing it.
 //!
+//! The two tests that name the holding stages carry their own proof. Put both
+//! gathering positions of the holding rewrite under one label, then declare
+//! two entries for that label. The general check stays green, because the
+//! declaration and the step still agree. Both named tests fail. That was
+//! checked by doing it.
+//!
 //! # It says nothing about time
 //!
 //! No assertion here reads a duration. The rule forbids it, and a duration
@@ -163,5 +169,85 @@ fn a_build_without_the_feature_says_so() {
     assert!(
         stage::is_recording(),
         "a build with the feature must record"
+    );
+}
+
+/// The holding rewrite gathers the cities, then it gathers the candidate
+/// tiles from those cities. Each position is its own stage.
+///
+/// One label over both walks would make the cost for each entry of that
+/// label an average of two unrelated walks. The one before it reads the
+/// settlement arena and the upgrade sites. The one after it reads the grid
+/// around each city. The general check above compares every declared count
+/// at once, and it would pass again if somebody merged the two positions
+/// under one label and declared two entries. This test names the two
+/// positions, so that merge fails here.
+#[test]
+fn the_rewrite_opens_one_stage_for_the_cities_and_one_for_the_candidates() {
+    let _alone = alone();
+    let mut world = world_with_units(32);
+    world.step(1).expect("the step must run");
+
+    stage::reset();
+    world.step(1).expect("the step must run");
+    let costs = stage::costs();
+
+    assert_eq!(
+        costs.cost(Stage::HoldingCities).entries,
+        1,
+        "one frame must gather the cities once"
+    );
+    assert_eq!(
+        costs.cost(Stage::HoldingCandidates).entries,
+        1,
+        "one frame must gather the candidate tiles once"
+    );
+}
+
+/// The two gathering stages open before the early return of the rewrite, and
+/// the two working stages open after it.
+///
+/// The rewrite stops as soon as the candidate list is empty. A world with no
+/// unit holds no city, so the list is empty and the rewrite decides nothing
+/// and applies nothing. The gathering stages still open once each, because
+/// the rewrite must gather the list to find that it is empty.
+///
+/// This test fixes which side of the early return each stage sits on. A
+/// world that models the typical case supplies units, and it therefore
+/// reaches neither position of the return.[^1] The counts below are what
+/// tells a missing span apart from a pass that did no work.
+///
+/// # References
+///
+/// [^1]: Testing rules, a fixture supplies the input. `.claude/rules/testing.md`
+#[test]
+fn a_world_with_no_unit_gathers_the_candidates_and_decides_nothing() {
+    let _alone = alone();
+    let mut world = world_with_units(0);
+    world.step(1).expect("the step must run");
+
+    stage::reset();
+    world.step(1).expect("the step must run");
+    let costs = stage::costs();
+
+    assert_eq!(
+        costs.cost(Stage::HoldingCities).entries,
+        1,
+        "the rewrite must gather the cities before it can stop"
+    );
+    assert_eq!(
+        costs.cost(Stage::HoldingCandidates).entries,
+        1,
+        "the rewrite must gather the candidate tiles before it can stop"
+    );
+    assert_eq!(
+        costs.cost(Stage::HoldingDecide).entries,
+        0,
+        "an empty candidate list decides nothing"
+    );
+    assert_eq!(
+        costs.cost(Stage::HoldingApply).entries,
+        0,
+        "an empty candidate list applies nothing"
     );
 }
