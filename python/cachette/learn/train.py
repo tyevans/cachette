@@ -688,6 +688,7 @@ def evaluate(
     seeds: list[int],
     workers: int,
     repeats: int = 1,
+    label: str = "",
 ) -> dict[str, float]:
     """Play one policy on a seed set, and average what it ended with.
 
@@ -695,6 +696,13 @@ def evaluate(
     deterministic, so a repeat only changes the answer for a policy that
     draws at random. A repeat therefore narrows the random baseline, which
     is the baseline that matters.
+
+    The label names the pass in a progress line, for example
+    ``conquer baseline``. A pass that gives one reports itself while it runs,
+    and a pass that gives none stays silent. **A pass over the held-out seeds
+    takes minutes, and a silent pass of that length reads as a stopped
+    process.** A dashboard tells a working process from a stopped one by the
+    age of its last line, so a long pass must give it one.
 
     The summary holds one entry for each quantity the engine publishes about
     the seat, and the refusal figures beside them. **The set of quantities
@@ -704,7 +712,9 @@ def evaluate(
     episodes: list[EpisodeRecord] = []
     values: list[float] = []
     for _ in range(max(1, repeats)):
-        played = run_population(env_config, scoring, [policy], seeds, workers)
+        played = run_population(
+            env_config, scoring, [policy], seeds, workers, label=label
+        )
         values.append(played.mean())
         rows.extend(played.rows())
         episodes.extend(played.episodes)

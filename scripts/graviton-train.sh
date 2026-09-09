@@ -97,16 +97,21 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # later run with the same inputs installs the wheel the earlier run made.
 readonly WHEEL_CACHE="${CACHETTE_WHEEL_CACHE:-$HOME/.cache/cachette-wheels}"
 
-# The key holds the sources, the two manifests that pin the dependency
-# versions, and the toolchain file that pins the compiler. A change to any one
-# of them changes the bytes, and a change to anything else does not.
+# **The controller baseline is a function of the engine build too.** A run
+# plays the built-in controller over the whole held-out seed set, to set the
+# bar the trained policy must beat, and that pass took over nine minutes of a
+# rented machine. The trainer keeps each measurement under a key that holds
+# the engine build, the world, the seeds and the objective. This directory
+# travels with the run, so a later run with the same inputs reads the number
+# instead of playing for it again.
+readonly BASELINE_CACHE="${CACHETTE_BASELINE_CACHE:-$HOME/.cache/cachette-baselines}"
+
+# The key of the engine build. **One script derives it and three things read
+# it**: the wheel cache above, the baseline cache beside it, and the trainer on
+# the instance. A second derivation would serve a stale wheel or a stale
+# baseline after an engine change, and nothing would fail.
 build_key() {
-    local parts=""
-    local path
-    for path in crates Cargo.lock Cargo.toml rust-toolchain.toml; do
-        parts="$parts$(git -C "$root" rev-parse "HEAD:$path" 2>/dev/null || echo none)"
-    done
-    printf '%s' "$parts" | sha256sum | cut -c1-16
+    bash "$root/scripts/build-key.sh"
 }
 
 say() { printf '=== %s\n' "$1" >&2; }
@@ -396,6 +401,16 @@ fetch_wheel() {
     fi
 }
 
+# Fetch every controller baseline the instance measured, into the cache. A run
+# that measured nothing new copies files the cache already holds, which costs
+# one transfer of a few kilobytes and never a wrong answer: each file names
+# every input its number answers for, and a reader compares them all.
+fetch_baselines() {
+    mkdir -p "$BASELINE_CACHE"
+    scp "${ssh_options[@]}" "$remote:.cache/cachette-baselines/*.json" \
+        "$BASELINE_CACHE/" >/dev/null 2>&1 || true
+}
+
 # The loop that follows a running job. It polls, renders the dashboard, and
 # ends when the marker says the run finished, when the search has stopped, or
 # when the local deadline passes.
@@ -415,6 +430,7 @@ follow() {
             2>/dev/null || true)"
         render_progress
         fetch_wheel
+        fetch_baselines
         case "$state" in
             done*) finished="done" ;;
             failed*)
@@ -679,6 +695,19 @@ else
     say "No cached wheel for build $wheel_key. The instance compiles once, and the run keeps the result"
 fi
 
+# **The baseline cache must travel, because the instance is new.** A fresh
+# machine holds no measurement, so a run that sent nothing would play for the
+# bar again whatever the last run paid for it.
+if compgen -G "$BASELINE_CACHE/*.json" >/dev/null; then
+    say "Sending the stored controller baselines. A run with the same inputs reads them"
+    ssh "${ssh_options[@]}" "$remote" \
+        "mkdir -p .cache/cachette-baselines" >/dev/null
+    scp "${ssh_options[@]}" "$BASELINE_CACHE"/*.json \
+        "$remote:.cache/cachette-baselines/" >/dev/null
+else
+    say "No stored controller baseline. This run measures it once and keeps the result"
+fi
+
 # --------------------------------------------------------------------- remote
 
 cat > "$out_dir/remote.sh" <<'REMOTE'
@@ -760,6 +789,12 @@ export OMP_NUM_THREADS=1
 export MKL_NUM_THREADS=1
 export NUMEXPR_NUM_THREADS=1
 
+# **The instance holds no repository, so it cannot derive the engine key.**
+# The launcher derived it from the tracked sources and passes it in. Without
+# it the trainer stores nothing, because a stored baseline that cannot name
+# its engine could answer for an engine that never played.
+export CACHETTE_ENGINE_KEY="${CACHETTE_ENGINE_KEY:-}"
+
 # **One trainer process for each strategy, all at once.** One process of
 # every core does not use them: the batch crosses into the engine once for
 # each tick and waits for the slowest world, and one interpreter picks the
@@ -796,24 +831,51 @@ printf '# strategies\t%s\n# workers each\t%s\n' "$count" "$each"
 # x86-64. It runs before the training, because it takes about a minute and
 # because a run that is interrupted later still brings this back.
 mark measuring
+mkdir -p runs/learn
 # One row, in the shape this run trains in. It costs about half a minute and
 # it says what the machine reached, which is what the costs register wants.
 # A sweep of other shapes belongs in a probe-only run, not here, because
 # every second it takes is a second the training does not get.
+#
+# **The figure must reach the log the follower reads.** It went to two files
+# under `/tmp`, and the follower reads neither, so the one tick rate this
+# project owns on the target never appeared on the dashboard.
 uv run python scripts/train_throughput.py \
     --workers "$each" \
     --worlds "${PROBE_WORLDS:-144}" \
     --decisions 20 --price "${PRICE:-0}" --out /tmp/throughput.txt \
-    2>&1 | tee -a /tmp/throughput-console.txt
-cat /tmp/throughput.txt
+    2>&1 | tee -a /tmp/throughput-console.txt | tee -a runs/learn/train.log
+tee -a runs/learn/train.log < /tmp/throughput.txt
 
 if [ "${PROBE_ONLY:-0}" = "1" ]; then
     exit 0
 fi
 
+# ---------------------------------------------- the bar every strategy needs
+#
+# **One number sets the bar for the whole run, and every process needed it.**
+# The trainer reports each policy against the built-in controller playing the
+# learner's own seat, and it measures that by playing the controller over the
+# whole held-out seed set. One process for each strategy measured it before
+# training and again after, so a run of six strategies played the same worlds
+# twelve times, each at a sixth of the cores.
+#
+# This pass measures it once, before any trainer starts, and it may hold every
+# core. It writes each number into the cache under a key that holds the engine
+# build, the world, the seeds and the objective, so each trainer reads it. Two
+# strategies that hold the same objective share one number.
+#
+# **A failure here must not end the run.** The cache is an optimisation, and
+# each trainer measures the number itself when the cache does not hold it.
+# Ending the run over a missing optimisation would cost the whole run.
+mark baseline
+uv run python -u -m cachette.learn --baseline-only \
+    --only "$(printf '%s' "$names" | tr ' ' ',')" \
+    --out runs/learn/baseline --workers "$cores" $TRAIN_ARGS 2>&1 \
+    | tee -a runs/learn/train.log || true
+
 # ------------------------------------------------------------- the training
 mark running
-mkdir -p runs/learn
 
 # Each process writes its own log, and appends to the one the follower reads.
 # A line of the log is short and each process writes whole lines, so the
@@ -883,6 +945,7 @@ scp "${ssh_options[@]}" "$out_dir/remote.sh" "$remote:remote.sh" >/dev/null
 ssh "${ssh_options[@]}" "$remote" \
     "TRAIN_ARGS='$train_args' PRICE='$price' \
      PROBE_WORLDS='$probe_worlds' \
+     CACHETTE_ENGINE_KEY='$wheel_key' \
      PROBE_ONLY='${CACHETTE_TRAIN_PROBE_ONLY:-0}' \
      nohup setsid bash remote.sh > run.log 2>&1 < /dev/null & echo started"
 
