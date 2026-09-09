@@ -328,21 +328,41 @@ class ObjectiveReward:
         """Return what the episode scored, for a later reader of the run."""
         return EpisodeScore(objectives=self._total, outcome=self.outcome)
 
+    def _array(self, world: World, observation: np.ndarray | None) -> np.ndarray:
+        """Return the observation array of the seat at this state.
+
+        A caller that holds the array passes it. A caller that does not gets
+        one from the world.
+        """
+        if observation is None:
+            return np.asarray(world.faction_observation(self._faction))
+        return np.asarray(observation)
+
     def reset(self, world: World) -> None:
         """Take the first reading of a run, and pay nothing for it.
 
         A caller resets before the first decision. The first reading is the
         baseline of every term that reads a change, so it earns nothing.
         """
-        self._previous = np.asarray(world.faction_observation(self._faction))
+        self._previous = self._array(world, None)
         self._total = self._objectives.zero()
         self._outcomes.reset()
 
-    def read(self, world: World) -> RewardStep:
-        """Return what the decision before this reading earned."""
+    def read(self, world: World, observation: np.ndarray | None = None) -> RewardStep:
+        """Return what the decision before this reading earned.
+
+        **The observation array of one state serves every reader of it.** The
+        objective vector and the outcome both come from the array of the seat
+        at this state, and building it twice gives the same numbers at twice
+        the cost. A caller that already holds the array passes it here, and
+        this reads no array of its own.
+
+        **The array is kept as the baseline of the next reading.** A caller
+        that passes one must not write it afterwards.
+        """
         ended = self.done
-        observation = np.asarray(world.faction_observation(self._faction))
-        state = self._outcomes.read(world)
+        held = self._array(world, observation)
+        state = self._outcomes.read(world, held)
         if ended:
             return RewardStep(
                 value=0.0,
@@ -355,8 +375,8 @@ class ObjectiveReward:
                 changes={},
                 objectives=self._objectives.zero().as_dict(),
             )
-        reading = self._objectives.read(observation, self._previous)
-        self._previous = observation
+        reading = self._objectives.read(held, self._previous)
+        self._previous = held
         self._total = self._total.plus(reading)
         shaped = reading.combine(self._style.weights)
         terminal = self._style.terminal(state.name)

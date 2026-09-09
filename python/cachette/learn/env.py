@@ -206,6 +206,10 @@ class Env:
         reads an observation through it and never through a position of its
         own.** A tuple of names written by hand is a second declaration of
         what the engine publishes, and nothing fails when the two disagree.
+
+        The held array is the observation the last decision built. A reset
+        clears it, a decision sets it, and a finished episode answers every
+        later row with it.
         """
         self._config = config
         self._scoring = scoring
@@ -214,6 +218,7 @@ class Env:
         self._decisions = 0
         self._terminated = False
         self._truncated = False
+        self._held: np.ndarray | None = None
         # The lengths come from the schemas, and both are functions of the
         # world parameters alone. A probe world answers them once, so a
         # caller sizes a network before it runs an episode.
@@ -287,6 +292,7 @@ class Env:
         self._decisions = 0
         self._terminated = False
         self._truncated = False
+        self._held = None
         return self.observation()
 
     def _require_world(self) -> World:
@@ -325,6 +331,7 @@ class Env:
         self._decisions = 0
         self._terminated = False
         self._truncated = False
+        self._held = None
         return self.observation()
 
     def observation(self) -> np.ndarray:
@@ -404,16 +411,35 @@ class Env:
 
         The applied entry is what ``apply`` answered. It travels into the
         result, so a caller reads the refusal of the decision it just took.
+
+        **One decision builds the observation of its state once.** The reward
+        reads the array, the outcome reader reads the array, and the result
+        carries the array. Three readers of one state read one build, because
+        the world does not change between them and a second build gives the
+        same numbers at the same cost again. The array of a decision was
+        built four times before this, and a training run spent about a fifth
+        of every decision on the three builds it threw away.[^1]
+
+        **The array in the result is the array the reward kept.** A caller
+        must not write it. A caller that needs a writable array copies it,
+        and stacking a batch of them copies.
+
+        References
+        ----------
+        [^1]: Report 38, where the training time goes, section 10.2.
+        ``docs/research/reports/38-where-the-training-time-goes.md``
         """
         world = self._require_world()
         if self._reward is None:  # pragma: no cover - reset builds both
             message = "the environment has no reward. Call reset first."
             raise RuntimeError(message)
         self._decisions += 1
-        reading = self._reward.read(world)
+        held = self.observation()
+        self._held = held
+        reading = self._reward.read(world, held)
         self._record_end(reading)
         return StepResult(
-            observation=self.observation(),
+            observation=held,
             reward=reading.value,
             terminated=self._terminated,
             truncated=self._truncated,
@@ -435,9 +461,17 @@ class Env:
         The batch keeps every environment in index order, so a finished
         episode still reports a row. The row earns nothing and changes
         nothing, and the skipped entry of the info says so.
+
+        **A finished episode leaves the batch, so its world stands still.**
+        The array of the last decision is therefore the array of every row
+        after it, and this returns that array rather than building it again.
+        A pass that started 512 worlds runs its last decisions with most of
+        them finished, and each of those built an array nothing read.
         """
+        if self._held is None:
+            self._held = self.observation()
         return StepResult(
-            observation=self.observation(),
+            observation=self._held,
             reward=0.0,
             terminated=self._terminated,
             truncated=self._truncated,

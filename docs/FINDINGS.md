@@ -17724,6 +17724,40 @@ changes which worker writes which block, and the record that governs the
 parallel passes requires disjoint outputs, so it is a decision and not a
 repair.[^F682C]
 
+### FND-683 — The interpreter between two decisions cost a fifth of a training pass, and the draining tail cost almost nothing
+
+**Believed.** A training run of six strategies on a machine of sixty-four cores
+reached about twenty-five cores. Two causes were named for the gap. One was the
+interpreter, which picks the actions of every world between two decisions while
+every engine worker waits. The other was the draining tail, because a pass
+starts many worlds and ends with a few long games running nearly alone. The
+throughput of a pass falls to about a third of its opening figure, and that
+decay was read as the tail.[^F683A]
+
+**True.** The interpreter is the binding cause and the tail is not. Inside a
+generation the batch holds ninety-six to one hundred percent of its workers
+loaded from the first decision to the last, because the pass runs many more
+worlds than workers. The decay of the rate is the tick getting dearer as a game
+develops, and a heartbeat window where the live count did not move at all still
+lost a fifth of its rate.
+
+The interpreter held thirty-eight percent of a decision, and three quarters of
+that was one array built four times. The loop built the observation of a world
+for the policy, the reward built it again for its terms, the outcome reader
+built it a third time, and the step result carried a fourth build that no
+caller read. Every build ran under one interpreter with every worker idle.
+
+**Evidence.** The heartbeat lines of a run on the target platform give the live
+world count and the ticks a second of each window. Modelling the batch as it is,
+with worker `w` taking the worlds `w`, `w + workers` and so on, gives the
+utilisation of each window directly. A local probe timed each phase of a
+decision separately. The commit holds both tables and the commands.[^F683B]
+
+**Follows.** A pass that gives one process many workers pays the interpreter in
+proportion to those workers, and a pass that gives one process few workers does
+not. The passes to look at are therefore the ones that hold the whole core count
+in one process, not the generations.
+
 ## References
 
 [^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
@@ -17770,3 +17804,5 @@ repair.[^F682C]
 [^F682A]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^F682B]: Testing rules, a fixture supplies the input, section 2a. `.agents/rules/testing.md`
 [^F682C]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F683A]: Report 38, where the training time goes, sections 4.2 and 10.2. `docs/research/reports/38-where-the-training-time-goes.md`
+[^F683B]: The commit `Build the observation of a decision once`. Read its message for the tables and the commands.
