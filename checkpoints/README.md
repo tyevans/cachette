@@ -48,15 +48,22 @@ Four policies from one run of the play style table, on a 128 by 128 world of
 three factions at a tick limit of 6000, at observation version 7 and action
 version 2. Every one is a structured policy of 5354 trainable weights.
 
-**A number in the return column is a mean shaped return over 128 held-out
-seeds under that style's own weighting. It is not a win rate and it is not a
-percentage.** A return under one weighting does not compare with a return
-under another, and the scale is arbitrary: the version 6 policies below score
-in the thousands on their own weightings. Read a return of 86.90 against a
-bar of 50.00 as 1.74 times the controller's shaped return, and read the
-rating table for how the policy actually played. The yardstick is the built-in controller measured on the same
-seeds under the same weighting, so the only fair comparison is a row against
-its own bar. **Each bar is read from that style's own log**, because the four
+**A number in the return column is not a win rate, not a percentage, and not
+a held-out measurement.** It is the largest mean shaped return the run reached
+on any of its validation passes, under that style's own weighting, **on the
+same 128 seeds that chose which centre to keep**. So it is a selection
+maximum over ten noisy passes, and a maximum over ten draws is optimistic by
+an amount nothing here estimates. The honest 256-seed held-out pass ran only
+when a strategy finished, and the wall-clock cap ended the run before any
+strategy did, so no held-out figure exists for these four files.
+
+A return under one weighting does not compare with a return under another,
+and the scale is arbitrary: the version 6 policies below score in the
+thousands on their own weightings. Read a return of 86.90 against a bar of
+50.00 as 1.74 times the controller's shaped return on the seeds that did the
+selecting, and read the rating table for how a policy actually played. The
+yardstick is the built-in controller measured on the same seeds under the
+same weighting, so the only fair comparison is a row against its own bar. **Each bar is read from that style's own log**, because the four
 styles write one shared log and the controller row there names no style.
 
 | File | Mean shaped return | Controller's return | Beats it | Generation | Style rewards |
