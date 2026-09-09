@@ -445,6 +445,67 @@ impl World {
         Ok((address, group, faction, survey))
     }
 
+    /// Returns the settlers of one faction, and why the settle verb refuses
+    /// each one.
+    ///
+    /// The answer holds one name for each settler, in the order the settler
+    /// reader gives, so a caller reads a position for every settler and not a
+    /// refusal count. A settler the verb would accept carries the accepted
+    /// name.[^1]
+    ///
+    /// **A refused verb answers one byte and names no reason.** A learner
+    /// that takes the settle row and reads a refusal therefore learns
+    /// nothing about which rule refused, and neither does the person who
+    /// debugs the run. This reader is the reason, and it comes from the one
+    /// statement of the rule that the verb itself calls.[^2]
+    ///
+    /// **This answers for one faction and reads no other.** It is therefore a
+    /// reader the environment of a learner may call.[^3]
+    ///
+    /// Returns `None` when the number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: The accepted name. [`crate::founding::SETTLE_ACCEPTED`]
+    /// [^2]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^3]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
+    #[must_use]
+    pub fn settle_refusal_names(&self, faction: FactionId) -> Option<Vec<&'static str>> {
+        if faction.0 >= self.config.faction_count.max(1) {
+            return None;
+        }
+        Some(
+            self.settlers_of(faction)
+                .into_iter()
+                .map(|unit| match self.settle_refusal(unit) {
+                    Ok(_) => founding::SETTLE_ACCEPTED,
+                    Err(refusal) => refusal.name(),
+                })
+                .collect(),
+        )
+    }
+
+    /// Returns how many settlers one faction holds.
+    ///
+    /// A settler is a unit whose type row holds a settle column above zero,
+    /// and the reader that answers the settlers of a faction is the one
+    /// statement of that rule.[^1] The observation publishes this count, so
+    /// the array a policy reads and this reader cannot disagree.[^2]
+    ///
+    /// Returns `None` when the number names no faction of this world.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn settler_count(&self, faction: FactionId) -> Option<u32> {
+        if faction.0 >= self.config.faction_count.max(1) {
+            return None;
+        }
+        Some(self.settlers_of(faction).len() as u32)
+    }
+
     /// Sets the food a founded site produces, from the ground it reaches.
     ///
     /// A founding seats a group and gives it a store. Nothing else fills

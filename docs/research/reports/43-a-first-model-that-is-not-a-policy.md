@@ -117,10 +117,10 @@ blocks are these.
 |---|---|
 | Ring stack, 151 cells at 25 channels | 3775 |
 | Entity tokens, four sets | 624 |
-| Every other scalar and order statistic | 319 |
+| Every other scalar and order statistic | 320 |
 | Trade board, 8 goods at 5 statistics | 40 |
 | Frontier and pressure by sector | 32 |
-| Layout reserve | 29 |
+| Layout reserve | 28 |
 | Total | 4819 |
 
 The ring stack holds 14 rings. Ring 0 holds one cell, ring 1 holds six

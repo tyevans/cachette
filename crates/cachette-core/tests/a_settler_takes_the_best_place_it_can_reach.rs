@@ -72,8 +72,10 @@ fn places_of(world: &World, faction: FactionId) -> Vec<Axial> {
 #[test]
 fn a_target_lies_beyond_the_founding_distance_from_every_city_of_the_faction() {
     // **This is the first part of the rule, and it reuses the distance the
-    // founding already keeps.** The survey takes the sites of the faction as
-    // the places taken, so the target choice states no distance of its own.
+    // founding already keeps.** The survey takes every settlement that
+    // stands as the places taken, so the target choice states no distance of
+    // its own. The seats of this faction are a part of that list, and this
+    // test reads that part.
     let mut world = probe_world(3);
     let mut checked = 0u32;
     for _ in 0..TICKS {
@@ -315,4 +317,67 @@ fn a_settler_sent_at_a_tile_arrives_at_that_tile_and_founds_there() {
         "the founding must add a site"
     );
     println!("the settler founded at {target:?} after arriving on tick {arrived}");
+}
+
+/// Returns the place of every settlement that stands, in slot order.
+fn every_place(world: &World) -> Vec<Axial> {
+    world
+        .settlements()
+        .iter()
+        .filter_map(|site| world.settlements().address(site))
+        .collect()
+}
+
+#[test]
+fn a_target_lies_beyond_the_founding_distance_from_every_city_that_stands() {
+    // **The settle verb compares a place against every settlement in the
+    // world, and the target choice must compare against the same list.** A
+    // choice made against the sites of one faction alone names ground beside
+    // a rival city, and the verb then refuses every settler that walks
+    // there. The two lists are one rule, and this test is what fails when
+    // they part.[^1]
+    //
+    // The fixture is a world of four factions, so a rival city stands inside
+    // the reach of every faction. A world of one faction would hold no rival
+    // place, and the assertion would then never receive the input that fails
+    // it.[^2]
+    //
+    // [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    // [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
+    let mut world = probe_world(3);
+    let mut checked = 0u32;
+    let mut rivals = 0u32;
+    for _ in 0..TICKS {
+        world.step(THREADS).expect("the step runs");
+        let places = every_place(&world);
+        for index in 0..FACTIONS {
+            let faction = FactionId(index);
+            let Some(target) = world.settling_target_of(faction) else {
+                continue;
+            };
+            let own = places_of(&world, faction);
+            for place in &places {
+                assert!(
+                    place.distance(target) >= MINIMUM_FOUNDING_DISTANCE,
+                    "the target {target:?} is {} from the city at {place:?}, \
+                     inside the founding distance {MINIMUM_FOUNDING_DISTANCE}",
+                    place.distance(target)
+                );
+                if !own.contains(place) {
+                    rivals += 1;
+                }
+            }
+            checked += 1;
+        }
+    }
+    assert!(
+        checked > 0,
+        "no faction offered a target, so the test measured nothing"
+    );
+    assert!(
+        rivals > 0,
+        "no city of another faction stood beside a target, so the fixture \
+         never supplied the case this test exists for"
+    );
+    println!("the test checked {checked} targets against {rivals} rival places");
 }

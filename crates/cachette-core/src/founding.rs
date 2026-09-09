@@ -834,6 +834,47 @@ pub enum SettleError {
     Founding(FoundingError),
 }
 
+/// The name the readers give a settler the settle verb would accept.
+///
+/// A caller that asks why each settler founded nothing reads one name for
+/// each settler, so the list holds a name for the accepted case as well. A
+/// list that dropped the accepted settlers would state a refusal count and
+/// no position, and a caller could not tell an accepted settler from a
+/// settler that is not there.
+pub const SETTLE_ACCEPTED: &str = "accepted";
+
+impl SettleError {
+    /// Returns the stable name of this refusal.
+    ///
+    /// **The name is the one thing a caller outside this crate reads.** The
+    /// message of a refusal carries an address and a unit identity, so it
+    /// changes with the world, and a caller that grouped refusals by the
+    /// message would count each one once. The name carries the reason alone.
+    ///
+    /// A Python caller reads these names, and the environment of a learner
+    /// puts them in the mapping it reports beside each decision. A refused
+    /// verb answers one byte and names nothing, so a reader of that byte
+    /// cannot say which rule refused.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D6. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
+    #[must_use]
+    pub const fn name(&self) -> &'static str {
+        match self {
+            Self::NoSuchUnit(_) => "no_such_unit",
+            Self::NotASettler(_) => "not_a_settler",
+            Self::OutsideWorld(_) => "outside_world",
+            Self::FactionMayNotFound(_) => "faction_may_not_found",
+            Self::GroundIsHeld(_) => "ground_is_held",
+            Self::SettlementStands(_) => "settlement_stands",
+            Self::GroundAdmitsNobody(_) => "ground_admits_nobody",
+            Self::TooCloseToACity(_) => "too_close_to_a_city",
+            Self::Founding(_) => "founding_refused_the_place",
+        }
+    }
+}
+
 impl core::fmt::Display for SettleError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {

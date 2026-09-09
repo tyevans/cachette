@@ -290,3 +290,68 @@ fn the_controller_founds_a_city_through_the_verb() {
     }
     panic!("the controller founded no city in 64 ticks, so the option is inert");
 }
+
+#[test]
+fn the_refusal_reader_names_the_rule_that_refused_each_settler() {
+    // **The verb answers one byte, and this reader is the reason.** A caller
+    // that reads a refusal and no reason cannot tell a settler on held
+    // ground from a settler that stands too near a city, and those two
+    // states ask for different actions.
+    //
+    // The fixture supplies both extremes at once, and one settler the verb
+    // accepts. A fixture of one settler would leave two arms of the reader
+    // unmeasured.
+    let (mut field, city) = one_city(700);
+    field.step(2).expect("the step must run");
+    let held = ground_at_distance(&field, city, 1);
+    let near = ground_at_distance(&field, city, MINIMUM_FOUNDING_DISTANCE - 1);
+    let far = ground_at_distance(&field, city, MINIMUM_FOUNDING_DISTANCE);
+    settler_at(&mut field, held, FactionId(1));
+    settler_at(&mut field, near, FactionId(1));
+    settler_at(&mut field, far, FactionId(1));
+
+    let names = field
+        .settle_refusal_names(FactionId(1))
+        .expect("the world holds the faction");
+
+    assert_eq!(
+        names.len(),
+        3,
+        "the reader answers one name for each settler and not one for each refusal"
+    );
+    assert!(
+        names.contains(&"ground_is_held"),
+        "the reader names the held ground refusal, and it gave {names:?}"
+    );
+    assert!(
+        names.contains(&"too_close_to_a_city"),
+        "the reader names the distance refusal, and it gave {names:?}"
+    );
+    assert!(
+        names.contains(&"accepted"),
+        "the reader names the settler the verb would take, and it gave {names:?}"
+    );
+    assert_eq!(
+        field.settler_count(FactionId(1)),
+        Some(3),
+        "the settler count and the refusal reader read one set of settlers"
+    );
+}
+
+#[test]
+fn the_refusal_reader_and_the_settler_count_refuse_a_faction_the_world_lacks() {
+    let (field, _) = one_city(700);
+    let outside = FactionId(9);
+    assert_eq!(field.settle_refusal_names(outside), None);
+    assert_eq!(field.settler_count(outside), None);
+}
+
+#[test]
+fn a_faction_with_no_settler_reads_an_empty_refusal_list() {
+    // **This is the state the reader exists to separate.** A faction that
+    // holds no settler and a faction whose settler stands on held ground both
+    // read a refused settle verb, and only the reader tells them apart.
+    let (field, _) = one_city(700);
+    assert_eq!(field.settle_refusal_names(FactionId(1)), Some(Vec::new()));
+    assert_eq!(field.settler_count(FactionId(1)), Some(0));
+}

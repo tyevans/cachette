@@ -78,6 +78,10 @@ FACTION_SCOPED_READERS: frozenset[str] = frozenset(
         "action_schema",
         # The legality answer holds only what the faction observes.
         "legal_actions",
+        # Why the settle verb refuses each settler of the faction. The verb
+        # answers one byte and names no reason, and this names it. It reads
+        # the settlers of one faction and no other unit.
+        "settle_refusals",
         # What the built-in controller did in one seat on the last tick. It
         # answers for one faction and reads no other.
         "controller_actions",
@@ -108,8 +112,10 @@ class SeatWorld(Protocol):
 
     An environment builds its own world for a normal episode. A test hands it
     a proxy instead, to record which readers the episode reaches for, and the
-    proxy is not a ``World``. This states the six calls the episode makes, so
-    that the door describes what it takes.
+    proxy is not a ``World``. This states every call the episode makes, so
+    that the door describes what it takes. **It states no count of them**,
+    because a count here goes false the next time the episode reads one more
+    reader, and nothing fails when it does.
     """
 
     def faction_observation(self, faction: int) -> npt.NDArray[np.int64]:
@@ -123,6 +129,9 @@ class SeatWorld(Protocol):
 
     def act(self, faction: int, action: int) -> bool:
         """Run one action for one faction, and say whether the verb took it."""
+
+    def settle_refusals(self, faction: int) -> Sequence[str]:
+        """Name why the settle verb refuses each settler of one faction."""
 
     def step(self, threads: int) -> int:
         """Run the world for one tick, and give back the event count."""
@@ -529,8 +538,24 @@ class Env:
                 "objectives": dict(reading.objectives),
                 "also": also,
                 "decisions": self._decisions,
+                "settle_refusals": self._settle_refusals(),
             },
         )
+
+    def _settle_refusals(self) -> tuple[str, ...]:
+        """Name why the settle verb refuses each settler of the seat.
+
+        **A refused verb answers one byte and names nothing.** A caller that
+        reads a refusal therefore cannot say whether the seat holds no
+        settler, whether the settler stands on held ground, or whether it
+        stands too near a city. The engine states the reason, and this carries
+        it out with the decision that met it.
+
+        A seat that holds no settler gets an empty tuple. A settler the verb
+        would accept carries the accepted name the engine publishes.
+        """
+        world = self._require_world()
+        return tuple(world.settle_refusals(self._config.seat))
 
     def idle(self) -> StepResult:
         """Return the result of an environment whose episode already ended.
