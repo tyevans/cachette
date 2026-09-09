@@ -30,7 +30,7 @@
 //! [^4]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decisions D1 to D4. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 //! [^5]: Testing Rules, sections 2 and 2a. `.agents/rules/testing.md`
 
-use cachette_core::action::{ActionSchema, ActionShape, CandidateKind, Verb};
+use cachette_core::action::{ActionSchema, ActionShape, CandidateKind, Verb, PLACE_ANYWHERE};
 use cachette_core::faction_view::Sighting;
 use cachette_core::{Axial, FactionId, World, WorldConfig};
 
@@ -353,8 +353,8 @@ fn the_answer_names_no_campaign_objective_the_faction_cannot_see() {
 
     let schema = world.action_schema();
     let campaign = schema
-        .encode(Verb::Campaign, &[])
-        .expect("the campaign verb takes no argument");
+        .encode(Verb::Campaign, &[PLACE_ANYWHERE])
+        .expect("the campaign verb takes one place");
     let answer = world
         .legal_actions(FactionId(0))
         .expect("the faction is of this world");

@@ -36,7 +36,7 @@
 
 use bytemuck::{Pod, Zeroable};
 
-use crate::action::{ActionSchema, Verb};
+use crate::action::{ActionSchema, Verb, PLACE_ANYWHERE};
 
 use crate::campaign::wants_campaign;
 use crate::hash::StateHash;
@@ -559,21 +559,26 @@ impl Choice {
     ///
     /// **A choice and a learner action reach one encoding.**[^1] A verb
     /// whose content the engine resolves at the tick the command applies
-    /// declares no argument, so a campaign and a crossing carry none: the
-    /// engine chose the objective and the tile, and it chooses them again
-    /// for a learner.[^2]
+    /// declares no argument, so a crossing carries none: the engine chose
+    /// the tile, and it chooses it again for a learner.[^2]
+    ///
+    /// **A campaign carries the place value that names the whole frame.**
+    /// The controller names no cell, and that value says the engine resolves
+    /// the objective over every cell. The choice therefore lands on one row
+    /// of the table, and the verb set does not move.[^3]
     ///
     /// # References
     ///
     /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
     /// [^2]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+    /// [^3]: ADR-0199, a verb names a place by a cell of the egocentric frame the observation publishes, decision D2. `docs/adrs/draft/adr-0199-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
     #[must_use]
     pub const fn verb(self) -> (Verb, Option<u32>) {
         match self {
             Self::Gather(kind) => (Verb::Gather, Some(kind.to_u8() as u32)),
             Self::Build(kind) => (Verb::Build, Some(kind.to_u8() as u32)),
             Self::Relation(other) => (Verb::Relation, Some(other.0 as u32)),
-            Self::Campaign { .. } => (Verb::Campaign, None),
+            Self::Campaign { .. } => (Verb::Campaign, Some(PLACE_ANYWHERE)),
             Self::Advertise => (Verb::Advertise, None),
             Self::Trade => (Verb::Trade, None),
             Self::Carry => (Verb::Carry, None),

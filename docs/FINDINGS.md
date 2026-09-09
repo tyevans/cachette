@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-686**
+**Next number: FND-687**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -17861,6 +17861,53 @@ proportion to those workers, and a pass that gives one process few workers does
 not. The passes to look at are therefore the ones that hold the whole core count
 in one process, not the generations.
 
+### FND-686 — A place argument was believed to grow the action table with the world, and an egocentric place does not
+
+**Believed.** No argument position of the action table may name a place. A
+draft record states it as a decision, and it gives two costs. The legality
+answer returns one byte for each row, so a table indexed by the map lattice
+makes one decision walk the world. A weight file is a function of the table
+length, so a table that follows the world extent parts every stored policy
+from every world of another size.[^F683A]
+
+**True.** Both costs are real, and both follow from one premise the record
+does not name: that a place is an index into the extent of the world. The
+premise held when the record was written, because the observation then carried
+one position for each cell of the map lattice and nothing else named a place.
+
+The observation now reads an egocentric frame of rings and angular sectors,
+and the cell count of that frame is a constant of the frame.[^F683B] A place
+named as a cell of that frame is bounded by a constant. The legality answer is
+therefore a fixed length at every world size, and one action integer names one
+relative place on a world of any extent.
+
+**Evidence.** The campaign verb now declares one place position over that
+frame. Two worlds of two extents, seated on the same addresses under one seed,
+answer the same set of legal place values for one faction. The action schema
+is byte-identical across three extents at one faction count. Both facts have
+tests.[^F683C]
+
+The constraint underneath the refused decision survives: no bound of the action
+schema follows the world extent. The shape of the schema enforces it, because
+the schema is built from a world shape that carries the faction count and
+nothing about the extent.
+
+**What follows.** A record narrows the refused decision rather than reversing
+it.[^F683D] A place is admissible when its bound is a constant of the
+egocentric frame, and inadmissible when it indexes the extent.
+
+A second rule bounds which verbs may take one. A verb whose target comes from
+a keyed sample of the world declares no place position, because narrowing a
+draw is a narrowing the engine resolves by a draw, and the draft record
+forbids that.[^F683A] The crossing verb and the settling verb both take a
+keyed founding survey, so both keep no place. The campaign verb reads the
+settlements the faction has observed, and it takes one.
+
+**A read of the refused decision as a refusal of every place would have cost
+the largest single gain available in the action table.** A research report
+ranks a spatial argument first among the changes to that table, and it found
+no published macro action space whose rows name no place at all.[^F683E]
+
 ## References
 
 [^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
@@ -17912,3 +17959,6 @@ in one process, not the generations.
 [^F681B]: The commit `Derive an approach field only when its arguments changed`. Read its message for the figures, the tests and the commands.
 [^F683A]: The commit `Give the holding city walk a stage of its own`. Read its message for the file table and the entry counts.
 [^F683B]: Findings register, FND-305. `docs/FINDINGS.md`
+[^F683C]: The commit `Let a campaign name the cell of the frame it marches in`. Read its message for the table lengths and the fixture.
+[^F683D]: ADR-0199, a verb names a place by a cell of the egocentric frame the observation publishes. `docs/adrs/draft/adr-0199-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+[^F683E]: Report 40, what a well-trained policy needs, section 6.1. `docs/research/reports/40-what-a-well-trained-policy-needs.md`
