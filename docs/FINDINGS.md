@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-707**
+**Next number: FND-708**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18889,3 +18889,55 @@ will read a behaviour change into a constant change. The gate is working
 exactly as designed; the inference was the defect.
 [^F706A]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D1. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
 [^F706B]: Findings register, FND-704. `docs/FINDINGS.md`
+
+### FND-707 — The policy does not read the world, and the legality mask hid it for a whole run
+
+**Believed.** A training run over four play styles produced validated scores
+well above the built-in controller on held-out worlds, and the register read
+that as four policies that had learned to play. The dispatcher watched nine
+validated checkpoints, explained a flat curve as a coarse metric, and
+published four weight files.
+
+**True.** **Not one of the four reads the observation.** Each is a fixed
+preference order over the action rows, and the engine's legality answer does
+the situational work.
+
+Measured inside two of the files, over sixty decisions of one changing world:
+the score of a single action row moves by 0.013 to 0.022 across the whole
+episode, while the spread between rows is 0.258 to 0.371. So the constant part
+of the readout is twelve to twenty times the part that answers the world. The
+highest-scoring row, ignoring the mask, is the same row at every decision of
+every step measured. All four styles chose the same action, the wonder build,
+including the two whose objectives pay nothing for a wonder.
+
+**Why the score is nonetheless honest.** A constant is a good strategy in this
+world. Over six held-out seeds under the army style's weighting: always
+building the wonder returns 102.29, the trained policy 151.68, a uniform legal
+draw minus 61.19, and doing nothing minus 96.56. The trained file beats the
+best constant because it falls to its next preferred legal row where the
+constant falls to a no-op, and only 13 to 18 of 180 rows are legal at any
+decision. **The mask, not the policy, supplies the response to the world.**
+
+**Why the search stops there.** The gradient toward a constant is large and
+immediately available, and the gradient toward conditional behaviour asks many
+more weights to agree for a smaller gain. An evolution strategy takes the
+constant and settles. Every flat validated curve of the run is that local
+optimum, and the coarse-metric reading of it was wrong.
+
+**Evidence for the human observation over the measurement.** The project owner
+played three of the files and reported one unit wandering for a thousand ticks.
+Every number the run produced said the policies were strong. The owner was
+right and the numbers were answering a different question.
+
+**Follows.** A score against a yardstick does not measure play, and this
+register now holds the instance. Two checks are cheap and neither existed: the
+share of decisions on which a policy emits its most common action, and whether
+the argmax over the unmasked rows ever changes within an episode. A policy that
+answers the same row at every decision has learned a preference and not a
+policy.
+
+**The rule this instance belongs to.** The testing rule says a determinism
+test cannot tell correct from consistently wrong, and that the repair is to
+test what a value depends on rather than that it repeats.[^F703A] A validated
+return is the same shape of gate. It was watched for nine checkpoints and it
+never once asked what the policy did.

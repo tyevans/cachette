@@ -55,15 +55,41 @@ seeds under the same weighting, so the only fair comparison is a row against
 its own bar. **Each bar is read from that style's own log**, because the four
 styles write one shared log and the controller row there names no style.
 
-| File | Score | Yardstick | Beats it | Generation | Win path |
+| File | Score | Yardstick | Beats it | Generation | Style rewards |
 |---|---|---|---|---|---|
-| `styles/obs7-act2-aggressive-gen7` | 86.90 | 50.00 | yes | 7 | domination |
-| `styles/obs7-act2-wonder-rush-gen9` | 86.35 | 10.44 | yes | 9 | wonder |
-| `styles/obs7-act2-defensive-expansionist-gen3` | 49.47 | −9.05 | yes | 3 | territory |
-| `styles/obs7-act2-renown-champion-gen7` | 48.84 | 49.03 | no | 7 | renown |
+| `styles/obs7-act2-aggressive-gen7` | 86.90 | 50.00 | yes | 7 | army, ground |
+| `styles/obs7-act2-wonder-rush-gen9` | 86.35 | 10.44 | yes | 9 | wonder work |
+| `styles/obs7-act2-defensive-expansionist-gen3` | 49.47 | −9.05 | yes | 3 | ground, seats |
+| `styles/obs7-act2-renown-champion-gen7` | 48.84 | 49.03 | no | 7 | renown, army |
 
-**The two styles that improved are the two whose win path was closed before
-this run.** A worker carries an attack of zero and an armour of zero, and one
+**Read every score above against the paragraph below before you trust it.**
+
+**None of these policies reads the world.** Each one is a fixed preference
+order over the action rows, and the legality mask does the rest. Measured over
+sixty decisions of a changing world, the score of one row moves by 0.013 to
+0.022 while the spread between rows is 0.258 to 0.371, so the constant part of
+the readout is twelve to twenty times the part that answers the
+observation.[^C10] The highest row never changes: every one of these files
+ranks the same action first at every decision, whatever the world holds.
+
+That action is the wonder build. **All four styles converged on it**, including
+the two whose objectives pay nothing for a wonder.
+
+The scores are real and the ranking is honest. A constant is simply a good
+strategy here: always building the wonder returns 102.29 against 151.68 for the
+trained policy, minus 61.19 for a uniform legal draw and minus 96.56 for doing
+nothing, over six held-out seeds under the army style's weighting. So the
+policy earns its score, and it earns it by holding one plan rather than by
+playing.
+
+**What that means for a watcher.** A faction under one of these files builds in
+place and moves almost nothing. The project owner played three of them and saw
+one unit wander for a thousand ticks, which is what a fixed plan looks like on
+screen. Do not read a score here as a measure of play.
+
+**The two styles whose validated score improved are the two whose win path was
+closed before this run.** Read that against the paragraph above: a rising score
+here is a constant that pays better, not a policy that learned to play. A worker carries an attack of zero and an armour of zero, and one
 verb promotes a unit to the soldier type, so a faction that never campaigns
 cannot fell anything.[^C9] The military strength of a faction was also a field
 the layout declared and nothing wrote. With the field written and a level
@@ -238,3 +264,4 @@ policy asks for an observation after a game ends.[^C2]
 [^C7]: Findings register, FND-700. `docs/FINDINGS.md`
 [^C8]: Findings register, FND-698. `docs/FINDINGS.md`
 [^C9]: Findings register, FND-704. `docs/FINDINGS.md`
+[^C10]: Findings register, FND-707. `docs/FINDINGS.md`
