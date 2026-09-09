@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-692**
+**Next number: FND-693**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18139,8 +18139,67 @@ world before and after the change and compare the arrays position for
 position. A run that is writing weights loses them when the version moves, so
 the comparison is the cheaper of the two.
 
+### FND-692 — The reward paid the same for a win at tick 251 and a win at the tick limit
+
+**Believed.** The outcome weights were the objective. An earlier finding cut
+the loss weight to a tenth of the win weight, because a symmetric pair ranked
+a draw above an attempt at a win, and the policy had learned to survive.[^F692A]
+The project read that repair as enough to make a policy play for a win.
+
+**True.** It makes a policy play for a win. It does not make a policy play for
+a decisive win. The reward held no term on how long the game ran, so a win at
+tick 251 and a win at the tick limit paid the same amount.
+
+Four paths end a game. Domination, a finished wonder and a renown target all
+fire inside the run. The territory path fires at the tick limit and compares
+held ground, so an episode that runs out the clock still ends won or lost. A
+policy that does nothing therefore reaches a scored ending, and nothing in the
+reward ranked that ending below an early one.
+
+**A per-decision term cannot repair this.** An undiscounted episode return
+sums the reward of every decision, and every shaped term of the reward weighs
+a change since the previous reading. A sum of changes collapses to the last
+reading less the first, so such a term contributes the same amount whatever
+the policy did in between.[^F692B] A term that must change what the optimiser
+sees has to fire once, at the end, on a level.
+
+**Evidence.** The measured endings against the built-in controller fall in two
+clusters over 24 held-out seeds. Domination took 17 games and territory took
+7, and random play reached the limit in 14 of 24. The end tick that would have
+shown this in a trainer report read zero for every episode until one commit
+repaired it, so no earlier attempt at a timing term could have measured
+anything.[^F692C] The two conquest policies sit still and let the clock run
+out, which is the behaviour the reward ranked equal to an early win.
+
+**Follows.** The reward now pays one terminal term for the time a win left on
+the clock. It is the early weight times the share of the tick limit still to
+run when the game ended, so a win at the limit pays nothing there.
+
+**Only a win pays it, and the alternatives are worse.** A flat penalty for
+reaching the limit makes a fast loss cheaper than a slow one, so a faction
+that gives up at tick 300 outscores a faction that holds on and loses narrowly
+at the limit. A term that paid the time left on any outcome has the same
+defect. The chosen term pays on the win side alone, so no ordering between a
+win and a loss moves, and the loss weight stays where the earlier finding put
+it.
+
+**The weight is zero unless a caller sets it.** Every other weight of the
+reward refuses to run while it is unset, and this one defaults instead. A
+default of zero pays nothing, so a score measured before the term existed
+stays comparable with a score measured after it. The run entry point sets the
+weight on the conquest strategies alone, and every stored conquest score
+becomes incomparable with a score measured after the change.[^F692D]
+
+**Nothing has measured the effect yet.** No training run has been made under
+the term. This row records the arithmetic and the reasoning, and it does not
+claim a behaviour change.
+
 ## References
 
+[^F692A]: Findings register, FND-679. `docs/FINDINGS.md`
+[^F692B]: Findings register, FND-676. `docs/FINDINGS.md`
+[^F692C]: Findings register, FND-689. `docs/FINDINGS.md`
+[^F692D]: The stored policy index. `checkpoints/README.md`
 [^F689A]: The commit `Split the trainer into a search, a play and a record`, which replaced the hard index with a lookup that defaults.
 [^F689B]: The commit `Replace the observation layout with the scale-free blocks of report 42`, which removed the field the lookup named.
 [^F689C]: The commit `Read the end tick of an episode from the world, not a signal`. Read its message for the figures and the search command.

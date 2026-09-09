@@ -374,6 +374,7 @@ class ObjectiveReward:
                 terms={},
                 changes={},
                 objectives=self._objectives.zero().as_dict(),
+                remaining_share=state.remaining_share,
             )
         reading = self._objectives.read(held, self._previous)
         self._previous = held
@@ -390,6 +391,7 @@ class ObjectiveReward:
             terms=dict(reading.values),
             changes={},
             objectives=reading.as_dict(),
+            remaining_share=state.remaining_share,
         )
 
 
