@@ -708,16 +708,37 @@ def evaluate(
     the seat, and the refusal figures beside them. **The set of quantities
     comes from the schema of the engine and never from a tuple written here.**
     """
+    played = [
+        run_population(env_config, scoring, [policy], seeds, workers, label=label)
+        for _ in range(max(1, repeats))
+    ]
+    return summarise(played)
+
+
+def summarise(played: Sequence[PopulationRecord]) -> dict[str, float]:
+    """Return one summary over a set of batches of one policy.
+
+    **This is the one declaration of what a summary holds.** Two callers need
+    it: the pass that plays one objective, and the pass that plays several
+    objectives over one set of episodes. A second copy would be one rule
+    stored twice, with nothing that fails when the copies disagree.
+
+    The return entry is the mean over the batches, so a caller that repeated
+    the seed set reads one number. Every other entry is a mean over every
+    episode of every batch.
+
+    The summary holds one entry for each quantity the engine publishes about
+    the seat, and the refusal figures beside them. **The set of quantities
+    comes from the schema of the engine and never from a tuple written
+    here.**
+    """
     rows: list[dict[str, float]] = []
     episodes: list[EpisodeRecord] = []
     values: list[float] = []
-    for _ in range(max(1, repeats)):
-        played = run_population(
-            env_config, scoring, [policy], seeds, workers, label=label
-        )
-        values.append(played.mean())
-        rows.extend(played.rows())
-        episodes.extend(played.episodes)
+    for batch in played:
+        values.append(batch.mean())
+        rows.extend(batch.rows())
+        episodes.extend(batch.episodes)
     summary = {"return": float(np.mean(values)), "episodes": float(len(rows))}
     for name in sorted({key for row in rows for key in row}):
         summary[name] = float(np.mean([row[name] for row in rows]))
@@ -777,6 +798,7 @@ __all__ = [
     "score_generation",
     "shell_policy",
     "store_centres",
+    "summarise",
     "train",
     "unit",
     "viable_seeds",

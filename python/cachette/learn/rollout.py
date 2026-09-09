@@ -14,6 +14,17 @@ Every candidate of one generation plays the same worlds. That removes the
 variance that would otherwise drown a small population. The caller moves the
 set between generations, so a policy cannot learn one map.
 
+# One play answers for several objectives
+
+A baseline return separates into two things. The episodes are the games the
+seat plays, and they depend on the world shape and the seed set. The
+weighting turns the readings of those games into one number, and only it
+differs between two objectives.
+
+This module therefore holds a pass that plays the episodes once and scores
+them once for each objective. A run of six objectives plays one batch, and a
+seventh objective then costs the arithmetic of one more scorer.
+
 # A candidate may be scored against the seats it played
 
 A generation may put more than one candidate in one world. Two candidates in
@@ -37,7 +48,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -93,7 +104,7 @@ def run_population(
     no-op whatever it chooses.
     """
     ordered = [int(seed) for seed in seeds]
-    pairs = [(c, s) for c in range(len(policies)) for s in range(len(ordered))]
+    pairs = _pairs(len(policies), len(ordered))
     positions = _each_position(scoring, len(ordered))
     vector = VectorEnv(
         config,
@@ -101,9 +112,99 @@ def run_population(
         count=len(pairs),
         workers=workers,
     )
-    vector.reset([ordered[s] for _, s in pairs])
+    played = _drive(vector, policies, ordered, pairs, label)
+    return _record_of(vector, played, policies, ordered, None)
 
+
+def run_objectives(
+    config: EnvConfig,
+    scorings: Mapping[str, Scoring],
+    policies: Sequence[Policy],
+    seeds: Sequence[int],
+    workers: int,
+    label: str = "",
+) -> dict[str, PopulationRecord]:
+    """Play the episodes once, and return one record for each objective.
+
+    **The episodes do not depend on the objective.** The world comes from the
+    configuration and the seed. The action comes from the policy, and a world
+    the built-in controller holds takes no action at all. The end of an
+    episode comes from the outcome reader, which reads the observation of the
+    faction and the recorded end of the game. A scoring weights the readings
+    of an episode and never moves it, so one play answers for every scoring.
+
+    A caller that wants six numbers therefore plays one batch rather than six.
+    Each environment holds one scorer for each objective, and every scorer
+    reads the same decision.
+
+    The result holds one record for each name, under the name the caller gave.
+    **The names keep the order of the mapping the caller passed**, so the
+    order of the result comes from a key the caller stated and never from
+    which world or worker finished first.
+
+    A caller that gives one objective gets the same answer as a call that
+    plays that objective alone, which is the property the tests fix.
+    """
+    if not scorings:
+        message = "a shared pass plays at least one objective"
+        raise ValueError(message)
+    ordered = [int(seed) for seed in seeds]
+    pairs = _pairs(len(policies), len(ordered))
+    names = list(scorings)
+    primary = names[0]
+    vector = VectorEnv(
+        config,
+        scorings[primary],
+        count=len(pairs),
+        workers=workers,
+        also={name: scorings[name] for name in names[1:]},
+    )
+    played = _drive(vector, policies, ordered, pairs, label)
+    records = {primary: _record_of(vector, played, policies, ordered, None)}
+    for name in names[1:]:
+        shared = replace(played, returns=played.also[name])
+        records[name] = _record_of(vector, shared, policies, ordered, name)
+    return records
+
+
+def _pairs(candidates: int, seeds: int) -> list[tuple[int, int]]:
+    """Return the candidate and seed position of each world, in index order."""
+    return [(c, s) for c in range(candidates) for s in range(seeds)]
+
+
+@dataclass(frozen=True)
+class _Played:
+    """What one batch earned, before any record is built from it.
+
+    The returns entry holds the return of each world under the primary
+    scoring, in index order. The also entry holds the same for each further
+    scoring, under the name the caller gave.
+    """
+
+    returns: np.ndarray
+    also: Mapping[str, np.ndarray]
+    chosen: list[int]
+    refused: list[int]
+
+
+def _drive(
+    vector: VectorEnv,
+    policies: Sequence[Policy],
+    seeds: Sequence[int],
+    pairs: Sequence[tuple[int, int]],
+    label: str,
+) -> _Played:
+    """Reset the batch, run it to the end, and total what each world earned.
+
+    **This is the one declaration of the batch loop.** Two callers need it:
+    one that plays a population under one objective, and one that plays it
+    once under several. A second copy of the loop would be one rule stored
+    twice, with nothing that fails when the copies disagree.
+    """
+    vector.reset([seeds[s] for _, s in pairs])
+    names = vector.envs[0].also_names
     returns = np.zeros(len(pairs))
+    also = {name: np.zeros(len(pairs)) for name in names}
     chosen = [0] * len(pairs)
     refused = [0] * len(pairs)
     started = time.perf_counter()
@@ -117,12 +218,15 @@ def run_population(
         # Each candidate scores its own worlds. The rows of one candidate are
         # contiguous, so one matrix product answers for all of them.
         for candidate, policy in enumerate(policies):
-            first = candidate * len(ordered)
-            last = first + len(ordered)
+            first = candidate * len(seeds)
+            last = first + len(seeds)
             picked = policy.choose_many(observations[first:last], masks[first:last])
             actions[first:last] = picked
         for index, result in enumerate(vector.step(actions)):
             returns[index] += result.reward
+            paid = result.info["also"]
+            for name in names:
+                also[name][index] += paid[name]
             applied = result.info.get("applied")
             if applied is None:
                 continue
@@ -162,10 +266,28 @@ def run_population(
                 flush=True,
             )
 
+    return _Played(returns=returns, also=also, chosen=chosen, refused=refused)
+
+
+def _record_of(
+    vector: VectorEnv,
+    played: _Played,
+    policies: Sequence[Policy],
+    seeds: Sequence[int],
+    scoring_name: str | None,
+) -> PopulationRecord:
+    """Build the record of one objective over a batch that already ran."""
     return PopulationRecord(
-        seeds=tuple(ordered),
-        returns=returns.reshape(len(policies), len(ordered)),
-        episodes=episode_records(vector.envs, ordered, returns, chosen, refused),
+        seeds=tuple(seeds),
+        returns=played.returns.reshape(len(policies), len(seeds)),
+        episodes=episode_records(
+            vector.envs,
+            seeds,
+            played.returns,
+            played.chosen,
+            played.refused,
+            scoring_name,
+        ),
         ticks=vector.world_ticks,
     )
 
@@ -291,6 +413,7 @@ __all__ = [
     "HEARTBEAT_SECONDS",
     "Generation",
     "one_scoring",
+    "run_objectives",
     "run_population",
     "score_generation",
 ]

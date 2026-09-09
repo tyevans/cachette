@@ -192,7 +192,12 @@ class Env:
     that knows this project.
     """
 
-    def __init__(self, config: EnvConfig, scoring: Scoring) -> None:
+    def __init__(
+        self,
+        config: EnvConfig,
+        scoring: Scoring,
+        also: Mapping[str, Scoring] | None = None,
+    ) -> None:
         """Build the environment. This builds no world; ``reset`` does that.
 
         The scoring entry is what the seat is rewarded for. A weighting over
@@ -206,9 +211,25 @@ class Env:
         reads an observation through it and never through a position of its
         own.** A tuple of names written by hand is a second declaration of
         what the engine publishes, and nothing fails when the two disagree.
+
+        The also entry names further scorings that read the same episode. **A
+        scoring reaches no choice of the world.** The world comes from the
+        configuration and the seed, the action comes from the caller, and the
+        end of an episode comes from the outcome reader, which reads the
+        observation of the faction and the recorded end of the game. A scoring
+        therefore weights the readings of an episode and never moves it, so
+        one play answers for every scoring at once.
+
+        Each companion scorer keeps its own running state, and it reads the
+        world once for each decision the primary scorer reads it. The names
+        keep the order the caller gave, so a caller that combines the results
+        sorts by a key it stated and never by what finished first.
+
         """
         self._config = config
         self._scoring = scoring
+        self._also_scorings: dict[str, Scoring] = dict(also or {})
+        self._also: dict[str, Scorer] = {}
         self._world: World | None = None
         self._reward: Scorer | None = None
         self._decisions = 0
@@ -284,10 +305,42 @@ class Env:
         """
         self._world = self._build(seed)
         self._reward = self._scoring.scorer(self._world, self._config.seat)
+        self._also = self._companions()
         self._decisions = 0
         self._terminated = False
         self._truncated = False
         return self.observation()
+
+    def _companions(self) -> dict[str, Scorer]:
+        """Build one companion scorer for each further scoring, in name order."""
+        world = self._require_world()
+        return {
+            name: scoring.scorer(world, self._config.seat)
+            for name, scoring in self._also_scorings.items()
+        }
+
+    @property
+    def also_names(self) -> tuple[str, ...]:
+        """The further scorings this environment reads, in the order given."""
+        return tuple(self._also_scorings)
+
+    def objectives_under(self, name: str | None = None) -> Mapping[str, float]:
+        """Return what each objective scored under one scoring of this episode.
+
+        A name of ``None`` asks the primary scoring. Any other name asks one
+        companion, and a name the environment does not hold is refused with
+        the list of the names it does hold.
+        """
+        if name is None:
+            return self.objectives
+        scorer = self._also.get(name)
+        if scorer is None:
+            message = (
+                f"{name!r} names no scoring of this environment. It holds "
+                f"{sorted(self._also_scorings)}."
+            )
+            raise KeyError(message)
+        return scorer.objectives
 
     def _require_world(self) -> World:
         """Return the world of the episode, or refuse."""
@@ -322,6 +375,7 @@ class Env:
         """
         self._world = cast(World, world)
         self._reward = self._scoring.scorer(self._world, self._config.seat)
+        self._also = self._companions()
         self._decisions = 0
         self._terminated = False
         self._truncated = False
@@ -404,6 +458,11 @@ class Env:
 
         The applied entry is what ``apply`` answered. It travels into the
         result, so a caller reads the refusal of the decision it just took.
+
+        Each companion scorer reads the same decision, and the also entry of
+        the info carries what each one paid. **Only the primary scoring
+        decides that the episode ended**, because the end of an episode is a
+        property of the world and every scorer reads the same answer for it.
         """
         world = self._require_world()
         if self._reward is None:  # pragma: no cover - reset builds both
@@ -411,6 +470,7 @@ class Env:
             raise RuntimeError(message)
         self._decisions += 1
         reading = self._reward.read(world)
+        also = {name: scorer.read(world).value for name, scorer in self._also.items()}
         self._record_end(reading)
         return StepResult(
             observation=self.observation(),
@@ -425,6 +485,7 @@ class Env:
                 "terms": dict(reading.terms),
                 "changes": dict(reading.changes),
                 "objectives": dict(reading.objectives),
+                "also": also,
                 "decisions": self._decisions,
             },
         )
@@ -435,13 +496,20 @@ class Env:
         The batch keeps every environment in index order, so a finished
         episode still reports a row. The row earns nothing and changes
         nothing, and the skipped entry of the info says so.
+
+        No scorer reads a finished episode, so every companion earns nothing
+        here as well. The also entry still holds one zero for each name, so
+        a caller reads the same set of names on every row.
         """
         return StepResult(
             observation=self.observation(),
             reward=0.0,
             terminated=self._terminated,
             truncated=self._truncated,
-            info={"skipped": True},
+            info={
+                "skipped": True,
+                "also": dict.fromkeys(self._also_scorings, 0.0),
+            },
         )
 
     def _record_end(self, reading: RewardStep) -> None:
@@ -577,6 +645,7 @@ class VectorEnv:
         scoring: Scoring | Sequence[Scoring],
         count: int,
         workers: int = 1,
+        also: Mapping[str, Scoring] | None = None,
     ) -> None:
         """Build a vector of environments over one configuration.
 
@@ -585,6 +654,11 @@ class VectorEnv:
         the scoring gives one entry for each index and never one entry for
         each candidate.** Two candidates scored under two objectives are not
         comparable, so a rank over them carries no information.
+
+        The also entry names further scorings that every environment reads
+        beside its own. A scoring reaches no choice of the world, so one play
+        answers for every scoring at once, and a caller that needs one number
+        for each of several objectives plays the episodes once.
         """
         if count < 1:
             message = "a vector holds at least one environment"
@@ -594,7 +668,7 @@ class VectorEnv:
         self._scorings = scorings
         self._count = count
         self._workers = max(1, workers)
-        self._envs = [Env(config, held) for held in scorings]
+        self._envs = [Env(config, held, also) for held in scorings]
         self._batch: Batch | None = None
         self._live: list[int] = []
         # How many world-ticks this vector has run. One world stepped one

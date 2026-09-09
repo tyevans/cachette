@@ -59,7 +59,7 @@ import time
 from dataclasses import asdict, replace
 from pathlib import Path
 
-from .baseline import controller_baseline
+from .baseline import available_workers, controller_baseline, controller_baselines
 from .env import Env, EnvConfig, viable_seeds
 from .policy import (
     LinearPolicy,
@@ -324,21 +324,44 @@ def fill_baseline_cache(
     it does. This pass runs once, before any trainer starts, and it may hold
     every core.
 
+    **One set of games answers for every strategy.** The games come from the
+    world and the seed set, and the objective weights their readings. The
+    strategies that miss therefore play one batch, and the pass scores that
+    batch once for each of them. A seventh strategy then costs the arithmetic
+    of one more scorer.
+
     Two strategies that hold the same objective share one number. The second
-    call finds what the first wrote, so this loop needs no list of its own of
-    which objectives differ.
+    of them reads what the first wrote, so this pass needs no list of its own
+    of which objectives differ.
+
+    **Every strategy plays the same world here.** The strategy table names a
+    world for each strategy, and a table that gave two strategies two
+    different worlds could not share one batch between them. This refuses
+    such a table rather than reporting one world under the name of another.
     """
-    for name in names:
-        config, scoring, _ = STRATEGIES[name]
-        summary, source = controller_baseline(
-            replace(config, controlled=False),
-            first_scoring(scoring),
-            LinearPolicy.zeros(probe.action_length, probe.observation_length),
-            holdout,
-            workers,
-            probe.observation_version,
-            f"{name} baseline",
+    world = replace(STRATEGIES[names[0]][0], controlled=False)
+    other = [
+        name
+        for name in names
+        if replace(STRATEGIES[name][0], controlled=False) != world
+    ]
+    if other:
+        message = (
+            f"{other} name another world than {names[0]!r}, and one batch "
+            "plays one world. Measure them in separate passes."
         )
+        raise ValueError(message)
+    measured = controller_baselines(
+        world,
+        {name: first_scoring(STRATEGIES[name][1]) for name in names},
+        LinearPolicy.zeros(probe.action_length, probe.observation_length),
+        holdout,
+        workers,
+        probe.observation_version,
+        "baseline",
+    )
+    for name in names:
+        summary, source = measured[name]
         print(
             f"  {name} controller {source} return {summary['return']:10.1f} "
             f"won {summary['won']:5.2f}",
@@ -362,6 +385,21 @@ def main() -> int:
             "how many engine workers one process gives its batch. This is a "
             "per process count, so a run of five shards with twelve workers "
             "asks for sixty workers on the machine"
+        ),
+    )
+    # **The pass that fills the baseline cache runs alone, so it takes the
+    # whole machine.** Every trainer of the run waits for it, and it took the
+    # per process worker count of a trainer instead. That held the pass over
+    # the whole held-out seed set to a tenth of a rented machine of sixty
+    # four cores, and nothing failed. Zero asks the machine what it has.
+    parser.add_argument(
+        "--baseline-workers",
+        type=int,
+        default=0,
+        help=(
+            "how many engine workers the pass that fills the baseline cache "
+            "gives its batch. Zero takes every core the machine offers, "
+            "because that pass runs alone and every trainer waits for it"
         ),
     )
     parser.add_argument(
@@ -545,7 +583,7 @@ def main() -> int:
         return fill_baseline_cache(
             names,
             holdout,
-            arguments.workers,
+            arguments.baseline_workers or available_workers(),
             Env(WORLD, first_scoring(STRATEGIES[names[0]][1])),
         )
 
