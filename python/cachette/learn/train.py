@@ -163,6 +163,11 @@ class Checkpoint:
         still had a population to rank when it stopped, which is the signal
         that the first full run lost silently.
 
+        **The fit carries the action table as the engine published it.** That
+        table is what lets a later reader place a row of this file by its verb
+        and its candidate coordinates, so a change to one verb no longer
+        retires the whole file.[^2]
+
         **A file names the fit and the episode shape, and nothing about the
         search that produced it.** The written entries used to carry a hidden
         width as well. Nothing read it back, so it was one number declared in
@@ -177,6 +182,10 @@ class Checkpoint:
         ----------
         [^1]: Recurring defect shapes, shape 1 and shape 3.
         ``.agents/rules/recurring-defects.md``
+
+        [^2]: ADR-0200, a stored policy names each row of the action table by
+        its verb and its candidate coordinates, decision D1.
+        ``docs/adrs/draft/adr-0200-a-stored-policy-names-each-action-row-by-verb-and-coordinates.md``
         """
         current.save(
             target,
@@ -197,11 +206,11 @@ class Checkpoint:
             },
         )
 
-    def resume(self, shell: Trainable) -> tuple[Trainable, int, float]:
-        """Read back the centre, the generation counter and the best score.
+    def resume(self, shell: Trainable) -> tuple[Trainable, int, float, str | None]:
+        """Read back the centre, the generation counter, the best score and a note.
 
         **A resumed run continues the run. It is not a fresh run wearing an
-        old centre.** It takes all three, so it neither repeats the
+        old centre.** It takes the first three, so it neither repeats the
         generations already paid for nor overwrites a better checkpoint with
         a worse one.
 
@@ -210,10 +219,23 @@ class Checkpoint:
         another extent can hold the same layout length while meaning
         something else by every position of it.
 
+        **A resumed run reports when it rebuilt the readout rather than
+        loading it.** A change to one verb of the action table moves the rows
+        of every verb above it, and the reader carries each row onto the row
+        of the same identity.[^1] The note says what moved, and it is nothing
+        when nothing moved. A reader who cannot tell a rebuild from a load
+        cannot read the score of the first generation.
+
         A weight file states what it holds, and the reader gives back what
         the file held. A file written by an older run can therefore be
         missing a key, so each read names the type it needs and falls back
         to the value a fresh run would start at.
+
+        References
+        ----------
+        [^1]: ADR-0200, a stored policy names each row of the action table by
+        its verb and its candidate coordinates, decisions D3 and D5.
+        ``docs/adrs/draft/adr-0200-a-stored-policy-names-each-action-row-by-verb-and-coordinates.md``
         """
         stored, meta = load_policy(
             self.latest_path, PolicyFit.of_env(self.probe), layout_of(shell)
@@ -237,7 +259,8 @@ class Checkpoint:
             score = load_policy(self.best_path)[1].get("best_score")
             if isinstance(score, (int, float)) and math.isfinite(score):
                 best = float(score)
-        return policy, first_generation, best
+        note = meta.get("action_rebuild")
+        return policy, first_generation, best, note if isinstance(note, str) else None
 
 
 @dataclass
@@ -380,12 +403,14 @@ def train(
     first_generation = 0
     resumed_best = -np.inf
     if resume and checkpoint.latest_path.exists():
-        policy, first_generation, resumed_best = checkpoint.resume(policy)
+        policy, first_generation, resumed_best, rebuilt = checkpoint.resume(policy)
         print(
             f"  {name} resumes from {checkpoint.latest_path} "
             f"at generation {first_generation}",
             flush=True,
         )
+        if rebuilt is not None:
+            print(f"  {name} {rebuilt}", flush=True)
 
     judge = Validator(
         name=name,

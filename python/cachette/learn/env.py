@@ -49,6 +49,7 @@ import numpy as np
 
 from cachette._core import Batch, World
 
+from .policy import ActionTable
 from .reward import RewardStep, Scorer, Scoring
 from .signals import SignalCatalogue
 
@@ -212,6 +213,12 @@ class Env:
         own.** A tuple of names written by hand is a second declaration of
         what the engine publishes, and nothing fails when the two disagree.
 
+        The action table names each verb, its block of rows and the bound of
+        each argument position, and it also comes from the schema of the probe
+        world. **A stored policy carries a copy of it, so that a later table
+        places each row by its verb and its candidate coordinates rather than
+        by its index.**[^1]
+
         The also entry names further scorings that read the same episode. **A
         scoring reaches no choice of the world.** The world comes from the
         configuration and the seed, the action comes from the caller, and the
@@ -228,6 +235,12 @@ class Env:
         The held array is the observation the last decision built. A reset
         clears it, a decision sets it, and a finished episode answers every
         later row with it.
+
+        References
+        ----------
+        [^1]: ADR-0200, a stored policy names each row of the action table by
+        its verb and its candidate coordinates, decision D1.
+        ``docs/adrs/draft/adr-0200-a-stored-policy-names-each-action-row-by-verb-and-coordinates.md``
         """
         self._config = config
         self._scoring = scoring
@@ -254,6 +267,7 @@ class Env:
         self.action_length: int = int(action["length"])
         self.observation_version: int = int(observation["version"])
         self.action_version: int = int(action["version"])
+        self.action_table: ActionTable = ActionTable.of_schema(action)
         self.signals: SignalCatalogue = SignalCatalogue.of_world(probe)
 
     @property
@@ -495,8 +509,7 @@ class Env:
         self._held = held
         reading = self._reward.read(world, held)
         also = {
-            name: scorer.read(world, held).value
-            for name, scorer in self._also.items()
+            name: scorer.read(world, held).value for name, scorer in self._also.items()
         }
         self._record_end(reading)
         return StepResult(
