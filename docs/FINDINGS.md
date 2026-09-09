@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-686**
+**Next number: FND-687**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -17232,9 +17232,13 @@ buys the same factor for nothing. Neither knob is free of a cost elsewhere: a
 smaller readout states fewer rules, and the register does not yet say where the
 best point between them lies.
 
-**Do not read this as a reason to shrink the observation.** The projection is
-fixed, so the trainable count follows the hidden width and the action count,
-and not the length of the observation.
+**Do not read this as a reason to shrink the observation.** The trainable count
+follows the parameters a policy trains, and a policy that shares weights across
+positions trains far fewer of them than the observation is long. The reasoning
+above held that in terms of a policy whose first layer was a fixed random
+projection. **The project has since removed that policy, so read the mechanism
+from the later finding and not from this paragraph.** The law itself is
+unaffected, and it is still the governing constraint on a search shape.[^F668B]
 
 ### FND-669 — The set of readable quantities was declared three times, and a caller that crossed the boundary got silence
 
@@ -17861,8 +17865,55 @@ proportion to those workers, and a pass that gives one process few workers does
 not. The passes to look at are therefore the ones that hold the whole core count
 in one process, not the generations.
 
+### FND-686 — A fixed random projection buys step alignment and cannot buy a representation
+
+**Believed.** A frozen random projection with a trained readout is a good way
+to reach a nonlinear policy under an evolution strategy. Such a policy holds
+the smallest trainable count available, because the projection never moves and
+only the readout trains. The alignment law rewards a small trainable count, so
+the shape looked like the best step a generation can buy.[^F686A] The trainer
+offered this kind beside the linear policy for every reward.
+
+**True.** The count was real and the alignment was real, and neither was
+enough. At the ring layout the kind trained 696 weights behind a fixed
+projection of 115,680, against 139,780 for the linear policy of the same
+reward. The law then puts the alignment of a 64-pair generation about fourteen
+times higher for the projection than for the linear policy.
+
+A step that points fourteen times better still points inside a representation
+the search cannot change. The projection is drawn once from a seed and frozen,
+so a feature that the draw did not happen to mix is a feature no amount of
+training reaches. The alignment measures how well a generation finds the best
+step available in the space it searches. It says nothing about whether that
+space holds the rule the policy needs to state.
+
+The project removed the kind. The structured policy replaces it, and its
+scalar block is now trainable. That policy trains its own representation over
+the blocks the schema declares, at a count between the two above and an
+alignment several times the linear one.
+
+**The measurements did not condemn the deleted kind, and a later reader must
+not assume they did.** Both strategies of that kind led the linear policy of
+their own reward at the one generation either reached, and the earlier dense
+run put the same kind ahead of its linear control as well. The decision rests
+on the architecture alone.
+
+**Evidence.** The trainable count of each kind comes from the builder that the
+trainer and every worker process call, sized from the engine schemas. The two
+layer shapes come from the stored files themselves. The scores come from the
+stored policy index, which keeps the measurement of a removed file.[^F686B] The
+commit holds each count, each alignment figure and the commands.[^F686C]
+
+**Follows.** Read the alignment law as necessary and not as sufficient. A
+search shape earns its alignment only when the parameters it trains span the
+rules the policy must state. Do not reach for a fixed random bottleneck again
+in order to make a trainable count small.
+
 ## References
 
+[^F686A]: Findings register, FND-668. `docs/FINDINGS.md`
+[^F686B]: The stored policy index. `checkpoints/README.md`
+[^F686C]: The commit `Remove what the deleted frozen projection policy left behind`. Read its message for the counts, the alignment figures and the commands.
 [^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
 [^F670A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D2. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F670B]: The commit `Record what the observation width follows, and how its own ground flickers`. Read its message for the figures.
@@ -17872,6 +17923,7 @@ in one process, not the generations.
 [^F679A]: Findings register, FND-676. `docs/FINDINGS.md`
 [^F679B]: The commit `Record that the outcome weights prefer a draw to an attempt at a win`. Read its message for the weights and the arithmetic.
 [^F668A]: The commit `Measure what sets how well one generation points the right way`. Read its message for the figures.
+[^F668B]: Findings register, FND-686. `docs/FINDINGS.md`
 [^F667A]: The commit `Measure what water does to a training world, and free two colliding numbers`. Read its message for the figures.
 [^F667B]: Findings register, FND-666. `docs/FINDINGS.md`
 [^F643A]: ADR-0192, a window of controller commands is one label distribution over the action table, decision D2. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`

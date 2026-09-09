@@ -622,6 +622,6 @@ def test_the_search_builds_the_structured_shell_from_the_probe_schema() -> None:
         decision_interval=10,
     )
     probe = Env(config, Weighting(terms={}, won=0.0, lost=0.0, drawn=0.0))
-    policy = shell_policy("structured", probe, 32)
+    policy = shell_policy("structured", probe)
     assert isinstance(policy, StructuredPolicy)
     assert policy.parameter_count < probe.observation_length

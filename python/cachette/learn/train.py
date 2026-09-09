@@ -136,7 +136,6 @@ class Checkpoint:
     env_config: EnvConfig
     probe: Env
     kind: str
-    hidden: int
 
     @property
     def best_path(self) -> Path:
@@ -164,9 +163,20 @@ class Checkpoint:
         still had a population to rank when it stopped, which is the signal
         that the first full run lost silently.
 
-        A weight that is absent is written as a quiet value rather than left
-        out, because a file that loads with a missing key fails somewhere
-        further away than the file.
+        **A file names the fit and the episode shape, and nothing about the
+        search that produced it.** The written entries used to carry a hidden
+        width as well. Nothing read it back, so it was one number declared in
+        a file and answered nowhere, which is the shape this project has paid
+        for before.[^1]
+
+        The reader builds what a file names from the keys the file holds, so
+        it neither needs this key nor refuses a file that carries it. A file
+        written by an older run therefore still loads.
+
+        References
+        ----------
+        [^1]: Recurring defect shapes, shape 1 and shape 3.
+        ``.agents/rules/recurring-defects.md``
         """
         current.save(
             target,
@@ -184,7 +194,6 @@ class Checkpoint:
                 "tick_limit": self.env_config.tick_limit,
                 "horizon": self.env_config.horizon,
                 "decision_interval": self.env_config.decision_interval,
-                "hidden": 0,
             },
         )
 
@@ -326,7 +335,6 @@ def train(
     out_dir: Path,
     seed_pool: list[int],
     kind: str = "linear",
-    hidden: int = 32,
     resume: bool = False,
     validation: list[int] | None = None,
     validate_every: int = 3,
@@ -359,9 +367,8 @@ def train(
         env_config=env_config,
         probe=probe,
         kind=kind,
-        hidden=hidden,
     )
-    shell = shell_policy(kind, probe, hidden)
+    shell = shell_policy(kind, probe)
     optimiser: Optimiser = EvolutionStrategy(
         shell=shell,
         pairs=train_config.pairs,
@@ -437,7 +444,6 @@ def train(
                 seeds,
                 pool,
                 kind,
-                hidden,
                 label,
             )
             update = optimiser.update(centre, generation, played.ranked)
@@ -533,7 +539,6 @@ def play_generation(
     seeds: list[int],
     pool: ShardPool | None,
     kind: str,
-    hidden: int,
     label: str,
 ) -> Generation:
     """Score one generation, in this process or across the worker pool.
@@ -564,7 +569,6 @@ def play_generation(
         centre,
         pool,
         kind,
-        hidden,
         label,
     )
 

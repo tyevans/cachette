@@ -8,10 +8,13 @@ layout, one action layout, one world extent and one faction count. The loader
 reads the fit a file states, compares it against the world the caller names,
 and refuses a file that disagrees.[^C3]
 
-Nine policies that stated observation version 3 were removed rather than
-retired in place. The engine writes version 4, the loader refused all nine,
-and an index that lists a file nobody can load costs a reader the time it
-takes to find that out.
+**A file the loader refuses is removed rather than retired in place.** An index
+that lists a file nobody can load costs a reader the time it takes to find that
+out. Nine policies that stated observation version 3 went that way when the
+engine wrote version 4, and later groups went the same way.
+
+The section on what is gone says what each removed group reached. A
+measurement stays here when its file cannot.
 
 ## Watch one play
 
@@ -20,57 +23,75 @@ demonstration refuses a policy that does not fit the world it plays, so name
 that world.
 
     uv run python -m cachette.demo --extent 48 --factions 3 \
-      --policy 0=checkpoints/dense/obs4-land-dense-mlp-gen99.npz
+      --policy 0=checkpoints/ring/obs6-people-gen1.npz
 
 `--policy` repeats, and `N=path` names the faction that holds it. Three
 policies play each other like this:
 
     uv run python -m cachette.demo --extent 48 --factions 3 \
-      --policy 0=checkpoints/dense/obs4-land-dense-mlp-gen99.npz \
-      --policy 1=checkpoints/dense/obs4-land-dense-linear.npz \
-      --policy 2=checkpoints/dense/obs4-conquer-sparse-mlp.npz
+      --policy 0=checkpoints/ring/obs6-people-gen1.npz \
+      --policy 1=checkpoints/ring/obs6-land-gen1.npz \
+      --policy 2=checkpoints/ring/obs6-conquer-gen1.npz
 
 ## What is here
 
-**The ring policies are the current layout. The dense policies are not.** Every
-file here loads, and the two groups were fitted against two different rewards,
-so a score from one group does not compare with a score from the other.
-
-### The ring observation, one run of two generations
+Every file here holds a linear policy over the ring observation, and every one
+of them loads.
 
 | Policy | Score | Generation | Search |
 |---|---|---|---|
-| `ring/obs6-people-gen1` | 12051.5 | 1 | 64 candidates, 8 seeds, no hidden layer |
-| `ring/obs6-land-net-gen1` | 9197.3 | 1 | 64 candidates, 8 seeds, a hidden layer of 24 |
-| `ring/obs6-land-gen1` | 8873.8 | 1 | 64 candidates, 8 seeds, no hidden layer |
-| `ring/obs6-wealth-gen1` | 4233.9 | 1 | 64 candidates, 8 seeds, no hidden layer |
-| `ring/obs6-conquer-net-gen1` | 978.2 | 1 | 64 candidates, 8 seeds, a hidden layer of 24 |
-| `ring/obs6-conquer-gen1` | 870.4 | 1 | 64 candidates, 8 seeds, no hidden layer |
+| `ring/obs6-people-gen1` | 12051.5 | 1 | 64 candidates, 8 seeds |
+| `ring/obs6-land-gen1` | 8873.8 | 1 | 64 candidates, 8 seeds |
+| `ring/obs6-wealth-gen1` | 4233.9 | 1 | 64 candidates, 8 seeds |
+| `ring/obs6-conquer-gen1` | 870.4 | 1 | 64 candidates, 8 seeds |
 
 **Each row is generation 1 of a run that asked for 40.** The run was stopped
 after two generations. A row is an early centre of a search and it is not a
 level that any run held. Read none of them as a standard of play.
+
+## What is gone, and what it reached
+
+A removed file leaves its measurement here. A reader learns what the project
+tried without being offered a file that cannot run.
+
+### The dense observation
+
+Four policies were fitted against a dense observation of 184 positions, over a
+reward that weighed held ground at one. **They stated observation version 4 and
+the engine writes 6, so the loader refused all four.** This index said so and
+kept them anyway. Removing them completes a job that stopped at the prose.
+
+| Policy | Score | Generation | Search |
+|---|---|---|---|
+| `dense/obs4-land-dense-mlp-gen99` | -1043.7 | 99 | 256 candidates, 1 seed, a fixed projection into 24 units |
+| `dense/obs4-land-dense-linear` | -1071.1 | 87 | 256 candidates, 1 seed, linear |
+| `dense/obs4-land-dense-mlp` | -1080.5 | 19 | 256 candidates, 1 seed, a fixed projection into 24 units |
+| `dense/obs4-conquer-sparse-mlp` | -1167.4 | 15 | 256 candidates, 1 seed, a fixed projection into 24 units |
+
+The first row supersedes the third: the same run and the same strategy, 80
+generations later.
 
 **A ring score is positive and a dense score is negative, and the sign is the
 reward and not the play.** A loss now costs a tenth of what a win pays, where
 it used to cost the same. The terms of each play style also read new field
 names. Nothing about the two groups is comparable.
 
-### The dense observation, superseded
+### The frozen projection over the ring observation
+
+Two policies of the ring run held a fixed random projection into 24 units and
+trained only the readout from it. The project removed that policy kind, and the
+loader now refuses a file that names it.[^C6]
 
 | Policy | Score | Generation | Search |
 |---|---|---|---|
-| `dense/obs4-land-dense-mlp-gen99` | -1043.7 | 99 | 256 candidates, 1 seed, a hidden layer of 24 |
-| `dense/obs4-land-dense-linear` | -1071.1 | 87 | 256 candidates, 1 seed, no hidden layer |
-| `dense/obs4-land-dense-mlp` | -1080.5 | 19 | 256 candidates, 1 seed, a hidden layer of 24 |
-| `dense/obs4-conquer-sparse-mlp` | -1167.4 | 15 | 256 candidates, 1 seed, a hidden layer of 24 |
+| `ring/obs6-land-net-gen1` | 9197.3 | 1 | 64 candidates, 8 seeds, a fixed projection into 24 units |
+| `ring/obs6-conquer-net-gen1` | 978.2 | 1 | 64 candidates, 8 seeds, a fixed projection into 24 units |
 
-The first row supersedes the third: the same run and the same strategy, 80
-generations later.
-
-**These four state observation version 4 and the engine writes 6, so the loader
-refuses all four.** They are kept as a record of what the dense observation
-reached. Nothing can play them.
+**Each of the two led the linear policy of its own reward, and the kind was
+removed on its architecture and not on a measured loss.** Both rows come from
+the run that the table of what is here holds, so a reader can compare them
+reward by reward. One generation of one run is one measurement, and the
+section on reading a score says how little a single difference carries.
 
 ## A ring file states a version it was not fitted under
 
@@ -131,3 +152,4 @@ policy asks for an observation after a game ends.[^C2]
 [^C3]: ADR-0193, an observation names another faction by a position relative to the reader. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
 [^C4]: Findings register, FND-666. `docs/FINDINGS.md`
 [^C5]: Findings register, FND-667. `docs/FINDINGS.md`
+[^C6]: Findings register, FND-686. `docs/FINDINGS.md`

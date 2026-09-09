@@ -209,7 +209,7 @@ def carries_information(spread: float) -> bool:
     return spread > 0.0
 
 
-def shell_policy(kind: str, probe: Env, hidden: int) -> Trainable:
+def shell_policy(kind: str, probe: Env) -> Trainable:
     """Build the untrained policy of one kind, sized from the world.
 
     **The trainer and a worker process both build this, and they must build
@@ -224,12 +224,11 @@ def shell_policy(kind: str, probe: Env, hidden: int) -> Trainable:
     takes the signal catalogue of the probe. That catalogue is the schema the
     engine published, and this module states no part of it.
 
-    **No kind reads the hidden width.** It served the policy that held a
-    frozen projection and a trained readout, and this project removed that
-    policy. The argument stays until the two callers of this function drop
-    it.
+    **A kind sizes itself from the probe and from nothing a caller passes.**
+    The builder took a hidden width while one kind held a frozen projection
+    into a fixed number of units. This project removed that kind, and the
+    width went with it.
     """
-    del hidden
     if kind == STRUCTURED_KIND:
         return StructuredPolicy.of_catalogue(probe.action_length, probe.signals)
     return LinearPolicy.zeros(probe.action_length, probe.observation_length)

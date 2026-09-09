@@ -101,7 +101,6 @@ class ShardTask:
     seeds: list[int]
     centre: np.ndarray
     kind: str
-    hidden: int
     first_pair: int
     last_pair: int
     label: str = ""
@@ -182,7 +181,7 @@ def play_shard(task: ShardTask) -> ShardScore:
         raise RuntimeError(message)
     config = task.train_config
     probe = Env(task.env_config, task.scoring)
-    shell = shell_policy(task.kind, probe, task.hidden)
+    shell = shell_policy(task.kind, probe)
     noise = generation_noise(
         config.seed, task.generation, config.pairs, task.centre.size
     )
@@ -327,7 +326,6 @@ def run_sharded_generation(
     centre: np.ndarray,
     pool: ShardPool,
     kind: str = "linear",
-    hidden: int = 0,
     label: str = "",
 ) -> Generation:
     """Score one generation across the pool, and combine it in candidate order.
@@ -348,7 +346,6 @@ def run_sharded_generation(
             seeds=list(seeds),
             centre=centre,
             kind=kind,
-            hidden=hidden,
             first_pair=first,
             last_pair=last,
             label=f"{label} shard {index + 1}/{len(ranges)}" if label else "",
