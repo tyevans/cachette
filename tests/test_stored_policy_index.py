@@ -23,8 +23,8 @@ References
 
 from __future__ import annotations
 
-import re
 import json
+import re
 from pathlib import Path
 
 import numpy as np
