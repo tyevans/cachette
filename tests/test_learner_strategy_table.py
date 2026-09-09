@@ -102,9 +102,18 @@ def test_the_structured_strategies_train_fewer_weights_than_the_linear_ones() ->
     the smaller shape is the better aligned one. **The linear policy stays in
     the table as the control**, and this asserts which of the two is which
     rather than assuming it.
+
+    **The observation length is not the bound to compare against.** It was,
+    while the action table held one row for each verb. A place argument gives
+    the table one row for each cell of the frame, and the readout of a policy
+    carries one weight for each row it scores, so the readout grew with the
+    table while the observation did not move. The dense control grew with it
+    and the structured shape did not, which is the claim this holds: the
+    structured shape stays smaller by an order of magnitude, whatever the
+    table costs.
     """
     probe = _probe()
     linear = shell_policy("linear", probe, UNREAD_WIDTH)
     structured = shell_policy(STRUCTURED_KIND, probe, UNREAD_WIDTH)
     assert structured.flat().size < linear.flat().size
-    assert structured.flat().size < probe.observation_length
+    assert structured.flat().size * 10 < linear.flat().size

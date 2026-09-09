@@ -611,6 +611,12 @@ def test_the_search_builds_the_structured_shell_from_the_probe_schema() -> None:
     The schema of the engine carries the ring geometry, so the builder gives
     a policy. A schema that stopped carrying it would raise here, and the
     message would name the entries to add.
+
+    **The bound is a dense read of the observation for every action row.**
+    The readout holds one weight for each row it scores, so the count of
+    this policy follows the action table. The observation length alone was
+    the bound while the table held one row for each verb, and a place
+    argument gives it one row for each cell of the frame.
     """
     config = EnvConfig(
         width=WIDTH,
@@ -624,4 +630,4 @@ def test_the_search_builds_the_structured_shell_from_the_probe_schema() -> None:
     probe = Env(config, Weighting(terms={}, won=0.0, lost=0.0, drawn=0.0))
     policy = shell_policy("structured", probe, 32)
     assert isinstance(policy, StructuredPolicy)
-    assert policy.parameter_count < probe.observation_length
+    assert policy.parameter_count < probe.observation_length * probe.action_length
