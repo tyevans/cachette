@@ -44,6 +44,21 @@ lowest score the same, the ranking carries no information and the update
 that follows it is noise. A run in that state keeps billing and learns
 nothing, so this module names it and the launcher can end the run on it.
 
+**Every strategy answers that question, and the threshold is a share of the
+reward.** The strategies of a run write their lines into one file, so a test
+that read the last strategy parsed tested an arbitrary quarter of a run of
+four. A spread is a difference of two returns, so an absolute threshold
+holds for one reward scale only, and the styles of this project score two
+orders of magnitude apart.
+
+# The run-level controller bar answers for one weighting
+
+One process measures the controller bar once for the whole run, under the
+weighting of the first strategy the run names. A return under one weighting
+does not compare with a return under another, so this module names the
+weighting beside the return. The win share of the same bar compares, because
+no weighting changes who won.
+
 # What the parser reads
 
 The trainer prints one line for each generation, one heading for each
@@ -142,12 +157,34 @@ BASELINE = re.compile(
 # The controller baseline, printed once before any training, as a dictionary.
 CONTROLLER = re.compile(r"^\s+controller (?P<body>\{.*\})\s*$")
 
-# The number of generations behind the collapse test, and the spread under
-# which a generation counts as collapsed. A spread is a difference of two
-# returns, so the threshold is in the units of the reward and a caller that
-# changes the reward scale must change it too.
+# The line that names the weighting the run-level controller bar was measured
+# under, for example:
+#   the controller bar is measured under the conquer weighting
+#
+# **A return under one weighting does not compare with a return under
+# another.** One process measures the bar under the first strategy of the run
+# and every strategy later measures its own, so the run-level figure answers
+# for one strategy and the dashboard must say which.
+CONTROLLER_WEIGHTING = re.compile(
+    r"^\s+the controller bar is measured under the (?P<name>\S+) weighting"
+)
+
+# The number of generations behind the collapse test, and the share of the
+# reward scale under which a generation counts as collapsed.
+#
+# **The threshold is a share and never a reward.** A spread is a difference of
+# two returns, so an absolute threshold holds for one reward scale only. This
+# threshold was an absolute 1.0, and a comment beside it told a caller who
+# changed the reward scale to change the number too. That is one rule stored
+# in two places with nothing that fails when the copies disagree. The retired
+# policies scored in the thousands, where a spread under 1.0 could never fire,
+# and the play styles score in the tens, where the same 1.0 is a tenth of the
+# whole quantity.
+#
+# The share below is that absolute 1.0 read against a generation whose scores
+# were of order one thousand, which is the scale it was written at.
 COLLAPSE_WINDOW = 3
-COLLAPSE_SPREAD = 1.0
+COLLAPSE_SHARE = 0.001
 
 
 @dataclass
@@ -180,6 +217,34 @@ class Generation:
     # unmasked argmax changed. Both are instruments and neither gates a run.
     most_common_share: float | None = None
     preference_varies: float | None = None
+
+    @property
+    def reward_scale(self) -> float:
+        """Return how large the reward this generation scored is.
+
+        The mean and the best of one generation are two readings of the same
+        reward, so the larger magnitude of the two states the scale that a
+        spread of this generation must be read against. Both are means over
+        the seeds of a candidate, so neither carries the terminal quantum of
+        a single seed on its own.
+        """
+        return max(abs(self.mean), abs(self.best))
+
+    @property
+    def carries_no_information(self) -> bool:
+        """Say whether the candidates of this generation scored the same.
+
+        **The test is a share of the reward scale and never an absolute
+        return.** A run whose style scores in the tens and a run whose style
+        scores in the thousands must answer this question alike, and an
+        absolute threshold answers it for one of the two.
+
+        A generation that scored zero on both readings has no scale, so only
+        a spread of exactly zero counts as carrying nothing.
+        """
+        if self.spread is None:
+            return False
+        return self.spread <= COLLAPSE_SHARE * self.reward_scale
 
 
 @dataclass
@@ -357,16 +422,20 @@ class Strategy:
 
     @property
     def collapsed(self) -> bool:
-        """Say whether the search has stopped.
+        """Say whether the search of this strategy has stopped.
 
-        The last few generations decide it. A run collapses when every
+        The last few generations decide it. A strategy collapses when every
         candidate of each of them scored the same, because the ranking that
         drives the update then ranks nothing.
+
+        Each generation answers against its own reward scale, so a strategy
+        that scores in the tens and a strategy that scores in the thousands
+        are read alike.
         """
-        recent = [row.spread for row in self.generations[-COLLAPSE_WINDOW:]]
-        if len(recent) < COLLAPSE_WINDOW or any(value is None for value in recent):
+        recent = self.generations[-COLLAPSE_WINDOW:]
+        if len(recent) < COLLAPSE_WINDOW or any(row.spread is None for row in recent):
             return False
-        return all(value < COLLAPSE_SPREAD for value in recent if value is not None)
+        return all(row.carries_no_information for row in recent)
 
 
 @dataclass
@@ -375,6 +444,12 @@ class Progress:
 
     strategies: list[Strategy] = field(default_factory=list)
     controller: dict[str, float] = field(default_factory=dict)
+    # The strategy whose weighting the run-level controller bar was measured
+    # under. One process measures that bar once for the whole run, and it
+    # reads under the first strategy the run names. A return under one
+    # weighting does not compare with a return under another, so a reader that
+    # met the figure without this name took it for the whole run.
+    controller_weighting: str = ""
     # The wall clock the run has used, which the caller measures from the
     # start of the run. The log cannot supply it, so a caller that knows the
     # start must set it.
@@ -411,9 +486,28 @@ class Progress:
         )
 
     @property
+    def collapsed_strategies(self) -> list[str]:
+        """Return the name of every strategy whose search has stopped."""
+        return [strategy.name for strategy in self.strategies if strategy.collapsed]
+
+    @property
     def collapsed(self) -> bool:
-        """Say whether the strategy under training has stopped searching."""
-        return bool(self.strategies) and self.strategies[-1].collapsed
+        """Say whether the whole run has stopped searching.
+
+        **Every strategy answers, and not the last one parsed.** The
+        strategies of a run write their lines into one file, so the last one
+        in this list is whichever process wrote last. A guard that read that
+        one tested a quarter of a run of four strategies and never tested the
+        other three.
+
+        The run ends when every strategy has stopped, because the caller of
+        this property ends the run on it. A strategy that is still searching
+        is worth the machine, whatever its neighbours do, and the dashboard
+        names each stopped strategy so that a person can end one early.
+        """
+        return bool(self.strategies) and all(
+            strategy.collapsed for strategy in self.strategies
+        )
 
 
 def parse(text: str) -> Progress:
@@ -445,6 +539,13 @@ def parse(text: str) -> Progress:
             if name == "controller baseline":  # pragma: no cover - unreachable
                 continue
             current = strategy_named(name, heading.group("kind") or "")
+            continue
+
+        # The line that qualifies the run-level bar sits beside that row, and
+        # it names the weighting the return reads under.
+        weighting = CONTROLLER_WEIGHTING.match(line)
+        if weighting and not progress.controller_weighting:
+            progress.controller_weighting = weighting.group("name")
             continue
 
         # The controller baseline sits under its own heading, which the
@@ -647,6 +748,52 @@ def verdict_lines(strategy: Strategy, controller: dict[str, float] | None) -> li
     ]
 
 
+def weighting_lines(weighting: str) -> list[str]:
+    """Return the qualification the run-level controller bar needs.
+
+    **The return of that bar answers for one weighting.** One process
+    measures the bar once for the whole run, under the weighting of the first
+    strategy the run names, and every strategy later measures its own bar
+    under its own weighting. A reader who met the run-level return without
+    this line took a figure for the run that answered for a quarter of it.
+
+    The win share of the same bar does compare, because a win is a fact of
+    the game and no weighting changes it. The verdict of each strategy reads
+    that win share, so the qualification bounds the return alone.
+    """
+    if not weighting:
+        return [
+            "                the weighting behind this return is not named in the "
+            "log, so the",
+            "                return compares with nothing. The win share compares.",
+        ]
+    return [
+        f"                the return reads under the {weighting} weighting, and a "
+        "return under",
+        "                one weighting does not compare with a return under "
+        "another. The win",
+        "                share compares, because no weighting changes who won.",
+    ]
+
+
+def collapse_lines(strategy: Strategy) -> list[str]:
+    """Return what the dashboard says about a strategy that stopped searching.
+
+    The message names the share of the reward scale that the test used and
+    the scale it read, so a person can see why a run of one reward size and a
+    run of another answered the same question alike.
+    """
+    recent = strategy.generations[-COLLAPSE_WINDOW:]
+    scale = max((row.reward_scale for row in recent), default=0.0)
+    return [
+        f"      SEARCH STOPPED: the spread stayed under {COLLAPSE_SHARE:.3%} of a "
+        f"reward scale of {scale:.1f}",
+        f"      for {COLLAPSE_WINDOW} generations. Every candidate scored the same, "
+        "so the update carries",
+        "      no information. Stop this strategy.",
+    ]
+
+
 def render(
     progress: Progress,
     price_per_hour: float,
@@ -670,6 +817,7 @@ def render(
             f"return {bar.get('return', 0.0):9.1f} "
             f"on {int(bar.get('episodes', 0))} held-out seeds"
         )
+        lines.extend(weighting_lines(progress.controller_weighting))
     else:
         lines.append("  bar to beat   not measured yet")
 
@@ -750,13 +898,22 @@ def render(
                 "Both are instruments."
             )
         if strategy.collapsed:
-            lines.append(
-                f"      SEARCH STOPPED: the spread was under {COLLAPSE_SPREAD} "
-                f"for {COLLAPSE_WINDOW} generations. Every candidate scored the"
-            )
-            lines.append(
-                "      same, so the update carries no information. Stop the run."
-            )
+            lines.extend(collapse_lines(strategy))
+
+    # Every strategy answers the collapse test, and the run ends only when
+    # all of them have stopped. A reader who met one stopped strategy needs
+    # to know whether the machine is still buying anything.
+    stopped = progress.collapsed_strategies
+    if stopped and not progress.collapsed:
+        lines.append(
+            f"  --- {len(stopped)} of {len(progress.strategies)} strategies stopped "
+            f"searching: {', '.join(stopped)}"
+        )
+        lines.append("      The run keeps paying, because the rest still search.")
+    elif progress.collapsed:
+        lines.append(
+            "  --- EVERY STRATEGY STOPPED SEARCHING. The run buys nothing more."
+        )
 
     # 3. The money, and 4. the time. The two questions he asked to be able
     # to answer stand together at the bottom, where a reader ends.
@@ -872,6 +1029,9 @@ def main() -> int:
         controller = report.get("controller")
         if isinstance(controller, dict) and not progress.controller:
             progress.controller = controller
+        weighting = report.get("controller_weighting")
+        if isinstance(weighting, str) and not progress.controller_weighting:
+            progress.controller_weighting = weighting
 
     if arguments.collapsed:
         return 3 if progress.collapsed else 0

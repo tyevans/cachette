@@ -1,0 +1,23 @@
+training seeds 80, validation seeds 128, holdout seeds 256
+
+=== controller baseline ===
+  controller {'return': 1480.2, 'episodes': 256.0, 'held_tiles': 242.5, 'won': 0.34, 'lost': 0.66}
+  the controller bar is measured under the aggressive weighting
+  the controller baseline was measured
+
+=== aggressive (structured) ===
+=== defensive_expansionist (structured) ===
+=== population_growth (structured) ===
+=== wonder_rush (structured) ===
+  aggressive generation  4 mean      45.2 best      45.2 spread      0.0 agreed  0.00 aligned 0.0000 abs-spread      0.0 won  0.21 ticks 852690 refused 0.04 valid      44.1 valid-won  0.19 top-share  0.99 varies  0.01 [1231s]
+  defensive_expansionist generation  4 mean      31.8 best      31.8 spread      0.0 agreed  0.00 aligned 0.0000 abs-spread      0.0 won  0.18 ticks 848120 refused 0.05 valid      30.2 valid-won  0.17 top-share  0.99 varies  0.01 [1244s]
+  population_growth generation  4 mean      12.4 best      12.4 spread      0.0 agreed  0.00 aligned 0.0000 abs-spread      0.0 won  0.14 ticks 851004 refused 0.06 valid      11.8 valid-won  0.13 top-share  0.99 varies  0.01 [1259s]
+  wonder_rush generation  4 mean      88.5 best      88.5 spread      0.0 agreed  0.00 aligned 0.0000 abs-spread      0.0 won  0.09 ticks 849330 refused 0.03 valid      88.5 valid-won  0.09 top-share  0.99 varies  0.01 [1263s]
+  aggressive generation  5 mean      45.2 best      45.2 spread      0.0 agreed  0.00 aligned 0.0000 abs-spread      0.0 won  0.21 ticks 853110 refused 0.04 valid - [2455s]
+  defensive_expansionist generation  5 mean      31.8 best      31.8 spread      0.0 agreed  0.00 aligned 0.0000 abs-spread      0.0 won  0.18 ticks 847900 refused 0.05 valid - [2470s]
+  population_growth generation  5 mean      12.4 best      12.4 spread      0.0 agreed  0.00 aligned 0.0000 abs-spread      0.0 won  0.14 ticks 850220 refused 0.06 valid - [2481s]
+  wonder_rush generation  5 mean      88.5 best      88.5 spread      0.0 agreed  0.00 aligned 0.0000 abs-spread      0.0 won  0.09 ticks 849410 refused 0.03 valid - [2489s]
+  aggressive generation  6 mean      45.2 best      45.2 spread      0.0 agreed  0.00 aligned 0.0000 abs-spread      0.0 won  0.21 ticks 852410 refused 0.04 valid      44.1 valid-won  0.19 top-share  0.99 varies  0.01 [3688s]
+  defensive_expansionist generation  6 mean      31.8 best      31.8 spread      0.0 agreed  0.00 aligned 0.0000 abs-spread      0.0 won  0.18 ticks 848800 refused 0.05 valid      30.2 valid-won  0.17 top-share  0.99 varies  0.01 [3701s]
+  population_growth generation  6 mean      12.4 best      12.4 spread      0.0 agreed  0.00 aligned 0.0000 abs-spread      0.0 won  0.14 ticks 850910 refused 0.06 valid      11.8 valid-won  0.13 top-share  0.99 varies  0.01 [3714s]
+  wonder_rush generation  6 mean      88.5 best      88.5 spread      0.0 agreed  0.00 aligned 0.0000 abs-spread      0.0 won  0.09 ticks 849980 refused 0.03 valid      88.5 valid-won  0.09 top-share  0.99 varies  0.01 [3722s]

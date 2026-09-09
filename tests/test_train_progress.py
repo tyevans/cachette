@@ -355,3 +355,138 @@ def test_the_held_out_row_survives_a_generation_that_took_no_pass() -> None:
     rendered = progress_module.render(parsed, 0.7628, 60)
     assert "at generation 0, during the run" in rendered
     assert "from the held-out seeds at generation 0, which chose nothing" in rendered
+
+
+# Four strategies of one run, interleaved into one log, where the last one
+# parsed has stopped searching and the other three have not. **The order is
+# the point.** The reader answered from the last strategy in its list, which
+# is whichever process wrote last, so three of four were never tested and the
+# guard ended a run over one arbitrary quarter of it.
+ONE_STOPPED = (LOGS / "collapsed-last-of-four.log").read_text(encoding="utf-8")
+
+# The same four strategies with every one of them stopped. This is the state
+# that is worth ending a run over.
+ALL_STOPPED = (LOGS / "collapsed-all-of-four.log").read_text(encoding="utf-8")
+
+# Four strategies at two reward scales, an order of magnitude apart. Two are
+# still searching and two have stopped, and each pair holds the same spread
+# as a share of its own reward. **A threshold in the units of the reward
+# answers this fixture differently for the two members of each pair.**
+TWO_SCALES = (LOGS / "two-reward-scales.log").read_text(encoding="utf-8")
+
+
+def test_the_collapse_watch_reads_every_strategy_and_not_the_last_one() -> None:
+    """One stopped strategy of four must not end a run that still searches.
+
+    The guard read the last strategy in its list. The four processes of a run
+    write their lines into one file, so that strategy is whichever one the
+    parser met last. A run of four therefore tested one quarter of itself.
+    """
+    progress = progress_module.parse(ONE_STOPPED)
+    names = [strategy.name for strategy in progress.strategies]
+    assert names[-1] == "wonder_rush", f"the fixture orders the strategies {names}"
+
+    assert progress.collapsed_strategies == ["wonder_rush"]
+    assert progress.collapsed is False, (
+        "the run ends over one stopped strategy of four, and the other three "
+        "still search"
+    )
+
+    rendered = progress_module.render(progress, 0.7628, 80)
+    assert "1 of 4 strategies stopped searching: wonder_rush" in rendered
+    assert "The run keeps paying" in rendered
+
+
+def test_a_run_whose_every_strategy_stopped_is_a_collapsed_run() -> None:
+    """The guard must still fire when nothing is searching."""
+    progress = progress_module.parse(ALL_STOPPED)
+
+    assert len(progress.strategies) == 4
+    assert len(progress.collapsed_strategies) == 4
+    assert progress.collapsed is True
+
+    rendered = progress_module.render(progress, 0.7628, 80)
+    assert "EVERY STRATEGY STOPPED SEARCHING" in rendered
+
+
+def test_the_collapse_threshold_tracks_the_scale_of_the_reward() -> None:
+    """Two rewards an order of magnitude apart must be judged alike.
+
+    The threshold was an absolute spread of 1.0, and a comment beside it told
+    a caller who changed the reward scale to change the number too. The
+    retired policies scored in the thousands, where a spread under 1.0 could
+    never fire. The play styles score in the tens, where the same 1.0 is a
+    tenth of the whole quantity.
+
+    Each pair below holds the same spread as a share of its own reward, so
+    the watch must answer the same for both members. **The absolute
+    threshold answers differently for every pair here.**
+    """
+    progress = progress_module.parse(TWO_SCALES)
+    by_name = {strategy.name: strategy for strategy in progress.strategies}
+    assert set(by_name) == {
+        "small_live",
+        "large_live",
+        "small_stopped",
+        "large_stopped",
+    }
+
+    assert by_name["small_live"].collapsed == by_name["large_live"].collapsed
+    assert by_name["small_stopped"].collapsed == by_name["large_stopped"].collapsed
+    assert by_name["small_live"].collapsed is False
+    assert by_name["small_stopped"].collapsed is True
+
+
+def test_the_stopped_message_names_the_scale_it_read() -> None:
+    """A person must be able to see why the watch fired at this scale."""
+    progress = progress_module.parse(TWO_SCALES)
+    rendered = progress_module.render(progress, 0.7628, 80)
+
+    assert "SEARCH STOPPED" in rendered
+    assert "reward scale of 50020.0" in rendered
+    assert "reward scale of 5002.0" in rendered
+
+
+def test_the_run_level_controller_return_names_its_weighting() -> None:
+    """A return under one weighting must never read as a run-level figure.
+
+    One process measures the bar once for the whole run, under the weighting
+    of the first strategy the run names. Two parses of one shared log have
+    already paired that figure with two different styles.
+    """
+    progress = progress_module.parse(ONE_STOPPED)
+    assert progress.controller_weighting == "aggressive"
+
+    rendered = progress_module.render(progress, 0.7628, 80)
+    assert "the return reads under the aggressive weighting" in rendered
+    assert "share compares" in rendered
+
+
+def test_an_unqualified_controller_return_is_marked_as_comparing_nothing() -> None:
+    """An older log names no weighting, and silence must not read as safety."""
+    progress = progress_module.parse(FINISHED)
+    assert progress.controller_weighting == ""
+
+    rendered = progress_module.render(progress, 0.7628, 60)
+    assert "the weighting behind this return is not named" in rendered
+
+
+def test_the_line_the_trainer_prints_is_the_line_the_feed_reads() -> None:
+    """The producer of the qualification and its reader must agree.
+
+    The trainer declares the sentence. A pattern here against a sentence of
+    its own would be one rule stored in two places, with nothing that fails
+    when the copies disagree.
+    """
+    from cachette.learn.__main__ import controller_weighting_line
+
+    log = "\n".join(
+        [
+            "=== controller baseline ===",
+            "  controller {'return': 1.0, 'episodes': 4.0, 'won': 0.3, 'lost': 0.7}",
+            controller_weighting_line("wonder_rush"),
+            "  the controller baseline was measured",
+        ]
+    )
+
+    assert progress_module.parse(log).controller_weighting == "wonder_rush"

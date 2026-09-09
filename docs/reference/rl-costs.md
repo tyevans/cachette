@@ -295,6 +295,78 @@ plays, and the engine is deterministic, so a limit measured on a development
 machine answers for the target platform unchanged.[^18] The cost of running
 under that limit is a machine figure, and the target register holds it.[^8]
 
+## The spread of a generation, against the terminal quantum
+
+**Every row below is set, and one measurement took all of them.** The figures
+say how far the shaped part of a candidate score separates the candidates of
+one generation, and how far one seed changing its outcome moves one candidate.
+A decision record must not hold them, because a later measurement changes
+them.[^2]
+
+An evolution strategy ranks the candidates of one generation and moves the
+centre along the ranking. The score of a candidate is the mean over its seeds.
+The shaped part is the objective vector combined under the weights of the
+style. The terminal part is what the outcome of each episode pays.
+
+**One seed that changes from a loss to a win moves a candidate mean by the win
+weight less the loss weight, over the seed count.** That is the terminal
+quantum below. The engine names a winner at the tick limit, so no episode of
+the measured generation was drawn.
+
+| Value | Reading |
+|---|---|
+| `population` | 24 |
+| `seeds` | 6 |
+| `episodes` | 144 |
+| `won_episodes` | 8 |
+| `shaped_spread_range` | 43.81 |
+| `shaped_spread_deviation` | 12.38 |
+| `terminal_spread_deviation` | 28.33 |
+| `total_spread_deviation` | 27.52 |
+| `terminal_quantum` | 33.33 |
+| `shaped_range_over_quantum` | 1.31 |
+
+**The terminal part carries more of the spread than the shaped part does.**
+Its deviation over the candidates is 28.33 against 12.38 for the shaped part,
+and the deviation of the whole score is 27.52, which is nearly the terminal
+part alone. One seed changing its outcome moves a candidate by 33.33, and the
+whole shaped separation between the highest and the lowest candidate of the
+generation is 43.81. An audit argued this from the weights alone and marked
+the comparison unverified. The measurement confirms it.
+
+**The correction is a rule of the downstream game, and one blocker holds
+it.**[^3] Lowering the terminal weights states how much winning is worth
+against the shaped objectives, and that ratio is not a figure a measurement
+answers. Raising the seed count lowers the quantum in proportion, and it costs
+episodes that one blocker on cost figures governs.[^8] A test reads the rows
+above and fails when a weight of the style table or the seed count moves the
+quantum, so the next change to either must take a new measurement rather than
+inherit this one.[^25]
+
+**These rows are not machine figures.** The engine is deterministic and the
+reward is integer arithmetic over what the engine publishes, so the reading is
+a property of the world, the seeds and the weights alone.[^18] A separate
+register holds what the target platform measured, and it holds none of
+these.[^26]
+
+### The conditions of the measurement
+
+The measurement played one generation of the shape a paid run plays: 24
+candidates over 6 seeds, in the world this register states, under the
+`aggressive` style with the structured policy kind. The candidates are the
+antithetic pairs of generation 0 around a centre of zeros, at the sigma the
+trainer configuration declares. The commit body holds the command.
+
+**The play style table states the weights the quantum divides, and this
+register states none of them.** Those weights are starting values that a
+researcher edits, and the terminal rows of this register stay unset. The
+quantum below therefore reads the table and not a row here.
+
+**Generation 0 is the generation the measurement reaches cheaply, and it is
+not every generation.** A later generation holds a centre that has moved, so
+its shaped spread may differ. Read these rows as the spread at the start of a
+run.
+
 ## What this register does not hold
 
 **It holds no discount.** A discount belongs to the learning algorithm, and the
@@ -332,3 +404,5 @@ target platform measures it.
 [^22]: The simulation arithmetic, the compressed magnitude. `crates/cachette-core/src/sim_math.rs`
 [^23]: The event history. `crates/cachette-core/src/event_memory.rs`
 [^24]: The strategy table of the trainer. `python/cachette/learn/__main__.py`
+[^25]: The test of the terminal scale. `tests/test_learner_terminal_scale.py`
+[^26]: Target platform costs. `docs/reference/graviton-costs.md`

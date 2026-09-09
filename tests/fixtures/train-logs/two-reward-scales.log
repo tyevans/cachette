@@ -1,0 +1,23 @@
+training seeds 80, validation seeds 128, holdout seeds 256
+
+=== controller baseline ===
+  controller {'return': 1480.2, 'episodes': 256.0, 'held_tiles': 242.5, 'won': 0.34, 'lost': 0.66}
+  the controller bar is measured under the small_live weighting
+  the controller baseline was measured
+
+=== small_live (structured) ===
+=== large_live (structured) ===
+=== small_stopped (structured) ===
+=== large_stopped (structured) ===
+  small_live generation  4 mean      50.0 best      50.5 spread      0.5 agreed  0.11 aligned 0.0102 abs-spread      0.5 won  0.21 ticks 852690 refused 0.04 valid - [1231s]
+  large_live generation  4 mean     500.0 best     505.0 spread      5.0 agreed  0.11 aligned 0.0102 abs-spread      5.0 won  0.21 ticks 852690 refused 0.04 valid - [1234s]
+  small_stopped generation  4 mean    5000.0 best    5002.0 spread      2.0 agreed  0.01 aligned 0.0004 abs-spread      2.0 won  0.21 ticks 852690 refused 0.04 valid - [1237s]
+  large_stopped generation  4 mean   50000.0 best   50020.0 spread     20.0 agreed  0.01 aligned 0.0004 abs-spread     20.0 won  0.21 ticks 852690 refused 0.04 valid - [1240s]
+  small_live generation  5 mean      50.0 best      50.5 spread      0.5 agreed  0.11 aligned 0.0102 abs-spread      0.5 won  0.21 ticks 852690 refused 0.04 valid - [2455s]
+  large_live generation  5 mean     500.0 best     505.0 spread      5.0 agreed  0.11 aligned 0.0102 abs-spread      5.0 won  0.21 ticks 852690 refused 0.04 valid - [2458s]
+  small_stopped generation  5 mean    5000.0 best    5002.0 spread      2.0 agreed  0.01 aligned 0.0004 abs-spread      2.0 won  0.21 ticks 852690 refused 0.04 valid - [2461s]
+  large_stopped generation  5 mean   50000.0 best   50020.0 spread     20.0 agreed  0.01 aligned 0.0004 abs-spread     20.0 won  0.21 ticks 852690 refused 0.04 valid - [2464s]
+  small_live generation  6 mean      50.0 best      50.5 spread      0.5 agreed  0.11 aligned 0.0102 abs-spread      0.5 won  0.21 ticks 852690 refused 0.04 valid - [3688s]
+  large_live generation  6 mean     500.0 best     505.0 spread      5.0 agreed  0.11 aligned 0.0102 abs-spread      5.0 won  0.21 ticks 852690 refused 0.04 valid - [3691s]
+  small_stopped generation  6 mean    5000.0 best    5002.0 spread      2.0 agreed  0.01 aligned 0.0004 abs-spread      2.0 won  0.21 ticks 852690 refused 0.04 valid - [3694s]
+  large_stopped generation  6 mean   50000.0 best   50020.0 spread     20.0 agreed  0.01 aligned 0.0004 abs-spread     20.0 won  0.21 ticks 852690 refused 0.04 valid - [3697s]

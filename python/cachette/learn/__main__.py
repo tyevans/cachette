@@ -97,6 +97,13 @@ from .policy import (
 )
 from .presets import ObjectiveSchedule, load_library, schedule_of
 from .reward import Scoring, Weighting
+from .sizing import (
+    TICKS_A_SECOND_FOR_EACH_WORKER,
+    Plan,
+    RunShape,
+    plan_lines,
+    plan_of,
+)
 from .structured import STRUCTURED_KIND, StructuredPolicy
 from .train import TrainConfig, evaluate, first_scoring, train, write_report
 
@@ -234,6 +241,57 @@ def world_lines(world: EnvConfig) -> str:
         "horizon": world.horizon,
     }
     return "\n".join(f"{name}\t{value}" for name, value in fields.items())
+
+
+def controller_weighting_line(name: str) -> str:
+    """Return the line that qualifies the run-level controller bar.
+
+    **The return of that bar answers for one weighting.** One process
+    measures it once for the whole run, under the weighting of the first
+    strategy the run names, and every strategy later measures its own bar
+    under its own weighting. A reader who met the run-level return without
+    this line took a figure for the run that answered for a part of it. Two
+    parses of one shared log have already paired that figure with two styles.
+
+    **This is the one declaration of the line.** Two dashboards read it, and
+    a pattern of their own against a sentence of this module would be one
+    rule stored in three places.
+    """
+    return f"  the controller bar is measured under the {name} weighting"
+
+
+def run_plan(arguments: argparse.Namespace, names: list[str]) -> Plan:
+    """Return what this run would play, on the machine it names.
+
+    **A launcher reads this rather than counting episodes of its own.** The
+    launcher sized a run from the cores of the instance, and a run gives each
+    strategy the cores divided by the strategy count. A configuration asking
+    for twenty generations therefore delivered nine, and nothing had said it
+    would.
+
+    The launcher also read the interval arguments out of its own argument
+    string, with a fallback for each one it could not find. Every such
+    fallback was a second copy of a default this module owns. The plan comes
+    from the parsed arguments instead, so a run that states no interval is
+    counted under the interval it will run.
+    """
+    shape = RunShape(
+        generations=arguments.generations,
+        population=arguments.population,
+        seeds=arguments.seeds,
+        validation=arguments.validation,
+        validate_every=arguments.validate_every,
+        holdout=arguments.holdout,
+        holdout_every=arguments.holdout_every,
+        tick_limit=WORLD.tick_limit,
+        strategies=len(names),
+    )
+    return plan_of(
+        shape,
+        arguments.cores or available_workers(),
+        arguments.wall_minutes * 60.0,
+        arguments.ticks_for_each_worker or TICKS_A_SECOND_FOR_EACH_WORKER,
+    )
 
 
 def use_decision_interval(interval: int) -> None:
@@ -764,6 +822,48 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--print-plan",
+        action="store_true",
+        help=(
+            "print what this run would play and whether it fits its wall "
+            "clock, as one name and one value for each line, and exit "
+            "without training. A launcher asks for the plan through this "
+            "flag, so no launcher counts episodes of its own"
+        ),
+    )
+    parser.add_argument(
+        "--cores",
+        type=int,
+        default=0,
+        help=(
+            "how many cores the machine the run will use holds. The run "
+            "divides them between one process for each strategy, so this and "
+            "the strategy count decide the workers one strategy receives. "
+            "Zero asks this machine what it has"
+        ),
+    )
+    parser.add_argument(
+        "--wall-minutes",
+        type=float,
+        default=0.0,
+        help=(
+            "the wall clock cap of the run, in minutes. The plan says how "
+            "many generations finish inside it. Zero states no cap"
+        ),
+    )
+    parser.add_argument(
+        "--ticks-for-each-worker",
+        type=float,
+        default=0.0,
+        help=(
+            "the simulated ticks a second one engine worker reaches. Zero "
+            "takes the figure the target register holds, which is a "
+            "measurement of one process of twelve workers. A caller that "
+            "measured its own throughput passes it here, so the plan reads "
+            "the machine it runs on"
+        ),
+    )
+    parser.add_argument(
         "--styles",
         type=str,
         default="",
@@ -869,6 +969,9 @@ def main() -> int:
     if arguments.print_world:
         print(world_lines(WORLD))
         return 0
+    if arguments.print_plan:
+        print(plan_lines(run_plan(arguments, names)))
+        return 0
     learner_seats = tuple(
         int(seat) for seat in arguments.league.split(",") if seat.strip()
     )
@@ -967,10 +1070,18 @@ def main() -> int:
         probe.observation_version,
         f"{names[0]} baseline",
     )
+    # **The return of this bar answers for one weighting and the win share
+    # answers for the run.** The play does not change with the weighting and
+    # the reading of it does, so a run of four strategies holds one run-level
+    # return that four strategies later contradict with their own. The name
+    # goes in the report and on its own line, so no reader meets the figure
+    # without it.
+    report["controller_weighting"] = names[0]
     # **The line below is the interface the dashboard reads.** Two readers
     # match it by shape, so the source of the number goes on its own line
     # rather than inside this one.
     print(f"  controller {report['controller']}", flush=True)
+    print(controller_weighting_line(names[0]), flush=True)
     print(f"  the controller baseline was {source}", flush=True)
     write_report(out / "report.json", report)
 

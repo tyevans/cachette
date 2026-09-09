@@ -527,3 +527,49 @@ def test_one_round_of_silence_from_a_sharded_strategy_is_not_a_stall() -> None:
     assert max(behind.values()) < watch.QUIET_ROUNDS
     assert "QUIET" not in screen(composed, log_quiet=4.0)
     assert "4 of 4 strategies working" in screen(composed, log_quiet=4.0)
+
+
+def test_the_shared_controller_return_names_the_weighting_it_reads() -> None:
+    """The run-level controller return answers for one strategy of four.
+
+    One process measures that row once for the whole run, under the weighting
+    of the first strategy the run names. Every strategy later measures its
+    own row under its own weighting, so the two exist side by side and the
+    run-level one carried no name. Two parses of one shared log have already
+    paired that figure with two different styles.
+
+    The line the trainer prints is the one declaration of the sentence, so
+    this test builds the line from the trainer rather than writing its own.
+    """
+    from cachette.learn.__main__ import controller_weighting_line
+
+    log = "\n".join(
+        [
+            "=== controller baseline ===",
+            "  controller {'return': 1480.2, 'episodes': 256.0, 'won': 0.34, "
+            "'lost': 0.66}",
+            controller_weighting_line("wonder_rush"),
+            "  the controller baseline was measured",
+        ]
+    )
+
+    reading = watch.read(log)
+    assert reading.controller_weighting == "wonder_rush"
+    rendered = screen(log)
+    assert "the return reads under the wonder_rush weighting alone" in rendered
+
+
+def test_an_unnamed_controller_return_says_that_it_names_nothing() -> None:
+    """An older log carries no weighting, and silence must read as a caution."""
+    log = "\n".join(
+        [
+            "=== controller baseline ===",
+            "  controller {'return': 1480.2, 'episodes': 256.0, 'won': 0.34, "
+            "'lost': 0.66}",
+            "  the controller baseline was measured",
+        ]
+    )
+
+    reading = watch.read(log)
+    assert reading.controller_weighting == ""
+    assert "does not name the weighting" in screen(log)
