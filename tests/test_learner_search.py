@@ -54,9 +54,13 @@ from cachette.learn.policy import LinearPolicy
 from cachette.learn.search import (
     EvolutionStrategy,
     Optimiser,
+    Trainable,
     choice_survives_scaling,
     configuration_notes,
+    generation_noise,
     generations_before_a_climb_beats_a_wander,
+    layer_sizes,
+    layer_weighting,
     rank_shape,
     step_alignment,
     unit,
@@ -879,3 +883,349 @@ def test_the_report_states_the_alignment_and_the_wander() -> None:
         AUDITED_BREAK_EVEN,
     )
     assert not any("mostly wander" in note for note in long_enough), long_enough
+
+
+# The blocks of the structured policy, in the order the flat vector holds
+# them. **The policy states the count of each one**, so no test here states a
+# weight count. The order is the order the policy lays the arrays out, and the
+# reader that cuts a flat vector back into arrays reads the same order.
+POLICY_BLOCKS = ("scalars", "ring", "tokens", "trunk", "readout")
+
+TRAVEL_GENERATIONS = 14
+"""How many generations the travel test runs.
+
+The run must stay under the norm bound, because a clipped step is a step the
+bound chose and not one the layers chose. Every generation of the fixture
+agrees perfectly, which is the fastest the length can rise, and the test
+asserts that the length stayed inside the bound at the end.
+"""
+
+TRAVEL_DEVIATIONS = 3.0
+"""How many standard deviations the travel test allows each block.
+
+**The band is derived and it is not a round number.** The test states the
+derivation beside the function that computes it.
+"""
+
+
+def isotropic_weighting(policy: Trainable, centre: np.ndarray) -> np.ndarray:
+    """Weight every coordinate the same, whatever layer it sits in.
+
+    **This is the defect, restated so that a test can put it back.** The
+    search drew an isotropic perturbation over the whole flat vector, so a
+    layer took the share of the step that its weight count predicts and every
+    weight of the policy moved the same distance. The initial scale of a layer
+    then decided how far the search could revise it.[^1]
+
+    References
+    ----------
+    [^1]: Findings register, FND-713. ``docs/FINDINGS.md``
+    """
+    return np.ones(centre.size)
+
+
+def bare_layer_weighting(policy: Trainable, centre: np.ndarray) -> np.ndarray:
+    """Weight each layer by its own scale, and give a layer of zeros nothing.
+
+    **This is the second defect, restated so that a test can put it back.** A
+    rule that reads the current scale of a layer and states no fallback gives
+    a zero layer a zero perturbation. The layer stays zero, and the zero is a
+    fixed point the search can never leave. The readout of the untrained
+    structured policy is such a layer.
+    """
+    sizes = layer_sizes(policy)
+    scales = np.empty(len(sizes))
+    walked = 0
+    for index, size in enumerate(sizes):
+        scales[index] = float(np.linalg.norm(centre[walked : walked + size])) / np.sqrt(
+            size
+        )
+        walked += size
+    weighting = np.repeat(scales, sizes)
+    return np.asarray(weighting / weighting.max())
+
+
+def restated_weighting(shell: StructuredPolicy, centre: np.ndarray) -> np.ndarray:
+    """Restate the layer weighting from the shapes and the centre.
+
+    **Nothing here calls the function under test.** The rule is one line of
+    arithmetic: a layer takes the root mean square of its own weights. The
+    tolerance of the travel test comes from this array, and the expectation of
+    that test does not.
+    """
+    sizes = [int(np.prod(shape)) for shape in shell.shapes]
+    weighting = np.empty(centre.size)
+    walked = 0
+    for size in sizes:
+        length = float(np.linalg.norm(centre[walked : walked + size]))
+        weighting[walked : walked + size] = length / np.sqrt(size)
+        walked += size
+    return weighting
+
+
+def walked_layers(shell: StructuredPolicy) -> list[tuple[int, int, int]]:
+    """Give the index, first coordinate and last coordinate of each layer."""
+    bounds = []
+    walked = 0
+    for index, size in enumerate(layer_sizes(shell)):
+        bounds.append((index, walked, walked + size))
+        walked += size
+    return bounds
+
+
+def block_bounds(shell: StructuredPolicy) -> list[tuple[str, int, int]]:
+    """Give the first and last coordinate of each block of the flat vector."""
+    counts = shell.counts()
+    bounds = []
+    walked = 0
+    for name in POLICY_BLOCKS:
+        bounds.append((name, walked, walked + counts[name]))
+        walked += counts[name]
+    return bounds
+
+
+def effective_count(squared: np.ndarray) -> float:
+    """Return how many equal coordinates a set of weighted ones counts as.
+
+    A sum of squared normal draws with unequal weights has the variance of a
+    smaller sum of equal ones. The count is the square of the sum of the
+    weights over the sum of their squares, which is the usual answer for a
+    weighted sum of squares.
+    """
+    return float(squared.sum() ** 2 / (squared**2).sum())
+
+
+def travel_deviation(weighting: np.ndarray, first: int, last: int) -> float:
+    """Return the standard deviation of one block's relative step, as a fraction.
+
+    **The band of the travel test is derived here and it is not chosen.** One
+    perturbation is a normal draw scaled by the weighting and then normalised,
+    so the share a block takes of the squared step length is a ratio of two
+    weighted sums of squared normal draws. The share has the mean the
+    weighting predicts. Its variance follows from the effective coordinate
+    count of the block, from the effective count of the rest, and from the
+    share itself, and the step length is the square root of the share, which
+    halves the fraction.
+
+    The relative step of one generation is therefore the travel times one plus
+    this fraction. A run of several generations adds the squared steps, so the
+    fraction of the accumulated travel falls with the square root of the
+    generation count. The caller divides by that.
+    """
+    squared = weighting**2
+    block = squared[first:last]
+    rest = np.concatenate([squared[:first], squared[last:]])
+    share = float(block.sum() / squared.sum())
+    spread = np.sqrt(2.0 / effective_count(block) + 2.0 / effective_count(rest))
+    return float(0.5 * (1.0 - share) * spread)
+
+
+def relative_travel(
+    search: EvolutionStrategy, shell: StructuredPolicy, centre: np.ndarray, gens: int
+) -> tuple[dict[str, float], np.ndarray]:
+    """Run the search and give back how far each block travelled, over itself.
+
+    The quantity is the length of each step of a block, divided by the length
+    that block held when it took the step, accumulated in quadrature. Two
+    steps in a space of this dimension are near orthogonal, so the quadrature
+    sum is the travel of the block.
+
+    **The quantity divides by the length the block holds at each generation
+    and not by the length it started at.** A block grows as it travels, and
+    every block grows by the same fraction under the rule under test, so the
+    two forms differ by one factor that is common to every block. The
+    generation form states the property directly.
+    """
+    travelled = {name: 0.0 for name in POLICY_BLOCKS}
+    for generation in range(gens):
+        update = search.update(centre, generation, AGREED_SCORES)
+        assert update.agreement == pytest.approx(1.0), (
+            "the fixture agreed on nothing, so the centre never moved"
+        )
+        step = update.centre - centre
+        for name, first, last in block_bounds(shell):
+            reach = float(np.linalg.norm(step[first:last]))
+            held = float(np.linalg.norm(centre[first:last]))
+            travelled[name] += (reach / held) ** 2
+        centre = update.centre
+    return {name: np.sqrt(value) for name, value in travelled.items()}, centre
+
+
+def test_the_layers_of_a_policy_cover_its_flat_vector() -> None:
+    """The layer boundaries and the flat vector are one statement, not two.
+
+    The search cuts a perturbation into layers by the shapes the policy
+    states, and the policy cuts a flat vector into arrays by the same shapes.
+    A vector the layers do not cover is those two statements disagreeing, and
+    a silent answer there would weight the wrong coordinates.
+    """
+    shell = a_structured_shell()
+    assert sum(layer_sizes(shell)) == shell.flat().size
+    linear = LinearPolicy.zeros(ACTIONS, FEATURES)
+    assert sum(layer_sizes(linear)) == linear.flat().size
+    with pytest.raises(ValueError, match="lays its weights out in layers"):
+        layer_weighting(shell, shell.flat()[:-1])
+
+
+def test_a_linear_policy_draws_the_isotropic_perturbation_it_always_drew() -> None:
+    """The one-layer kind must not move, and it must not move in the last bits.
+
+    A linear policy holds one layer, so the layer rule scales its whole vector
+    by one number and the normalisation of each perturbation removes that
+    number. The weighting is therefore exactly one at every coordinate, and
+    the draw is the draw. **The expectation states the arithmetic rather than
+    calling the search**, because an expectation taken from the search would
+    hold whatever the search now does.
+    """
+    linear = LinearPolicy.zeros(ACTIONS, FEATURES)
+    size = linear.flat().size
+    drawn = np.random.default_rng(11).standard_normal(size)
+    for centre in (linear.flat(), drawn):
+        weighting = layer_weighting(linear, centre)
+        assert np.all(weighting == 1.0)
+    raw = np.random.default_rng([7, 4]).standard_normal((3, size))
+    expected = raw / np.linalg.norm(raw, axis=1, keepdims=True)
+    assert np.array_equal(generation_noise(7, 4, 3, linear, drawn), expected)
+
+
+def test_a_layer_reads_its_own_weights_and_not_the_layers_beside_it() -> None:
+    """The scale of a layer is a function of that layer alone.
+
+    A rule that read the layers in the order a mapping happened to hold them,
+    or that let one layer reach the scale of another, would put an order the
+    search invented into every perturbation. The test moves one layer and
+    asserts that the ratio between two others does not move at all.
+
+    The weighting is also one number inside each layer, because a layer has
+    one scale.
+    """
+    shell = a_structured_shell()
+    centre = a_trained_centre(shell)
+    sizes = layer_sizes(shell)
+    before = layer_weighting(shell, centre)
+    walked = 0
+    for size in sizes:
+        block = before[walked : walked + size]
+        assert np.all(block == block[0])
+        walked += size
+
+    moved = centre.copy()
+    first = sizes[0]
+    moved[first : first + sizes[1]] *= 4.0
+    after = layer_weighting(shell, moved)
+    third = first + sizes[1]
+    fourth = third + sizes[2]
+    assert before[0] / before[third] == after[0] / after[third]
+    assert before[third] / before[fourth] == after[third] / after[fourth]
+
+
+def test_a_layer_of_zeros_still_receives_a_perturbation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A zero layer takes the scale of the whole centre, so it can leave zero.
+
+    The readout of the untrained structured policy is zero, and so is every
+    bias array. A perturbation proportional to a zero scale is zero, the layer
+    stays zero, and the zero is a fixed point the search can never leave.
+
+    **The second half puts that rule back and asserts that the layer then
+    stays zero.** A test of a fallback that never sees the case without it
+    measures nothing.[^1]
+
+    References
+    ----------
+    [^1]: Testing Rules, section 1. ``.agents/rules/testing.md``
+    """
+    shell = a_structured_shell()
+    search = EvolutionStrategy(
+        shell=shell, pairs=3, sigma=0.5, learning_rate=0.3, seed=7
+    )
+    centre = search.start(shell.flat())
+    zeros = [
+        (first, last)
+        for _, first, last in walked_layers(shell)
+        if not np.any(centre[first:last])
+    ]
+    assert zeros, "the shell holds no zero layer, so this test measures nothing"
+
+    moved = search.propose(centre, 0)[0].flat() - centre
+    for first, last in zeros:
+        assert np.all(moved[first:last] != 0.0)
+    update = search.update(centre, 0, AGREED_SCORES)
+    for first, last in zeros:
+        assert np.any(update.centre[first:last] != 0.0)
+
+    monkeypatch.setattr(search_module, "layer_weighting", bare_layer_weighting)
+    bare = search.update(centre, 0, AGREED_SCORES)
+    for first, last in zeros:
+        assert np.all(bare.centre[first:last] == 0.0), (
+            "the layer left zero without the fallback, so the fallback proves nothing"
+        )
+
+
+def test_every_block_travels_the_same_fraction_of_its_own_length(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The search must revise each block by the same fraction of itself.
+
+    **This is the property that did not hold before this change.** The search
+    drew an isotropic perturbation over the flat vector, so a block took the
+    share of the step that its weight count predicts and every weight of the
+    policy moved the same distance. The initial scale of a block then decided
+    how far the search could revise it, and that scale spans a factor of seven
+    across the blocks of this policy.[^1]
+
+    The expectation is stated arithmetic and not a call. Every generation of
+    the fixture agrees perfectly, so each step is the learning rate times the
+    length of the centre, and a block that takes its own fraction of that step
+    travels the learning rate times the square root of the generation count.
+
+    **The band is derived from the fixture.** A perturbation is a normal draw,
+    so the share a block takes of one step fluctuates, and the function beside
+    this one states the closed form of that fluctuation.
+
+    **The second half puts the isotropic draw back.** The blocks then miss the
+    band by more than ten times its width, which is what the finding
+    measured.
+
+    References
+    ----------
+    [^1]: Findings register, FND-713. ``docs/FINDINGS.md``
+    """
+    shell = a_structured_shell()
+    search = EvolutionStrategy(
+        shell=shell, pairs=3, sigma=0.5, learning_rate=0.3, seed=7
+    )
+    start = a_trained_centre(shell)
+    for _, first, last in walked_layers(shell):
+        assert np.any(start[first:last]), (
+            "a layer of the fixture is zero, so the test measures the fallback"
+        )
+    weighting = restated_weighting(shell, start)
+    bands = {
+        name: TRAVEL_DEVIATIONS
+        * travel_deviation(weighting, first, last)
+        / np.sqrt(TRAVEL_GENERATIONS)
+        for name, first, last in block_bounds(shell)
+    }
+    expected = 0.3 * np.sqrt(TRAVEL_GENERATIONS)
+
+    travelled, ended = relative_travel(search, shell, start, TRAVEL_GENERATIONS)
+    assert float(np.linalg.norm(ended)) < search.norm_ceiling, (
+        "the bound clipped a step, so the test measured the bound"
+    )
+    for name, reached in travelled.items():
+        assert abs(reached / expected - 1.0) <= bands[name], (
+            f"the {name} block travelled {reached:.4f} against {expected:.4f}"
+        )
+
+    monkeypatch.setattr(search_module, "layer_weighting", isotropic_weighting)
+    isotropic, _ = relative_travel(search, shell, start, TRAVEL_GENERATIONS)
+    missed = [
+        name
+        for name, reached in isotropic.items()
+        if abs(reached / expected - 1.0) > bands[name]
+    ]
+    assert len(missed) >= len(POLICY_BLOCKS) - 1, (
+        f"the isotropic draw held the band at {missed}, so the band is too wide"
+    )

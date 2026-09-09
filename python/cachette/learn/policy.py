@@ -1287,6 +1287,17 @@ class LinearPolicy:
         actions, features = self.weights.shape
         return actions, features
 
+    @property
+    def shapes(self) -> tuple[tuple[int, ...], ...]:
+        """The shape of each trainable array, in the order the vector holds them.
+
+        **This kind holds one layer, and the answer is one shape.** A search
+        that scales a perturbation by the layer it lands in therefore scales
+        this whole vector by one number, which leaves the perturbation of this
+        kind where it was.
+        """
+        return (self.weights.shape,)
+
     def choose(self, observation: np.ndarray, mask: np.ndarray) -> int:
         """Return the action integer of the highest-scoring legal row."""
         scores = self.weights @ encode(observation, self.normalizer)

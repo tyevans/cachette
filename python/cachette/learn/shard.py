@@ -191,7 +191,7 @@ def play_shard(task: ShardTask) -> ShardScore:
     probe = Env(task.env_config, task.scoring)
     shell = shell_policy(task.kind, probe, task.normalizer)
     noise = generation_noise(
-        config.seed, task.generation, config.pairs, task.centre.size
+        config.seed, task.generation, config.pairs, shell, task.centre
     )
     candidates = pair_candidates(
         shell, task.centre, noise, config.sigma, task.first_pair, task.last_pair
