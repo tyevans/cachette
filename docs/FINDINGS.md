@@ -18163,7 +18163,7 @@ reward ranked that ending below an early one.
 sums the reward of every decision, and every shaped term of the reward weighs
 a change since the previous reading. A sum of changes collapses to the last
 reading less the first, so such a term contributes the same amount whatever
-the policy did in between.[^F692B] A term that must change what the optimiser
+the policy did in between.[^F679A] A term that must change what the optimiser
 sees has to fire once, at the end, on a level.
 
 **Evidence.** The measured endings against the built-in controller fall in two
@@ -18191,7 +18191,7 @@ reward refuses to run while it is unset, and this one defaults instead. A
 default of zero pays nothing, so a score measured before the term existed
 stays comparable with a score measured after it. The run entry point sets the
 weight on the conquest strategies alone, and every stored conquest score
-becomes incomparable with a score measured after the change.[^F692D]
+becomes incomparable with a score measured after the change.[^F688B]
 
 **Nothing has measured the effect yet.** No training run has been made under
 the term. This row records the arithmetic and the reasoning, and it does not
@@ -18203,7 +18203,7 @@ claim a behaviour change.
 named a field and a weight, one row weighed the ground and another weighed the
 people, and the run compared what those rewards taught. One finding had already
 stated that a change term telescopes under an undiscounted episode return, and
-the project read that as a statement about one timing term.[^F700A]
+the project read that as a statement about one timing term.[^F692A]
 
 **True.** It was a statement about every shaped weight the reward module held.
 The module offered one shaped form, and that form was the change of a field
@@ -18235,7 +18235,7 @@ field, so it states no bound of its own and every level weight carries one unit.
 
 Every row of the strategy table now states level weights. **Every stored score
 of every strategy is therefore incomparable with a score measured after this
-change.**[^F700B]
+change.**[^F688B]
 
 **One weight was wrong by five orders of magnitude, for the same reason.** The
 wealth row scaled its store weight by one part in a hundred thousand, and a
@@ -18248,7 +18248,7 @@ strategy was a ground strategy under another name.
 **A check now fails when a row telescopes.** A weighting reports whether its
 shaped weights are all change weights, and one test reads that for every row.
 Nothing failed before, because a change weight is a legal weight and reads as
-dense.[^F700C]
+dense.[^F487B]
 
 ### FND-697 — The settle target and the settle verb kept two lists of the places taken
 
@@ -18317,11 +18317,83 @@ verb answers one byte and names nothing.
 
 ## References
 
+[^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+[^F638B]: Backlog item 0525, build the stage workers of a world once. `docs/backlog/proposed/0525-build-the-stage-workers-of-a-world-once.md`
+[^F641A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^F641B]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+[^F641E]: ADR-0192, a window of controller commands is one label distribution over the action table, decisions D2 and D4. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
+[^F643A]: ADR-0192, a window of controller commands is one label distribution over the action table, decision D2. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
+[^F643B]: Findings register, FND-634. `docs/FINDINGS.md`
+[^F644A]: The observation reader of the binding. `crates/cachette-py/src/lib.rs`
+[^F644B]: The policy pilot of the demonstration. `python/cachette/demo/pilot.py`
+[^F644C]: Backlog item 0528, let a stored policy play a demonstration to the end of a game. `docs/backlog/complete/0528-let-a-stored-policy-play-a-demonstration-to-the-end-of-a-game.md`
+[^F647A]: The seated league of the control plane, the seat-matched plan. `python/cachette/learn/league.py`
+[^F647B]: The observation test of the engine. `crates/cachette-core/tests/a_faction_reads_one_flat_array.rs`
+[^F647C]: ADR-0193, a faction's observation names another faction by a position relative to the reader, decision D1. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
+[^F647D]: The policy fit of the control plane. `python/cachette/learn/policy.py`
+[^F648A]: Findings register, FND-644. `docs/FINDINGS.md`
+[^F648B]: The test that drives each verb and reads afterwards. `crates/cachette-core/tests/a_step_leaves_the_world_readable.rs`
+[^F648C]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decisions D3 and D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+[^F648D]: The refusal of a faction reader. `crates/cachette-core/src/faction_view.rs`
+[^F648E]: Findings register, FND-646. `docs/FINDINGS.md`
+[^F664A]: Findings register, FND-029. `docs/FINDINGS.md`
+[^F664B]: Report 39, what one tick of the training world costs. `docs/research/reports/39-what-one-tick-of-the-training-world-costs.md`
+[^F664D]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+[^F664E]: The test that the step derives the destination field after the controller. `crates/cachette-core/tests/the_step_derives_the_destination_field_after_the_controller.rs`
+[^F665A]: Report 39, the second defect, section 4.4. `docs/research/reports/39-what-one-tick-of-the-training-world-costs.md`
+[^F666A]: The degenerate world test of the learner. `tests/test_learner_degenerate.py`
+[^F666B]: Findings register, FND-544. `docs/FINDINGS.md`
+[^F667A]: The commit `Measure what water does to a training world, and free two colliding numbers`. Read its message for the figures.
+[^F667B]: Findings register, FND-666. `docs/FINDINGS.md`
+[^F668A]: The commit `Measure what sets how well one generation points the right way`. Read its message for the figures.
+[^F668B]: Findings register, FND-688. `docs/FINDINGS.md`
+[^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
+[^F670A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D2. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+[^F670B]: The commit `Record what the observation width follows, and how its own ground flickers`. Read its message for the figures.
+[^F672A]: Findings register, FND-648. `docs/FINDINGS.md`
+[^F672B]: ADR-0055, a site derives its effective rate from the world at each application, the consequences. `docs/adrs/draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md`
+[^F673A]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
+[^F674A]: The census table of the engine. `crates/cachette-core/src/world/census.rs`
+[^F675A]: ADR-0062, production and upkeep are rates attached to a site, the consequences. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+[^F676A]: The commit `Record that a difference reward telescopes, and what the array does not carry`. Read its message for the measurement.
+[^F676B]: Report 42, what a policy should be able to see, section 10.4. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+[^F677A]: The commit `Merge the tool that draws what a policy sees`. Read its message for the figures.
+[^F679A]: Findings register, FND-676. `docs/FINDINGS.md`
+[^F679B]: The commit `Record that the outcome weights prefer a draw to an attempt at a win`. Read its message for the weights and the arithmetic.
+[^F680B]: Findings register, FND-664. `docs/FINDINGS.md`
+[^F680C]: The commit `Derive the destination field only when a seed set changed`. Read its message for the figures, the frame counts and the commands.
+[^F681B]: The commit `Derive an approach field only when its arguments changed`. Read its message for the figures, the tests and the commands.
+[^F682A]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+[^F682B]: Testing rules, a fixture supplies the input, section 2a. `.agents/rules/testing.md`
+[^F682C]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F683A]: The commit `Give the holding city walk a stage of its own`. Read its message for the file table and the entry counts.
+[^F683B]: Findings register, FND-305. `docs/FINDINGS.md`
+[^F683C]: The commit `Let a campaign name the cell of the frame it marches in`. Read its message for the table lengths and the fixture.
+[^F683D]: ADR-0199, a verb names a place by a cell of the egocentric frame the observation publishes. `docs/adrs/draft/adr-0199-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+[^F683E]: Report 40, what a well-trained policy needs, section 6.1. `docs/research/reports/40-what-a-well-trained-policy-needs.md`
+[^F687A]: The structured scaling tests of the search. `tests/test_learner_search.py`
+[^F688A]: Findings register, FND-668. `docs/FINDINGS.md`
+[^F688B]: The stored policy index. `checkpoints/README.md`
+[^F688C]: The commit `Remove what the deleted frozen projection policy left behind`. Read its message for the counts, the alignment figures and the commands.
+[^F689A]: The commit `Split the trainer into a search, a play and a record`, which replaced the hard index with a lookup that defaults.
+[^F689B]: The commit `Replace the observation layout with the scale-free blocks of report 42`, which removed the field the lookup named.
+[^F689C]: The commit `Read the end tick of an episode from the world, not a signal`. Read its message for the figures and the search command.
+[^F689D]: Report 40, what a well-trained policy needs, the proxy table. `docs/research/reports/40-what-a-well-trained-policy-needs.md`
+[^F689E]: Report 41, a handbook for training a policy, section 4.4. `docs/research/reports/41-a-handbook-for-training-a-policy.md`
+[^F689F]: The instrumental population script, which reads the end tick from the world. `scripts/instrumental_population.py`
+[^F689G]: The proxy quality script, which divides each field by the end tick. `scripts/proxy_quality.py`
+[^F690A]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
+[^F690B]: The commit `Name each stored action row by its verb and its coordinates`. Read its message for the perturbation and the figures.
+[^F691A]: The commit `Publish the structure of the observation, not only its positions`. Read its message for the length figure and the field split.
+[^F691B]: The commit `Publish the value form of each observation field`. Read its message for the array comparison and the commands.
+[^F692A]: Findings register, FND-679. `docs/FINDINGS.md`
+[^F692C]: Findings register, FND-689. `docs/FINDINGS.md`
+
 **Believed.** The eight rows of the strategy table held dense rewards. Each row
 named a field and a weight, one row weighed the ground and another weighed the
 people, and the run compared what those rewards taught. One finding had already
 stated that a change term telescopes under an undiscounted episode return, and
-the project read that as a statement about one timing term.[^F700A]
+the project read that as a statement about one timing term.[^F692A]
 
 **True.** It was a statement about every shaped weight the reward module held.
 The module offered one shaped form, and that form was the change of a field
@@ -18353,7 +18425,7 @@ field, so it states no bound of its own and every level weight carries one unit.
 
 Every row of the strategy table now states level weights. **Every stored score
 of every strategy is therefore incomparable with a score measured after this
-change.**[^F700B]
+change.**[^F688B]
 
 **One weight was wrong by five orders of magnitude, for the same reason.** The
 wealth row scaled its store weight by one part in a hundred thousand, and a
@@ -18366,7 +18438,7 @@ strategy was a ground strategy under another name.
 **A check now fails when a row telescopes.** A weighting reports whether its
 shaped weights are all change weights, and one test reads that for every row.
 Nothing failed before, because a change weight is a legal weight and reads as
-dense.[^F700C]
+dense.[^F487B]
 
 ### FND-701 — A compressed magnitude term took the logarithm of a logarithm
 
@@ -18506,11 +18578,7 @@ that it did. A single-seat score is a statement about one seat of one world.
 The rotations here are cyclic and not the full six permutations, so the seat is
 cancelled and the neighbour is not. Which faction sits to a player's left is
 still unmeasured.
-[^F700A]: Findings register, FND-679. `docs/FINDINGS.md`
-[^F700B]: The stored policy index. `checkpoints/README.md`
-[^F700C]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F701A]: The play style table. `python/cachette/learn/play_styles.toml`
-[^F702A]: The stored policy index. `checkpoints/README.md`
 ### FND-696 — A declared observation field that reads a constant zero cannot be told from a real zero, and forty-two of them were declared
 
 **Believed.** A reserved field of the observation is a safe placeholder. It
