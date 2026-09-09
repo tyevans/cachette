@@ -33,8 +33,13 @@ Give it a stored policy and the world that policy plays.
 
     uv run python scripts/calibrate_sigma.py runs/learn/night2/conquer.npz
 
-The centre is scaled to unit length first, because the trainer holds it there.
-A measurement against an unnormalised centre answers a question nobody asks.
+**The centre and the perturbation come from the search, so the number this
+tool reports is the number the trainer would produce.** The search holds the
+centre of a policy kind whose choice survives a positive scaling at unit
+length, and it leaves every other centre where it is. Sigma is a fraction of
+the centre in both cases. A measurement that normalised every centre would
+answer a question nobody asks for a policy whose ``tanh`` layers move under a
+scaling.
 """
 
 from __future__ import annotations
@@ -47,7 +52,7 @@ import numpy as np
 from cachette.learn.env import EnvConfig, VectorEnv, viable_seeds
 from cachette.learn.policy import load_policy
 from cachette.learn.reward import Weighting
-from cachette.learn.train import unit
+from cachette.learn.search import perturbation_scale, unit
 
 # The sizes to report. The range spans a perturbation that does nothing and one
 # that replaces the policy, so a reader sees where the useful band sits rather
@@ -61,9 +66,7 @@ DIRECTIONS = 8
 # A weighting that lets the environment run. **It states no rule of the
 # downstream game.** This tool reads choices and never reads the reward, so the
 # weights here change nothing it reports.
-PROBE_WEIGHTING = Weighting(
-    terms={"held_tiles": 1.0}, won=1.0, lost=-1.0, drawn=0.0
-)
+PROBE_WEIGHTING = Weighting(terms={"held_tiles": 1.0}, won=1.0, lost=-1.0, drawn=0.0)
 
 
 def collect(
@@ -116,7 +119,8 @@ def main() -> int:
     seeds = viable_seeds(config, arguments.seeds, arguments.seed_start)
     observations, masks = collect(config, policy, seeds, arguments.workers)
 
-    centre = unit(np.asarray(policy.flat()))
+    flat = np.asarray(policy.flat())
+    centre = unit(flat) if policy.CHOICE_SURVIVES_SCALING else flat
     base = np.array(policy.rebuild(centre).choose_many(observations, masks))
     legal = float(masks.sum(axis=1).mean())
     taken, counts = np.unique(base, return_counts=True)
@@ -139,11 +143,10 @@ def main() -> int:
         for _ in range(DIRECTIONS):
             direction = rng.standard_normal(centre.size)
             direction /= np.linalg.norm(direction)
-            moved = policy.rebuild(centre + size * direction)
+            step = perturbation_scale(policy, centre, size)
+            moved = policy.rebuild(centre + step * direction)
             changed.append(
-                float(
-                    np.mean(np.array(moved.choose_many(observations, masks)) != base)
-                )
+                float(np.mean(np.array(moved.choose_many(observations, masks)) != base))
             )
         print(f"  {size:5.2f}   {np.mean(changed):.3f}")
     print()

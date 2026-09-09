@@ -501,6 +501,18 @@ class StructuredPolicy:
     length alone does not separate two layouts.
     """
 
+    # **A positive scaling of the weights moves the choice.** Every tower ends
+    # in a ``tanh`` and the trunk does too. Scaling the weight vector puts each
+    # ``tanh`` at another place on its curve, and a saturating function is not
+    # linear. The bias arrays are a second reason: a bias meets a constant
+    # feature of value one, so it scales while what it is added to does not
+    # scale by the same factor.
+    #
+    # The scores are therefore not the old scores times one positive number,
+    # and the highest-scoring legal row can change. The search reads this and
+    # never normalises the centre of this kind.
+    CHOICE_SURVIVES_SCALING = False
+
     def __init__(
         self,
         layout: ObservationLayout,
