@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-714**
+**Next number: FND-715**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19289,3 +19289,43 @@ generations, a population of 12 and one weighting. The share and displacement
 figures follow from the arithmetic of the search and do not depend on the world.
 No run varied the initial scale, which is the measurement this finding
 recommends.
+
+### FND-714 — More threads for one world step is slower at every extent the project trains on
+
+**Believed.** The determinism rule requires one binary to give one answer at
+any thread count, and the thread-count test runs one tick at 1, 2 and 12
+threads. The engine takes a thread count for each step, the environment
+carries a thread field, and nothing states which value a caller should pass.
+A reader who sees the field and holds a sixteen core machine raises it.
+
+**True.** Measured on a sixteen core development machine, engine only, twenty
+warm ticks then four hundred timed ticks, three factions, one world:
+
+| extent | 1 thread | 4 threads | 16 threads |
+|---|---|---|---|
+| 48 | 756.1 | 484.8 | 326.0 |
+| 64 | 636.7 | 431.1 | 314.3 |
+| 128 | 439.3 | 253.6 | 214.5 |
+
+**One thread beats sixteen by 2.0 to 2.3 times at every extent.** The
+training world of extent 128 holds 16,384 tiles against a design target of
+16.7 million, so the work of one tick is far too small to cover the cost of
+the barrier that joins the threads.
+
+**Why this is not a defect.** The thread count exists for the target scale and
+the measurement says nothing against it. It says that the extents the project
+trains on are three orders of magnitude below the scale at which the thread
+count pays.
+
+**The trainer already passes one**, so no run has paid this. The field is
+simply an invitation that nothing warns about, which is the shape of a value
+that reads as a tuning knob and is not one at this scale.
+
+**Follows.** Parallelise across worlds and not inside a step, at any extent
+this project trains on. **A rate measured on one worker does not divide by the
+worker count**: the same measurement gave about 400 ticks a second in
+aggregate for sixteen workers on a shared machine against 637 for one
+uncontended worker at the same extent, so per-worker throughput collapses
+under concurrency. A run sizing estimate must take its rate from a measurement
+at the concurrency it plans to run, and the register holds one such row for
+the target platform at sixty parallel workers.
