@@ -1,0 +1,21 @@
+{
+  "file": "obs7-act2-defensive-expansionist-gen3.npz",
+  "run": "cachette-train-20260909-082958-3862654",
+  "strategy": "defensive_expansionist",
+  "generation": 3,
+  "validation_score": 49.468433427810666,
+  "validation_seeds": 128,
+  "controller_yardstick": -9.045363052686056,
+  "above_yardstick": true,
+  "observation_version": 7,
+  "action_version": 2,
+  "observation_length": 4819,
+  "action_length": 180,
+  "policy_kind": "structured",
+  "decision_interval": 10,
+  "tick_limit": 6000,
+  "width": 128,
+  "height": 128,
+  "faction_count": 3,
+  "sha256": "9091a46eeb4d3842fbd2ea6b0ebfdfd5ba1525e05932fcf4227b5a81462f645f"
+}

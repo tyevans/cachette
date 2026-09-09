@@ -8,11 +8,9 @@ layout, one action layout, one world extent and one faction count. The loader
 reads the fit a file states, compares it against the world the caller names,
 and refuses a file that disagrees.[^C3]
 
-**This index holds no policy right now.** The observation reached version 7,
-and every stored policy read version 6. The section on what is gone holds what
-each one measured, and the files themselves are kept outside this directory so
-that nothing this project measured is thrown away. A reader who wants a policy
-to play must train one.
+**This index holds four policies, all at observation version 7.** Every
+earlier policy read version 6 and the loader refuses it; the section on what is
+gone holds what each of those measured.
 
 **A file the loader refuses is removed rather than retired in place.** An index
 that lists a file nobody can load costs a reader the time it takes to find that
@@ -28,21 +26,55 @@ The demonstration refuses a policy that does not fit the world it plays, so
 name the world the policy was trained on. A policy trained on a 48 by 48 world
 of three factions plays like this:
 
-    uv run python -m cachette.demo --extent 48 --factions 3 \
-      --policy 0=<path to a weight file>
+    uv run python -m cachette.demo --extent 128 --factions 3 \
+      --policy 0=checkpoints/styles/obs7-act2-aggressive-gen7.npz
 
 `--policy` repeats, and `N=path` names the faction that holds it, so three
-policies play each other by naming three paths.
+policies play each other by naming three paths:
 
-**No path is named here on purpose.** This index named two files that had
-already been removed, and a reader following it met a directory that does not
-exist. A command that names a live file goes stale the next time the
-observation moves.
+    uv run python -m cachette.demo --extent 128 --factions 3 \
+      --policy 0=checkpoints/styles/obs7-act2-aggressive-gen7.npz \
+      --policy 1=checkpoints/styles/obs7-act2-wonder-rush-gen9.npz \
+      --policy 2=checkpoints/styles/obs7-act2-defensive-expansionist-gen3.npz
+
+**Name the world these policies were trained on.** Every file here was fitted
+on 128 by 128 with three factions, and the loader refuses a file trained
+against another world. The earlier index said 48 by 48, which is the world the
+retired policies played.
 
 ## What is here
 
-Nothing. The table below the break holds every policy this project has stored,
-and why each one went.
+Four policies from one run of the play style table, on a 128 by 128 world of
+three factions at a tick limit of 6000, at observation version 7 and action
+version 2. Every one is a structured policy of 5354 trainable weights.
+
+**A score is a mean return over 128 held-out seeds under that style's own
+weighting, and a return under one weighting does not compare with a return
+under another.** The yardstick is the built-in controller measured on the same
+seeds under the same weighting, so the only fair comparison is a row against
+its own bar. **Each bar is read from that style's own log**, because the four
+styles write one shared log and the controller row there names no style.
+
+| File | Score | Yardstick | Beats it | Generation | Win path |
+|---|---|---|---|---|---|
+| `styles/obs7-act2-aggressive-gen7` | 86.90 | 50.00 | yes | 7 | domination |
+| `styles/obs7-act2-wonder-rush-gen9` | 86.35 | 10.44 | yes | 9 | wonder |
+| `styles/obs7-act2-defensive-expansionist-gen3` | 49.47 | −9.05 | yes | 3 | territory |
+| `styles/obs7-act2-renown-champion-gen7` | 48.84 | 49.03 | no | 7 | renown |
+
+**The two styles that improved are the two whose win path was closed before
+this run.** A worker carries an attack of zero and an armour of zero, and one
+verb promotes a unit to the soldier type, so a faction that never campaigns
+cannot fell anything.[^C9] The military strength of a faction was also a field
+the layout declared and nothing wrote. With the field written and a level
+weight paying for it, the two army styles sat flat and negative for five
+generations and then climbed 103.7 and 117.6 points on held-out worlds. The two
+styles that need no army found their level at once and moved by two points and
+by minus three.
+
+**The run these came from was still training when they were taken.** A later
+generation may hold a better centre.
+
 
 ## What is gone
 
@@ -205,3 +237,4 @@ policy asks for an observation after a game ends.[^C2]
 [^C6]: Findings register, FND-692. `docs/FINDINGS.md`
 [^C7]: Findings register, FND-700. `docs/FINDINGS.md`
 [^C8]: Findings register, FND-698. `docs/FINDINGS.md`
+[^C9]: Findings register, FND-704. `docs/FINDINGS.md`

@@ -77,9 +77,21 @@ def index_names(kept: bool) -> set[str]:
     return {match.group(1) for match in ROW.finditer(head if kept else tail)}
 
 
-def a_world() -> World:
-    """Build the world the index names, seeded so it publishes its schemas."""
-    world = World(width=EXTENT, height=EXTENT, seed=0, faction_count=FACTIONS)
+def a_world(meta: dict[str, object] | None = None) -> World:
+    """Build the world a stored file names, seeded so it publishes its schemas.
+
+    **A weight file states the world it was fitted on, and this reads it.**
+    One extent for the whole corpus was a second declaration of that world,
+    and it held while every stored file came from one run. The first file from
+    a larger world then failed to place against it, and the failure named the
+    loader rather than the assumption.
+    """
+    width = int(meta["width"]) if meta and "width" in meta else EXTENT
+    height = int(meta["height"]) if meta and "height" in meta else EXTENT
+    factions = (
+        int(meta["faction_count"]) if meta and "faction_count" in meta else FACTIONS
+    )
+    world = World(width=width, height=height, seed=0, faction_count=factions)
     world.seed_world()
     return world
 
@@ -94,7 +106,8 @@ def test_every_stored_policy_loads_against_the_world_the_index_names(
     beside a file would pass against a file whose weights the loader cannot
     place, because a manifest is prose that nothing derives.
     """
-    policy, meta = load_policy(path, PolicyFit.of_world(a_world()))
+    _, stated = load_policy(path)
+    policy, meta = load_policy(path, PolicyFit.of_world(a_world(stated)))
     assert policy is not None
     kind = str(meta["kind"])
     assert kind in KINDS, f"{path.name} names the kind {kind!r}, which no builder knows"
