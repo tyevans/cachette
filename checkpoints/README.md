@@ -35,78 +35,55 @@ policies play each other like this:
 
 ## What is here
 
-Every file here holds a linear policy over the ring observation, and every one
-of them loads.
+**Nothing. Every stored policy has been removed, and the index states what
+each one reached.**
 
-| Policy | Score | Generation | Search |
-|---|---|---|---|
-| `ring/obs6-people-gen1` | 12051.5 | 1 | 64 candidates, 8 seeds |
-| `ring/obs6-land-gen1` | 8873.8 | 1 | 64 candidates, 8 seeds |
-| `ring/obs6-wealth-gen1` | 4233.9 | 1 | 64 candidates, 8 seeds |
-| `ring/obs6-conquer-gen1` | 870.4 | 1 | 64 candidates, 8 seeds |
+A weight file is a function of one observation layout and one action layout.
+The engine now writes observation version 6 and action version 2, and no file
+this project ever wrote states both. An index that lists a file nobody can
+load costs a reader the time it takes to find that out, so the files go and
+their measurements stay.
 
-**Each row is generation 1 of a run that asked for 40.** The run was stopped
-after two generations. A row is an early centre of a search and it is not a
-level that any run held. Read none of them as a standard of play.
+## What is gone
 
-## What is gone, and what it reached
+Every row below names a file this project removed, and the measurement it
+carried. A file goes when the loader refuses it, and the measurement stays
+because a reader wants to know what a layout managed.
 
-A removed file leaves its measurement here. A reader learns what the project
-tried without being offered a file that cannot run.
+### The ring observation, before a place argument
 
-### The dense observation
+Four policies trained on a 48 by 48 world of three factions, one generation
+into a run that asked for forty. Each is an early centre of a search and not
+a level any run held. The scores are mean returns over 128 held-out worlds,
+and a return under one objective does not compare with a return under
+another.
 
-Four policies were fitted against a dense observation of 184 positions, over a
-reward that weighed held ground at one. **They stated observation version 4 and
-the engine writes 6, so the loader refused all four.** This index said so and
-kept them anyway. Removing them completes a job that stopped at the prose.
+| File | Score | Search |
+|---|---|---|
+| `ring/obs6-people-gen1` | 12051.5 | 64 candidates, 8 seeds, no hidden layer |
+| `ring/obs6-land-gen1` | 8873.8 | 64 candidates, 8 seeds, no hidden layer |
+| `ring/obs6-wealth-gen1` | 4233.9 | 64 candidates, 8 seeds, no hidden layer |
+| `ring/obs6-conquer-gen1` | 870.4 | 64 candidates, 8 seeds, no hidden layer |
 
-| Policy | Score | Generation | Search |
-|---|---|---|---|
-| `dense/obs4-land-dense-mlp-gen99` | -1043.7 | 99 | 256 candidates, 1 seed, a fixed projection into 24 units |
-| `dense/obs4-land-dense-linear` | -1071.1 | 87 | 256 candidates, 1 seed, linear |
-| `dense/obs4-land-dense-mlp` | -1080.5 | 19 | 256 candidates, 1 seed, a fixed projection into 24 units |
-| `dense/obs4-conquer-sparse-mlp` | -1167.4 | 15 | 256 candidates, 1 seed, a fixed projection into 24 units |
+They were refused by the action version and not by any fault of their own. A
+place argument gives the action table one row for each cell of the
+observation frame, so a policy fitted against 29 rows cannot score 180.
 
-The first row supersedes the third: the same run and the same strategy, 80
-generations later.
+### What the dense observation reached, before the ring stack
 
-**A ring score is positive and a dense score is negative, and the sign is the
-reward and not the play.** A loss now costs a tenth of what a win pays, where
-it used to cost the same. The terms of each play style also read new field
-names. Nothing about the two groups is comparable.
+Four policies of an older observation, kept here as a record of what that
+layout managed. The best reached -1043.7 over 128 held-out worlds at
+generation 99, against -1071.1 for a policy of the same run with no hidden
+layer. A negative score is the older reward, which paid a loss the same
+weight it paid a win, and it does not compare with any score above.
 
-### The frozen projection over the ring observation
+### What a frozen projection reached
 
-Two policies of the ring run held a fixed random projection into 24 units and
-trained only the readout from it. The project removed that policy kind, and the
-loader now refuses a file that names it.[^C6]
-
-| Policy | Score | Generation | Search |
-|---|---|---|---|
-| `ring/obs6-land-net-gen1` | 9197.3 | 1 | 64 candidates, 8 seeds, a fixed projection into 24 units |
-| `ring/obs6-conquer-net-gen1` | 978.2 | 1 | 64 candidates, 8 seeds, a fixed projection into 24 units |
-
-**Each of the two led the linear policy of its own reward, and the kind was
-removed on its architecture and not on a measured loss.** Both rows come from
-the run that the table of what is here holds, so a reader can compare them
-reward by reward. One generation of one run is one measurement, and the
-section on reading a score says how little a single difference carries.
-
-## A ring file states a version it was not fitted under
-
-Each ring file was fitted under observation version 5 and states version 6. The
-manifest beside it records both numbers and the reason.
-
-The bump added no quantity and moved no position. The schema gained entries
-that describe the shape of the spatial part, and the one token field became
-four fields over the same positions. The observation of one fixed world is
-identical under both versions, position for position, and the four token fields
-begin where the one field began and hold the same count between them.
-
-**A retag is correct only against that evidence.** Nine files that stated
-version 3 were removed rather than retagged, because the layout had genuinely
-changed and the weights described quantities that had moved.
+Two of the removed ring policies trained a readout over a fixed random
+projection of the observation. **They beat their siblings that trained a
+whole matrix**: 9197.3 against 8873.8 on held ground, and 978.2 against 870.4
+on conquest. The kind is gone because a fixed projection cannot learn a
+representation, and not because it lost.
 
 ## Read the score for what it is
 
