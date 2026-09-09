@@ -25,7 +25,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-160**
+**Next number: BLK-161**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
@@ -70,6 +70,62 @@ count. Do not weigh it and the live unit count as two terms of one objective,
 because that weighs one quantity twice.
 
 [^BLK159A]: Findings register, FND-695. `docs/FINDINGS.md`
+
+
+### BLK-160 — Is the standing of a faction toward a win public to every faction, or does the fog cover it?
+
+**Blocks.** Every published reading of a faction's progress toward a win, and
+the test that asserts the observation of one faction changes nothing when a
+place it never saw changes. It does not stop work: the readings exist and the
+test passes. It is the rule that is open.
+
+**Owner.** Whoever next works on what one faction may read about another.
+
+**Status.** Open.
+
+**What is not known.** Whether a policy may read the win standing of a rival
+that it has never observed.
+
+The observation states both answers today, and the two contradict each other.
+The seats a faction holds declares that it carries no fog rule, because the
+reader ends the game on it. Two power fields publish a rival's renown and a
+rival's wonder work with an exact confidence, which is the same claim. Against
+that, one test asserts that the whole published array of a faction is
+unchanged when a place the faction never saw changes, and its own doc argues
+against carving an exception into it.
+
+**Nothing fails, and that is the defect.** The test passes because its fixture
+moves no seat, no renown and no wonder. A fixture that moved one would fail
+it, and the reader that failed would be the one the engine declares exempt.
+
+**What was tried.** An attempt to publish the second branch of the domination
+rule, which asks whether every rival holds no units, failed this test at once:
+a rival raised on ground the reader had never seen moved the published value.
+The fields were removed rather than the test weakened, and the reason is
+written where the fields would have been.
+
+**Why it matters beyond one field.** A win path a policy cannot observe is a
+win path it cannot pursue, and the domination path is measured as the one no
+trained policy has ever taken.[^B160A] So the honest answers pull in opposite
+directions: fog makes the game fair to a player and leaves a win path
+invisible, while a public standing makes the path learnable and tells a
+faction something it did not scout.
+
+**Options.** Declare the win standing public, and state it once so that the
+fog test carries the exception by rule rather than by fixture. Or keep the
+fog, and accept that a faction reads its own progress and not a rival's, which
+is enough for a policy to steer by. Or publish a rival's standing only where
+the reader has observed the ground that carries it, which is the most honest
+and the most expensive.
+
+**Recommendation.** Publish a faction's own standing on every path without
+fog, because it ends its own game on it, and cover a rival's standing with the
+fog. That answers the domination path, which needs the reader to know how far
+it has come, without telling anyone what it has not seen.
+
+## References
+
+[^B160A]: Findings register, FND-703. `docs/FINDINGS.md`
 
 ### BLK-158 — How does the attack column and the armour column of a unit type combine into a military strength?
 
