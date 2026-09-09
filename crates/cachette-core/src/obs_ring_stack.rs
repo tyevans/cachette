@@ -1,8 +1,10 @@
 //! The ring stack block of the observation, and the passes that build it.
 //!
 //! The block holds one cell for each cell of the egocentric ring frame, and
-//! 25 channels for each cell. The frame samples the ground around a faction
-//! at falling resolution, so the block has one width on every world.[^1]
+//! one group of channels for each cell. The channel table of this module
+//! names every channel and is the one statement of the order. The frame
+//! samples the ground around a faction at falling resolution, so the block
+//! has one width on every world.[^1]
 //!
 //! # Where each channel comes from
 //!
@@ -37,20 +39,21 @@
 //!
 //! # The channels this block cannot fill
 //!
-//! Three channels of the design have no source in the engine, and this block
+//! Some channels of the design have no source in the engine, and this block
 //! publishes zero in them rather than a number it invented.
 //!
-//! Channel 4 carries the age of a memory. The fog layer holds two boolean
-//! bitsets for each faction and no tick, so the engine cannot say when a
-//! faction last saw a tile. The channel stays in the layout, because a
+//! The memory age channel carries the age of a memory. The fog layer holds
+//! two boolean bitsets for each faction and no tick, so the engine cannot say
+//! when a faction last saw a tile. The channel stays in the layout, because a
 //! remembered value and a seen value are different facts and the layout must
 //! keep room to say so.
 //!
-//! Channels 24 and 25 carry military strength. The engine holds an attack
-//! column and an armour column for each unit type, and it holds no strength
-//! quantity and no record that defines one.
+//! The own strength channel and the rival strength channel carry military
+//! strength. The engine holds an attack column and an armour column for each
+//! unit type, and it holds no strength quantity and no record that defines
+//! one.
 //!
-//! Six further channels have a source at level 0 and no source at the summary
+//! Further channels have a source at level 0 and no source at the summary
 //! level, so a far ring reads zero in them. They are the water share, the
 //! height deviation, the tile water, the resource share and the hazard share.
 //! The summary level holds a tile count, an open tile count, a unit count, a
@@ -88,19 +91,76 @@ use crate::world::World;
 /// The positions that the ring stack block holds.
 pub const RING_STACK_SLOTS: u32 = RING_STACK_CELLS * RING_STACK_CHANNELS;
 
+/// The name a schema gives to the space the ring stack lays its cells out in.
+///
+/// A reader of the observation must tell a spatial field from a scalar one,
+/// and the drawing tool of this project established the vocabulary before the
+/// engine published it.[^1]
+///
+/// # References
+///
+/// [^1]: The drawing tool of the observation. `python/cachette/learn/picture.py`
+pub const RING_SPACE: &str = "ring";
+
+/// Returns the number of the channel of one name.
+///
+/// The channel table is the one place that pairs a name with a position, so
+/// every named channel below reads its number from that table. A name the
+/// table does not hold fails the build.
+const fn channel_number(wanted: &str) -> u32 {
+    let mut index = 0usize;
+    while index < RING_STACK_CHANNEL_NAMES.len() {
+        if same_name(RING_STACK_CHANNEL_NAMES[index], wanted) {
+            return index as u32 + 1;
+        }
+        index += 1;
+    }
+    panic!("the ring stack channel table holds no channel of that name");
+}
+
+/// Returns whether two names hold the same bytes.
+///
+/// A const context cannot compare two strings with the equality operator, so
+/// this walks the bytes of both.
+pub(crate) const fn same_name(left: &str, right: &str) -> bool {
+    let left = left.as_bytes();
+    let right = right.as_bytes();
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut index = 0usize;
+    while index < left.len() {
+        if left[index] != right[index] {
+            return false;
+        }
+        index += 1;
+    }
+    true
+}
+
 /// The channel that carries how much of the cell lies inside the world.
 ///
 /// **This channel gates the rest.** A ring that lies outside the world reads
 /// zero here, and every other channel of that cell reads zero because there
 /// is no ground to report. A policy reads this one and learns which rings its
 /// world reaches.
-pub const AREA_CHANNEL: u32 = 1;
+pub const AREA_CHANNEL: u32 = channel_number(AREA_CHANNEL_NAME);
+
+/// The name of the channel that gates the rest.
+///
+/// The schema publishes the name, so a reader of the observation tells an
+/// absent cell from a cell that holds zero.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D8. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+pub const AREA_CHANNEL_NAME: &str = "area_inside_world";
 
 /// The channel that carries the observed share of the cell.
-pub const OBSERVED_CHANNEL: u32 = 2;
+pub const OBSERVED_CHANNEL: u32 = channel_number("observed_share");
 
 /// The channel that carries the share of the cell the reader holds.
-pub const OWN_HELD_CHANNEL: u32 = 13;
+pub const OWN_HELD_CHANNEL: u32 = channel_number("own_held_share");
 
 /// The channel that carries the rival unit presence of the cell.
 ///
@@ -111,14 +171,14 @@ pub const OWN_HELD_CHANNEL: u32 = 13;
 /// # References
 ///
 /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
-pub const RIVAL_PRESENCE_CHANNEL: u32 = 17;
+pub const RIVAL_PRESENCE_CHANNEL: u32 = channel_number("rival_unit_density");
 
 /// The channel that carries the settlement count of the reader in the cell.
-pub const OWN_SETTLEMENT_CHANNEL: u32 = 18;
+pub const OWN_SETTLEMENT_CHANNEL: u32 = channel_number("own_settlements");
 
 /// The channel that carries the share of the cell inside the reach of the
 /// reader.
-pub const OWN_REACH_CHANNEL: u32 = 22;
+pub const OWN_REACH_CHANNEL: u32 = channel_number("own_reach_share");
 
 /// What one pass of the ring stack touched.
 ///
@@ -203,7 +263,7 @@ impl RingStack {
 
     /// Returns every position of the block, in ascending cell order.
     ///
-    /// The 25 channels of one cell are contiguous, so a set encoder over the
+    /// The channels of one cell are contiguous, so a set encoder over the
     /// cells reads one contiguous run for each cell and needs no stride
     /// table.
     #[must_use]
@@ -213,8 +273,8 @@ impl RingStack {
 
     /// Returns one channel of one cell.
     ///
-    /// The channel number runs from 1 to 25, as the design layout numbers
-    /// them.
+    /// The channel number runs from one to the channel count, as the design
+    /// layout numbers them. The channel table names every one of them.
     #[must_use]
     pub fn channel(&self, cell: u32, channel: u32) -> i64 {
         if channel == 0 || channel > RING_STACK_CHANNELS {
@@ -641,47 +701,86 @@ fn mean_share(total: i64, count: i64) -> Fix32 {
     sim_math::bounded_share(total, count.saturating_mul(i64::from(Fix32::ONE.0)))
 }
 
-/// Returns the 25 channels of one cell of the ring stack.
+/// Declares the channel table of one cell of the ring stack.
 ///
-/// Every channel is a share, a signed relation or a compressed magnitude, and
-/// the design publishes no raw count and no unbounded total.[^1] Each one
-/// goes through the arithmetic boundary of the project.[^2]
+/// **The table is the one place that pairs a channel name with a channel
+/// position.** The macro takes one name and one expression for each channel,
+/// so a name and the value it describes cannot drift apart. A second list of
+/// names would be a second declaration of the order, and nothing would fail
+/// when the two disagreed.[^1]
 ///
-/// A channel that the engine holds no source for reads zero. The module
-/// documentation names each one and says what is missing.
+/// The macro takes the names of the five bindings that a channel expression
+/// reads. A macro body declares its own bindings, and a caller expression
+/// cannot see them, so the caller names them instead.
 ///
 /// # References
 ///
-/// [^1]: Report 42, what a policy should be able to see, section 8.1. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
-/// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
-fn channels_of(total: CellTotals, extent: &CellExtent, cell: u32) -> [Fix32; 25] {
-    let in_world = extent.in_world_tiles(cell);
-    let observed = total.observed;
-    [
-        sim_math::bounded_share(extent.inside(cell), extent.sampled(cell)),
-        sim_math::bounded_share(observed, in_world),
-        sim_math::bounded_share(total.seen_now, in_world),
-        Fix32::ZERO,
-        sim_math::bounded_share(total.open, observed),
-        sim_math::bounded_share(total.water, observed),
-        mean_share(total.height_total, observed),
-        mean_share(total.height_deviation_total, observed),
-        sim_math::compressed_magnitude(density(total.food_total, observed)),
-        sim_math::compressed_magnitude(density(total.ground_water_total, observed)),
-        sim_math::compressed_magnitude(density(total.value_total, observed)),
-        sim_math::bounded_share(total.resource_tiles, observed),
-        sim_math::bounded_share(total.own_held, observed),
-        sim_math::bounded_share(total.rival_held, observed),
-        sim_math::bounded_share(total.unclaimed_open, total.open),
-        sim_math::compressed_magnitude(density(total.own_units, observed)),
-        sim_math::compressed_magnitude(density(total.rival_units, observed)),
-        sim_math::compressed_magnitude(total.own_settlements),
-        sim_math::compressed_magnitude(total.rival_settlements),
-        sim_math::compressed_magnitude(total.own_upgrades),
-        sim_math::compressed_magnitude(total.rival_upgrades),
-        sim_math::bounded_share(total.own_held, in_world),
-        sim_math::bounded_share(total.hazard_tiles, observed),
-        Fix32::ZERO,
-        Fix32::ZERO,
-    ]
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+macro_rules! declare_ring_channels {
+    (
+        $total:ident, $extent:ident, $cell:ident, $in_world:ident, $observed:ident,
+        { $( $name:literal => $value:expr ; )* }
+    ) => {
+        /// The channels of one cell, in the order the block stores them.
+        ///
+        /// The schema publishes this list, so a reader of the observation
+        /// names a channel rather than counting positions.
+        pub const RING_STACK_CHANNEL_NAMES: [&str; RING_STACK_CHANNELS as usize] =
+            [ $( $name, )* ];
+
+        /// Returns every channel of one cell of the ring stack.
+        ///
+        /// Every channel is a share, a signed relation or a compressed
+        /// magnitude, and the design publishes no raw count and no unbounded
+        /// total.[^1] Each one goes through the arithmetic boundary of the
+        /// project.[^2]
+        ///
+        /// A channel that the engine holds no source for reads zero. The
+        /// module documentation names each one and says what is missing.
+        ///
+        /// # References
+        ///
+        /// [^1]: Report 42, what a policy should be able to see, section 8.1. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+        /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+        fn channels_of(
+            $total: CellTotals,
+            $extent: &CellExtent,
+            $cell: u32,
+        ) -> [Fix32; RING_STACK_CHANNELS as usize] {
+            let $in_world = $extent.in_world_tiles($cell);
+            let $observed = $total.observed;
+            [ $( $value, )* ]
+        }
+    };
+}
+
+declare_ring_channels! {
+    total, extent, cell, in_world, observed,
+    {
+        "area_inside_world" => sim_math::bounded_share(extent.inside(cell), extent.sampled(cell));
+        "observed_share" => sim_math::bounded_share(observed, in_world);
+        "seen_now_share" => sim_math::bounded_share(total.seen_now, in_world);
+        "memory_age" => Fix32::ZERO;
+        "open_share" => sim_math::bounded_share(total.open, observed);
+        "water_share" => sim_math::bounded_share(total.water, observed);
+        "mean_height" => mean_share(total.height_total, observed);
+        "height_deviation" => mean_share(total.height_deviation_total, observed);
+        "food_density" => sim_math::compressed_magnitude(density(total.food_total, observed));
+        "ground_water_density" => sim_math::compressed_magnitude(density(total.ground_water_total, observed));
+        "value_density" => sim_math::compressed_magnitude(density(total.value_total, observed));
+        "resource_share" => sim_math::bounded_share(total.resource_tiles, observed);
+        "own_held_share" => sim_math::bounded_share(total.own_held, observed);
+        "rival_held_share" => sim_math::bounded_share(total.rival_held, observed);
+        "unclaimed_open_share" => sim_math::bounded_share(total.unclaimed_open, total.open);
+        "own_unit_density" => sim_math::compressed_magnitude(density(total.own_units, observed));
+        "rival_unit_density" => sim_math::compressed_magnitude(density(total.rival_units, observed));
+        "own_settlements" => sim_math::compressed_magnitude(total.own_settlements);
+        "rival_settlements" => sim_math::compressed_magnitude(total.rival_settlements);
+        "own_upgrades" => sim_math::compressed_magnitude(total.own_upgrades);
+        "rival_upgrades" => sim_math::compressed_magnitude(total.rival_upgrades);
+        "own_reach_share" => sim_math::bounded_share(total.own_held, in_world);
+        "hazard_share" => sim_math::bounded_share(total.hazard_tiles, observed);
+        "own_strength" => Fix32::ZERO;
+        "rival_strength" => Fix32::ZERO;
+    }
 }

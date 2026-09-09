@@ -21,7 +21,7 @@
 use cachette_core::obs_frontier::FRONTIER_SLOTS;
 use cachette_core::obs_ring::{cell_of_delta, ring_of_cell, RING_STACK_CELLS, RING_STACK_CHANNELS};
 use cachette_core::obs_ring_stack::{
-    AREA_CHANNEL, OWN_HELD_CHANNEL, OWN_REACH_CHANNEL, OWN_SETTLEMENT_CHANNEL, RING_STACK_SLOTS,
+    AREA_CHANNEL, OWN_HELD_CHANNEL, OWN_SETTLEMENT_CHANNEL, RING_STACK_SLOTS,
 };
 use cachette_core::obs_token::TOKEN_SLOTS;
 use cachette_core::{Axial, Entity, FactionId, SightRules, World, WorldConfig};

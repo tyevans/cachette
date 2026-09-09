@@ -71,6 +71,37 @@
 //! through the fog of this frame.** The count the holding keeps is the whole
 //! count, and a fog-scoped count of the same thing flickers with sight.[^10]
 //!
+//! # The schema states the structure, and not only the position
+//!
+//! A policy that exploits the shape of the observation must know that shape.
+//! A start and a width do not carry it. One block of channels over cells
+//! holds the same positions as another block of cells over channels, and
+//! nothing in the width separates the two.[^11]
+//!
+//! The schema therefore states more than the place of each field, and it
+//! derives every entry from the modules that fill the blocks. No file outside
+//! this module states a position, a width, a count or an order.[^12]
+//!
+//! **A spatial field names its space.** The ring stack marks its field, so a
+//! reader tells it from a scalar field by the mark and not by the name.
+//!
+//! **A field of channels names its channels.** The module that fills a block
+//! owns the channel list, and the schema publishes that list.
+//!
+//! **The schema states the cells of each ring.** A cell index says nothing
+//! about its ring and its sector on its own.
+//!
+//! **The schema states which axis runs first.** Every block of this layout
+//! stores the channels of one place next to each other.
+//!
+//! **The schema names the channel that gates a cell.** A cell of the frame
+//! that lies outside the world reads zero in every channel. That zero is an
+//! absent value and not a quantity of zero, and the gate channel states the
+//! difference.[^13]
+//!
+//! **Each token set is one field.** The sets hold different channel counts,
+//! so one field cannot state the shape of every set.[^14]
+//!
 //! # Determinism
 //!
 //! One pass builds the array, on the calling thread. It visits the observed
@@ -91,6 +122,10 @@
 //! [^8]: ADR-0059, fog storage grows with observed area, not with world area, decision D2. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 //! [^9]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 //! [^10]: Findings register, FND-671. `docs/FINDINGS.md`
+//! [^11]: The layout reader of the control plane. `python/cachette/learn/layout.py`
+//! [^12]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D1. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+//! [^13]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D8. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+//! [^14]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D4. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
 
 use crate::action::{CandidateKind, Verb};
 use crate::event_layout::ColumnKind;
@@ -100,8 +135,10 @@ use crate::faction_view::{BlockMask, FactionViewError};
 use crate::hex::Axial;
 use crate::holding::Holder;
 use crate::obs_frontier::Frontier;
+use crate::obs_ring::ring_cell_counts;
 use crate::obs_ring_stack::RingStack;
-use crate::obs_token::EntityTokens;
+use crate::obs_ring_stack::RING_SPACE;
+use crate::obs_token::{EntityTokens, TokenSet, TOKEN_SPACE};
 use crate::position::WORK_COMMODITY;
 use crate::resource::ResourceKind;
 use crate::sim_math;
@@ -125,7 +162,7 @@ use crate::world::World;
 /// # References
 ///
 /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-pub const OBSERVATION_VERSION: u32 = 5;
+pub const OBSERVATION_VERSION: u32 = 6;
 
 /// The good classes that the layout carries.
 ///
@@ -179,7 +216,6 @@ pub const BOARD_STATISTIC_COUNT: u32 = 5;
 /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 pub(crate) use crate::obs_frontier::FRONTIER_SLOTS;
 pub(crate) use crate::obs_ring::{RING_STACK_CELLS, RING_STACK_CHANNELS};
-pub(crate) use crate::obs_token::TOKEN_SLOTS;
 
 /// The elements of the objective weight vector that the layout carries.
 ///
@@ -258,7 +294,7 @@ impl ValueKind {
 ///
 /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 macro_rules! declare_observation_fields {
-    ( $( $(#[$note:meta])* $variant:ident => $name:literal, $positions:expr, $kind:ident ; )* ) => {
+    ( $( $(#[$note:meta])* $variant:ident => $name:expr, $positions:expr, $kind:ident ; )* ) => {
         /// One field of the observation array.
         ///
         /// **This list is the whole layout.** The schema derives every start
@@ -645,13 +681,22 @@ declare_observation_fields! {
     /// count.
     ContractShare => "contract_share", 1, Share;
 
-    /// Block I. The entity tokens.
+    /// Block I. The settlements the reader holds, as tokens.
     ///
-    /// The block holds four token sets, in this order: the own settlements,
-    /// the rivals, the threat clusters and the candidate sites. Each set
-    /// holds a fixed number of tokens, and each token holds a fixed number
-    /// of channels.
-    EntityTokens => "entity_tokens", TOKEN_SLOTS, Statistic;
+    /// **One field states one shape.** The token sets hold different channel
+    /// counts, so one field cannot say how wide a token of each set is. The
+    /// layout therefore publishes one field for each set, and each one names
+    /// its own channels.
+    ///
+    /// The set list is the one declaration of the order of the sets, and each
+    /// field takes its name and its width from that list.
+    TokenOwnSettlements => TokenSet::Settlements.name(), TokenSet::Settlements.slots(), Statistic;
+    /// The rivals the reader ranks by threat, as tokens.
+    TokenRivals => TokenSet::Rivals.name(), TokenSet::Rivals.slots(), Statistic;
+    /// The clusters of rival units the reader remembers, as tokens.
+    TokenThreatClusters => TokenSet::Threats.name(), TokenSet::Threats.slots(), Statistic;
+    /// The places a founding survey scored, as tokens.
+    TokenCandidateSites => TokenSet::Sites.name(), TokenSet::Sites.slots(), Statistic;
 
     /// **Reserved.** Block J. The observed ground under a storm.
     ///
@@ -788,6 +833,64 @@ declare_observation_fields! {
     LayoutReserve => "layout_reserve", LAYOUT_RESERVE, Reserved;
 }
 
+/// The axis that runs first where a block holds channels over places.
+///
+/// Every block of this layout stores the channels of one place next to each
+/// other, so a reader of one place gathers one unbroken run. The vocabulary
+/// is the one the drawing tool of the project established.[^1]
+///
+/// # References
+///
+/// [^1]: The drawing tool of the observation. `python/cachette/learn/picture.py`
+pub const CHANNEL_ORDER: &str = "cell_major";
+
+impl ObsField {
+    /// Returns the space the positions of the field lay out in.
+    ///
+    /// A ring field holds one group of channels for each cell of the
+    /// egocentric frame. A token field holds one group of channels for each
+    /// token of a set, and a token position names no subject. Every other
+    /// field holds separate quantities and lays out in no space.
+    #[must_use]
+    pub const fn space(self) -> Option<&'static str> {
+        if self.token_set().is_some() {
+            return Some(TOKEN_SPACE);
+        }
+        match self {
+            Self::RingStack => Some(RING_SPACE),
+            _ => None,
+        }
+    }
+
+    /// Returns the channels of one place of the field, in store order.
+    ///
+    /// A field that holds one quantity for each position names no channel and
+    /// answers an empty list. The module that fills a block owns the list, so
+    /// this file states no name of its own.
+    #[must_use]
+    pub const fn channels(self) -> &'static [&'static str] {
+        if let Some(set) = self.token_set() {
+            return set.channel_names();
+        }
+        match self {
+            Self::RingStack => &crate::obs_ring_stack::RING_STACK_CHANNEL_NAMES,
+            _ => &[],
+        }
+    }
+
+    /// Returns the token set the field publishes, or nothing.
+    #[must_use]
+    pub const fn token_set(self) -> Option<TokenSet> {
+        match self {
+            Self::TokenOwnSettlements => Some(TokenSet::Settlements),
+            Self::TokenRivals => Some(TokenSet::Rivals),
+            Self::TokenThreatClusters => Some(TokenSet::Threats),
+            Self::TokenCandidateSites => Some(TokenSet::Sites),
+            _ => None,
+        }
+    }
+}
+
 /// One row of the observation schema.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FieldRow {
@@ -808,6 +911,18 @@ impl FieldRow {
     #[must_use]
     pub const fn name(&self) -> &'static str {
         self.field.name()
+    }
+
+    /// Returns the space the positions of the field lay out in.
+    #[must_use]
+    pub const fn space(&self) -> Option<&'static str> {
+        self.field.space()
+    }
+
+    /// Returns the channels of one place of the field, in store order.
+    #[must_use]
+    pub const fn channels(&self) -> &'static [&'static str] {
+        self.field.channels()
     }
 
     /// Returns how a reader reads each position of the field.
@@ -837,6 +952,7 @@ pub struct ObservationSchema {
     version: u32,
     length: u32,
     rows: Vec<FieldRow>,
+    ring_cells: Vec<u32>,
 }
 
 impl ObservationSchema {
@@ -862,6 +978,38 @@ impl ObservationSchema {
     #[must_use]
     pub fn row(&self, name: &str) -> Option<FieldRow> {
         self.rows.iter().copied().find(|row| row.name() == name)
+    }
+
+    /// Returns the cells of each ring of the egocentric frame, in ring order.
+    ///
+    /// A cell index says nothing about its ring and its sector on its own, so
+    /// a reader of a ring field needs this list. The ring module derives it
+    /// from the sector rule of the frame.
+    #[must_use]
+    pub fn ring_cells(&self) -> &[u32] {
+        &self.ring_cells
+    }
+
+    /// Returns the axis that runs first where a block holds channels over
+    /// places.
+    #[must_use]
+    pub const fn channel_order(&self) -> &'static str {
+        CHANNEL_ORDER
+    }
+
+    /// Returns the name of the channel that says whether a cell holds a value.
+    ///
+    /// A cell of the frame that lies outside the world reads zero in every
+    /// channel. A reader that took that zero for a quantity would read a fact
+    /// the engine never published, so the gate channel states the
+    /// difference.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D8. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+    #[must_use]
+    pub const fn spatial_gate(&self) -> &'static str {
+        crate::obs_ring_stack::AREA_CHANNEL_NAME
     }
 }
 
@@ -889,6 +1037,7 @@ pub fn observation_schema() -> ObservationSchema {
         version: OBSERVATION_VERSION,
         length: start,
         rows,
+        ring_cells: ring_cell_counts().to_vec(),
     }
 }
 
@@ -2040,7 +2189,18 @@ impl World {
                 }
                 ObsField::RingStack => span.copy_from_slice(read.ring_stack.slots()),
                 ObsField::FrontierBySector => span.copy_from_slice(read.frontier.slots()),
-                ObsField::EntityTokens => span.copy_from_slice(read.tokens.slots()),
+                ObsField::TokenOwnSettlements => {
+                    span.copy_from_slice(read.tokens.set_slots(TokenSet::Settlements));
+                }
+                ObsField::TokenRivals => {
+                    span.copy_from_slice(read.tokens.set_slots(TokenSet::Rivals));
+                }
+                ObsField::TokenThreatClusters => {
+                    span.copy_from_slice(read.tokens.set_slots(TokenSet::Threats));
+                }
+                ObsField::TokenCandidateSites => {
+                    span.copy_from_slice(read.tokens.set_slots(TokenSet::Sites));
+                }
                 ObsField::HeldTiles => span[0] = magnitude(read.held_tiles),
                 ObsField::HeldShareObserved => {
                     span[0] = share(read.held_tiles, ground.observed_passable);

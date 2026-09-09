@@ -697,6 +697,15 @@ class ObservationField(TypedDict):
     A field whose bounds are zero and zero is reserved. It reads zero in every
     position until a layout revision claims it, and that zero does not state a
     real quantity of zero.
+
+    The space entry says how the positions of the field lay out. It holds
+    ``ring`` when they are cells of the egocentric frame, ``token`` when they
+    are tokens of one set, and ``None`` when the field holds separate
+    quantities.
+
+    The channels entry names the channels of one place of the field, in the
+    order the field stores them. A field that holds one quantity for each
+    position holds an empty list.
     """
 
     name: str
@@ -705,6 +714,8 @@ class ObservationField(TypedDict):
     dtype: str
     low: int
     high: int
+    space: str | None
+    channels: list[str]
 
 class ActionPosition(TypedDict):
     """One argument position of one verb of the action table.
@@ -776,12 +787,27 @@ class ObservationSchema(TypedDict):
     The length entry gives how many positions the whole array holds. It is
     the length that ``faction_observation`` returns.
 
+    The ring_cells entry gives the cells of each ring of the egocentric frame,
+    in ring order. A cell index says nothing about its ring and its sector on
+    its own.
+
+    The channel_order entry holds ``cell_major`` when every channel of one
+    place is adjacent, and ``channel_major`` when every place of one channel is
+    adjacent.
+
+    The spatial_gate entry names the channel that says whether a cell holds a
+    value at all. A cell of the frame outside the world reads zero in every
+    channel, and that zero is an absent value and not a quantity of zero.
+
     The fields entry lists one entry for each field, in the order the array
     holds them.
     """
 
     version: int
     length: int
+    ring_cells: list[int]
+    channel_order: str
+    spatial_gate: str
     fields: list[ObservationField]
 
 class FactionTileReport(TypedDict):

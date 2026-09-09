@@ -19,6 +19,12 @@ faction count, so a policy trained against one shape could not read
 another.[^4] One test below builds four world shapes at four faction counts
 and asserts that the schema does not move.
 
+The schema states the structure of the array and not only the position of each
+field. A start and a width do not say how many cells a block holds, how many
+channels a cell holds, or which of the two axes runs first. The tests below
+read those entries and check that they account for every position of the
+spatial part.[^5]
+
 Every position of the array is a share, a signed relation or a compressed
 magnitude, and each of the three lies between minus one and one. A field the
 engine cannot answer is reserved: it reads zero and the schema declares its
@@ -32,14 +38,30 @@ References
 [^2]: Recurring Defect Shapes, shape 1. ``.agents/rules/recurring-defects.md``
 [^3]: Testing Rules, drive the real caller. ``.agents/rules/testing.md``
 [^4]: Findings register, FND-670. ``docs/FINDINGS.md``
+[^5]: ADR-0195, the observation of a faction is a fixed-width scale-free
+    table, decisions D4 and D8.
+    ``docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md``
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 import numpy as np
 import pytest
 
 from cachette import VerbError, World
+
+# The binding that carries the schema across the boundary. The test that reads
+# it asserts that it states no number of its own.
+BINDING = (
+    Path(__file__).resolve().parents[1]
+    / "crates"
+    / "cachette-py"
+    / "src"
+    / "world"
+    / "faction_view.rs"
+)
 
 # The world every test below builds. It is wide enough that a faction seated
 # in one part of it has never seen another part.
@@ -79,6 +101,187 @@ def field(world: World, values: np.ndarray, name: str) -> np.ndarray:
         if row["name"] == name:
             return values[row["start"] : row["start"] + row["positions"]]
     raise AssertionError(f"the schema declares no field named {name}")
+
+
+def rows_of_space(world: World, space: str) -> list[dict]:
+    """Return every schema row the engine marks with one space."""
+    return [
+        row for row in world.observation_schema()["fields"] if row["space"] == space
+    ]
+
+
+def ring_row(world: World) -> dict:
+    """Return the one row the engine marks as ring space."""
+    rows = rows_of_space(world, "ring")
+    assert len(rows) == 1, "the engine publishes one ring stack"
+    return rows[0]
+
+
+def channel_column(row: dict, channel: str, cells: int, order: str) -> np.ndarray:
+    """Return the position of one channel of a row, at every place.
+
+    The channel order says which axis runs first, so this reads the order
+    rather than assuming one.
+    """
+    index = list(row["channels"]).index(channel)
+    count = len(row["channels"])
+    start = int(row["start"])
+    if order == "cell_major":
+        return np.arange(start + index, start + count * cells, count, dtype=np.int64)
+    assert order == "channel_major", f"the schema states the order {order!r}"
+    return np.arange(start + index * cells, start + (index + 1) * cells, dtype=np.int64)
+
+
+def test_the_ring_geometry_accounts_for_every_position_of_the_block() -> None:
+    """The published geometry adds up, cell by cell and channel by channel.
+
+    A geometry that did not add up would let a reader gather a plausible block
+    that is not the one the engine wrote.
+    """
+    world = a_seeded_world()
+    schema = world.observation_schema()
+    counts = list(schema["ring_cells"])
+    assert counts, "the schema states the cells of each ring"
+    assert counts[0] == 1, "the centre has no direction, so ring 0 holds one cell"
+    row = ring_row(world)
+    cells = sum(counts)
+    channels = len(row["channels"])
+    assert channels > 0, "a ring field names its channels"
+    assert cells * channels == row["positions"], (
+        f"{cells} cells of {channels} channels do not fill {row['positions']} positions"
+    )
+
+
+def test_every_token_set_is_one_field_of_a_whole_number_of_tokens() -> None:
+    """One field states one shape, so each token set gets a field of its own."""
+    world = a_seeded_world()
+    rows = rows_of_space(world, "token")
+    assert len(rows) >= 2, "one field cannot state the shape of every set"
+    shapes = set()
+    for row in rows:
+        channels = len(row["channels"])
+        assert channels > 0, f"{row['name']} names its channels"
+        tokens, remainder = divmod(int(row["positions"]), channels)
+        assert remainder == 0, (
+            f"{row['name']} holds {row['positions']} positions over {channels} channels"
+        )
+        assert tokens >= 1
+        shapes.add((tokens, channels))
+    assert len(shapes) > 1, (
+        "the sets hold different shapes, which is why one field cannot state them all"
+    )
+
+
+def test_a_channel_list_holds_no_repeated_name() -> None:
+    """A reader names a channel, so two channels of one field cannot share one."""
+    world = a_seeded_world()
+    for row in world.observation_schema()["fields"]:
+        names = list(row["channels"])
+        assert len(names) == len(set(names)), f"{row['name']} repeats a channel name"
+        if row["space"] is None:
+            assert not names, f"{row['name']} lays out in no space and names channels"
+
+
+def test_the_schema_names_the_channel_that_gates_a_cell() -> None:
+    """An absent cell must not read as a cell that holds zero.
+
+    The gate channel states the difference.[^1]
+
+    References
+    ----------
+    [^1]: ADR-0195, the observation of a faction is a fixed-width scale-free
+        table, decision D8.
+        ``docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md``
+    """
+    world = a_seeded_world()
+    schema = world.observation_schema()
+    gate = schema["spatial_gate"]
+    row = ring_row(world)
+    assert gate in row["channels"], (
+        f"the schema gates the spatial part with {gate!r} and the ring stack "
+        f"names {list(row['channels'])}"
+    )
+    values = world.faction_observation(WATCHER)
+    cells = sum(schema["ring_cells"])
+    column = values[channel_column(row, gate, cells, schema["channel_order"])]
+    assert column.max() > 0, "a cell of the world holds a value"
+    assert column.min() == 0, (
+        "the frame reaches past the edge of this world, so a cell of it lies "
+        "outside the world and holds nothing"
+    )
+
+
+def test_the_channel_order_the_schema_states_is_the_order_the_engine_wrote() -> None:
+    """Read a channel the engine never fills, and find zero at every cell.
+
+    The ring stack holds three channels that no source in the engine fills.
+    Each one reads zero in every cell of every world. A reader that took the
+    wrong axis for the fastest one gathers a different set of positions, and
+    those positions hold the quantities of the cells instead. The wrong order
+    therefore fails here and looks plausible everywhere else.
+    """
+    world = a_seeded_world()
+    schema = world.observation_schema()
+    row = ring_row(world)
+    values = world.faction_observation(WATCHER)
+    cells = sum(schema["ring_cells"])
+    order = schema["channel_order"]
+    empty = ("memory_age", "own_strength", "rival_strength")
+    for channel in empty:
+        column = values[channel_column(row, channel, cells, order)]
+        assert not column.any(), (
+            f"the engine fills no source for {channel!r}, so every cell of it "
+            f"reads zero under the order {order!r}"
+        )
+    gate = values[channel_column(row, schema["spatial_gate"], cells, order)]
+    assert gate.any(), "the gate channel is not one of the empty ones"
+
+
+def schema_binding_body() -> str:
+    """Return the body of the function that publishes the observation schema."""
+    text = BINDING.read_text()
+    opening = "fn observation_schema<'py>"
+    start = text.index(opening)
+    end = text.index("\n    }\n", start)
+    return text[start:end]
+
+
+def test_the_published_schema_states_no_number_of_its_own() -> None:
+    """The binding translates the layout. It does not restate it.
+
+    A hand-written channel count or cell count in the binding is a second
+    declaration of a number the engine owns, and nothing would fail when the
+    two disagreed.[^1] The binding therefore holds no digit at all: every
+    number it publishes comes from the schema the engine built.
+
+    References
+    ----------
+    [^1]: Recurring Defect Shapes, shape 1.
+        ``.agents/rules/recurring-defects.md``
+    """
+    body = schema_binding_body()
+    digits = sorted({character for character in body if character.isdigit()})
+    assert digits == [], (
+        f"the binding of the observation schema states the digits {digits}. "
+        f"Read the number from the schema instead."
+    )
+
+
+def test_the_channel_names_come_from_the_engine_and_not_from_the_binding() -> None:
+    """No channel name of the schema appears in the binding.
+
+    The engine names its channels, and the binding carries the list across the
+    boundary. A name written into the binding would be a second declaration of
+    the list.
+    """
+    body = schema_binding_body()
+    world = a_seeded_world()
+    for row in world.observation_schema()["fields"]:
+        for channel in row["channels"]:
+            assert channel not in body, (
+                f"the binding names the channel {channel!r}, which the engine "
+                f"already names"
+            )
 
 
 def test_the_schema_covers_the_array_exactly() -> None:
@@ -154,7 +357,8 @@ def test_the_width_is_one_number_for_every_world_shape() -> None:
     """
     declared = a_seeded_world().observation_schema()
     tile_counts = set()
-    for width, height, factions in ((24, 24, 2), (48, 48, 5), (96, 96, 7), (128, 64, 12)):
+    shapes = ((24, 24, 2), (48, 48, 5), (96, 96, 7), (128, 64, 12))
+    for width, height, factions in shapes:
         world = a_seeded_world(width, height, factions)
         tile_counts.add(width * height)
         schema = world.observation_schema()

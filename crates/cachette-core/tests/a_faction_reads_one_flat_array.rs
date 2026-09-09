@@ -29,6 +29,9 @@
 //! [^3]: Findings register, FND-670. `docs/FINDINGS.md`
 
 use cachette_core::faction_observation::{observation_schema, ObsField, OBSERVATION_VERSION};
+use cachette_core::obs_ring::{ring_cell_counts, RING_STACK_CELLS, RING_STACK_CHANNELS};
+use cachette_core::obs_ring_stack::RING_STACK_CHANNEL_NAMES;
+use cachette_core::obs_token::TokenSet;
 use cachette_core::{Axial, Entity, FactionId, SightRules, World, WorldConfig};
 
 /// A world wide enough to hold ground that one faction never reaches.
@@ -288,6 +291,86 @@ fn every_position_lies_inside_its_declared_bounds() {
 /// The three spatial blocks are built, so none of them is reserved. The test
 /// derives that relationship from the schema rather than naming a count, so
 /// a later revision that claims another reserve does not make it false.
+/// The schema publishes one field for each token set, of the width the set
+/// states.
+///
+/// **A set the field list forgets leaves the schema with no gap.** The fields
+/// that follow move down, the array shrinks, and every check of coverage
+/// still passes. The set list is the one declaration of the four sets, so
+/// this test walks it and asks the schema for each one.
+#[test]
+fn the_schema_publishes_one_field_for_each_token_set() {
+    let schema = observation_schema();
+    for set in TokenSet::ALL {
+        let row = schema
+            .row(set.name())
+            .unwrap_or_else(|| panic!("the schema publishes the token set {}", set.name()));
+        assert_eq!(
+            row.positions,
+            set.slots(),
+            "the field {} holds the positions the set states",
+            set.name()
+        );
+        assert_eq!(
+            row.channels().len() as u32,
+            set.channels(),
+            "the field {} names one channel for each channel of a token",
+            set.name()
+        );
+        assert_eq!(
+            row.space(),
+            Some("token"),
+            "the field {} lays its positions out as tokens",
+            set.name()
+        );
+    }
+    let published = schema
+        .rows()
+        .iter()
+        .filter(|row| row.space() == Some("token"))
+        .count();
+    assert_eq!(
+        published,
+        TokenSet::ALL.len(),
+        "the schema publishes no token field the set list does not name"
+    );
+}
+
+/// The published ring geometry accounts for every position of the block.
+#[test]
+fn the_published_ring_geometry_fills_the_ring_stack() {
+    let schema = observation_schema();
+    let row = schema
+        .row("ring_stack")
+        .expect("the schema publishes the ring stack");
+    let counts = schema.ring_cells();
+    assert_eq!(
+        counts.iter().sum::<u32>(),
+        RING_STACK_CELLS,
+        "the published ring cell counts sum to the cells of the frame"
+    );
+    assert_eq!(
+        row.channels().len() as u32,
+        RING_STACK_CHANNELS,
+        "the field names one channel for each channel of a cell"
+    );
+    assert_eq!(
+        counts.iter().sum::<u32>() * row.channels().len() as u32,
+        row.positions,
+        "the cells and the channels fill the block"
+    );
+    assert_eq!(
+        counts.as_ref(),
+        ring_cell_counts(),
+        "the schema publishes the cell counts the frame derives"
+    );
+    assert!(
+        row.channels().contains(&schema.spatial_gate()),
+        "the gate the schema names is a channel of the ring stack"
+    );
+    assert_eq!(RING_STACK_CHANNEL_NAMES.len() as u32, RING_STACK_CHANNELS);
+}
+
 #[test]
 fn a_reserved_field_reads_zero() {
     let mut world = a_still_world();
@@ -299,7 +382,10 @@ fn a_reserved_field_reads_zero() {
     let spatial = [
         ObsField::RingStack,
         ObsField::FrontierBySector,
-        ObsField::EntityTokens,
+        ObsField::TokenOwnSettlements,
+        ObsField::TokenRivals,
+        ObsField::TokenThreatClusters,
+        ObsField::TokenCandidateSites,
     ];
     for field in spatial {
         assert!(

@@ -30,18 +30,21 @@ an absent position as a hatch and a zero position as the light end of the
 ramp.
 
 The tool learns which positions are absent from three places. A position that
-no field covers is absent. A signal that names a gate is absent where the gate
-reads zero. A caller may name the gate on the command line, for a schema that
-does not state one yet.
+no field covers is absent. A cell is absent where the gate reads zero. A caller
+may name the gate on the command line, for a schema that does not state one.
+
+A gate is a field of one value for each cell, or a channel of a spatial field.
+The engine gates the ring stack with a channel of the stack, so the tool reads
+a gate name among the fields and then among the channels.
 
 # What the constants of this module are, and what they are not
 
 Every drawing size here is a drawing size. The layout constants of the
 observation are not here, and this module reads all of them from the schema.
 
-``LATTICE_PREFIX`` is the prefix the published lattice fields carry today. The
-tool applies it only when the schema marks no field with a space, so that the
-tool draws the current observation as well as the one that replaces it.
+``LATTICE_PREFIX`` is the prefix a lattice field carries. The tool applies it
+only when the schema marks no field with a space, so a schema that marks its
+spatial fields never reaches it.
 
 ``RING_ZERO_CELLS`` and ``RING_ONE_CELLS`` are the cell counts of the two
 innermost rings. The design fixes both from the geometry of a hex ring and not
@@ -53,15 +56,14 @@ The one-hue ramp draws a quantity that never goes below zero. The two-hue ramp
 draws a quantity that does. The middle stop of the two-hue ramp is the light
 end of the one-hue ramp, so a zero reads the same way in both.
 
-# Two spatial shapes, because the engine is between two layouts
+# Two spatial shapes, because a schema may state either
 
-The published layout today holds a square lattice of summary cells, and each
-lattice signal holds one value for each cell. The new design holds an
-egocentric ring stack: rings at geometric hex distance from the centroid of
-the faction, sectors inside each ring, and one value for each cell of each
-channel.[^3] The tool draws a lattice signal as a square grid and a ring
-signal as a polar plot. It selects between them from the schema, and it falls
-back to the lattice for a signal whose name carries the lattice prefix.
+The engine publishes an egocentric ring stack: rings at geometric hex distance
+from the centroid of the faction, sectors inside each ring, and one value for
+each channel of each cell.[^3] A square lattice of summary cells is the other
+shape, and a schema that marks no field at all falls back to it through the
+name prefix. The tool draws a lattice signal as a square grid and a ring
+signal as a polar plot, and it selects between them from the schema.
 
 The polar plot draws each ring as a band of equal width. The hex distance
 bands of the design are geometric, so a plot with proportional bands would
@@ -483,13 +485,21 @@ def _spatial_split(
 def _gate_name(
     catalogue: SignalCatalogue, spatial: Sequence[Signal], chosen: str | None
 ) -> str | None:
-    """Name the signal that says which spatial cells carry a value.
+    """Name the field or the channel that says which cells carry a value.
 
     The caller wins, then the schema entry that names one gate for the whole
     spatial part, then a gate named on a spatial field itself.
+
+    A gate is a field of one value for each cell, or a channel of a spatial
+    field. The engine gates the ring stack with a channel of the stack, so a
+    name that no field carries is looked for among the channels.
     """
     if chosen is not None:
-        return catalogue.signal(chosen).name
+        if chosen in catalogue:
+            return catalogue.signal(chosen).name
+        if any(chosen in signal.channels for signal in spatial):
+            return chosen
+        raise KeyError(_unknown_gate(catalogue, spatial, chosen))
     declared = catalogue.geometry.get("spatial_gate")
     if declared is not None:
         return str(declared)
@@ -501,6 +511,46 @@ def _gate_name(
         )
         raise ValueError(message)
     return named.pop() if named else None
+
+
+def _unknown_gate(
+    catalogue: SignalCatalogue, spatial: Sequence[Signal], chosen: str
+) -> str:
+    """Say that a name gates nothing, and name what does."""
+    channels = sorted({channel for signal in spatial for channel in signal.channels})
+    return (
+        f"{chosen!r} names no field and no spatial channel of this world. The "
+        f"layout holds the channels {channels}."
+    )
+
+
+def _gate_cells(
+    catalogue: SignalCatalogue,
+    spatial: Sequence[Signal],
+    values: npt.NDArray[np.float64],
+    cells: int,
+    gate_name: str,
+    order: str | None,
+) -> npt.NDArray[np.bool_]:
+    """Read the value of the gate at every spatial cell.
+
+    A gate that is a field of its own holds one position for each cell. A gate
+    that is a channel of a spatial field sits inside that field, and the
+    channel order of the schema says where.
+    """
+    if gate_name in catalogue:
+        window = catalogue.signal(gate_name)
+        return values[window.start : window.start + cells] > 0.0
+    for signal in spatial:
+        if gate_name not in signal.channels:
+            continue
+        positions = np.arange(
+            signal.start, signal.start + signal.positions, dtype=np.int64
+        )
+        for channel, slot in _channel_windows(signal, cells, order):
+            if channel == gate_name:
+                return values[positions[slot]] > 0.0
+    raise KeyError(_unknown_gate(catalogue, spatial, gate_name))
 
 
 def read_page(
@@ -536,10 +586,17 @@ def read_page(
         )
 
     gate_name = _gate_name(catalogue, spatial, gate)
+    order = catalogue.geometry.get("channel_order")
     present_cells: npt.NDArray[np.bool_] | None = None
     if gate_name is not None and geometry is not None:
-        window = catalogue.signal(gate_name)
-        present_cells = values[window.start : window.start + geometry.cells] > 0.0
+        present_cells = _gate_cells(
+            catalogue,
+            spatial,
+            values,
+            geometry.cells,
+            gate_name,
+            None if order is None else str(order),
+        )
         notes.append(
             f"{gate_name!r} gates the spatial cells. A cell it reads as zero "
             f"draws as absent and not as zero."
@@ -780,8 +837,7 @@ def _draw_ring_panel(panel: Panel, stack: RingStack, x: float, y: float) -> list
         else:
             path = _wedge(cx, cy, inner, outer, start, start + width)
             shape = (
-                f'<path d="{path}" fill="{fill}" stroke="{PAPER}" '
-                f'stroke-width="0.7"/>'
+                f'<path d="{path}" fill="{fill}" stroke="{PAPER}" stroke-width="0.7"/>'
             )
         parts.append(shape)
     outermost = stack.sectors(stack.rings - 1)

@@ -319,7 +319,14 @@ impl PyWorld {
     /// arithmetic over this schema cannot disagree with the array. No file
     /// outside the engine may state a position, a length or a bound.[^1]
     ///
-    /// The dictionary holds three keys.
+    /// **The schema states the structure of the array and not only the
+    /// position of each field.** A start and a width do not say how many
+    /// cells a block holds, how many channels a cell holds, or which of the
+    /// two axes runs first. A reader that guessed would read a plausible
+    /// observation that does not exist, so the engine states every one of
+    /// them.[^6]
+    ///
+    /// The dictionary holds six keys.
     ///
     /// - `version`, an integer. The version of the layout. A field added,
     ///   removed, relengthened or rebounded changes the meaning of a stored
@@ -327,10 +334,20 @@ impl PyWorld {
     ///   must stop.[^2]
     /// - `length`, an integer. How many positions the whole array holds. It
     ///   is the length `faction_observation` returns.
+    /// - `ring_cells`, a list of integers. The cells of each ring of the
+    ///   egocentric frame, in ring order. A cell index says nothing about its
+    ///   ring and its sector on its own.
+    /// - `channel_order`, a string. `cell_major` when every channel of one
+    ///   place is adjacent, and `channel_major` when every place of one
+    ///   channel is adjacent.
+    /// - `spatial_gate`, a string. The channel that says whether a cell holds
+    ///   a value at all. A cell of the frame outside the world reads zero in
+    ///   every channel, and that zero is an absent value and not a quantity
+    ///   of zero.[^6]
     /// - `fields`, a list of `dict`. One entry for each field, in the order
     ///   the array holds them.
     ///
-    /// Each field entry holds six keys.
+    /// Each field entry holds eight keys.
     ///
     /// - `name`, a string. The name of the field.
     /// - `start`, an integer. The position the field starts at.
@@ -339,16 +356,21 @@ impl PyWorld {
     /// - `dtype`, a string. The NumPy element type of every position.
     /// - `low` and `high`, integers. The lowest and the highest value any
     ///   position of the field may hold.
+    /// - `space`, a string or `None`. `ring` when the positions of the field
+    ///   are cells of the egocentric frame, and `token` when they are tokens
+    ///   of one set. A field of separate quantities holds `None`.
+    /// - `channels`, a list of strings. The channels of one place of the
+    ///   field, in the order the field stores them. A field that holds one
+    ///   quantity for each position holds an empty list.
+    ///
+    /// **The engine publishes one token field for each token set.** The four
+    /// sets hold different channel counts, so one field cannot state four
+    /// shapes.[^7]
     ///
     /// A field whose bounds are the whole range of the element type has no
     /// tighter bound that the world parameters give. The engine states no
     /// measured figure, because a blocker governs every measured figure of
     /// this project.[^3]
-    ///
-    /// A field whose name starts with `cell_` holds one position for each
-    /// cell of the block lattice, in ascending cell order. That is the same
-    /// lattice the fog layer and the summary level divide the world over, and
-    /// it carries no margin.[^4] [^5]
     ///
     /// # Errors
     ///
@@ -359,8 +381,8 @@ impl PyWorld {
     /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D1. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
     /// [^2]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
     /// [^3]: Blockers register, BLK-007. `docs/BLOCKERS.md`
-    /// [^4]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-    /// [^5]: Findings register, FND-569. `docs/FINDINGS.md`
+    /// [^6]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D8. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+    /// [^7]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D4. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
     fn observation_schema<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let schema = observation_schema();
         let fields = PyList::empty(python);
@@ -372,11 +394,16 @@ impl PyWorld {
             entry.set_item("dtype", row.kind().numpy_name())?;
             entry.set_item("low", row.low)?;
             entry.set_item("high", row.high)?;
+            entry.set_item("space", row.space())?;
+            entry.set_item("channels", PyList::new(python, row.channels())?)?;
             fields.append(entry)?;
         }
         let out = PyDict::new(python);
         out.set_item("version", schema.version())?;
         out.set_item("length", schema.length())?;
+        out.set_item("ring_cells", PyList::new(python, schema.ring_cells())?)?;
+        out.set_item("channel_order", schema.channel_order())?;
+        out.set_item("spatial_gate", schema.spatial_gate())?;
         out.set_item("fields", fields)?;
         Ok(out)
     }

@@ -35,49 +35,12 @@ from cachette.learn.picture import (
 )
 from cachette.learn.signals import Signal, SignalCatalogue
 
-
-# The gate argument names a spatial channel, and the schema carries no spatial
-# part for the tool to gate.
-#
-# The observation now publishes its spatial signals as three blocks:
-# ``ring_stack``, ``frontier_by_sector`` and ``entity_tokens``. The lattice
-# fields these tests gated on, which were named ``cell_*``, are gone. The
-# drawing tool cannot read the new blocks, because the schema the binding
-# publishes does not carry what the tool needs to draw them.
-#
-# The schema must carry four things before these tests can run again:
-#
-# 1. ``space``, of ``"ring"`` or ``"grid"``, on each spatial row. The tool
-#    finds no spatial signal without it, and it falls back to the ``cell_``
-#    name prefix that no field carries now.
-# 2. ``ring_cells``, the cell count of each ring in ring order, at the top
-#    level of the schema, or ``rings`` and ``sectors`` to derive it. A cell
-#    index says nothing about its ring and its sector without one of the two.
-# 3. ``gate``, on each spatial row or as ``spatial_gate`` at the top level,
-#    naming the channel that says whether a cell holds a value at all. This
-#    is the entry that keeps an absent cell from drawing as a zero.
-# 4. One row for each channel of the ring stack, or a channel naming rule the
-#    tool can split the block on. One row of 3775 positions cannot become one
-#    panel for each channel.
-#
-# The engine names the ring stack channels already, so the material for the
-# fourth exists and the schema does not carry it to Python.
-# Five tests need the spatial part. Three of them name a gate. The other two
-# need a panel to exist at all: the coverage test drops the last panel and
-# expects the drawing to miss a position, and the lattice test reads the
-# ``cell_*`` rows straight out of the schema. A page of scalar blocks alone
-# holds no panel, so dropping the last one forgets nothing.
-#
-# The scalar coverage path still holds. The page covers all 4819 positions of
-# the merged layout, including the five memory fields, through its blocks.
-NEEDS_A_SPATIAL_SCHEMA = pytest.mark.skip(
-    reason=(
-        "the drawing tool cannot gate the new spatial blocks. The schema must "
-        "carry space on each spatial row, ring_cells or rings and sectors for "
-        "the ring geometry, gate or spatial_gate for the absence rule, and one "
-        "row for each ring stack channel. See the note above this marker."
-    )
-)
+# The engine states the spatial part of the layout in its own schema. The
+# schema marks the ring stack with a space, names its channels, states the
+# cells of each ring, states which axis runs first, and names the channel that
+# gates a cell. The tests below therefore drive the engine and state none of
+# those.
+GATE = "area_inside_world"
 
 
 def a_world(width: int = 24, height: int = 24, factions: int = 3) -> World:
@@ -90,6 +53,21 @@ def a_page(world: World, faction: int = 0, gate: str | None = None) -> Page:
     catalogue = SignalCatalogue.of_world(world)
     observation = np.asarray(world.faction_observation(faction))
     return read_page(catalogue, observation, "a caption", gate)
+
+
+def an_ungated_page(world: World, faction: int = 0) -> Page:
+    """Draw one page from a schema that names no gate.
+
+    The engine names the gate, so this drops that one entry and keeps every
+    other. The two pages then differ in the gate alone.
+    """
+    catalogue = SignalCatalogue.of_world(world)
+    geometry = {
+        key: value for key, value in catalogue.geometry.items() if key != "spatial_gate"
+    }
+    bare = SignalCatalogue(list(catalogue), catalogue.observation_length, geometry)
+    observation = np.asarray(world.faction_observation(faction))
+    return read_page(bare, observation, "a caption")
 
 
 def test_the_page_draws_every_position_the_schema_declares() -> None:
@@ -112,7 +90,6 @@ def test_the_page_draws_every_position_of_every_declared_field() -> None:
         assert undrawn == [], f"{row['name']} is not in the picture"
 
 
-@NEEDS_A_SPATIAL_SCHEMA
 def test_a_field_the_page_forgets_fails_the_coverage_check() -> None:
     """Prove that the coverage check can fail.
 
@@ -133,31 +110,55 @@ def test_a_field_the_page_forgets_fails_the_coverage_check() -> None:
     assert not bool(forgetful.drawn().all())
 
 
-@NEEDS_A_SPATIAL_SCHEMA
 def test_the_page_draws_the_lattice_as_a_grid_when_no_field_states_a_space() -> None:
-    world = a_world(width=48, height=48)
-    page = a_page(world)
-    assert isinstance(page.geometry, Lattice)
-    lattice = [
-        row for row in world.observation_schema()["fields"] if "cell_" in row["name"]
+    """A schema that marks no space still draws, through the name prefix.
+
+    The engine marks its spatial field today, so this states a schema of its
+    own. The names are a fixture of this test and not fields of the engine,
+    because the rule under test is the fallback and not the layout.
+    """
+    names = ("cell_seen_ever", "cell_units", "held_tiles")
+    signals = [
+        Signal(name, index * 4, 4 if name.startswith("cell_") else 1)
+        for index, name in enumerate(names)
     ]
-    assert page.geometry.cells == int(lattice[0]["positions"])
-    assert len(page.panels) == len(lattice)
+    catalogue = SignalCatalogue(signals, 9)
+    page = read_page(catalogue, np.arange(9, dtype=np.int64), "a caption")
+    assert isinstance(page.geometry, Lattice)
+    assert page.geometry.cells == 4
+    assert len(page.panels) == 2
+    assert any("marks no field as spatial" in note for note in page.notes)
 
 
-@NEEDS_A_SPATIAL_SCHEMA
 def test_a_gate_of_zero_reads_as_absent_and_not_as_zero() -> None:
     """The tool must not shade an empty cell the way it shades a zero.
 
-    The picture of a 48 by 48 world holds a lattice cell that carries no
-    tiles at all. That cell holds no value, and a reader who sees the zero
-    shade there reads a fact the engine never published.
+    The ring frame reaches far past the edge of any world this test builds, so
+    the outer cells lie outside the world and hold no value. A reader who sees
+    the zero shade there reads a fact the engine never published.
     """
     world = a_world(width=48, height=48)
-    gated = a_page(world, gate="cell_seen_ever")
-    ungated = a_page(world)
+    gated = a_page(world)
+    ungated = an_ungated_page(world)
+    assert ungated.panels
     assert all(bool(panel.present.all()) for panel in ungated.panels)
     assert any(not bool(panel.present.all()) for panel in gated.panels)
+
+
+def test_the_schema_names_the_gate_the_caller_would_have_to_name() -> None:
+    """The engine states the gate, so a caller states nothing."""
+    world = a_world()
+    assert world.observation_schema()["spatial_gate"] == GATE
+    stated = a_page(world, gate=GATE)
+    declared = a_page(world)
+    for first, second in zip(stated.panels, declared.panels, strict=True):
+        assert np.array_equal(first.present, second.present)
+
+
+def test_a_gate_name_the_layout_does_not_hold_names_the_channels() -> None:
+    world = a_world()
+    with pytest.raises(KeyError, match="names no field and no spatial channel"):
+        a_page(world, gate="the_channel_of_a_typo")
 
 
 def test_a_position_no_field_covers_draws_as_absent() -> None:
@@ -268,16 +269,14 @@ def test_the_picture_name_holds_the_world_the_faction_and_the_tick() -> None:
     )
 
 
-@NEEDS_A_SPATIAL_SCHEMA
 def test_the_rendered_picture_is_one_element_tree() -> None:
     world = a_world()
-    picture = render(a_page(world, gate="cell_seen_ever"))
+    picture = render(a_page(world))
     assert picture.startswith("<svg")
     assert picture.endswith("</svg>")
     assert "url(#absent)" in picture
 
 
-@NEEDS_A_SPATIAL_SCHEMA
 def test_a_run_writes_one_picture_for_each_decision(tmp_path: Path) -> None:
     written = sequence(
         directory=tmp_path,
@@ -288,7 +287,7 @@ def test_a_run_writes_one_picture_for_each_decision(tmp_path: Path) -> None:
         faction=0,
         ticks=6,
         decision_interval=3,
-        gate="cell_seen_ever",
+        gate=GATE,
     )
     names = [path.name for path in written]
     assert "obs-24x24-f2-seed3-faction0-tick000000.svg" in names
