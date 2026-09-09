@@ -22,10 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-703**
-**Next number: FND-703**
-**Next number: FND-695**
-**Next number: FND-696**
+**Next number: FND-704**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18699,3 +18696,49 @@ The derived figures were already right. The count of finished generations, the
 spend for each generation and the estimate of the time left read the same
 before and after on the real log, because a substring test had kept the
 heartbeats out of them. That test is now the explicit marker.
+
+### FND-703 — A win path that measures its own progress against the wrong denominator passes every gate this project has
+
+**Believed.** The two determinism tests protect the engine, and a reader that
+publishes a faction's progress toward a win is covered by them. A reading
+derived from state is deterministic, so a defect in it would show.
+
+**True.** Neither test can see this class of defect, and one of them says so
+in the rule that governs it: a determinism test proves that a run repeats and
+says nothing about whether the run was right.[^F703A] A reading that is
+consistently wrong is bit-identical on every thread count, on every run and on
+every machine, so the thread-count test compares two runs and finds them the
+same, because they are. The golden state hash notices only that a value
+changed, and this value never changed.
+
+The instance: the published domination progress divides the seats a faction
+holds by the count of **seated** factions, where the win requires the seats of
+the **live** factions. The denominator never shrinks and the requirement does,
+so the reading tops out below one at the moment the win fires. A policy trained
+against it reads a signal that cannot reach its own target.
+
+**This is also one fact declared twice.** The win condition states the rule,
+and the progress reading states it again. The copies disagree, and nothing
+fails when they do.[^F487B]
+
+**Evidence.** Across 252 rated games with every seat rotated, only the
+built-in controller ever won by domination, taking 21 of the 22 domination
+wins in the whole run. No trained policy took a seat. An audit of the
+observation then traced the denominator to its write site and found the
+mismatch by reading, not by any failing check.
+
+**Follows.** A progress reading needs a test that the reading reaches its
+winning value on the tick its win fires, for each way to win. That is a
+property test over the pair of declarations, and it is the only thing that
+fails when the two part. A product record now states the requirement as a
+property of the game rather than of a trainer.[^F703B]
+
+**The shape generalises past this reader.** Any published quantity that
+restates a rule the engine already holds can drift from it silently. The
+question to ask of such a field is not whether it is deterministic, but what
+fails when it disagrees with the rule it mirrors.
+
+## References
+
+[^F703A]: Testing rules, a determinism test cannot tell correct from consistently wrong, section 2. `.agents/rules/testing.md`
+[^F703B]: PRD-0057, more than one way to win decides a game. `docs/product/shaped/prd-0057-more-than-one-way-to-win-decides-a-game.md`
