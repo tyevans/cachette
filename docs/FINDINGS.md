@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-685**
+**Next number: FND-686**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -17565,6 +17565,51 @@ not do. A method that follows a discounted gradient would use the difference
 form correctly, so the choice of shaping form is bound to the choice of
 optimiser and cannot be made once.[^F676B]
 
+### FND-685 — Normalising the centre was believed to be free, and it changes the policy of every kind but one
+
+**Believed.** A policy chooses by the highest score, and that choice does not
+change when every weight is multiplied by one positive number. The search used
+that freedom to hold the centre at unit length, so a perturbation of a fixed
+size was always the same fraction of the centre.
+
+**True.** The claim holds for the linear policy and fails for the structured
+one. A linear policy is one matrix, so a scaling scales every action score by
+one factor and the highest row stays the highest row. A structured policy ends
+every tower in a ``tanh`` and holds bias arrays. A scaling puts each saturating
+layer at another place on its curve, and a bias meets a constant feature of
+value one, so it scales while what it is added to does not. The scores are then
+not the old scores times one positive number, and the chosen action moves.
+
+**Evidence.** A structured centre of 3131 weights over the layout of a 24 by 24
+world at three factions, measured over 60 decisions drawn across twelve orders
+of magnitude in both signs.[^F685A] Scaling the centre by a half moved 10 of
+the 60 choices, by two moved 16, and by ten moved 25. Scaling the centre to
+unit length, which is what the search did at the start of every generation,
+moved 17 of the 60.
+
+The second cost is the perturbation. The centre of that policy had a length of
+8.334, and the search normalised it to one. A candidate then moved by the
+configured sigma of 1.5 against a centre the run had shrunk, which is 0.180 of
+the length the centre stood at. The run asked for a perturbation of 1.5 of the
+centre and took one of 0.180.
+
+**What follows.** Each policy kind now declares whether a positive scaling of
+its weight vector leaves every choice where it was, and the search normalises
+only the centre of a kind that declares it. The linear trajectory is unchanged,
+which matters because every stored score compares against it.
+
+The search takes the perturbation and the step of an unnormalised centre as
+fractions of the length of that centre, so sigma and the learning rate keep the
+dimensionless meaning they had. The length of such a centre then grows over a
+run, by about the square root of one plus the learning rate squared at each
+generation. That growth is a trainable quantity and not a defect, and the
+search states no bound on it. A run of thousands of generations would need one.
+
+This is the defect shape the project names first: one rule declared in two
+places.[^F685B] The claim about scaling was stated in the search, and the
+arithmetic that had to satisfy it lived in each policy. Nothing failed when the
+two disagreed, because a normalised centre still plays and still scores.
+
 ### FND-677 — Twenty-nine percent of the observation carries nothing or a copy of another position
 
 **Believed.** The observation publishes thirty fields, and a field the schema
@@ -17835,6 +17880,8 @@ instance in the same apparatus.[^F683B] [^F487B]
 [^F676A]: The commit `Record that a difference reward telescopes, and what the array does not carry`. Read its message for the measurement.
 [^F676B]: Report 42, what a policy should be able to see, section 10.4. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
 [^F677A]: The commit `Merge the tool that draws what a policy sees`. Read its message for the figures.
+[^F685A]: The structured scaling tests of the search. `tests/test_learner_search.py`
+[^F685B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F679A]: Findings register, FND-676. `docs/FINDINGS.md`
 [^F679B]: The commit `Record that the outcome weights prefer a draw to an attempt at a win`. Read its message for the weights and the arithmetic.
 [^F668A]: The commit `Measure what sets how well one generation points the right way`. Read its message for the figures.

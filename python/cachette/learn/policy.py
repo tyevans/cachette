@@ -315,6 +315,16 @@ class Policy(Protocol):
 class LinearPolicy:
     """One weight matrix over the features, and one score for each action."""
 
+    # **A positive scaling of the weights leaves every choice where it was.**
+    # One matrix scores every action row as a weighted sum over one feature
+    # vector, so scaling the matrix scales every score by one factor. The row
+    # that scores highest stays the row that scores highest. The bias is a
+    # trailing feature of value one, and its weight scales with every other
+    # weight, so it carries no exception.
+    #
+    # The search reads this and holds the centre of this kind at unit length.
+    CHOICE_SURVIVES_SCALING = True
+
     def __init__(self, weights: np.ndarray) -> None:
         """Take the weight matrix. Its shape is (actions, features)."""
         self.weights = np.asarray(weights, dtype=np.float64)

@@ -19,12 +19,22 @@ resumed run therefore draws the perturbations the run it continues drew. A
 worker process draws them from the same two numbers, so a sharded generation
 builds the candidates a single process would build.[^1]
 
-# The centre keeps unit length
+# A perturbation stays the same fraction of the centre
 
-A policy chooses by the highest score, and that choice does not change when
-every weight is multiplied by one positive number. The search uses that
-freedom to hold the centre at unit length, so a perturbation of a fixed size
-is always the same fraction of the centre.
+A perturbation of a fixed length means one thing against a short centre and
+another against a long one. The search holds the fraction rather than the
+length, so the population of a generation keeps its spread however far the
+centre has travelled.
+
+**Only one kind of policy reaches that fraction by normalising the centre.** A
+policy kind declares whether a positive scaling of its weight vector leaves
+every choice where it was. A linear policy declares that it does, because one
+matrix scales every action score by one factor. The search then holds its
+centre at unit length, and sigma is the fraction. A structured policy declares
+that it does not, because a ``tanh`` layer moves along its curve under a
+scaling and a bias term does not scale with the weights beside it. The search
+then leaves that centre where it is, and it takes the fraction from the length
+of the centre.
 
 # A generation of equal scores moves nothing
 
@@ -108,29 +118,69 @@ class Optimiser(Protocol):
 def unit(vector: np.ndarray) -> np.ndarray:
     """Return the vector scaled to unit length, or the vector when it is zero.
 
-    **A policy chooses by the highest score, and that choice does not change
-    when every weight is multiplied by one positive number.** A linear policy
-    scores an action row as a weighted sum, and a network policy scores it
-    from a fixed projection and a second layer. Scaling the trainable weights
-    scales every score by the same factor, so the row that scores highest
-    stays the row that scores highest.
+    A zero vector has no direction to keep, so it comes back as it went in.
+    The untrained linear centre is such a vector, and the perturbations of the
+    first generation supply the first direction.
 
-    The search uses that freedom. It holds the centre at unit length, so a
-    perturbation of a fixed size is always the same fraction of the centre.
-    Without it the norm of the centre grows, the same perturbation becomes a
-    smaller and smaller turn, and every candidate of a generation ends up
-    choosing the same actions. The population then has no spread, the ranking
-    has nothing to rank, and the update becomes a walk driven by noise.
-
-    That failure is silent. The run keeps printing generations, and the best
-    score equals the mean because every candidate is the same policy.
+    **This function states no claim about a policy.** It scales a vector. The
+    search decides which vector it may scale, and it decides that from what
+    each policy kind declares about a scaling of its weights.
     """
     length = float(np.linalg.norm(vector))
     if length == 0.0:
-        # The first generation starts from zero. A zero centre has no
-        # direction to preserve, and the perturbations supply the first one.
         return vector
     return vector / length
+
+
+def choice_survives_scaling(policy: Trainable) -> bool:
+    """Say whether the policy chooses the same action after a positive scaling.
+
+    **Each policy kind declares this, and the search never derives it.** A
+    kind that declares true promises that multiplying its whole weight vector
+    by one positive number leaves every choice where it was. The search then
+    holds the centre of that kind at unit length.
+
+    A search that read the arithmetic of each kind instead would give a new
+    kind an answer nobody checked for it. That failure is silent, because a
+    normalised centre still plays and still scores.
+    """
+    return bool(policy.CHOICE_SURVIVES_SCALING)
+
+
+def centre_scale(vector: np.ndarray) -> float:
+    """Return the length of the centre, or one when the centre is zero.
+
+    A perturbation and a step are both fractions of this number. A zero centre
+    states no length of its own, so the search falls back to one. Sigma then
+    means for a zero centre what it means for a centre of unit length.
+    """
+    length = float(np.linalg.norm(vector))
+    return length if length > 0.0 else 1.0
+
+
+def perturbation_scale(policy: Trainable, centre: np.ndarray, sigma: float) -> float:
+    """Return the length of one perturbation of this centre.
+
+    **Sigma is a fraction of the centre and never a length.** A perturbation
+    that is too small for the centre it moves gives every candidate of a
+    generation the same choices. The population then has no spread, the
+    ranking has nothing to rank, and the update becomes a walk driven by
+    noise. That failure is silent: the run keeps printing generations, and the
+    best score equals the mean because every candidate is the same policy.
+
+    A kind whose choice survives a scaling holds its centre at unit length, so
+    sigma is already the fraction. A kind whose choice does not survive a
+    scaling keeps its centre where it is, so the fraction comes from the
+    length of the centre.
+
+    **The trainer and every worker process call this with the same two
+    arguments**, so a sharded generation builds the candidates a single
+    process would build. The shell states the kind and the centre states the
+    length, and neither reads a number this module holds.
+    """
+    if choice_survives_scaling(policy):
+        return sigma
+    return sigma * centre_scale(centre)
 
 
 def generation_noise(seed: int, generation: int, pairs: int, size: int) -> np.ndarray:
@@ -171,9 +221,14 @@ def pair_candidates(
     **A worker process calls this with the pairs of its own shard.** The
     noise it passes is the whole generation's noise, so the row of a pair is
     the row that pair has in every process.
+
+    Sigma is a fraction of the centre and never a length. The policy states
+    its kind and the centre states its length, so the perturbation of a kind
+    that keeps an unnormalised centre stays the same fraction of it.
     """
+    step = perturbation_scale(policy, centre, sigma)
     return [
-        policy.rebuild(centre + sign * sigma * noise[index])
+        policy.rebuild(centre + sign * step * noise[index])
         for index in range(first_pair, last_pair)
         for sign in (1.0, -1.0)
     ]
@@ -263,9 +318,33 @@ class EvolutionStrategy:
         """Give back the policy that one flat centre names."""
         return self.shell.rebuild(centre)
 
+    @property
+    def holds_unit_centre(self) -> bool:
+        """Say whether this search normalises the centre it holds.
+
+        It normalises only when the policy kind declares that a positive
+        scaling of the weight vector leaves every choice where it was.
+
+        **Normalising the centre of a kind that declares otherwise changes the
+        function the policy computes.** A ``tanh`` layer sits at another place
+        on its curve once its weights are scaled, and a bias term does not
+        scale with the weights beside it. The mapping is then not the old
+        mapping times one positive number, so the chosen action can change.
+        """
+        return choice_survives_scaling(self.shell)
+
     def start(self, centre: np.ndarray) -> np.ndarray:
-        """Scale one flat centre to the unit length the search holds it at."""
-        return unit(centre)
+        """Put one flat centre into the form the search holds it in.
+
+        The search scales the centre of a kind whose choice survives a
+        scaling to unit length. It gives back the centre of every other kind
+        as it stands, because scaling that one would change the policy.
+
+        The search never writes to a centre, so it never copies one.
+        """
+        if self.holds_unit_centre:
+            return unit(centre)
+        return centre
 
     def noise(self, centre: np.ndarray, generation: int) -> np.ndarray:
         """Draw the perturbations of one generation, one row for each pair."""
@@ -281,6 +360,36 @@ class EvolutionStrategy:
             0,
             self.pairs,
         )
+
+    def step(self, centre: np.ndarray, gradient: np.ndarray) -> np.ndarray:
+        """Move the centre one learning rate along the weighted sum.
+
+        The rank shaping already threw away the scale of the reward, so the
+        length of the weighted sum carries no information worth keeping. The
+        search therefore takes a step of a fixed size along the direction, and
+        the learning rate is the fraction of the centre that one generation
+        moves.
+
+        A kind whose choice survives a scaling holds its centre at unit
+        length. The learning rate is then already that fraction, and the
+        search normalises again after the step.
+
+        A kind whose choice does not survive a scaling takes the fraction from
+        the length of the centre, and the search never normalises it. **The
+        length of such a centre is a trainable quantity and not a free one.**
+
+        That length grows over a run. A step of many thousand dimensions sits
+        near a right angle to the centre, so one generation multiplies the
+        length by about the square root of one plus the learning rate squared.
+        A run of the length this project takes pays that as a slowly rising
+        saturation of the ``tanh`` layers, and a much longer run would pay it
+        as a policy that saturates. A search that ran for thousands of
+        generations needs a bound on the length, and this one states none.
+        """
+        direction = unit(gradient)
+        if self.holds_unit_centre:
+            return unit(centre + self.learning_rate * direction)
+        return centre + self.learning_rate * centre_scale(centre) * direction
 
     def update(self, centre: np.ndarray, generation: int, scores: np.ndarray) -> Update:
         """Rank the scores, step along the ranked sum, and report both.
@@ -308,12 +417,7 @@ class EvolutionStrategy:
         for index in range(self.pairs):
             weight = ranks[2 * index] - ranks[2 * index + 1]
             gradient += weight * noise[index]
-        # The rank shaping already threw away the scale of the reward, so the
-        # length of this sum carries no information worth keeping. The search
-        # therefore takes a step of a fixed size along the direction, and the
-        # learning rate is the fraction of the centre that one generation
-        # moves.
-        moved = unit(centre + self.learning_rate * unit(gradient))
+        moved = self.step(centre, gradient)
         return Update(
             centre=moved,
             spread=spread,
@@ -329,8 +433,11 @@ __all__ = [
     "Trainable",
     "Update",
     "carries_information",
+    "centre_scale",
+    "choice_survives_scaling",
     "generation_noise",
     "pair_candidates",
+    "perturbation_scale",
     "rank_shape",
     "shell_policy",
     "unit",

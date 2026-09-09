@@ -22,11 +22,13 @@ class TrainConfig:
     generations: int = 12
     population: int = 16
     seeds_per_generation: int = 4
-    # Sigma is a relative size. The centre has unit length and each
-    # perturbation has unit length, so sigma is the fraction of the centre
-    # that one candidate moves. A measurement on real decisions of a trained
-    # policy fixed the working range, and it is far above the value a run
-    # would reach by analogy with a gradient method.
+    # Sigma is a relative size and never a length. Each perturbation has unit
+    # length before the search scales it, and the search scales it by the
+    # length of the centre, so sigma is the fraction of the centre that one
+    # candidate moves. **The search states the length, and this states the
+    # fraction.** A measurement on real decisions of a trained policy fixed
+    # the working range, and it is far above the value a run would reach by
+    # analogy with a gradient method.
     sigma: float = 1.5
     # The fraction of the centre that one generation moves.
     learning_rate: float = 0.3
