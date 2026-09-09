@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-715**
+**Next number: FND-716**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19329,3 +19329,50 @@ uncontended worker at the same extent, so per-worker throughput collapses
 under concurrency. A run sizing estimate must take its rate from a measurement
 at the concurrency it plans to run, and the register holds one such row for
 the target platform at sixty parallel workers.
+
+### FND-715 — The sky over a place holds one narrow band, and the saturation clamp is not what a watcher sees
+
+**Believed.** Two things. The project owner reports that the sky is never
+broken and never clear. A reading of the settle pass says the equatorial band
+stands at exactly the saturation mark, because the pass moves every drop above
+the capacity onto the ground. That reading says the band is frozen by
+construction, so no variation can exist in it.
+
+**True.** The clamp is real and it is not the defect. The set of cells it holds
+rotates. About 19 percent of cells stand exactly at their own mark at one tick,
+and 1.3 percent stand there at every tick of four hundred.
+
+**The defect is that the sky over a place holds one narrow band and never
+leaves it.** Over four hundred ticks, 412 cells of 9216 were ever clear and
+ever overcast. 2369 cells were clear at every tick. 522 were overcast at every
+tick. A cell at the equator held 247 to 255 for the whole window. A cell at 35
+degrees south held 11 to 20.
+
+**The middle of the range is populated, and the view discards it.** 4315 cells
+stand in the broken band for more than half the window, and the median cell
+moves 78 of 255 across it. The renderer turns a share into a line density over
+the whole cell.[^F715B] So a cell at a third of a sky paints as thin cloud
+everywhere, and never as cloud over a third of the sky.
+
+**Evidence.** One run of the cell probe over the demonstration world, at an
+extent of 96, at seed `0x2f`, at the tile pitch, settled for 400 ticks and then
+sampled every tick for 400 ticks.[^F715A] It ran on 9 September 2026 on one
+development machine (x86-64). Every figure is derived and none is measured on
+the target platform. The commit body holds the command.
+
+**Follows.** Three things.
+
+**A cover share and an opacity are two quantities, and this field carries
+one.** A broken sky is one part of the sky at full opacity beside a part at
+none. A single ratio cannot state that, so the picture of a broken sky needs a
+second quantity or a sub-cell rule that derives one.
+
+**Measure a cloud field by reading one cell over time.** A mean over a row says
+the band is wet. It says nothing about whether a day there differs from the
+next, which is the question a watcher asks.
+
+**Do not read a clamp as a frozen field.** Measure which cells the clamp holds,
+and for how many ticks it holds each one.
+
+[^F715A]: The weather cell probe. `crates/cachette-core/examples/weather_cell_probe.rs`
+[^F715B]: The demonstration sky shader. `python/cachette/demo/sketch_shader.py`
