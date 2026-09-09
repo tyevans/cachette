@@ -1043,7 +1043,7 @@ impl Holding {
         let threads = threads.max(1);
 
         let cities = {
-            let _span = stage::open(Stage::HoldingCandidates);
+            let _span = stage::open(Stage::HoldingCities);
             self.cities(settlements, upgrades)
         };
         let candidates = {

@@ -178,6 +178,7 @@ declare_stages! {
     HoldingLease,             "holding_lease",              true,  1, false;
     SiteCapture,              "site_capture",               false, 1, false;
     HoldingSpread,            "holding_spread",             true,  1, false;
+    HoldingCities,            "holding_cities",             false, 1, true;
     HoldingCandidates,        "holding_candidates",         true,  1, true;
     HoldingDecide,            "holding_decide",             true,  1, true;
     HoldingApply,             "holding_apply",              true,  1, true;
