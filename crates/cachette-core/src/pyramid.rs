@@ -1679,6 +1679,34 @@ pub const STOCK_PASSES: u32 = 2;
 #[derive(Clone, Debug)]
 pub struct ApproachField {
     layout: BlockLayout,
+    /// The arguments that the last derivation read, or nothing when no
+    /// derivation has run.
+    ///
+    /// **The field states here what it was derived from.** The offsets are a
+    /// pure function of these arguments, so a call that repeats them writes
+    /// the offsets the field already holds and may skip the walk. Nothing
+    /// else says which inputs the offsets describe.[^1] [^2]
+    ///
+    /// **The unguarded derivation clears this.** That derivation is one of
+    /// the two places the offsets are written, and a caller that takes it
+    /// leaves no claim behind for the guarded one to trust. A guarded call
+    /// after it derives the field again.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    derived_from: Option<ApproachInputs>,
+    /// How many times the field has derived its offsets.
+    ///
+    /// The count is an instrument. A test drives the engine and reads it to
+    /// find out whether a frame derived the field or skipped it. No
+    /// derivation reads it, so it reaches no result.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    derivations: u64,
     /// The plane and the block of each entry, in ascending order.
     entries: Vec<(u16, u32)>,
     /// One offset for each entry and each tile of a block, in block order.
@@ -1707,6 +1735,29 @@ pub struct ApproachField {
 /// The neighbour offset that means the neighbour lies outside the block.
 const OUTSIDE_BLOCK: u32 = u32::MAX;
 
+/// Every argument that one derivation of an approach field reads.
+///
+/// The offsets of the field are a pure function of these four values and of
+/// the block layout the field was built on. The layout is fixed when the
+/// field is built and no call can change it, so it is not held here.
+///
+/// **The set is complete on purpose.** A guard that compared some of the
+/// arguments would skip a derivation that one of the others had changed, and
+/// a stale offset is a wrong answer that repeats. A repeated wrong answer
+/// passes both determinism tests.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Testing Rules, section 2. `.agents/rules/testing.md`
+/// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ApproachInputs {
+    terrain: Terrain,
+    seeds: Vec<(u16, TileIdx)>,
+    crossing: Vec<u8>,
+    passes: u32,
+}
+
 impl ApproachField {
     /// Builds a field over a block layout, with no entry anywhere.
     #[must_use]
@@ -1714,6 +1765,8 @@ impl ApproachField {
         let area = block_area(layout);
         Self {
             layout,
+            derived_from: None,
+            derivations: 0,
             entries: Vec::new(),
             offsets: Vec::new(),
             reach: vec![UNREACHED; area],
@@ -1733,6 +1786,16 @@ impl ApproachField {
     #[must_use]
     pub fn entry_count(&self) -> usize {
         self.entries.len()
+    }
+
+    /// Returns how many times the field has derived its offsets.
+    ///
+    /// The count rises on every derivation and it never falls. A guarded call
+    /// that skips the walk leaves it alone, so a caller that drives the
+    /// engine reads this to find out whether a frame derived the field.
+    #[must_use]
+    pub const fn derivations(&self) -> u64 {
+        self.derivations
     }
 
     /// Returns the offset that one plane holds at one tile.
@@ -1783,6 +1846,73 @@ impl ApproachField {
         self.derive_within(terrain, seeds, crossing, passes);
     }
 
+    /// Derives every entry from a set of seed tiles, and skips the walk when
+    /// the arguments repeat the ones the last derivation read.
+    ///
+    /// The offsets are a pure function of the arguments and of the block
+    /// layout, so a call that repeats them would write the offsets the field
+    /// already holds. An engine that derives this field at every frame
+    /// repeats them on every frame that founds no site, razes none and takes
+    /// none, and the walk over the blocks is the largest cost of such a
+    /// frame.[^1]
+    ///
+    /// **The skip is an optimisation and never a different answer.** A
+    /// derived level may be recomputed at any moment and must give the
+    /// answer a full derivation gives, and that equality is what makes the
+    /// skip legal.[^2]
+    ///
+    /// A caller that needs to know whether one call derived the field reads
+    /// the derivation count before and after it.
+    ///
+    /// # References
+    ///
+    /// [^1]: Target platform costs, where the frame cost goes. `docs/reference/graviton-costs.md`
+    /// [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    pub fn derive_when_the_inputs_changed(
+        &mut self,
+        terrain: Terrain,
+        seeds: &[(u16, TileIdx)],
+        crossing: &[u8],
+    ) {
+        let passes = self.layout.block_edge() * APPROACH_PASSES_PER_EDGE;
+        self.derive_within_when_the_inputs_changed(terrain, seeds, crossing, passes);
+    }
+
+    /// Derives every entry to a stated reach, and skips the walk when the
+    /// arguments repeat the ones the last derivation read.
+    ///
+    /// Every rule of the guarded derivation above holds here. The pass count
+    /// is one of the arguments the guard compares, so a caller that asks for
+    /// a different reach over the same seeds derives the field again.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    pub fn derive_within_when_the_inputs_changed(
+        &mut self,
+        terrain: Terrain,
+        seeds: &[(u16, TileIdx)],
+        crossing: &[u8],
+        passes: u32,
+    ) {
+        let unchanged = self.derived_from.as_ref().is_some_and(|last| {
+            last.terrain == terrain
+                && last.passes == passes
+                && last.seeds == seeds
+                && last.crossing == crossing
+        });
+        if unchanged {
+            return;
+        }
+        self.derive_within(terrain, seeds, crossing, passes);
+        self.derived_from = Some(ApproachInputs {
+            terrain,
+            seeds: seeds.to_vec(),
+            crossing: crossing.to_vec(),
+            passes,
+        });
+    }
+
     /// Derives every entry from a set of seed tiles, to a stated reach.
     ///
     /// The relaxation carries a reach one tile further at each pass, so the
@@ -1809,6 +1939,8 @@ impl ApproachField {
         crossing: &[u8],
         passes: u32,
     ) {
+        self.derived_from = None;
+        self.derivations = self.derivations.wrapping_add(1);
         let layout = self.layout;
         let area = block_area(layout);
         // The entries are the distinct plane and block pairs of the seed set,

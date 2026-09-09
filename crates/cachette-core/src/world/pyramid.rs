@@ -248,6 +248,12 @@ impl World {
     /// gather orders and the ground, and a path that rebuilt level 1 without
     /// it would leave a stale value that nothing fails on.[^1]
     ///
+    /// **The field takes the seed set and decides for itself whether to
+    /// derive.** It holds the arguments the last derivation read, and it
+    /// skips the walk over the blocks when this call repeats them. The walk
+    /// over the blocks is the largest cost of a frame that occupies no new
+    /// block and empties no tile.[^3]
+    ///
     /// **No stock plane conducts across water**, so every plane takes the
     /// land crossing. The empty slice is how the approach field states
     /// that.[^2]
@@ -256,10 +262,18 @@ impl World {
     ///
     /// [^1]: Findings register, FND-029. `docs/FINDINGS.md`
     /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^3]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
     fn derive_stock_field(&mut self) {
-        let seeds = self.stock_seed_tiles();
-        self.stock_approaches
-            .derive_within(self.terrain, &seeds, &[], STOCK_PASSES);
+        let seeds = {
+            let _span = stage::open(Stage::RebuildStockSeeds);
+            self.stock_seed_tiles()
+        };
+        self.stock_approaches.derive_within_when_the_inputs_changed(
+            self.terrain,
+            &seeds,
+            &[],
+            STOCK_PASSES,
+        );
     }
 
     /// Returns one seed for each tile that holds stock, in a block that a
@@ -281,15 +295,31 @@ impl World {
     /// derivation builds no entry for it and the unit there reads the coarse
     /// field.
     ///
-    /// The walk is over the arena in ascending identity order, and then over
-    /// the tiles of each occupied block in ascending offset. It runs on the
-    /// calling thread and it names no thread count.[^3]
+    /// **The walk asks the ground of a tile once, and then asks every
+    /// kind.** The ground is generated from a noise field rather than
+    /// stored, and the stock of a tile is generated from the ground, so the
+    /// ground is the expensive half of the question. A walk that took the
+    /// kind on the outside asked for the ground of each tile once for each
+    /// kind, and the seed set is the largest cost of the stock field.[^4]
+    /// [^5]
+    ///
+    /// The walk is over the arena in ascending identity order, then over the
+    /// occupied blocks in ascending order, then over the tiles of each block
+    /// in ascending offset, and then over the kinds in the order the table
+    /// declares. It runs on the calling thread and it names no thread
+    /// count.[^3]
+    ///
+    /// The derivation reads the answer as a set. It groups the seeds by the
+    /// plane and the block, and each seed of a group gives its tile a reach
+    /// of zero, so the order of this vector reaches no offset.[^2]
     ///
     /// # References
     ///
     /// [^1]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
     /// [^2]: Findings register, FND-590. `docs/FINDINGS.md`
     /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^4]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    /// [^5]: ADR-0072, a tile stock is generated, and only what was taken is stored, decision D1. `docs/adrs/accepted/adr-0072-a-tile-stock-is-generated-and-only-what-was-taken-is-stored.md`
     fn stock_seed_tiles(&self) -> Vec<(u16, TileIdx)> {
         let layout = self.pyramid.layout();
         let mut occupied: Vec<u32> = Vec::new();
@@ -306,22 +336,27 @@ impl World {
         occupied.dedup();
         let edge = layout.block_edge();
         let mut seeds: Vec<(u16, TileIdx)> = Vec::new();
-        for kind in ResourceKind::ALL {
-            let plane = u16::from(kind.to_u8());
-            for block in &occupied {
-                let first_column = (block % layout.blocks_wide()) * edge;
-                let first_row = (block / layout.blocks_wide()) * edge;
-                for row in first_row..first_row + edge {
-                    for column in first_column..first_column + edge {
-                        let address = Axial::new(column as i32, row as i32);
-                        let Some(tile) = self.grid.index_of(address) else {
+        for block in &occupied {
+            let first_column = (block % layout.blocks_wide()) * edge;
+            let first_row = (block / layout.blocks_wide()) * edge;
+            for row in first_row..first_row + edge {
+                for column in first_column..first_column + edge {
+                    let address = Axial::new(column as i32, row as i32);
+                    let Some(tile) = self.grid.index_of(address) else {
+                        continue;
+                    };
+                    let Some(ground) = self.terrain.kind(address) else {
+                        continue;
+                    };
+                    for kind in ResourceKind::ALL {
+                        let Some(original) =
+                            self.resources.original_of_ground(address, ground, kind)
+                        else {
                             continue;
                         };
-                        if self
-                            .tile_stock(address, kind)
-                            .is_some_and(|amount| amount.0 > 0)
-                        {
-                            seeds.push((plane, tile));
+                        let taken = self.depletion.taken(tile, kind).0;
+                        if original.0 > taken {
+                            seeds.push((u16::from(kind.to_u8()), tile));
                         }
                     }
                 }
@@ -336,10 +371,21 @@ impl World {
     /// the live sites, and a path that wrote one without the other would
     /// leave a stale value that nothing fails on.[^1] [^2]
     ///
+    /// **The fine field takes the seed set and decides for itself whether to
+    /// derive.** It holds the arguments the last derivation read, and it
+    /// skips the walk over the blocks when this call repeats them. A frame
+    /// that founds no site, razes none and takes none repeats them, and the
+    /// walk is the largest cost of such a frame.[^4]
+    ///
+    /// The coarse field beside it derives at every call. It walks the level 1
+    /// cells rather than the tiles of a block, and it costs a small part of
+    /// what the fine one costs.
+    ///
     /// # References
     ///
     /// [^1]: Findings register, FND-029. `docs/FINDINGS.md`
     /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^4]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
     fn derive_return_fields(&mut self) {
         let _span = stage::open(Stage::RebuildReturns);
         self.returns.derive(&self.pyramid, &self.site_seeds());
@@ -351,8 +397,9 @@ impl World {
         // [^3]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
         drop(_span);
         let _span = stage::open(Stage::RebuildHomeApproaches);
+        let seeds = self.site_seed_tiles();
         self.home_approaches
-            .derive(self.terrain, &self.site_seed_tiles(), &[]);
+            .derive_when_the_inputs_changed(self.terrain, &seeds, &[]);
     }
 
     /// Returns one seed for each live site, as a faction plane and the tile
@@ -429,5 +476,427 @@ impl World {
     pub fn return_direction(&self, faction: FactionId, address: Axial) -> Option<Option<u8>> {
         let tile = self.grid.index_of(address)?;
         self.returns.direction(faction, self.cell_of(tile)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! The two guarded approach fields, and what each one depends on.
+    //!
+    //! The engine derives the home approach field and the stock approach
+    //! field at every rebuild of level 1, and each one skips the walk when
+    //! its arguments repeat. A skip that outlives a change to an argument is
+    //! a stale offset, and a stale offset is a wrong answer that repeats on
+    //! every thread count and on every machine. The two determinism tests
+    //! compare a run against a run, so neither one can see it.[^1]
+    //!
+    //! The tests here therefore assert on what each field depends on. One
+    //! test for each input drives the engine, changes that input, and reads
+    //! the derivation count and the offsets the field answers with. A last
+    //! test compares the guarded field against an unguarded derivation at
+    //! every frame, which is the equality that makes the skip legal.[^2]
+    //!
+    //! The seed sets are private to this module, so the comparison against an
+    //! unguarded derivation lives here rather than beside the public
+    //! interface.[^3]
+    //!
+    //! # References
+    //!
+    //! [^1]: Testing Rules, section 2. `.agents/rules/testing.md`
+    //! [^2]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    //! [^3]: Testing Rules, section 6. `.agents/rules/testing.md`
+
+    use super::*;
+    use crate::pyramid::ApproachField;
+    use crate::types::Entity;
+    use crate::world::WorldConfig;
+
+    /// The seed of every world these tests build.
+    const SEED: u64 = 20_260_908;
+
+    /// How many planes a snapshot reads.
+    ///
+    /// A home plane is a faction and a stock plane is a resource kind, and
+    /// the worlds here hold fewer of each than this. A snapshot that read
+    /// only the planes one field uses would miss an offset that appeared in
+    /// a plane nobody expected.
+    const SNAPSHOT_PLANES: u16 = 8;
+
+    /// The number of tiles that carry a unit that a fixture world needs.
+    ///
+    /// A world of open water seeds nothing, so every field of it is empty and
+    /// every assertion below passes whatever the guard does. The fixture must
+    /// supply ground, and this is the amount it must supply.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Testing Rules, section 2a. `.agents/rules/testing.md`
+    const GROUND_A_FIXTURE_NEEDS: u32 = 64;
+
+    /// Builds a world of one faction count, on ground that carries units.
+    ///
+    /// The walk reads a world of each seed in turn and takes the first one
+    /// whose ground carries enough units. It draws nothing of its own, so it
+    /// adds no state to the fixture.
+    fn world_of(faction_count: u16) -> World {
+        for step in 0..64u64 {
+            let config = WorldConfig {
+                width: 48,
+                height: 48,
+                seed: SEED + step,
+                faction_count,
+                unit_capacity: 64,
+            };
+            let world = World::new(config).expect("the extent must describe a world");
+            if passable_tile_count(&world) >= GROUND_A_FIXTURE_NEEDS {
+                return world;
+            }
+        }
+        panic!("no seed of the walk gives a world with ground");
+    }
+
+    /// Returns how many tiles of the world carry a unit.
+    fn passable_tile_count(world: &World) -> u32 {
+        let mut count = 0;
+        for index in 0..world.grid().tile_count() {
+            let Some(address) = world.grid().address_of(TileIdx(index)) else {
+                continue;
+            };
+            if world.admits_a_unit(address) {
+                count += 1;
+            }
+        }
+        count
+    }
+
+    /// Returns the first address that carries a unit, from a starting tile.
+    ///
+    /// The walk asks the grid for the address of each tile, so it names no
+    /// second rule for how a tile index maps to an address.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    fn passable_address_from(world: &World, first: u32) -> Axial {
+        let count = world.grid().tile_count();
+        for step in 0..count {
+            let index = (first + step) % count;
+            let Some(address) = world.grid().address_of(TileIdx(index)) else {
+                continue;
+            };
+            if world.admits_a_unit(address) {
+                return address;
+            }
+        }
+        panic!("the world must hold ground that carries a unit");
+    }
+
+    /// Returns every offset the field answers with, over every plane a
+    /// snapshot reads and every tile of the world.
+    ///
+    /// The vector is the whole observable projection of the field. Two fields
+    /// derived from the same arguments give the same vector, and a field that
+    /// went stale gives a different one.
+    fn snapshot(world: &World, field: &ApproachField) -> Vec<Option<u8>> {
+        let mut offsets = Vec::new();
+        for plane in 0..SNAPSHOT_PLANES {
+            for tile in 0..world.grid().tile_count() {
+                offsets.push(field.offset(plane, TileIdx(tile)));
+            }
+        }
+        offsets
+    }
+
+    /// Derives a field again from the site seed set of the world, with no
+    /// guard.
+    fn unguarded_home_field(world: &World) -> ApproachField {
+        let mut field = ApproachField::new(world.pyramid.layout());
+        field.derive(world.terrain, &world.site_seed_tiles(), &[]);
+        field
+    }
+
+    /// Derives a field again from the stock seed set of the world, with no
+    /// guard.
+    fn unguarded_stock_field(world: &World) -> ApproachField {
+        let mut field = ApproachField::new(world.pyramid.layout());
+        field.derive_within(world.terrain, &world.stock_seed_tiles(), &[], STOCK_PASSES);
+        field
+    }
+
+    /// Builds a world that holds one site of faction zero and one unit.
+    fn world_with_one_site() -> (World, Entity) {
+        let mut world = world_of(3);
+        let address = passable_address_from(&world, 0);
+        world
+            .spawn_soldier(address, FactionId(0))
+            .expect("the arena must take the soldier");
+        let site = world
+            .found_settlement(address, FactionId(0))
+            .expect("the ground must take the settlement");
+        world.step(1).expect("the step must run");
+        (world, site)
+    }
+
+    #[test]
+    fn a_frame_that_changes_no_site_derives_the_home_approach_field_no_further_time() {
+        let (mut world, _site) = world_with_one_site();
+        let derivations = world.home_approaches.derivations();
+        let offsets = snapshot(&world, &world.home_approaches);
+        for _ in 0..8 {
+            world.step(1).expect("the step must run");
+        }
+        assert_eq!(
+            world.home_approaches.derivations(),
+            derivations,
+            "eight frames that change no site must derive the field no further time"
+        );
+        assert_eq!(
+            snapshot(&world, &world.home_approaches),
+            offsets,
+            "a frame that derives nothing must leave the offsets alone"
+        );
+    }
+
+    #[test]
+    fn founding_a_site_derives_the_home_approach_field_again() {
+        let (mut world, _site) = world_with_one_site();
+        let derivations = world.home_approaches.derivations();
+        let offsets = snapshot(&world, &world.home_approaches);
+        let far = passable_address_from(&world, world.grid().tile_count() / 2);
+        world
+            .spawn_soldier(far, FactionId(1))
+            .expect("the arena must take the soldier");
+        world
+            .found_settlement(far, FactionId(1))
+            .expect("the ground must take the settlement");
+        world.step(1).expect("the step must run");
+        assert!(
+            world.home_approaches.derivations() > derivations,
+            "a founded site must derive the field again"
+        );
+        assert_ne!(
+            snapshot(&world, &world.home_approaches),
+            offsets,
+            "a founded site must change the offsets the field answers with"
+        );
+    }
+
+    #[test]
+    fn razing_a_site_derives_the_home_approach_field_again() {
+        let (mut world, site) = world_with_one_site();
+        let derivations = world.home_approaches.derivations();
+        let offsets = snapshot(&world, &world.home_approaches);
+        assert!(
+            world.destroy_settlement(site),
+            "the identity must resolve to a live site"
+        );
+        world.step(1).expect("the step must run");
+        assert!(
+            world.home_approaches.derivations() > derivations,
+            "a razed site must derive the field again"
+        );
+        assert_ne!(
+            snapshot(&world, &world.home_approaches),
+            offsets,
+            "a razed site must change the offsets the field answers with"
+        );
+    }
+
+    /// A capture moves the site into the plane of the taker, and the field
+    /// must answer in that plane afterwards.
+    ///
+    /// The test moves the faction column rather than winning a siege. A siege
+    /// takes hundreds of frames of work, and the input this guard reads is
+    /// the column.
+    #[test]
+    fn capturing_a_site_derives_the_home_approach_field_again() {
+        let (mut world, site) = world_with_one_site();
+        let derivations = world.home_approaches.derivations();
+        let offsets = snapshot(&world, &world.home_approaches);
+        assert!(
+            world.settlements.set_faction(site, FactionId(2)),
+            "the identity must resolve to a live site"
+        );
+        world.step(1).expect("the step must run");
+        assert!(
+            world.home_approaches.derivations() > derivations,
+            "a captured site must derive the field again"
+        );
+        assert_ne!(
+            snapshot(&world, &world.home_approaches),
+            offsets,
+            "a captured site must change the offsets the field answers with"
+        );
+    }
+
+    #[test]
+    fn a_frame_of_a_world_with_no_unit_derives_the_stock_field_no_further_time() {
+        let mut world = world_of(1);
+        world.step(1).expect("the step must run");
+        let derivations = world.stock_approaches.derivations();
+        let offsets = snapshot(&world, &world.stock_approaches);
+        for _ in 0..8 {
+            world.step(1).expect("the step must run");
+        }
+        assert_eq!(
+            world.stock_approaches.derivations(),
+            derivations,
+            "eight frames of a world with no unit must derive the stock field no further time"
+        );
+        assert_eq!(
+            snapshot(&world, &world.stock_approaches),
+            offsets,
+            "a frame that derives nothing must leave the offsets alone"
+        );
+    }
+
+    #[test]
+    fn a_unit_that_occupies_a_block_derives_the_stock_field_again() {
+        let mut world = world_of(1);
+        world.step(1).expect("the step must run");
+        let derivations = world.stock_approaches.derivations();
+        let offsets = snapshot(&world, &world.stock_approaches);
+        let address = passable_address_from(&world, 0);
+        world
+            .spawn_soldier(address, FactionId(0))
+            .expect("the arena must take the soldier");
+        world.step(1).expect("the step must run");
+        assert!(
+            world.stock_approaches.derivations() > derivations,
+            "a unit that occupies a block must derive the stock field again"
+        );
+        assert_ne!(
+            snapshot(&world, &world.stock_approaches),
+            offsets,
+            "a unit that occupies a block must change the offsets the field answers with"
+        );
+    }
+
+    /// The guarded field must answer what an unguarded derivation answers, at
+    /// every frame.
+    ///
+    /// This is the equality that makes the skip an optimisation and not a
+    /// different answer. The world holds units and sites, so the seed set of
+    /// each field moves while the run goes on.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    #[test]
+    fn a_guarded_field_answers_what_an_unguarded_derivation_answers() {
+        let mut world = world_of(3);
+        for slot in 0..12u32 {
+            let address = passable_address_from(&world, slot * 37);
+            let faction = FactionId(u16::try_from(slot % 3).expect("the faction must fit"));
+            if world.spawn_soldier(address, faction).is_err() {
+                continue;
+            }
+            if slot % 4 == 0 {
+                let _ = world.found_settlement(address, faction);
+            }
+        }
+        for frame in 0..40u32 {
+            world.step(1).expect("the step must run");
+            let home = unguarded_home_field(&world);
+            assert_eq!(
+                world.home_approaches.entry_count(),
+                home.entry_count(),
+                "the guarded home field must hold the entries of an unguarded one at frame {frame}"
+            );
+            assert_eq!(
+                snapshot(&world, &world.home_approaches),
+                snapshot(&world, &home),
+                "the guarded home field must answer what an unguarded one answers at frame {frame}"
+            );
+            let stock = unguarded_stock_field(&world);
+            assert_eq!(
+                world.stock_approaches.entry_count(),
+                stock.entry_count(),
+                "the guarded stock field must hold the entries of an unguarded one at frame {frame}"
+            );
+            assert_eq!(
+                snapshot(&world, &world.stock_approaches),
+                snapshot(&world, &stock),
+                "the guarded stock field must answer what an unguarded one answers at frame {frame}"
+            );
+        }
+    }
+
+    /// The stock seed set must hold a tile of an occupied block exactly when
+    /// the tile holds stock of that kind.
+    ///
+    /// The seed walk asks the ground of a tile once and then generates the
+    /// stock of each kind from it. The tile stock reader asks the ground
+    /// again for each kind. Two ways of asking one question is the defect
+    /// shape this project meets most often, so this test derives one from the
+    /// other and compares.[^1]
+    ///
+    /// The comparison is over the whole world and over every kind, so a tile
+    /// the walk added and a tile the walk missed both fail.
+    ///
+    /// **The test asserts that the wanted set is not empty.** A world whose
+    /// occupied blocks hold no stock at all would compare two empty vectors,
+    /// and the test would then measure the fixture.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^2]: Testing Rules, section 2a. `.agents/rules/testing.md`
+    #[test]
+    fn the_stock_seed_set_agrees_with_the_tile_stock_reader() {
+        let mut world = world_of(2);
+        for slot in 0..8u32 {
+            let address = passable_address_from(&world, slot * 53);
+            let _ = world.spawn_soldier(address, FactionId(0));
+        }
+        for frame in 0..12u32 {
+            world.step(1).expect("the step must run");
+            let seeds = world.stock_seed_tiles();
+            let layout = world.pyramid.layout();
+            let mut occupied: Vec<u32> = Vec::new();
+            for unit in world.soldiers.iter() {
+                let Some(tile) = world.soldiers.tile(unit) else {
+                    continue;
+                };
+                let Some(key) = layout.key_of(tile) else {
+                    continue;
+                };
+                occupied.push(layout.block_of_key(key));
+            }
+            occupied.sort_unstable();
+            occupied.dedup();
+            let mut wanted: Vec<(u16, TileIdx)> = Vec::new();
+            for index in 0..world.grid().tile_count() {
+                let tile = TileIdx(index);
+                let Some(key) = layout.key_of(tile) else {
+                    continue;
+                };
+                if !occupied.contains(&layout.block_of_key(key)) {
+                    continue;
+                }
+                let Some(address) = world.grid().address_of(tile) else {
+                    continue;
+                };
+                for kind in ResourceKind::ALL {
+                    if world
+                        .tile_stock(address, kind)
+                        .is_some_and(|amount| amount.0 > 0)
+                    {
+                        wanted.push((u16::from(kind.to_u8()), tile));
+                    }
+                }
+            }
+            assert!(
+                !wanted.is_empty(),
+                "the fixture must give an occupied block that holds stock, at frame {frame}"
+            );
+            let mut seen = seeds;
+            seen.sort_unstable();
+            wanted.sort_unstable();
+            assert_eq!(
+                seen, wanted,
+                "the seed walk and the tile stock reader disagree at frame {frame}"
+            );
+        }
     }
 }
