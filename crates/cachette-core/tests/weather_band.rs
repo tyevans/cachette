@@ -22,7 +22,9 @@
 //! [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
 
 use cachette_core::weather::{front_mark, storm_reach, Latitudes};
-use cachette_core::{WeatherScale, World, WorldConfig, CYCLONE_RADIUS_CEILING, LATITUDE_FINE};
+use cachette_core::{
+    WeatherScale, World, WorldConfig, CYCLONE_CEILING, CYCLONE_RADIUS_CEILING, LATITUDE_FINE,
+};
 
 /// The seed of every world here.
 const SEED: u64 = 0x2f;
@@ -46,7 +48,19 @@ const TROPIC: i32 = 30 * LATITUDE_FINE;
 /// **A real globe carries some tens of lows and storms at any moment.** This
 /// mark asks for a fraction of that, so it fails only a world that carries
 /// almost none.
-const STANDING_MARK: usize = 8;
+const STANDING_FLOOR: usize = 2;
+
+/// The solves that the run watches for a storm outside the tropics.
+///
+/// **A snapshot of a planet is too small a sample for this claim.** A settled
+/// world of this extent carries a few storms at once, so whether one of them
+/// stands outside the tropics at one moment is a matter of chance. The claim
+/// is about what the field raises over time, so the test reads over time.[^1]
+///
+/// # References
+///
+/// [^1]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
+const WATCH_TICKS: u32 = 400;
 
 /// Builds a world at one weather cell for each tile.
 fn world_of(extent: u32) -> World {
@@ -153,29 +167,52 @@ fn the_wettest_band_stands_at_one_share_of_the_height() {
 /// storm.** So a field that carries almost no storms holds the belts and
 /// nothing else, whatever else it does.
 ///
-/// The test asks two things of a settled planet. It must carry storms at
-/// once, and some of them must stand outside the tropics. The second is the
-/// stronger claim: the warm-sea gate admits nothing in the middle latitudes,
-/// because the middle latitudes are neither warm enough nor all sea, and the
-/// middle latitudes are where a real field carries most of its travelling
-/// weather.
+/// The test asks three things of a settled planet. It must carry storms at
+/// once, some of them must stand outside the tropics, and the count must stay
+/// under the ceiling that the field holds.
+///
+/// The second is the stronger claim: the warm-sea gate admits nothing in the
+/// middle latitudes, because the middle latitudes are neither warm enough nor
+/// all sea, and the middle latitudes are where a real field carries most of
+/// its travelling weather.
+///
+/// **The third is the guard that this test did not hold.** A population that
+/// stands at the ceiling is a population that the ceiling chose, and the
+/// genesis rate behind it can then be any figure at all. A field once ran at
+/// forty times the rate it needed, covered a quarter of the planet in storms,
+/// and passed a floor of eight without a word.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-712. `docs/FINDINGS.md`
 #[test]
 fn the_field_carries_storms_outside_the_tropics() {
     let world = settled(48);
     let latitudes = storm_latitudes(&world);
     assert!(
-        latitudes.len() >= STANDING_MARK,
-        "the planet carried {} storms at once, against the mark of {STANDING_MARK}",
+        latitudes.len() >= STANDING_FLOOR,
+        "the planet carried {} storms at once, against the floor of {STANDING_FLOOR}",
         latitudes.len()
     );
-    let outside = latitudes
+    assert!(
+        latitudes.len() < CYCLONE_CEILING,
+        "the planet carried {} storms at once, and the ceiling of {CYCLONE_CEILING} is what held it",
+        latitudes.len()
+    );
+    let mut world = world;
+    let mut seen = Vec::new();
+    for _ in 0..WATCH_TICKS {
+        world.step(THREADS).expect("the step must run");
+        seen.extend(storm_latitudes(&world));
+    }
+    let outside = seen
         .iter()
         .filter(|latitude| latitude.abs() >= TROPIC)
         .count();
     assert!(
         outside > 0,
-        "every one of the {} storms stood inside the tropics, at {latitudes:?}",
-        latitudes.len()
+        "every one of the {} storms the run watched stood inside the tropics",
+        seen.len()
     );
 }
 

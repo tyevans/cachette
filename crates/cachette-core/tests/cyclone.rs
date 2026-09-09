@@ -172,9 +172,19 @@ fn the_water_account_holds_under_a_storm() {
 
 /// **A storm rains harder and blows harder than the field around it.**
 ///
-/// The figures are read over the cells the storm covers against every other
-/// cell of the lattice, in the same frames. A comparison against the field
-/// before the storm would measure the season as well.
+/// The figures are read over the cells this storm covers against the cells no
+/// storm covers, in the same frames. A comparison against the field before the
+/// storm would measure the season as well.
+///
+/// **The test reads the footprint of the storm it raised, and not the
+/// depression plane.** That plane carries every storm, and the genesis pass
+/// raises storms of its own that are larger than this one and stand
+/// elsewhere. A test that read the plane measured those, and it answered for
+/// the genesis rate rather than for the storm it placed.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-713. `docs/FINDINGS.md`
 #[test]
 fn a_storm_rains_and_blows_harder_than_the_field_around_it() {
     let mut world = fine_world();
@@ -198,17 +208,23 @@ fn a_storm_rains_and_blows_harder_than_the_field_around_it() {
             .collect();
         world.step(1).expect("the step must run");
         let field = world.weather();
-        if !field.cyclones().iter().any(|one| one.id == raised.id) {
+        let Some(mine) = field.cyclones().iter().find(|one| one.id == raised.id) else {
             break;
-        }
+        };
+        let eye = mine.eye();
+        let reach = mine.radius.max(0) as u32;
+        let cells = field.cells();
         for at in 0..field.ground_plane().len() {
             let gained = field.ground_plane()[at].0 - before.get(at).copied().unwrap_or(0);
             let speed = i64::from(field.wind_plane()[at].speed());
-            if field.depression_at(at as u32) > 0 {
+            let Some(address) = cells.address_of(TileIdx(at as u32)) else {
+                continue;
+            };
+            if address.distance(eye) <= reach {
                 rain_under += gained.max(0);
                 wind_under += speed;
                 under_cells += 1;
-            } else {
+            } else if field.depression_at(at as u32) == 0 {
                 rain_out += gained.max(0);
                 wind_out += speed;
                 out_cells += 1;

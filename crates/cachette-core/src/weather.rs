@@ -3361,13 +3361,21 @@ pub const CYCLONE_DEPTH_FLOOR: i32 = 8;
 ///
 /// **A storm has one size in degrees of latitude, so its size in cells
 /// follows the lattice.** A fine lattice therefore asks for a larger radius
-/// than a coarse one for the same storm, and this ceiling must reach what the
-/// finest lattice asks.[^1]
+/// than a coarse one for the same storm.[^1]
+///
+/// **This ceiling is a cost bound and not that size.** The stamp pass costs
+/// the footprint of every storm on every solve, and a footprint grows with
+/// the square of the radius. So a lattice fine enough to ask for more than
+/// this draws a storm smaller than its own size on the ground, and the
+/// picture at that pitch shows a storm that does not grow with the lattice.
+/// The clamp is what a reader sees above about one hundred and thirty rows.
+/// It is a content constant that no measurement chose.[^2]
 ///
 /// # References
 ///
 /// [^1]: The reach of a storm. [`storm_reach`]
-pub const CYCLONE_RADIUS_CEILING: i32 = 32;
+/// [^2]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+pub const CYCLONE_RADIUS_CEILING: i32 = 8;
 
 /// The longest life that the field carries, in solves.
 pub const CYCLONE_LIFE_CEILING: u32 = 4096;
@@ -3388,7 +3396,7 @@ pub const CYCLONE_LIFE_CEILING: u32 = 4096;
 ///
 /// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
 /// [^2]: The reach of a storm. [`storm_reach`]
-pub const CYCLONE_CEILING: usize = 32;
+pub const CYCLONE_CEILING: usize = 8;
 
 /// What turns a wind into the sub-cell steps that a storm travels.
 ///
@@ -3469,15 +3477,29 @@ const CYCLONE_WARM_MARK: i32 = 3 * HEAT_CEILING / 5;
 /// **The attempt is a keyed draw, and the gates below it decide the rest.**
 /// So the rate that a world sees is the product of this period, of the
 /// attempts each solve makes, and of how much ground the gates admit.
-const CYCLONE_GENESIS_PERIOD: u64 = 4;
+///
+/// **The standing population is that rate multiplied by the life of a
+/// storm, and a storm lives hundreds of solves.** So a small change here
+/// moves the population by hundreds, the ceiling then holds it, and the
+/// count a reader sees is the ceiling rather than the rate. Read the two
+/// together, and set the rate so that the ceiling does not bind.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-712. `docs/FINDINGS.md`
+const CYCLONE_GENESIS_PERIOD: u64 = 24;
 
 /// The genesis attempts that one solve makes.
 ///
 /// **One attempt each solve cannot fill a world.** A storm ends when its
 /// depth falls under the floor, which takes tens of solves, so the standing
 /// population is the genesis rate multiplied by that life. One attempt per
-/// period, on one drawn cell, against gates that most cells fail, gave a
-/// planet that stood empty most of the time.[^1]
+/// period, on one drawn cell, gave a planet that stood empty most of the
+/// time.[^1]
+///
+/// **The gates do not thin the attempts much.** A measurement of the front
+/// gate admitted about nine cells in ten of the ones it was offered, so this
+/// count and the period set the rate almost on their own.[^3]
 ///
 /// Each attempt keys its two draws on an entity of its own, so the attempts
 /// of one solve name different cells.[^2]
@@ -3486,7 +3508,8 @@ const CYCLONE_GENESIS_PERIOD: u64 = 4;
 ///
 /// [^1]: Blockers register, BLK-130. `docs/BLOCKERS.md`
 /// [^2]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
-const CYCLONE_GENESIS_ATTEMPTS: u32 = 8;
+/// [^3]: Findings register, FND-712. `docs/FINDINGS.md`
+const CYCLONE_GENESIS_ATTEMPTS: u32 = 4;
 
 /// The share of its capacity that the air over a cell must hold before a
 /// storm may be raised there.
