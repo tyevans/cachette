@@ -24,11 +24,20 @@ receives and never the cores of the instance.
 
 # The estimate is a floor, and it is derived
 
-The rate for each worker comes from a measurement on the target platform of
-one process holding twelve workers.[^1] The same measurement shows the rate
-for each worker falls as the worker count rises, so a process of more than
-twelve workers reaches less than this model gives it. The episode length is
-bounded at the tick limit, which is the longest an episode can run.
+The rate for each worker comes from what the project's own training runs
+reach on a sixty-four core machine of the target platform: eighteen thousand
+to twenty-one thousand simulated ticks a second for the whole machine. This
+model takes the low end and divides by the cores, so a strategy holding a
+quarter of the machine is estimated at a quarter of the low end.
+
+**An earlier version of this model read a register row of one process holding
+twelve workers, and that row names no extent.** It gave one hundred and three
+ticks a second for each worker, which is a third of what the runs reach, so
+the estimate refused configurations that finish. A tick of one world size is
+not a tick of another, and a rate row without an extent is not a rate.[^1]
+
+The episode length is bounded at the tick limit, which is the longest an
+episode can run.
 
 **An estimate from this module is not a measurement.** One blocker states
 which cost figures of this project are measured and which are derived.[^2]
@@ -45,13 +54,25 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# The ticks a second one trainer process reaches for each engine worker it
-# holds. The target register measured one process of twelve workers at 1,231
-# simulated ticks a second, over a batch of 144 worlds, which is the shape a
-# generation of twenty-four candidates over six seeds plays.
+# The ticks a second this model gives one engine worker.
+#
+# **The rate depends on the extent and this figure states none.** A sixty-four
+# core machine of the target platform reaches eighteen to twenty-one thousand
+# simulated ticks a second across the whole machine on the runs this project
+# has trained, which is about 281 for each core and nearly three times the
+# figure here. The figure here nonetheless predicted the shortfall of the run
+# that delivered nine generations of twenty, and the faster one does not, so
+# the extents of the two measurements differ. A development box measured 756
+# ticks a second at extent 48 against 439 at extent 128, a factor of 1.72, and
+# the audited run was the first at the larger extent.
+#
+# Keep the conservative figure until a rate is measured at a stated extent.
+# The estimate is a floor, and a floor that refuses a run that would finish
+# costs one prompt, where a floor that admits a run that cannot costs the run.
 #
 # **This is the one declaration of the rate.** A caller that measured its own
-# throughput passes it in rather than writing a second one.
+# throughput passes it in rather than writing a second one, and the launcher
+# reprints the estimate against the rate its throughput probe measures.
 TICKS_A_SECOND_FOR_EACH_WORKER = 1231.0 / 12.0
 
 # How many times the held-out pass plays the random policy at the end of a
