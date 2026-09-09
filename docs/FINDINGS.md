@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-710**
+**Next number: FND-711**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19055,3 +19055,55 @@ reward test scored one episode and asserted one step or one terminal value,
 and a per-step assertion cannot see an episode sum collapse to a difference of
 its endpoints. The alignment law was never stated as a test at all, and the
 sweep that settled it lives in a commit message.
+
+### FND-710 — The win share separates a passive seat from a chance seat exactly, and no game reaches the tick limit
+
+**Believed.** Two things, and both were wrong in a way that mattered.
+
+The register held that renown ended no game because the learner reached about
+0.45 renown points in an episode against a target of 50, and it concluded that
+renown needed a second source rather than a lower target. It also held that an
+episode ends by the territory reader comparing held ground at the tick limit,
+which is why every episode names a winner.
+
+**True.** Measured over 12 seeds of the world a run now trains in, at an
+extent of 128 and a tick limit of 6000, with the other two seats under the
+built-in controller:
+
+| seat 0 driven by | wins | share |
+|---|---|---|
+| always the no-op | 0 of 12 | 0.000 |
+| a uniform legal draw | 4 of 12 | 0.333 |
+
+**The win share is a well-scaled selection signal.** A seat that does nothing
+wins nothing. A seat that acts without reading anything wins the chance share
+of a three faction game to three decimal places. So the quantity separates
+play from passivity at the floor, and a selection rule over it has something
+to climb that the shaped return did not supply.
+
+**The win paths overturn the rest.** Over the 24 games:
+
+| path | games |
+|---|---|
+| renown | 13 |
+| wonder | 7 |
+| domination | 4 |
+| territory | 0 |
+
+**Renown at a target of 50 is the modal win path, not an unreachable one.**
+The 0.45 points an episode measured a policy that could not fight, and the
+register read a property of one policy as a property of the balance. The
+built-in controller reaches the target readily.
+
+**No game reached the tick limit.** The territory reader does fire at the
+limit and does name a winner, and a test asserts it, so the conclusion that
+every episode names a winner is correct. It is correct for another reason:
+every game resolved early. **Territory is therefore a dead win path at this
+world size**, and the product record that asks which way wins a game now has
+a measurement rather than an assumption.
+
+**Follows.** Select on the win share. Read a rate that a policy achieves as a
+statement about that policy, and never as a statement about the balance, until
+a player that can use the path has been measured on it. One episode of this
+world costs 23.7 seconds passive and 34.0 seconds acting on sixteen cores,
+which is the basis any run sizing must use.
