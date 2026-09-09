@@ -16,6 +16,29 @@ measurement in section 2 says the trainer selects no feature at all in the
 observation it already has. Section 11 gives the two parts of the work that
 are not premature, and says why the rest is.
 
+## What has changed since this report
+
+**This report is fixed to the moment section 0 names, and nothing below was
+edited afterwards.** One policy kind it measures no longer exists.
+
+**The project deleted the kind that holds a frozen random projection in its
+first layer.** Section 7.5 states the trainable dimension of that kind and
+prices two hidden widths against it. The trainer now builds two kinds. One is
+`linear`, over the whole array. The other is `structured`, which shares a
+weight across the sector axis and trains every layer.[^44] The loader refuses
+a stored file that names the deleted kind, and it names the kind in the
+refusal.[^45]
+
+Read the dimension arithmetic of section 7.5 for its method. Do not read a
+hidden width there as an operating point that a run can ask for.
+
+**The observation is no longer the array this report measures.** The engine
+publishes an egocentric ring frame with an entity token block, and it reached
+layout version 7 on 8 September 2026. Section 1 measures the earlier array,
+whose length followed the block lattice. That is the defect this report asked
+about, and the frame answers it. A register holds the parameters of the layout
+the engine builds now.[^46]
+
 ## 0 Method, and the moment this measures
 
 The author read the engine, the Python binding and the learner package. The
@@ -950,3 +973,6 @@ evidence that the published literature does not contain.
 [^39]: ADR-0007, content supplies a key vector, never a comparator. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 [^40]: Findings register, FND-569. `docs/FINDINGS.md`
 [^41]: ADR-0008, the primary target is aarch64. `docs/adrs/accepted/adr-0008-the-primary-target-is-aarch64.md`
+[^44]: The strategy table of the trainer. `python/cachette/learn/__main__.py`
+[^45]: The stored policy reader of the control plane. `python/cachette/learn/policy.py`
+[^46]: Reinforcement learning parameters register, the observation layout. `docs/reference/rl-costs.md`

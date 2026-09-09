@@ -42,6 +42,29 @@ are settings rather than code. A simulation of the trainer places that point a
 quarter above the present one for the same episodes, and section 2.5 states
 what the simulation assumes and how to falsify it.
 
+## What has changed since this report
+
+**This report is fixed to the moment section 0 names, and nothing below was
+edited afterwards.** The recommended operating point names a policy kind that
+no longer exists.
+
+**The project deleted the kind that holds a frozen random projection in its
+first layer.** A hidden width is a parameter of that kind, so a run cannot ask
+for a hidden width of 8. The trainer now builds two kinds. One is `linear`,
+over the whole array. The other is `structured`, which shares a weight across
+the sector axis and trains every layer.[^25] The loader refuses a stored file
+that names the deleted kind, and it names the kind in the refusal.[^26]
+
+The other three settings of the recommendation stand. Read section 8 for what
+a smaller trainable count buys, and read the structured kind as the shape that
+now carries it.
+
+**The observation is no longer the array this report reads.** The engine
+publishes an egocentric ring frame with an entity token block, and it reached
+layout version 7 on 8 September 2026. Section 5 measures the earlier array, so
+read its share of the trade board as a fact of that array. A register holds the
+parameters of the layout the engine builds now.[^27]
+
 ## 0 Provenance, and what this report could not verify
 
 The author read the code in this repository, read the logs of one completed
@@ -1060,3 +1083,6 @@ share.
 [^22]: Findings register, FND-667. `docs/FINDINGS.md`
 [^23]: The commit `Remove the survival term, because the tick of the end predicts losing`. Read its message for the 249-pair table.
 [^24]: Report 41, a handbook for training a policy, section 9.1. `docs/research/reports/41-a-handbook-for-training-a-policy.md`
+[^25]: The strategy table of the trainer. `python/cachette/learn/__main__.py`
+[^26]: The stored policy reader of the control plane. `python/cachette/learn/policy.py`
+[^27]: Reinforcement learning parameters register, the observation layout. `docs/reference/rl-costs.md`
