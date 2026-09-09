@@ -1463,6 +1463,27 @@ impl SeededField {
     }
 }
 
+/// Two seeded fields are equal when they carry the same directions over the
+/// same lattice.
+///
+/// **The comparison reads the answer and not the working buffers.** The reach
+/// and the scratch hold what the last derivation left, no reader of the field
+/// reads either, and a field that skipped a derivation whose answer it already
+/// held must compare equal to one that made it.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+impl PartialEq for SeededField {
+    fn eq(&self, other: &Self) -> bool {
+        self.cells == other.cells
+            && self.plane_count == other.plane_count
+            && self.directions == other.directions
+    }
+}
+
+impl Eq for SeededField {}
+
 /// The direction of the nearest site of a faction, for each level 1 cell.
 ///
 /// **A unit that carries a load home reads one entry and steps.** It reads no
@@ -1706,6 +1727,28 @@ pub struct ApproachField {
 
 /// The neighbour offset that means the neighbour lies outside the block.
 const OUTSIDE_BLOCK: u32 = u32::MAX;
+
+/// Two approach fields are equal when they hold the same entries with the
+/// same offsets, over the same block layout.
+///
+/// **The comparison reads the answer and not the working buffers.** The reach,
+/// the scratch, the ground and the neighbour table hold what the last
+/// derivation left, no reader of the field reads any of them, and a field that
+/// skipped a derivation whose answer it already held must compare equal to one
+/// that made it.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+impl PartialEq for ApproachField {
+    fn eq(&self, other: &Self) -> bool {
+        self.layout == other.layout
+            && self.entries == other.entries
+            && self.offsets == other.offsets
+    }
+}
+
+impl Eq for ApproachField {}
 
 impl ApproachField {
     /// Builds a field over a block layout, with no entry anywhere.

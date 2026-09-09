@@ -166,6 +166,12 @@ probe:
     # it, so a sent unit reads a field that describes a seed set the world no
     # longer holds. The two tests below must fail under it.
     ! cargo test --package cachette-core --features probe-stale-destinations --test the_step_derives_the_destination_field_after_the_controller
+    # The step derives the destination field only when a send changed a seed
+    # set or a crossing. The frozen-destination build removes the mark that
+    # the send verb writes, so the step derives the field once and never
+    # again. The two checks below must fail under it.
+    ! cargo test --package cachette-core --features probe-frozen-destinations --lib destination_guard
+    ! cargo test --package cachette-core --features probe-frozen-destinations --test the_destination_field_follows_its_seed_sets
 
 # Check the unsafe code with Miri. ADR-0097 D4.
 #

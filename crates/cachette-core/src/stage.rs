@@ -128,6 +128,11 @@ macro_rules! declare_stages {
             /// what the check's own world gives, and it is not a claim that
             /// the step never opens the stage. A benchmark that wants the
             /// count reads the `entries` column of the table.
+            ///
+            /// **The two halves of the destination derivation are of that
+            /// kind as well.** The step derives the field only when a send
+            /// changed a seed set, so a frame that took no new order opens
+            /// neither half.
             #[must_use]
             pub const fn entries_for_each_frame(self) -> u64 {
                 match self {
@@ -216,6 +221,8 @@ declare_stages! {
     ControllerRelation,       "controller_relation",        false, 0, true;
     SendDeriveDestinations,   "send_derive_destinations",   false, 0, true;
     RebuildDestinations,      "rebuild_destinations",       false, 1, false;
+    DestinationsCoarse,       "destinations_coarse",        false, 0, true;
+    DestinationsFine,         "destinations_fine",          false, 0, true;
     BridgeRefreshClosing,     "bridge_refresh_closing",     false, 1, false;
 }
 

@@ -37,6 +37,12 @@ probe-nondeterminism = []
 # asserts that the send test fails. A test with no proven failure mode is
 # decoration.
 probe-stale-destinations = []
+# `probe-frozen-destinations` is a test-only switch. The send verb marks the
+# destination field as changed, and the step derives the field only when
+# something marked it. This switch removes the mark, so the field describes the
+# seed set of the first frame for the whole run. The dependency tests then fail.
+# A guard with no proven failure mode is decoration.
+probe-frozen-destinations = []
 census-generated-tiles = []
 stage-cost = []
 # `census-holding` counts what the holding apply does on each frame. It is a
