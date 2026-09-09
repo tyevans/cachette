@@ -102,6 +102,18 @@ def run_population(
     answer away**, so no figure of a run said how much of what a policy chose
     the engine carried out. A policy the engine mostly refuses is close to a
     no-op whatever it chooses.
+
+    **The loop takes the observation from the step and never asks a world for
+    it.** The reward of a decision reads the array of the state after the
+    ticks, and that state is the state the next decision hands the policy. So
+    the step already holds the array the loop needs, and a loop that asked a
+    world again built the same numbers a second time. Every one of those
+    builds ran in this interpreter with every engine worker idle.[^1]
+
+    References
+    ----------
+    [^1]: Report 38, where the training time goes, section 10.2.
+    ``docs/research/reports/38-where-the-training-time-goes.md``
     """
     ordered = [int(seed) for seed in seeds]
     pairs = _pairs(len(policies), len(ordered))
@@ -201,7 +213,7 @@ def _drive(
     once under several. A second copy of the loop would be one rule stored
     twice, with nothing that fails when the copies disagree.
     """
-    vector.reset([seeds[s] for _, s in pairs])
+    observations = vector.reset([seeds[s] for _, s in pairs])
     names = vector.envs[0].also_names
     returns = np.zeros(len(pairs))
     also = {name: np.zeros(len(pairs)) for name in names}
@@ -212,7 +224,6 @@ def _drive(
     told = 0
     decisions = 0
     while not vector.done:
-        observations = np.stack([env.observation() for env in vector.envs])
         masks = vector.action_masks()
         actions = [0] * len(pairs)
         # Each candidate scores its own worlds. The rows of one candidate are
@@ -222,7 +233,9 @@ def _drive(
             last = first + len(seeds)
             picked = policy.choose_many(observations[first:last], masks[first:last])
             actions[first:last] = picked
-        for index, result in enumerate(vector.step(actions)):
+        results = vector.step(actions)
+        observations = np.stack([result.observation for result in results])
+        for index, result in enumerate(results):
             returns[index] += result.reward
             paid = result.info["also"]
             for name in names:

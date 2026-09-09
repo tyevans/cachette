@@ -134,6 +134,8 @@ from typing import TYPE_CHECKING, Final, Protocol
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
+    import numpy as np
+
     from cachette import World
 
 # The shaped terms the register holds one row for. A caller may weigh any
@@ -291,8 +293,13 @@ class Scorer(Protocol):
     def reset(self, world: World) -> None:
         """Take the first reading of a run, and pay nothing for it."""
 
-    def read(self, world: World) -> RewardStep:
-        """Return what the decision before this reading earned."""
+    def read(self, world: World, observation: np.ndarray | None = None) -> RewardStep:
+        """Return what the decision before this reading earned.
+
+        The observation entry is the array of the seat at this state. A
+        caller that already holds it passes it, and the scorer then builds
+        no array of its own.
+        """
 
 
 class Scoring(Protocol):
@@ -362,14 +369,22 @@ class OutcomeReader:
         self._outcome = RUNNING
         self._done = False
 
-    def read(self, world: World) -> Outcome:
+    def read(self, world: World, observation: np.ndarray | None = None) -> Outcome:
         """Name the state of the run, and keep it.
 
         A run that has already ended keeps the outcome it ended with. The
         first terminal reading is the one that pays, and every later reading
         reports the same end.
+
+        The observation entry is the array of the faction at this state. The
+        reader reads three positions of it and never writes it, so a caller
+        that already holds the array passes it and the reader builds none.
         """
-        values = world.faction_observation(self._faction)
+        values = (
+            world.faction_observation(self._faction)
+            if observation is None
+            else observation
+        )
         reading = {name: int(values[start]) for name, start in self._starts.items()}
         alive = any(reading[name] > 0 for name in _ACTING_FIELDS)
         if self._done:
@@ -496,16 +511,22 @@ class Reward:
         self._previous = self._read(world)
         self._outcomes.reset()
 
-    def read(self, world: World) -> RewardStep:
+    def read(self, world: World, observation: np.ndarray | None = None) -> RewardStep:
         """Return what the decision before this reading earned.
 
         A caller steps the world and then calls this. The shaped part is the
         weighted change of each term since the previous reading. The terminal
         part is the weight of the outcome, and it is paid once.
+
+        **The observation array of one state serves every reader of it.** The
+        weighted terms and the outcome both come from the array of the seat
+        at this state, and building it twice gives the same numbers at twice
+        the cost. A caller that already holds the array passes it here, and
+        this reads no array of its own.
         """
         ended = self.done
-        reading = self._read(world)
-        state = self._outcomes.read(world)
+        reading = self._read(world, observation)
+        state = self._outcomes.read(world, observation)
         if ended:
             return RewardStep(
                 value=0.0,
@@ -541,9 +562,15 @@ class Reward:
             changes=changes,
         )
 
-    def _read(self, world: World) -> dict[str, int]:
+    def _read(
+        self, world: World, observation: np.ndarray | None = None
+    ) -> dict[str, int]:
         """Read every position this reward needs from the observation array."""
-        values = world.faction_observation(self._faction)
+        values = (
+            world.faction_observation(self._faction)
+            if observation is None
+            else observation
+        )
         return {name: int(values[start]) for name, start in self._starts.items()}
 
 

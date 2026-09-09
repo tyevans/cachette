@@ -225,6 +225,9 @@ class Env:
         keep the order the caller gave, so a caller that combines the results
         sorts by a key it stated and never by what finished first.
 
+        The held array is the observation the last decision built. A reset
+        clears it, a decision sets it, and a finished episode answers every
+        later row with it.
         """
         self._config = config
         self._scoring = scoring
@@ -235,6 +238,7 @@ class Env:
         self._decisions = 0
         self._terminated = False
         self._truncated = False
+        self._held: np.ndarray | None = None
         # The lengths come from the schemas, and both are functions of the
         # world parameters alone. A probe world answers them once, so a
         # caller sizes a network before it runs an episode.
@@ -309,6 +313,7 @@ class Env:
         self._decisions = 0
         self._terminated = False
         self._truncated = False
+        self._held = None
         return self.observation()
 
     def _companions(self) -> dict[str, Scorer]:
@@ -379,6 +384,7 @@ class Env:
         self._decisions = 0
         self._terminated = False
         self._truncated = False
+        self._held = None
         return self.observation()
 
     def observation(self) -> np.ndarray:
@@ -463,17 +469,38 @@ class Env:
         the info carries what each one paid. **Only the primary scoring
         decides that the episode ended**, because the end of an episode is a
         property of the world and every scorer reads the same answer for it.
+        **One decision builds the observation of its state once.** The reward
+        reads the array, the outcome reader reads the array, and the result
+        carries the array. Three readers of one state read one build, because
+        the world does not change between them and a second build gives the
+        same numbers at the same cost again. The array of a decision was
+        built four times before this, and a training run spent about a fifth
+        of every decision on the three builds it threw away.[^1]
+
+        **The array in the result is the array the reward kept.** A caller
+        must not write it. A caller that needs a writable array copies it,
+        and stacking a batch of them copies.
+
+        References
+        ----------
+        [^1]: Report 38, where the training time goes, section 10.2.
+        ``docs/research/reports/38-where-the-training-time-goes.md``
         """
         world = self._require_world()
         if self._reward is None:  # pragma: no cover - reset builds both
             message = "the environment has no reward. Call reset first."
             raise RuntimeError(message)
         self._decisions += 1
-        reading = self._reward.read(world)
-        also = {name: scorer.read(world).value for name, scorer in self._also.items()}
+        held = self.observation()
+        self._held = held
+        reading = self._reward.read(world, held)
+        also = {
+            name: scorer.read(world, held).value
+            for name, scorer in self._also.items()
+        }
         self._record_end(reading)
         return StepResult(
-            observation=self.observation(),
+            observation=held,
             reward=reading.value,
             terminated=self._terminated,
             truncated=self._truncated,
@@ -500,9 +527,16 @@ class Env:
         No scorer reads a finished episode, so every companion earns nothing
         here as well. The also entry still holds one zero for each name, so
         a caller reads the same set of names on every row.
+        **A finished episode leaves the batch, so its world stands still.**
+        The array of the last decision is therefore the array of every row
+        after it, and this returns that array rather than building it again.
+        A pass that started 512 worlds runs its last decisions with most of
+        them finished, and each of those built an array nothing read.
         """
+        if self._held is None:
+            self._held = self.observation()
         return StepResult(
-            observation=self.observation(),
+            observation=self._held,
             reward=0.0,
             terminated=self._terminated,
             truncated=self._truncated,
