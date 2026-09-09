@@ -22,10 +22,20 @@ column of the table and never as the headline, and the summary says so.
 
 **The held-out figure is the one that decides the spend.** The trainer plays
 the built-in controller on the held-out seeds before it trains anything, and
-writes that row to the report. That row is the bar. The validation figure,
-which the trainer takes every few generations on a third seed set, is the
-only in-flight measure of the centre, so this module carries it beside the
-bar.
+writes that row to the report. That row is the bar. The trainer also plays
+the best centre on the held-out seeds every few generations, so a run that a
+wall clock cap ends leaves an honest figure behind.
+
+The validation figure comes from the seeds that choose the centre, so it
+selects rather than measures. This module carries it, and it says which
+seeds every figure it prints came from.
+
+# The verdict reads a win share and never a return
+
+A win share measures play. The mean shaped return is what the search
+maximises, and a run can raise it while its policy takes one unit and
+wanders. The verdict of each strategy therefore compares win shares, and it
+names the measurement it used.[^1]
 
 # A spread of zero means the search stopped
 
@@ -41,6 +51,11 @@ strategy, and one row for each baseline at the end of a strategy. Those
 lines are the interface this module reads. A line it cannot parse is
 skipped rather than fatal, so a trainer that gains a column keeps working
 here.
+
+# References
+
+[^1]: What is wrong with training and evaluation, items 1 and 2.
+`docs/research/what-is-wrong-with-training-and-evaluation.md`
 """
 
 from __future__ import annotations
@@ -89,7 +104,7 @@ IN_FLIGHT = re.compile(r"(?:^|\s)working(?:\s|$)")
 # of them, and a pass that one process scores whole reports no shard.
 WORKING = re.compile(
     r"^\s+(?:(?P<name>\S+) )?(?P<what>generation\s+\d+|yardstick|baseline"
-    r"|validation\s+\d+)"
+    r"|validation\s+\d+|holdout\s+\d+)"
     r"(?: shard (?P<shard>\d+)/(?P<shards>\d+))?"
     r" working\s+decisions\s+(?P<decisions>\d+)\s+"
     r"live\s+(?P<live>\d+)/(?P<worlds>\d+)\s+"
@@ -150,7 +165,21 @@ class Generation:
     # and a reader must not read that as zero work.
     ticks: int | None = None
     won: float | None = None
+    # The mean shaped return of the validation pass, and the win share of the
+    # same pass. **The validation seeds choose the centre**, so both figures
+    # select and neither is a measurement.
     validation: float | None = None
+    validation_won: float | None = None
+    # The mean shaped return and the win share of the held-out pass. **The
+    # held-out seeds choose nothing**, so these measure. A generation that
+    # took no held-out pass holds neither.
+    holdout: float | None = None
+    holdout_won: float | None = None
+    # The share of decisions of the validation pass on which the policy
+    # emitted its most common action, and the share of its episodes whose
+    # unmasked argmax changed. Both are instruments and neither gates a run.
+    most_common_share: float | None = None
+    preference_varies: float | None = None
 
 
 @dataclass
@@ -200,6 +229,31 @@ class Flight:
         return None if self.worlds <= 0 else (self.worlds - self.live) / self.worlds
 
 
+@dataclass(frozen=True)
+class Measurement:
+    """One win share of a policy, and which seeds gave it.
+
+    **A win share is the quantity that measures play**, and the mean shaped
+    return is the training signal. A dashboard that printed the return said
+    nothing about winning, and the paid run it watched published four
+    policies that take one unit and wander.[^1]
+
+    The source entry names the seeds and the generation, so a reader knows
+    what the figure is. The selected entry is true when those seeds chose the
+    centre, which makes the figure a maximum over the passes of the run
+    rather than a measurement.
+
+    References
+    ----------
+    [^1]: What is wrong with training and evaluation, item 1.
+    `docs/research/what-is-wrong-with-training-and-evaluation.md`
+    """
+
+    won: float
+    source: str
+    selected: bool
+
+
 @dataclass
 class Strategy:
     """One policy under training, and what it has scored so far."""
@@ -235,6 +289,70 @@ class Strategy:
         for row in reversed(self.generations):
             if row.validation is not None:
                 return row.validation
+        return None
+
+    @property
+    def last_holdout(self) -> Generation | None:
+        """Return the newest generation that took a held-out pass, or nothing.
+
+        **The newest generation is not the newest held-out pass.** The trainer
+        takes that pass at an interval, so a reader that looked only at the
+        last row would report no held-out figure for every generation between
+        two intervals.
+        """
+        for row in reversed(self.generations):
+            if row.holdout is not None or row.holdout_won is not None:
+                return row
+        return None
+
+    @property
+    def latest_measurement(self) -> Measurement | None:
+        """Return the newest win share of this policy, and where it came from.
+
+        **The verdict renders from whatever the newest honest figure is.** It
+        used to render only from the row a finished strategy leaves, and a
+        wall clock cap ended a paid run before any strategy finished. The
+        dashboard then showed a shaped return for the whole run and never
+        once said anything about winning.[^1]
+
+        The three sources rank by how much they measure. The row of a
+        finished strategy plays the held-out seeds after the run. A periodic
+        held-out pass plays the same seeds during the run. The validation
+        pass plays the seeds that chose the centre, so it selects rather than
+        measures, and the source says so.
+
+        References
+        ----------
+        [^1]: What is wrong with training and evaluation, item 1.
+        `docs/research/what-is-wrong-with-training-and-evaluation.md`
+        """
+        trained = self.baselines.get("trained")
+        if trained is not None and "won" in trained:
+            return Measurement(
+                won=trained["won"],
+                source="the held-out seeds, after this strategy ended",
+                selected=False,
+            )
+        for row in reversed(self.generations):
+            if row.holdout_won is not None:
+                return Measurement(
+                    won=row.holdout_won,
+                    source=(
+                        f"the held-out seeds at generation {row.generation}, "
+                        "which chose nothing"
+                    ),
+                    selected=False,
+                )
+        for row in reversed(self.generations):
+            if row.validation_won is not None:
+                return Measurement(
+                    won=row.validation_won,
+                    source=(
+                        f"the validation seeds at generation {row.generation}, "
+                        "which chose the centre"
+                    ),
+                    selected=True,
+                )
         return None
 
     @property
@@ -389,6 +507,11 @@ def parse(text: str) -> Progress:
                     won=values.get("won"),
                     ticks=None if ticks is None else int(ticks),
                     validation=values.get("valid"),
+                    validation_won=values.get("valid-won"),
+                    holdout=values.get("holdout"),
+                    holdout_won=values.get("holdout-won"),
+                    most_common_share=values.get("top-share"),
+                    preference_varies=values.get("varies"),
                 )
             )
             # A finished generation ends every shard of the pass. A frozen
@@ -489,6 +612,41 @@ def clock(seconds: float) -> str:
 RECENT_GENERATIONS = 15
 
 
+def verdict_lines(strategy: Strategy, controller: dict[str, float] | None) -> list[str]:
+    """Return the verdict of one strategy, and which measurement gave it.
+
+    **The verdict compares win shares and never returns.** A win share
+    measures play. The mean shaped return is the training signal, and a run
+    can raise it while its policy takes one unit and wanders.[^1]
+
+    The verdict names the seeds it read, because the three sources answer
+    different questions. A figure from the seeds that chose the centre is a
+    maximum over the passes of the run, so the line marks it as a selection
+    figure rather than a measurement.
+
+    References
+    ----------
+    [^1]: Findings register, FND-707. `docs/FINDINGS.md`
+    """
+    measured = strategy.latest_measurement
+    if measured is None:
+        return ["      verdict    nothing measures winning yet"]
+    if not controller or "won" not in controller:
+        return [
+            f"      verdict    wins {measured.won:.3f}, and no controller bar "
+            "to compare",
+            f"                 from {measured.source}",
+        ]
+    beats = measured.won > controller["won"]
+    word = "BEATS the controller" if beats else "loses to the controller"
+    caution = ", which selects" if measured.selected else ""
+    return [
+        f"      verdict    wins {measured.won:.3f} against the controller's "
+        f"{controller['won']:.3f}: {word}",
+        f"                 from {measured.source}{caution}",
+    ]
+
+
 def render(
     progress: Progress,
     price_per_hour: float,
@@ -539,33 +697,58 @@ def render(
         else:
             lines.append("      in flight  nothing, between passes")
         if trained:
-            verdict = "BEATS the controller"
-            if controller and trained["won"] <= controller["won"]:
-                verdict = "loses to the controller"
             lines.append(
                 f"      held out   wins {trained['won']:.3f} "
-                f"return {trained['return']:9.1f}   {verdict}"
+                f"return {trained['return']:9.1f}"
             )
         else:
+            held = strategy.last_holdout
             latest = strategy.last_validation
-            lines.append(
-                "      held out   not measured until this strategy ends"
-                + (
-                    f"; validation {latest:.1f}"
-                    if latest is not None
-                    else "; no validation yet"
+            if held is not None:
+                wins = "-" if held.holdout_won is None else f"{held.holdout_won:.3f}"
+                gave = "-" if held.holdout is None else f"{held.holdout:9.1f}"
+                lines.append(
+                    f"      held out   wins {wins} return {gave} "
+                    f"at generation {held.generation}, during the run"
                 )
-            )
+            elif latest is not None:
+                lines.append(
+                    f"      held out   not measured yet; validation {latest:.1f}, "
+                    "which chose the centre"
+                )
+            else:
+                lines.append("      held out   not measured yet; no validation yet")
+        lines.extend(verdict_lines(strategy, controller))
         if rows:
             recent = rows[-recent_generations:] if recent_generations > 0 else rows
-            lines.append("      generation  mean       best       spread   won")
+            lines.append(
+                "      generation  mean       best       spread   won    top   vary"
+            )
             for row in recent:
                 spread = "     -" if row.spread is None else f"{row.spread:9.1f}"
                 won = "    -" if row.won is None else f"{row.won:5.2f}"
+                top = (
+                    "    -"
+                    if row.most_common_share is None
+                    else f"{row.most_common_share:5.2f}"
+                )
+                vary = (
+                    "    -"
+                    if row.preference_varies is None
+                    else f"{row.preference_varies:5.2f}"
+                )
                 lines.append(
                     f"      {row.generation:10d} {row.mean:10.1f} "
-                    f"{row.best:10.1f} {spread} {won}"
+                    f"{row.best:10.1f} {spread} {won} {top} {vary}"
                 )
+            lines.append(
+                "      top is the share of decisions on the most common action, "
+                "and vary is"
+            )
+            lines.append(
+                "      the share of episodes whose unmasked preference moved. "
+                "Both are instruments."
+            )
         if strategy.collapsed:
             lines.append(
                 f"      SEARCH STOPPED: the spread was under {COLLAPSE_SPREAD} "
@@ -614,6 +797,11 @@ def rows(progress: Progress, run_id: str) -> list[dict[str, object]]:
                     "spread": row.spread,
                     "won": row.won,
                     "validation": row.validation,
+                    "validation_won": row.validation_won,
+                    "holdout": row.holdout,
+                    "holdout_won": row.holdout_won,
+                    "most_common_share": row.most_common_share,
+                    "preference_varies": row.preference_varies,
                     "seconds": row.seconds,
                 }
             )

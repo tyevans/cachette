@@ -16,6 +16,27 @@ so a policy cannot learn one map.
 mean that rises may only mean that the new worlds are easier. Only the
 held-out measurement is evidence.
 
+# The win share selects, and the shaped return trains
+
+The shaped return is the training signal. It is dense, and it is what the
+search ranks. **It is not a measure of play.** A run that kept the centre
+with the highest mean shaped return published four policies that take one unit
+and wander, and the win share of every validation pass of that run was already
+computed and thrown away.[^2]
+
+This loop therefore selects on the win share and breaks a tie on the mean
+shaped return. Nothing about the training signal changes.
+
+# The held-out pass runs at an interval, not only at the end
+
+The validation seeds choose the centre, so a validation figure is a selection
+maximum and never an unbiased measurement. The held-out seeds choose nothing.
+
+A run under a wall clock cap can end at any generation, so a held-out pass
+that ran only after the loop returned left no honest figure behind at all.
+This loop takes a held-out interval in the way it takes a validation
+interval.[^2]
+
 # The latest centre and the best centre are two different files
 
 The latest centre is the resume point. The run writes it after every
@@ -46,6 +67,9 @@ is one action integer.
 
 [^1]: ADR-0194, a generation is scored in shards and combined in candidate
 order. ``docs/adrs/draft/adr-0194-a-generation-is-scored-in-shards.md``
+
+[^2]: What is wrong with training and evaluation, items 1 and 2.
+``docs/research/what-is-wrong-with-training-and-evaluation.md``
 """
 
 from __future__ import annotations
@@ -62,9 +86,23 @@ import numpy as np
 from .config import TrainConfig
 from .env import Env, EnvConfig, viable_seeds
 from .normalize import reference_normalizer
-from .policy import FeatureNormalizer, LinearPolicy, Policy, PolicyFit, load_policy
+from .policy import (
+    FeatureNormalizer,
+    LinearPolicy,
+    Policy,
+    PolicyFit,
+    PolicyFitError,
+    load_policy,
+)
 from .presets import ObjectiveSchedule
-from .record import EpisodeRecord, GenerationRecord, PopulationRecord
+from .record import (
+    EpisodeRecord,
+    GenerationRecord,
+    PopulationRecord,
+    ValidationScore,
+    most_common_share,
+    preference_varies,
+)
 from .reward import Scoring, Weighting
 from .rollout import (
     HEARTBEAT_SECONDS,
@@ -105,9 +143,21 @@ class TrainResult(TypedDict):
     of every candidate and the reading of every episode, so that a later
     reader can ask a question this run did not ask.
 
-    The holdout entry is absent when the run ends. The report writer plays
-    the stored centre against the held-out seeds and adds it, because only a
-    held-out measurement is evidence of what the run learned.
+    **Every entry names which quantity it holds.** The selection entries come
+    from the validation seeds, which choose the centre, so they are a maximum
+    over the passes of the run. The held-out entries come from seeds that
+    never influenced the choice. A result that gave one number for both let a
+    selection maximum be read as an unbiased measurement.[^1]
+
+    The held-out entries are the newest periodic pass of the run. They are
+    absent for a run with no held-out seeds. The holdout entry is a separate
+    thing: it is the four-way comparison the report writer adds after the run
+    ends, and it is absent while the run lives.
+
+    References
+    ----------
+    [^1]: What is wrong with training and evaluation, items 1 and 2.
+    ``docs/research/what-is-wrong-with-training-and-evaluation.md``
     """
 
     name: str
@@ -118,10 +168,73 @@ class TrainResult(TypedDict):
     latest_weights: str
     parameters: int
     best_generation: int
-    best_validation: float | None
+    best_selection_won: float | None
+    best_selection_return: float | None
     validation_seeds: list[int]
+    holdout_seeds: list[int]
+    held_out_won: float | None
+    held_out_return: float | None
+    held_out_generation: int
     degenerate_generations: list[int]
     holdout: NotRequired[dict[str, dict[str, float]]]
+
+
+def _figure_meta(prefix: str, score: ValidationScore | None) -> dict[str, object]:
+    """Return the entries a weight file states for one measured figure.
+
+    **The prefix says what the figure is.** A name that begins with
+    ``selection`` comes from the seeds that chose the centre. A name that
+    begins with ``held_out`` comes from seeds that chose nothing. A reader
+    that compares the two compares different quantities, so the file must not
+    let one be read as the other.[^1]
+
+    A figure that nothing measured reads back as the quiet value. That is the
+    state a run with no validation seeds is in.
+
+    References
+    ----------
+    [^1]: What is wrong with training and evaluation, items 1 and 2.
+    ``docs/research/what-is-wrong-with-training-and-evaluation.md``
+    """
+    quiet = float("nan")
+    if score is None:
+        return {
+            f"{prefix}_won": quiet,
+            f"{prefix}_return": quiet,
+            f"{prefix}_episodes": 0,
+        }
+    return {
+        f"{prefix}_won": float(score.won),
+        f"{prefix}_return": float(score.mean),
+        f"{prefix}_episodes": int(score.episodes),
+    }
+
+
+def _stored_figure(meta: Mapping[str, object], prefix: str) -> ValidationScore | None:
+    """Read back one measured figure of a weight file, or nothing.
+
+    **A quiet value means that nothing measured the figure**, so it reads
+    back as nothing rather than as a score. A resumed run that took the quiet
+    value as it stands would compare every later pass against a quantity that
+    no pass is greater than. The best centre would then never move again, the
+    run would keep printing generations, and nothing would say that the search
+    had stopped choosing.
+
+    A file written by an older run holds neither entry, and it reads back as
+    nothing for the same reason.
+    """
+    won = meta.get(f"{prefix}_won")
+    mean = meta.get(f"{prefix}_return")
+    if not isinstance(won, (int, float)) or not isinstance(mean, (int, float)):
+        return None
+    if not math.isfinite(won) or not math.isfinite(mean):
+        return None
+    episodes = meta.get(f"{prefix}_episodes")
+    return ValidationScore(
+        won=float(won),
+        mean=float(mean),
+        episodes=int(episodes) if isinstance(episodes, (int, float)) else 0,
+    )
 
 
 @dataclass(frozen=True)
@@ -159,8 +272,9 @@ class Checkpoint:
         target: Path,
         generation: int,
         spread: float,
-        validated: float,
-        best: float,
+        validated: ValidationScore | None,
+        best: ValidationScore | None,
+        held_out: ValidationScore | None = None,
     ) -> None:
         """Write one centre, and everything needed to reason about it later.
 
@@ -168,6 +282,20 @@ class Checkpoint:
         after a crash can be placed. The spread entry says whether the search
         still had a population to rank when it stopped, which is the signal
         that the first full run lost silently.
+
+        **The file states which figure selected this centre and which did
+        not.**[^4] The selection entries come from the validation seeds, which
+        choose the centre, so they are a maximum over the passes of the run.
+        The held-out entries come from seeds that never influenced the choice.
+
+        A file used to carry one entry called the validation score, and a
+        manifest built from it was published as a mean over held-out seeds.
+        The two are different quantities and the label said the opposite of
+        what the number was.[^3]
+
+        A quiet value means that nothing measured that figure. A run with no
+        validation seeds cannot tell one centre from another, so its
+        selection entries are quiet.
 
         **The fit carries the action table as the engine published it.** That
         table is what lets a later reader place a row of this file by its verb
@@ -192,14 +320,22 @@ class Checkpoint:
         [^2]: ADR-0200, a stored policy names each row of the action table by
         its verb and its candidate coordinates, decision D1.
         ``docs/adrs/draft/adr-0200-a-stored-policy-names-each-action-row-by-verb-and-coordinates.md``
+
+        [^3]: What is wrong with training and evaluation, items 1 and 2.
+        ``docs/research/what-is-wrong-with-training-and-evaluation.md``
+
+        [^4]: ADR-0202, a run selects on the win share, and
+        every published figure names its seed set, decision D3.
+        ``docs/adrs/draft/adr-0202-a-run-selects-on-the-win-share-and-every-published-figure-names-its-seed-set.md``
         """
         current.save(
             target,
             {
                 "generation": generation,
                 "spread": spread,
-                "validation_score": validated,
-                "best_score": best,
+                **_figure_meta("selection", validated),
+                **_figure_meta("best_selection", best),
+                **_figure_meta("held_out", held_out),
                 # **The fit states the world this file was trained against,
                 # and the engine owns every number in it.** A reader refuses
                 # a file whose fit is not the fit of the world it is asked
@@ -212,7 +348,9 @@ class Checkpoint:
             },
         )
 
-    def resume(self, shell: Trainable) -> tuple[Trainable, int, float, str | None]:
+    def resume(
+        self, shell: Trainable
+    ) -> tuple[Trainable, int, ValidationScore | None, str | None]:
         """Read back the centre, the generation counter, the best score and a note.
 
         **A resumed run continues the run. It is not a fresh run wearing an
@@ -230,12 +368,13 @@ class Checkpoint:
         feature, so a centre read under another standardization means
         something else at every position.
 
-        **A checkpoint written before the normalizer existed states none, and
-        this does not refuse it.** A file that states none loads so that a
-        policy published before the normalizer still plays, and a resume takes
-        the same door. Such a centre is then read under the transform of this
-        run rather than under the one it was trained through. Start a fresh
-        run rather than resuming one of those.
+        **A checkpoint that states no normalizer is refused here.** The reader
+        takes such a file, so a policy published before the normalizer existed
+        still plays. A resume must not take the same door. The file states no
+        transform and this run holds one, which is one fact stored in two
+        places with nothing that fails when they disagree, and the centre
+        would then be read under a transform it was never trained through.
+        Start a fresh run rather than resuming across that boundary.
 
         **A resumed run reports when it rebuilt the readout rather than
         loading it.** A change to one verb of the action table moves the rows
@@ -254,33 +393,59 @@ class Checkpoint:
         [^1]: ADR-0200, a stored policy names each row of the action table by
         its verb and its candidate coordinates, decisions D3 and D5.
         ``docs/adrs/draft/adr-0200-a-stored-policy-names-each-action-row-by-verb-and-coordinates.md``
+
+        [^2]: Recurring defect shapes, shape 1.
+        ``.agents/rules/recurring-defects.md``
         """
         stored, meta = load_policy(
             self.latest_path,
             PolicyFit.of_env(self.probe, self.normalizer),
             layout_of(shell),
         )
+        self._refuse_without_normalizer(stored)
         policy = shell.rebuild(np.asarray(stored.flat()))
         first_generation = 0
         written = meta.get("generation")
         if isinstance(written, (int, float)):
             first_generation = int(written) + 1
-        best = -np.inf
+        best = None
         if self.best_path.exists():
-            # **A stored best score that is not a real number means that no
-            # centre has been chosen yet.** That is the state a fresh run
-            # starts in, so it reads back as the value a fresh run starts
-            # from. A run with no validation seeds stores the quiet value for
-            # every generation, and a resumed run that took it as it stands
-            # would compare every later score against a quantity that no
-            # score is greater than. The best centre would then never move
-            # again, the run would keep printing generations, and nothing
-            # would say that the search had stopped choosing.
-            score = load_policy(self.best_path)[1].get("best_score")
-            if isinstance(score, (int, float)) and math.isfinite(score):
-                best = float(score)
+            best = _stored_figure(load_policy(self.best_path)[1], "best_selection")
         note = meta.get("action_rebuild")
         return policy, first_generation, best, note if isinstance(note, str) else None
+
+    def _refuse_without_normalizer(self, stored: Policy) -> None:
+        """Refuse a checkpoint that states no feature normalizer.
+
+        This run holds one, and the file states none. Every weight of the
+        stored centre scores a plain squash, and every weight this run trains
+        scores a standardized feature, so the same position means a different
+        quantity on the two sides. Nothing in the fit separates them, because
+        the fit accepts a file that states no normalizer on purpose.[^1] [^2]
+
+        References
+        ----------
+        [^1]: Recurring defect shapes, shape 1.
+        ``.agents/rules/recurring-defects.md``
+
+        [^2]: ADR-0202, a run selects on the win share, and
+        every published figure names its seed set, decision D6.
+        ``docs/adrs/draft/adr-0202-a-run-selects-on-the-win-share-and-every-published-figure-names-its-seed-set.md``
+        """
+        if self.normalizer is None:
+            return
+        if getattr(stored, "normalizer", None) is not None:
+            return
+        message = (
+            f"the checkpoint at {self.latest_path} states no feature "
+            f"normalizer, and this run holds one of "
+            f"{self.normalizer.describe()}. A centre trained through no "
+            "transform means something else at every position under this "
+            "one, so a resume would read the wrong quantity from every "
+            "weight. Start a fresh run rather than resuming across that "
+            "boundary."
+        )
+        raise PolicyFitError(message)
 
 
 @dataclass
@@ -295,6 +460,26 @@ class Validator:
     The validation seeds belong to neither the training pool nor the held-out
     set, so keeping the best of them takes nothing from the held-out
     measurement that the report is judged on.
+
+    **The win share selects, and the mean shaped return breaks a tie.**[^2] The
+    shaped return is the training signal and it is not a measure of play. A
+    run that selected on it published four policies that take one unit and
+    wander, while the win share of every pass sat unread in the same
+    object.[^1]
+
+    **A validation figure is a selection maximum and never a measurement.**
+    The judge also plays the held-out seeds, which chose nothing, and it
+    chooses nothing from them. That pass runs at an interval, so a run that a
+    wall clock cap ends still leaves an honest figure behind.
+
+    References
+    ----------
+    [^1]: What is wrong with training and evaluation, items 1 and 2.
+    ``docs/research/what-is-wrong-with-training-and-evaluation.md``
+
+    [^2]: ADR-0202, a run selects on the win share, and
+    every published figure names its seed set, decisions D1 and D4.
+    ``docs/adrs/draft/adr-0202-a-run-selects-on-the-win-share-and-every-published-figure-names-its-seed-set.md``
     """
 
     name: str
@@ -303,9 +488,12 @@ class Validator:
     workers: int
     seeds: list[int]
     best_policy: Trainable
-    best_score: float
+    best: ValidationScore | None = None
     best_generation: int = -1
-    yardstick: float | None = field(default=None)
+    yardstick: ValidationScore | None = field(default=None)
+    holdout_seeds: list[int] = field(default_factory=list)
+    held_out: ValidationScore | None = None
+    held_out_generation: int = -1
 
     def measure_controller(self) -> None:
         """Play the built-in controller in the learner's own seat.
@@ -324,38 +512,121 @@ class Validator:
             f"{self.name} yardstick",
             replace(self.env_config, controlled=False),
         )
-        print(f"  {self.name} controller yardstick {self.yardstick:9.1f}", flush=True)
+        # **The shaped return stays the first field of this line.** Two
+        # dashboards read it there by position, so the win share goes after
+        # it rather than in front of it.
+        print(
+            f"  {self.name} controller yardstick {self.yardstick.mean:9.1f} "
+            f"won {self.yardstick.won:5.2f}",
+            flush=True,
+        )
 
     def score(
-        self, current: Policy, label: str, env_config: EnvConfig | None = None
-    ) -> float:
-        """Return what one policy scores on the validation seeds.
+        self,
+        current: Policy,
+        label: str,
+        env_config: EnvConfig | None = None,
+        seeds: Sequence[int] | None = None,
+    ) -> ValidationScore:
+        """Return what one policy measured on a seed set.
 
         **This chooses nothing.** It plays the seeds and reports. The caller
         that keeps the best centre is ``check`` below, and it is the only one
         that may move the best. A candidate must never replace the centre,
         because a candidate is the highest of many draws on a few seeds and
         the highest draw is usually the luckiest one.
+
+        **The result carries both the win share and the mean shaped return.**
+        This used to give back a bare float, and the caller that selected on
+        it read the shaped mean without saying which quantity it took.[^1]
+
+        The seeds entry names the set to play. The validation seeds are the
+        default, and the held-out seeds are the other set a caller asks for.
+
+        References
+        ----------
+        [^1]: What is wrong with training and evaluation, items 1 and 2.
+        ``docs/research/what-is-wrong-with-training-and-evaluation.md``
         """
-        return run_population(
+        played = run_population(
             env_config or self.env_config,
             self.scoring,
             [current],
-            self.seeds,
+            list(self.seeds if seeds is None else seeds),
             self.workers,
             label,
-        ).mean()
+        )
+        return ValidationScore.of_record(played)
 
-    def check(self, current: Trainable, generation: int) -> float | None:
-        """Play the centre on the validation seeds, and keep it when it wins."""
+    def check(self, current: Trainable, generation: int) -> ValidationScore | None:
+        """Play the centre on the validation seeds, and keep it when it wins.
+
+        **The win share decides, and the mean shaped return breaks a tie.**
+        The shaped return trains the search and it does not measure play.
+        """
         if not self.seeds:
             return None
         scored = self.score(current, f"{self.name} validation {generation:2d}")
-        if scored > self.best_score:
-            self.best_score = scored
+        if scored.beats(self.best):
+            self.best = scored
             self.best_policy = current
             self.best_generation = generation
         return scored
+
+    def stored_centre(
+        self, current: Trainable, generation: int
+    ) -> tuple[Trainable, int]:
+        """Return the centre the best file holds, and where it came from.
+
+        **This is the one declaration of which centre a run publishes.** A run
+        with no validation seeds cannot tell one centre from another, so the
+        best file holds the centre of this generation. A run with them holds
+        the centre of the pass that selected, whichever generation that was.
+
+        The held-out pass and the writer of the best file both need this
+        answer, and two copies would be one rule stored twice with nothing
+        that fails when they disagree.[^1]
+
+        References
+        ----------
+        [^1]: Recurring defect shapes, shape 1.
+        ``.agents/rules/recurring-defects.md``
+        """
+        if not self.seeds:
+            return current, generation
+        return self.best_policy, self.best_generation
+
+    def measure_holdout(
+        self, current: Trainable, generation: int
+    ) -> ValidationScore | None:
+        """Play the published centre on the held-out seeds, and choose nothing.
+
+        **The held-out seeds never influenced the choice of the centre**, so
+        this is the only honest figure a run produces. A validation figure is
+        a maximum over the passes of the run on the seeds that did the
+        choosing.
+
+        A run under a wall clock cap can end at any generation. A pass that
+        ran only after the loop returned therefore left no honest figure at
+        all for four published policies, and the label on the one figure they
+        carried said the opposite of what it was.[^1]
+
+        References
+        ----------
+        [^1]: What is wrong with training and evaluation, items 1 and 2.
+        ``docs/research/what-is-wrong-with-training-and-evaluation.md``
+        """
+        if not self.holdout_seeds:
+            return None
+        centre, _ = self.stored_centre(current, generation)
+        measured = self.score(
+            centre,
+            f"{self.name} holdout {generation:2d}",
+            seeds=self.holdout_seeds,
+        )
+        self.held_out = measured
+        self.held_out_generation = generation
+        return measured
 
 
 def generation_seeds(
@@ -381,6 +652,8 @@ def train(
     resume: bool = False,
     validation: list[int] | None = None,
     validate_every: int = 3,
+    holdout: list[int] | None = None,
+    holdout_every: int = 5,
 ) -> TrainResult:
     """Train one policy, and return what each generation scored.
 
@@ -407,6 +680,16 @@ def train(
     candidate of every generation reads the result. A file this run writes
     carries the two arrays, so a reader plays the policy through the transform
     the weights were trained under.
+
+    The validation entry names the seeds that choose the centre, and the
+    validation interval says how often the run plays them. **The centre is
+    chosen on the win share of that pass, and a tie falls to the mean shaped
+    return.**
+
+    The holdout entry names seeds that choose nothing, and the holdout
+    interval says how often the run plays them. **A run that a wall clock cap
+    ends must still leave an honest figure behind**, and a pass that ran only
+    after this function returned left none for four published policies.
     """
     fixed = first_scoring(scoring)
     probe = Env(env_config, fixed)
@@ -433,7 +716,7 @@ def train(
     )
     policy: Trainable = shell
     first_generation = 0
-    resumed_best = -np.inf
+    resumed_best: ValidationScore | None = None
     if resume and checkpoint.latest_path.exists():
         policy, first_generation, resumed_best, rebuilt = checkpoint.resume(policy)
         print(
@@ -451,7 +734,8 @@ def train(
         workers=train_config.workers,
         seeds=list(validation or []),
         best_policy=policy,
-        best_score=resumed_best,
+        best=resumed_best,
+        holdout_seeds=list(holdout or []),
     )
     judge.measure_controller()
 
@@ -525,10 +809,22 @@ def train(
                     name, generation, optimiser, centre, played, judge, checked
                 )
 
+            # **The held-out pass runs at its own interval.** It measures the
+            # centre the run would publish, and it chooses nothing. A run that
+            # a wall clock cap ends therefore leaves an honest figure behind
+            # at the last interval it reached.
+            measuring = holdout_every > 0 and generation % holdout_every == (
+                holdout_every - 1
+            )
+            held = judge.measure_holdout(policy, generation) if measuring else None
+
             store_centres(checkpoint, policy, judge, record, checked)
             history.append(
                 record.summary(
-                    checked, judge.yardstick, round(time.time() - started, 1)
+                    checked,
+                    judge.yardstick,
+                    round(time.time() - started, 1),
+                    holdout=held,
                 )
             )
             print(
@@ -539,8 +835,8 @@ def train(
                 f"won {record.won:5.2f} "
                 f"ticks {record.ticks} "
                 f"refused {record.refusal_share:5.2f} "
-                f"valid {'-' if checked is None else f'{checked:9.1f}'} "
-                f"[{history[-1]['seconds']:.0f}s]",
+                + generation_figures(checked, held)
+                + f"[{history[-1]['seconds']:.0f}s]",
                 flush=True,
             )
 
@@ -553,10 +849,49 @@ def train(
         "latest_weights": str(checkpoint.latest_path),
         "parameters": int(judge.best_policy.flat().size),
         "best_generation": judge.best_generation,
-        "best_validation": (None if judge.best_score == -np.inf else judge.best_score),
+        "best_selection_won": None if judge.best is None else judge.best.won,
+        "best_selection_return": None if judge.best is None else judge.best.mean,
         "validation_seeds": list(validation or []),
+        "holdout_seeds": list(holdout or []),
+        "held_out_won": None if judge.held_out is None else judge.held_out.won,
+        "held_out_return": None if judge.held_out is None else judge.held_out.mean,
+        "held_out_generation": judge.held_out_generation,
         "degenerate_generations": list(degenerate),
     }
+
+
+def generation_figures(
+    checked: ValidationScore | None, held: ValidationScore | None
+) -> str:
+    """Return the measured part of one generation line, as named fields.
+
+    **A field says which quantity it holds and which seeds gave it.** The
+    validation fields come from the seeds that choose the centre, so they
+    select. The held-out fields come from seeds that chose nothing.
+
+    The two instrument fields say whether the policy answered one row at
+    every decision, over the validation pass. A dash means that the
+    generation took no pass, so nothing measured the field.[^1]
+
+    A dashboard reads these fields by name and never by their order, so a
+    field added here reaches a reader without a change there.
+
+    References
+    ----------
+    [^1]: Findings register, FND-707. ``docs/FINDINGS.md``
+    """
+    fields = [
+        ("valid", None if checked is None else checked.mean, "9.1f"),
+        ("valid-won", None if checked is None else checked.won, "5.2f"),
+        ("top-share", None if checked is None else checked.most_common_share, "5.2f"),
+        ("varies", None if checked is None else checked.preference_varies, "5.2f"),
+        ("holdout", None if held is None else held.mean, "9.1f"),
+        ("holdout-won", None if held is None else held.won, "5.2f"),
+    ]
+    return "".join(
+        f"{key} {'-' if value is None else format(value, shape)} "
+        for key, value, shape in fields
+    )
 
 
 def first_scoring(scoring: Scoring | ObjectiveSchedule) -> Scoring:
@@ -664,7 +999,7 @@ def store_centres(
     policy: Trainable,
     judge: Validator,
     record: GenerationRecord,
-    checked: float | None,
+    checked: ValidationScore | None,
 ) -> None:
     """Write the latest centre, and the best centre when the best moved.
 
@@ -675,36 +1010,36 @@ def store_centres(
     The best centre moves only when a validation pass finds something better.
     A run with no validation seeds has no way to tell one centre from another,
     so it writes the centre of this generation to both files.
+
+    **Each file states which figure selected the centre and which did not.**
+    The selection figure comes from the validation seeds, and the held-out
+    figure comes from seeds that chose nothing. The held-out figure is the
+    newest periodic pass of the run.
+
+    **The judge says which centre the best file holds.** This decides only
+    whether to write it again, so the two answers cannot part company.
     """
-    quiet = float("nan")
-    validated = quiet if checked is None else checked
-    best = quiet if judge.best_score == -np.inf else judge.best_score
     checkpoint.write(
         policy,
         checkpoint.latest_path,
         record.generation,
         record.spread,
-        validated,
-        best,
+        checked,
+        judge.best,
+        judge.held_out,
     )
-    if not judge.seeds:
-        checkpoint.write(
-            policy,
-            checkpoint.best_path,
-            record.generation,
-            record.spread,
-            validated,
-            best,
-        )
-    elif judge.best_generation == record.generation:
-        checkpoint.write(
-            judge.best_policy,
-            checkpoint.best_path,
-            judge.best_generation,
-            record.spread,
-            validated,
-            best,
-        )
+    if judge.seeds and judge.best_generation != record.generation:
+        return
+    centre, from_generation = judge.stored_centre(policy, record.generation)
+    checkpoint.write(
+        centre,
+        checkpoint.best_path,
+        from_generation,
+        record.spread,
+        checked,
+        judge.best,
+        judge.held_out,
+    )
 
 
 def report_candidate(
@@ -714,8 +1049,8 @@ def report_candidate(
     centre: np.ndarray,
     played: Generation,
     judge: Validator,
-    checked: float,
-) -> float:
+    checked: ValidationScore,
+) -> ValidationScore:
     """Play the highest candidate of a generation on the validation seeds.
 
     **The highest candidate of a generation is the highest of many draws on a
@@ -738,8 +1073,8 @@ def report_candidate(
         f"  {name} generation {generation:2d} "
         f"candidate {highest:4d} scored "
         f"{played.absolute[highest]:9.1f} on its own seeds and "
-        f"{scored:9.1f} on the validation seeds, "
-        f"where the centre scored {checked:9.1f}",
+        f"{scored.mean:9.1f} on the validation seeds, "
+        f"where the centre scored {checked.mean:9.1f}",
         flush=True,
     )
     return scored
@@ -814,6 +1149,12 @@ def summarise(played: Sequence[PopulationRecord]) -> dict[str, float]:
     # **A policy the engine mostly refuses is close to a no-op whatever it
     # chooses**, and no earlier figure of a run said so.
     summary["refusal_share"] = refused / chosen if chosen else 0.0
+    # The two behaviour instruments, over the same episodes. **A held-out
+    # figure that only reports a return cannot say that the policy answered
+    # one row at every decision**, and the engine's legality answer makes a
+    # fixed preference order emit many different actions.
+    summary["most_common_share"] = most_common_share(episodes)
+    summary["preference_varies"] = preference_varies(episodes)
     return summary
 
 
@@ -845,11 +1186,13 @@ __all__ = [
     "TrainResult",
     "Trainable",
     "Update",
+    "ValidationScore",
     "Validator",
     "Weighting",
     "asdict",
     "carries_information",
     "evaluate",
+    "generation_figures",
     "generation_noise",
     "generation_record",
     "generation_seeds",

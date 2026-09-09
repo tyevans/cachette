@@ -55,7 +55,13 @@ import numpy as np
 
 from .env import VectorEnv
 from .league import run_seated_population
-from .record import EpisodeRecord, PopulationRecord, episode_records
+from .policy import masked_choices, preferred_rows
+from .record import (
+    ActionTally,
+    EpisodeRecord,
+    PopulationRecord,
+    episode_records,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Mapping
@@ -191,12 +197,16 @@ class _Played:
     The returns entry holds the return of each world under the primary
     scoring, in index order. The also entry holds the same for each further
     scoring, under the name the caller gave.
+
+    The tallies entry holds the two behaviour instruments of each world, in
+    the same index order.
     """
 
     returns: np.ndarray
     also: Mapping[str, np.ndarray]
     chosen: list[int]
     refused: list[int]
+    tallies: list[ActionTally]
 
 
 def _drive(
@@ -212,6 +222,21 @@ def _drive(
     one that plays a population under one objective, and one that plays it
     once under several. A second copy of the loop would be one rule stored
     twice, with nothing that fails when the copies disagree.
+
+    **The loop instruments what each policy answered, not only what it
+    earned.** It keeps the action each world emitted and the row each policy
+    preferred over the unmasked scores. Those two say whether a policy
+    answered one row at every decision, and no figure of a run said so.[^1]
+
+    A policy that publishes a score matrix pays nothing for the instrument.
+    The loop masks that matrix itself, which is the arithmetic the policy
+    would have done, and it reads the unmasked argmax of the same matrix. A
+    policy that publishes none reports no preference, and the tally then says
+    that the preference was never read.
+
+    References
+    ----------
+    [^1]: Findings register, FND-707. ``docs/FINDINGS.md``
     """
     observations = vector.reset([seeds[s] for _, s in pairs])
     names = vector.envs[0].also_names
@@ -219,6 +244,8 @@ def _drive(
     also = {name: np.zeros(len(pairs)) for name in names}
     chosen = [0] * len(pairs)
     refused = [0] * len(pairs)
+    emitted: list[list[int]] = [[] for _ in pairs]
+    preferred: list[list[int]] = [[] for _ in pairs]
     started = time.perf_counter()
     spoke = started
     told = 0
@@ -226,13 +253,20 @@ def _drive(
     while not vector.done:
         masks = vector.action_masks()
         actions = [0] * len(pairs)
+        rows = [-1] * len(pairs)
         # Each candidate scores its own worlds. The rows of one candidate are
         # contiguous, so one matrix product answers for all of them.
         for candidate, policy in enumerate(policies):
             first = candidate * len(seeds)
             last = first + len(seeds)
-            picked = policy.choose_many(observations[first:last], masks[first:last])
-            actions[first:last] = picked
+            scores = _score_matrix(policy, observations[first:last])
+            if scores is None:
+                actions[first:last] = policy.choose_many(
+                    observations[first:last], masks[first:last]
+                )
+            else:
+                actions[first:last] = masked_choices(scores, masks[first:last])
+                rows[first:last] = preferred_rows(scores)
         results = vector.step(actions)
         observations = np.stack([result.observation for result in results])
         for index, result in enumerate(results):
@@ -246,6 +280,9 @@ def _drive(
             chosen[index] += 1
             if not applied:
                 refused[index] += 1
+            emitted[index].append(actions[index])
+            if rows[index] >= 0:
+                preferred[index].append(rows[index])
         decisions += 1
 
         # **A generation says it is working while it works.** A generation of
@@ -279,7 +316,29 @@ def _drive(
                 flush=True,
             )
 
-    return _Played(returns=returns, also=also, chosen=chosen, refused=refused)
+    return _Played(
+        returns=returns,
+        also=also,
+        chosen=chosen,
+        refused=refused,
+        tallies=[
+            ActionTally.of_actions(emitted[index], preferred[index])
+            for index in range(len(pairs))
+        ],
+    )
+
+
+def _score_matrix(policy: Policy, observations: np.ndarray) -> np.ndarray | None:
+    """Return the unmasked scores of one policy, or nothing when it has none.
+
+    The two baselines publish no score. A random draw and a fixed no-op have
+    no preference over the action rows, so the instrument reports none for
+    them rather than inventing one.
+    """
+    scored = getattr(policy, "scores_many", None)
+    if scored is None:
+        return None
+    return np.asarray(scored(observations))
 
 
 def _record_of(
@@ -300,6 +359,7 @@ def _record_of(
             played.chosen,
             played.refused,
             scoring_name,
+            played.tallies,
         ),
         ticks=vector.world_ticks,
     )

@@ -6,7 +6,11 @@ candidate did on one seed. A population record holds every episode of one
 batch. A generation record holds what a generation scored and what the search
 made of it.
 
-Four gaps in the earlier reporting are the reason each field is here.
+It also holds two readings that a record carries rather than earns. A tally
+says what a policy answered at each decision. A score says what one pass over
+a fixed seed set measured, and which of its two figures selects.
+
+Each field below answers a gap in the earlier reporting.
 
 # A paired comparison needs the outcome of each seed
 
@@ -28,6 +32,23 @@ that answer away. A policy whose actions the engine mostly refuses is close to
 a no-op whatever it chooses, and no figure of the run said so. An episode
 record therefore counts what the policy chose and what the engine refused.
 
+# A return does not say what the policy answered
+
+The four policies of one paid run are each a fixed preference order over the
+action rows, and the engine's legality answer supplies what looks like
+situational play. Every figure the run reported was a return, and no return
+can separate a preference from a policy. A tally therefore holds two
+readings: the share of decisions on the most common action, and whether the
+argmax over the unmasked rows ever moves.[^3]
+
+# The quantity that measures play was computed and thrown away
+
+A population record counts the episodes that ended in a win. The judge of the
+run reduced the same record to the mean of the shaped return and never read
+the win share, so the selection ran on a proxy. A score therefore carries
+both figures under their own names, and a caller cannot use one where it
+meant the other.[^4]
+
 # The tick of the end is not a signal
 
 How long a game ran is the strongest single answer a run reports about the
@@ -41,11 +62,16 @@ read from the world.[^2]
 
 [^1]: Findings register, FND-670. ``docs/FINDINGS.md``
 [^2]: Findings register, FND-689. ``docs/FINDINGS.md``
+[^3]: Findings register, FND-707. ``docs/FINDINGS.md``
+[^4]: What is wrong with training and evaluation, item 1.
+``docs/research/what-is-wrong-with-training-and-evaluation.md``
 """
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field
+from itertools import pairwise
 from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
@@ -63,6 +89,156 @@ if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
 # What a column of an objective is called in a report row. One prefix keeps
 # an objective apart from a signal of the engine of the same name.
 OBJECTIVE_PREFIX = "objective."
+
+
+@dataclass(frozen=True)
+class ActionTally:
+    """The two instruments over the decisions of one episode.
+
+    A finding named two cheap checks and the project had neither. The first is
+    the share of decisions on which the policy emits its most common action.
+    The second is whether the highest-scoring row over the **unmasked** action
+    rows ever changes inside the episode.[^1]
+
+    Both separate a preference order from a policy. A fixed preference order
+    over the action rows still emits many different actions, because the
+    engine's legality answer removes the rows it cannot take, so the emitted
+    actions look situational. The unmasked argmax does not: it moves only when
+    the observation moved the scores.
+
+    **These are instruments and not gates.** A run reports them and no run
+    fails on them.[^2]
+
+    The decisions entry counts the decisions the tally saw. The highest count
+    entry is how many of them fell on the most common action. The preferences
+    entry counts the decisions whose unmasked preference was read, which is
+    zero for a policy that publishes no score. The changes entry counts how
+    often that preference differed from the one before it.
+
+    References
+    ----------
+    [^1]: Findings register, FND-707. ``docs/FINDINGS.md``
+
+    [^2]: ADR-0202, a run selects on the win share, and
+    every published figure names its seed set, decision D5.
+    ``docs/adrs/draft/adr-0202-a-run-selects-on-the-win-share-and-every-published-figure-names-its-seed-set.md``
+    """
+
+    decisions: int = 0
+    most_common: int = -1
+    highest_count: int = 0
+    preferences: int = 0
+    changes: int = 0
+
+    @classmethod
+    def of_actions(
+        cls, actions: Sequence[int], preferences: Sequence[int]
+    ) -> ActionTally:
+        """Count one episode's emitted actions and its unmasked preferences.
+
+        The preferences may be shorter than the actions, or empty. A policy
+        that publishes no score reports none, and the tally then says that the
+        preference was never read rather than that it never changed.
+        """
+        counts = Counter(int(value) for value in actions)
+        common, highest = counts.most_common(1)[0] if counts else (-1, 0)
+        read = [int(value) for value in preferences]
+        changes = sum(1 for before, after in pairwise(read) if before != after)
+        return cls(
+            decisions=len(actions),
+            most_common=int(common),
+            highest_count=int(highest),
+            preferences=len(read),
+            changes=changes,
+        )
+
+    @property
+    def most_common_share(self) -> float:
+        """The share of the decisions that fell on the most common action.
+
+        An episode that took no decision reads zero, because it emitted no
+        action to be common.
+        """
+        if self.decisions == 0:
+            return 0.0
+        return self.highest_count / self.decisions
+
+    @property
+    def preference_varies(self) -> bool | None:
+        """Whether the unmasked argmax changed inside the episode.
+
+        Nothing when no preference was read. A policy that publishes no score
+        has no answer here, and a false would state that its preference held.
+        """
+        if self.preferences == 0:
+            return None
+        return self.changes > 0
+
+
+@dataclass(frozen=True)
+class ValidationScore:
+    """What one pass over a fixed seed set measured, and which figure selects.
+
+    **The win share selects, and the mean shaped return breaks a tie.** The
+    shaped return is the training signal, because it is dense and it drives
+    the search. It is not a measure of play. A run that selected its centre on
+    the mean shaped return published four policies that take one unit and
+    wander, and the win share of every one of those passes was already
+    computed and thrown away.[^1]
+
+    A win is always defined, so the win share is a real quantity over any
+    pass. The engine's territory reader compares held ground at the tick
+    limit and names a winner there, so an episode that runs out of ticks ends
+    won or lost rather than drawn.[^2]
+
+    **This type exists so that a caller cannot use one figure where it meant
+    the other.** The pass used to give back a bare float, and the one caller
+    that selected on it read the shaped mean without saying so.[^3]
+
+    The two instrument entries carry what the pass measured about the
+    behaviour of the policy rather than about its result.
+
+    References
+    ----------
+    [^1]: What is wrong with training and evaluation, item 1.
+    ``docs/research/what-is-wrong-with-training-and-evaluation.md``
+
+    [^2]: The game end readers of the engine.
+    ``crates/cachette-core/src/world/victory.rs``
+
+    [^3]: ADR-0202, a run selects on the win share, and
+    every published figure names its seed set, decisions D1 and D2.
+    ``docs/adrs/draft/adr-0202-a-run-selects-on-the-win-share-and-every-published-figure-names-its-seed-set.md``
+    """
+
+    won: float
+    mean: float
+    episodes: int = 0
+    most_common_share: float = 0.0
+    preference_varies: float = 0.0
+
+    @classmethod
+    def of_record(cls, record: PopulationRecord) -> ValidationScore:
+        """Read the score of one pass from the record of its batch."""
+        return cls(
+            won=record.won,
+            mean=record.mean(),
+            episodes=len(record.episodes),
+            most_common_share=record.most_common_share,
+            preference_varies=record.preference_varies,
+        )
+
+    @property
+    def key(self) -> tuple[float, float]:
+        """The order between two passes: the win share, then the mean return.
+
+        A caller that keeps the best centre compares this and nothing else.
+        """
+        return (self.won, self.mean)
+
+    def beats(self, other: ValidationScore | None) -> bool:
+        """Whether this pass selects over another one, or over nothing."""
+        return other is None or self.key > other.key
 
 
 class EndedWorld(Protocol):
@@ -164,9 +340,15 @@ class EpisodeRecord:
     world and never a signal, because the engine publishes no observation
     field that carries it.[^1]
 
+    The tally entry holds the two behaviour instruments over the decisions of
+    this episode. They say whether the policy answered one row at every
+    decision, which the return of the episode cannot say.[^2]
+
     References
     ----------
     [^1]: Findings register, FND-689. ``docs/FINDINGS.md``
+
+    [^2]: Findings register, FND-707. ``docs/FINDINGS.md``
     """
 
     candidate: int
@@ -179,6 +361,7 @@ class EpisodeRecord:
     end_tick: int
     signals: Mapping[str, float] = field(default_factory=dict)
     objectives: Mapping[str, float] = field(default_factory=dict)
+    tally: ActionTally = field(default_factory=ActionTally)
 
     @classmethod
     def of_env(
@@ -190,6 +373,7 @@ class EpisodeRecord:
         chosen: int,
         refused: int,
         scoring_name: str | None = None,
+        tally: ActionTally | None = None,
     ) -> EpisodeRecord:
         """Read the record of a finished episode from its environment.
 
@@ -218,6 +402,7 @@ class EpisodeRecord:
             end_tick=end_tick_of(env.world),
             signals=env.signals.read_scalars(np.asarray(env.observation())),
             objectives=dict(env.objectives_under(scoring_name)),
+            tally=ActionTally() if tally is None else tally,
         )
 
     @property
@@ -273,6 +458,8 @@ class EpisodeRecord:
             "end_tick": self.end_tick,
             "signals": dict(self.signals),
             "objectives": dict(self.objectives),
+            "most_common_share": self.tally.most_common_share,
+            "preference_varies": self.tally.preference_varies,
         }
 
 
@@ -327,6 +514,16 @@ class PopulationRecord:
         if self.chosen == 0:
             return 0.0
         return self.refused / self.chosen
+
+    @property
+    def most_common_share(self) -> float:
+        """The mean over the episodes of the most common action share."""
+        return most_common_share(self.episodes)
+
+    @property
+    def preference_varies(self) -> float:
+        """The share of the episodes whose unmasked argmax changed."""
+        return preference_varies(self.episodes)
 
     @property
     def objectives(self) -> dict[str, float]:
@@ -395,9 +592,10 @@ class GenerationRecord:
 
     def summary(
         self,
-        validation: float | None,
-        yardstick: float | None,
+        validation: ValidationScore | None,
+        yardstick: ValidationScore | None,
         seconds: float,
+        holdout: ValidationScore | None = None,
     ) -> dict[str, float | None]:
         """Return the one row a run prints and stores for this generation.
 
@@ -407,9 +605,24 @@ class GenerationRecord:
         against it, because a relative score cannot say whether the whole
         population improved.
 
+        **The row names which figure selected and which did not.** The
+        validation entries come from the seeds that choose the centre, so they
+        select. The holdout entries come from seeds that never influenced the
+        choice, so they measure. A row that gave one number for both let a
+        selection maximum be read as an unbiased measurement.[^1]
+
+        The win entries are the quantity that measures play, and the return
+        entries are the shaped training signal. The two are kept apart under
+        their own names.
+
         The degenerate entry is one when the generation carried no
         information and the centre did not move. A reader of the report finds
         the wasted generations by that entry alone.
+
+        References
+        ----------
+        [^1]: What is wrong with training and evaluation, items 1 and 2.
+        ``docs/research/what-is-wrong-with-training-and-evaluation.md``
         """
         return {
             "generation": float(self.generation),
@@ -425,13 +638,28 @@ class GenerationRecord:
             "chosen": float(self.chosen),
             "refused": float(self.refused),
             "refusal_share": self.refusal_share,
-            "validation": validation,
-            "yardstick": yardstick,
+            "validation": None if validation is None else validation.mean,
+            "validation_won": None if validation is None else validation.won,
+            "most_common_share": (
+                None if validation is None else validation.most_common_share
+            ),
+            "preference_varies": (
+                None if validation is None else validation.preference_varies
+            ),
+            "holdout": None if holdout is None else holdout.mean,
+            "holdout_won": None if holdout is None else holdout.won,
+            "yardstick": None if yardstick is None else yardstick.mean,
+            "yardstick_won": None if yardstick is None else yardstick.won,
             **objective_columns(self.objectives),
             "above_controller": (
                 None
                 if validation is None or yardstick is None
-                else validation - yardstick
+                else validation.mean - yardstick.mean
+            ),
+            "above_controller_won": (
+                None
+                if validation is None or yardstick is None
+                else validation.won - yardstick.won
             ),
             "seconds": seconds,
         }
@@ -454,6 +682,59 @@ class GenerationRecord:
             "objectives": dict(self.objectives),
             "episodes": [row.as_dict() for row in self.episodes],
         }
+
+
+def most_common_share(episodes: Sequence[EpisodeRecord]) -> float:
+    """Return the mean most common action share over a set of episodes.
+
+    A policy that answers one row at every decision reads one here. **A run
+    that reported only a return could not say that**, because the engine's
+    legality answer makes a fixed preference order emit many different
+    actions.[^1]
+
+    An episode that took no decision is out of the mean, because it emitted
+    no action to be common. A set of only such episodes reads zero, and that
+    is the state of the built-in controller, which takes no decision through
+    this seat.
+
+    **This is the one declaration of the reading.** The record of a batch and
+    the summary of a held-out pass both need it, and two copies would be one
+    rule stored twice with nothing that fails when they disagree.[^2]
+
+    References
+    ----------
+    [^1]: Findings register, FND-707. ``docs/FINDINGS.md``
+
+    [^2]: Recurring defect shapes, shape 1.
+    ``.agents/rules/recurring-defects.md``
+    """
+    held = [row.tally for row in episodes if row.tally.decisions]
+    if not held:
+        return 0.0
+    return float(np.mean([tally.most_common_share for tally in held]))
+
+
+def preference_varies(episodes: Sequence[EpisodeRecord]) -> float:
+    """Return the share of the episodes whose unmasked argmax changed.
+
+    The mask is out of this reading. A policy that holds one fixed preference
+    order over the action rows reads zero here whatever it emitted, because
+    the row it prefers never moves.[^1]
+
+    An episode whose preference nothing read is out of the share. A set of
+    episodes of a policy that publishes no score therefore reads zero.
+
+    **This is the one declaration of the reading**, for the reason the share
+    above states.
+
+    References
+    ----------
+    [^1]: Findings register, FND-707. ``docs/FINDINGS.md``
+    """
+    held = [row.tally for row in episodes if row.tally.preferences]
+    if not held:
+        return 0.0
+    return sum(1 for tally in held if tally.changes) / len(held)
 
 
 def mean_objectives(episodes: Sequence[EpisodeRecord]) -> dict[str, float]:
@@ -491,6 +772,7 @@ def episode_records(
     chosen: Sequence[int],
     refused: Sequence[int],
     scoring_name: str | None = None,
+    tallies: Sequence[ActionTally] | None = None,
 ) -> tuple[EpisodeRecord, ...]:
     """Read one record for each world of a finished batch, in index order.
 
@@ -512,6 +794,7 @@ def episode_records(
                 chosen=int(chosen[index]),
                 refused=int(refused[index]),
                 scoring_name=scoring_name,
+                tally=None if tallies is None else tallies[index],
             )
         )
     return tuple(records)
@@ -519,13 +802,17 @@ def episode_records(
 
 __all__ = [
     "OBJECTIVE_PREFIX",
+    "ActionTally",
     "EndedWorld",
     "EpisodeRecord",
     "GenerationRecord",
     "PopulationRecord",
+    "ValidationScore",
     "end_tick_of",
     "episode_records",
     "mean_objectives",
+    "most_common_share",
     "objective_columns",
     "outcome_columns",
+    "preference_varies",
 ]
