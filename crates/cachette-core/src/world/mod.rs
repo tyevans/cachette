@@ -271,10 +271,17 @@ pub struct World {
     /// faction instead of the destination. It is seeded from the same set as
     /// the return field, so it answers wherever the return field led.[^2]
     ///
+    /// **The step offers the field its seed set at every rebuild of level 1,
+    /// and the field derives itself only when that set has changed.** The set
+    /// is the live sites, and a frame that founds none, razes none and takes
+    /// none repeats it. The field states what it was derived from, so nothing
+    /// outside it says which moment it describes.[^3]
+    ///
     /// # References
     ///
     /// [^1]: ADR-0110, a unit returns by climbing a reach field seeded at every site of its faction, decision D1. `docs/adrs/draft/adr-0110-a-unit-returns-by-climbing-a-reach-field.md`
     /// [^2]: Findings register, FND-315. `docs/FINDINGS.md`
+    /// [^3]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
     home_approaches: ApproachField,
     /// The direction of the nearest tile that holds stock, for each tile of a
     /// seeded block and each resource kind.
@@ -293,11 +300,19 @@ pub struct World {
     /// in.** The set of gatherers is the whole set the field serves, so the
     /// derivation follows that set and never the world.[^3]
     ///
+    /// **The step offers the field its seed set at every rebuild of level 1,
+    /// and the field derives itself only when that set has changed.** The set
+    /// moves when a unit occupies a new block and when a tile runs out of
+    /// stock, and it repeats on every other frame. The field states what it
+    /// was derived from, so nothing outside it says which moment it
+    /// describes.[^4]
+    ///
     /// # References
     ///
     /// [^1]: Findings register, FND-589. `docs/FINDINGS.md`
     /// [^2]: Findings register, FND-315. `docs/FINDINGS.md`
     /// [^3]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    /// [^4]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
     stock_approaches: ApproachField,
     /// The direction of the nearest tile of a named destination, for each
     /// level 1 cell and each destination plane.
