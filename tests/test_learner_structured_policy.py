@@ -323,6 +323,11 @@ def test_the_engine_layout_trains_the_count_the_design_claims() -> None:
 
     The engine owns the layout, so this states no integer of it. It states
     the formula, which is the claim the architecture makes.
+
+    **The bound is a dense read of the layout for every action row.** The
+    readout holds one weight for each row it scores, so this count follows
+    the action table. The layout length alone was the bound while the
+    table held one row for each verb.
     """
     world = _world()
     layout = _layout_of(world)
@@ -330,7 +335,7 @@ def test_the_engine_layout_trains_the_count_the_design_claims() -> None:
     shape = StructuredShape()
     policy = StructuredPolicy.zeros(actions, layout, shape)
     assert policy.counts() == _expected_count(layout, actions, shape)
-    assert policy.parameter_count < layout.length
+    assert policy.parameter_count < layout.length * actions
 
 
 def test_every_position_of_the_engine_layout_belongs_to_exactly_one_part() -> None:
