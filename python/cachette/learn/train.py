@@ -117,6 +117,7 @@ from .search import (
     Trainable,
     Update,
     carries_information,
+    configuration_notes,
     generation_noise,
     pair_candidates,
     rank_shape,
@@ -714,6 +715,7 @@ def train(
         learning_rate=train_config.learning_rate,
         seed=train_config.seed,
     )
+    report_configuration(name, train_config, shell.flat().size)
     policy: Trainable = shell
     first_generation = 0
     resumed_best: ValidationScore | None = None
@@ -794,8 +796,8 @@ def train(
                 degenerate.append(generation)
                 print(
                     f"  {name} generation {generation:2d} carried no information: "
-                    f"every candidate scored {float(played.ranked.max()):9.1f} on "
-                    f"seeds {seeds}. The centre does not move",
+                    f"{no_information_reason(update, played)} on seeds {seeds}. "
+                    f"The centre does not move",
                     flush=True,
                 )
             record = generation_record(generation, seeds, played, update)
@@ -831,6 +833,8 @@ def train(
                 f"  {name} generation {generation:2d} "
                 f"mean {np.mean(record.ranked):9.1f} best {max(record.ranked):9.1f} "
                 f"spread {record.spread:8.1f} "
+                f"agreed {update.agreement:5.2f} "
+                f"aligned {update.alignment:6.4f} "
                 f"abs-spread {record.absolute_spread:8.1f} "
                 f"won {record.won:5.2f} "
                 f"ticks {record.ticks} "
@@ -966,6 +970,51 @@ def play_generation(
         label,
         normalizer,
     )
+
+
+def report_configuration(name: str, train_config: TrainConfig, trainable: int) -> None:
+    """Say what this configuration can reach, before the run spends anything.
+
+    **A run that gives each candidate fewer worlds than its sigma needs ranks
+    its candidates on noise.** A run shorter than its alignment allows wanders
+    further than it climbs. Both figures follow from the configuration and
+    from the trainable count of the policy, so both are free.
+
+    The run that paid for the audit of this path was under-sampled for its
+    sigma. Nothing said so, and nobody derived the number until the run had
+    finished.[^1]
+
+    References
+    ----------
+    [^1]: Report on how sigma trades against the worlds each candidate plays,
+    section 7.
+    ``docs/research/how-sigma-trades-against-worlds-for-each-candidate.md``
+    """
+    for note in configuration_notes(
+        train_config.sigma,
+        train_config.seeds_per_generation,
+        train_config.pairs,
+        trainable,
+        train_config.generations,
+    ):
+        print(f"  {name} {note}", flush=True)
+
+
+def no_information_reason(update: Update, played: Generation) -> str:
+    """Say why one generation left the centre where it was.
+
+    **A generation carries no information in two ways.** Every candidate may
+    score the same number, which a world that decides itself produces. Or the
+    candidates may score differently and still rank no better than a ranking
+    of pure noise ranks, which leaves the search no direction to step along.
+
+    The centre stands still either way, so the line names which of the two the
+    generation was. A reader who could not tell them apart would read a world
+    that decides itself as a search that found nothing.
+    """
+    if update.spread == 0.0:
+        return f"every candidate scored {float(played.ranked.max()):9.1f}"
+    return "the candidates agreed no better than noise agrees"
 
 
 def generation_record(

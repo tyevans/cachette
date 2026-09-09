@@ -36,11 +36,22 @@ scaling and a bias term does not scale with the weights beside it. The search
 then leaves that centre where it is, and it takes the fraction from the length
 of the centre.
 
-# A generation of equal scores moves nothing
+# A tie states no order, and the candidate index is not a neutral order
 
-The rank of a score comes from the order of a stable sort, so a set of equal
-scores ranks by candidate index. The search reports that a generation carried
-no information, and it leaves the centre where it was.
+The rank of a tied score is the mean of the positions the tied scores occupy.
+Two candidates that scored the same number therefore reach the step with the
+same rank. A stable sort would have ranked them by candidate index instead,
+which puts an ordering the search invented into the direction it steps along.
+
+A generation whose candidates all tie reports that it carried no information,
+and it leaves the centre where it was.
+
+# The length of a step is what the generation agreed on
+
+Rank shaping throws away the scale of the reward. It does not follow that the
+search should throw away the agreement between the candidates as well. The
+search reads that agreement out of the ranks, and it moves the centre by the
+learning rate times the agreement.
 
 # References
 
@@ -51,6 +62,7 @@ order, decision D2.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Protocol
 
@@ -66,6 +78,12 @@ if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
 # ``rebuild``, so the search never asks which kind it holds.
 Trainable = LinearPolicy | StructuredPolicy
 
+NORM_CEILING_OVER_SHELL = 2.0
+"""The largest length an unnormalised centre may reach, over the shell length.
+
+The search states the reasoning where it applies the bound.
+"""
+
 
 @dataclass(frozen=True)
 class Update:
@@ -73,13 +91,20 @@ class Update:
 
     The centre entry is where the search now stands. The spread entry is the
     highest score minus the lowest one, which is what the ranking had to rank.
-    The informative entry is false when the spread carried nothing and the
-    centre did not move.
+    The informative entry is false when the centre did not move.
 
     The scores entry holds the score of each candidate, in candidate order,
     and the ranks entry holds what the ranking made of them. **A run that
     logged neither could not say afterwards why the centre moved**, so both
     travel back to the caller.
+
+    The agreement entry is the fraction of the learning rate that this
+    generation moved the centre by, and it is the quantity a reader watches to
+    see whether a run is climbing or wandering. The alignment entry is the
+    cosine between the step and the direction the search is trying to find. It
+    follows from the pair count and the trainable count alone, so it is the
+    same number every generation of one run, and the run reports it beside the
+    agreement because the product of the two is what the centre gains.
     """
 
     centre: np.ndarray
@@ -87,6 +112,8 @@ class Update:
     informative: bool
     scores: np.ndarray
     ranks: np.ndarray
+    agreement: float
+    alignment: float
 
 
 class Optimiser(Protocol):
@@ -239,9 +266,266 @@ def rank_shape(scores: np.ndarray) -> np.ndarray:
 
     A rank removes the scale of the reward from the update, so one lucky
     episode cannot move the weights further than the population is wide.
+
+    **A set of tied scores takes the mean of the positions it occupies.** A
+    tie states that the two candidates scored the same, and nothing more. The
+    order of a stable sort states more than that: it orders the tied
+    candidates by candidate index, and the candidate index is a number the
+    search chose when it drew the perturbations. That number then reaches the
+    direction the centre steps along.
+
+    **A partial tie is the common case, and it is the expensive one.** A
+    measurement of one generation of eight candidates found two of them
+    scoring the same number to six decimal places, at two of the four sigmas
+    it tried.[^1] The whole-generation guard passed each of those
+    generations, so nothing saw the tie, and the index order reached the step
+    every time.
+
+    A mean rank is the neutral answer. Two tied candidates get one rank, so
+    the pair of each of them carries the same weight whichever slot it sits
+    in. A tie inside one pair then gives that pair a weight of zero, which
+    says that the pair separated nothing.
+
+    References
+    ----------
+    [^1]: Report on how sigma trades against the worlds each candidate plays,
+    section 5. ``docs/research/how-sigma-trades-against-worlds-for-each-candidate.md``
     """
-    order = np.argsort(np.argsort(scores))
-    return order / (len(scores) - 1) - 0.5
+    count = len(scores)
+    order = np.argsort(scores, kind="stable")
+    position = np.empty(count, dtype=np.float64)
+    position[order] = np.arange(count, dtype=np.float64)
+    _, group = np.unique(scores, return_inverse=True)
+    group = group.reshape(-1)
+    total = np.bincount(group, weights=position)
+    members = np.bincount(group)
+    return (total / members)[group] / (count - 1) - 0.5
+
+
+def pair_weights(ranks: np.ndarray) -> np.ndarray:
+    """Return what each antithetic pair says, as the plus rank less the minus.
+
+    Candidate ``2 * pair`` is the plus half and ``2 * pair + 1`` is the minus
+    half, so the difference is positive when the plus direction scored higher.
+    The magnitude says how far apart the ranking put the two halves of one
+    perturbation.
+    """
+    return np.asarray(ranks[0::2] - ranks[1::2])
+
+
+def noise_agreement_sum(pairs: int) -> float:
+    """Return the squared pair-weight sum a ranking of pure noise reaches.
+
+    A generation whose scores carry nothing ranks its candidates in an order
+    the noise chose, so the ranks are a random permutation of the shaped
+    values. The mean of a squared rank difference over two distinct positions
+    of that permutation is a closed form in the population size, so this
+    function measures nothing and states no figure of its own.
+
+    The shaped ranks are the positions divided by one less than the
+    population, less a half. Their variance is the population plus one over
+    twelve times the population less one. Two distinct positions of one
+    permutation correlate by minus one over the population less one, so the
+    mean squared difference is twice the variance times the population over
+    the population less one. One generation holds that many pairs.
+    """
+    population = 2 * pairs
+    variance = (population + 1) / (12.0 * (population - 1))
+    difference = 2.0 * variance * population / (population - 1)
+    return pairs * difference
+
+
+def perfect_agreement_sum(pairs: int) -> float:
+    """Return the squared pair-weight sum a perfectly split ranking reaches.
+
+    A generation carries the most a ranking can carry when the two halves of
+    every pair sit at opposite ends of the order. The pair weights are then
+    the odd numbers up to one less than the population, divided by one less
+    than the population, and the sum of their squares is a closed form.
+    """
+    population = 2 * pairs
+    odd = np.arange(1, population, 2, dtype=np.float64) / (population - 1)
+    return float(odd @ odd)
+
+
+def generation_agreement(ranks: np.ndarray) -> float:
+    """Return how far the candidates of one generation agreed, from zero to one.
+
+    The value is one when the two halves of every pair sit at opposite ends of
+    the ranking, which is what a ranking driven by one direction produces. It
+    is zero when the pair weights reach only what a ranking of pure noise
+    reaches. The search multiplies the learning rate by this number, so a
+    generation whose candidates disagree moves the centre less than one whose
+    candidates agree.
+
+    **The statistic is the squared sum of the pair weights, and it is a
+    statistic of the ranks alone.** One register measured the length of the
+    summed perturbation against the floor that near-orthogonal directions put
+    under it, and found that ratio to be one within a few parts in a hundred
+    for pure noise, for perfect signal and for a whole generation of ties.
+    **That measurement rules out the geometric length as a scale**, and it
+    says nothing against the floor itself.[^1] The floor is the squared sum of
+    the pair weights, which is a rank statistic, and this function compares it
+    against the two constants that bound it.
+
+    Both bounds follow from the population size and from nothing a generation
+    scored, so neither is a measured figure. The value is clipped, because a
+    ranking of noise falls below the noise expectation about half the time.
+
+    **One pair states no agreement.** A single pair always reaches both bounds
+    at once, because its two halves are the whole population and its weight is
+    fixed. Such a generation therefore takes the whole learning rate.
+
+    References
+    ----------
+    [^1]: Findings register, FND-668. ``docs/FINDINGS.md``
+    """
+    pairs = ranks.size // 2
+    if pairs < 2:
+        return 1.0
+    weights = pair_weights(ranks)
+    floor = noise_agreement_sum(pairs)
+    ceiling = perfect_agreement_sum(pairs)
+    reached = float(weights @ weights)
+    return float(np.clip((reached - floor) / (ceiling - floor), 0.0, 1.0))
+
+
+def step_alignment(pairs: int, trainable: int) -> float:
+    """Return the cosine between the step of one generation and the truth.
+
+    Sampling a fixed number of directions in a space of higher dimension
+    estimates the direction of steepest ascent to an accuracy that falls as
+    the dimension rises. One register measured the law over two orders of
+    magnitude: **the cosine is near the square root of the pair count divided
+    by the trainable count.** The same measurement found that the noise of
+    scoring on one world halves it.[^1]
+
+    The figure follows from the population and the policy shape alone. No
+    other knob of a run changes it, and doubling it needs four times the
+    population. A run that reports it can see before it spends whether its
+    steps point anywhere.
+
+    References
+    ----------
+    [^1]: Findings register, FND-668. ``docs/FINDINGS.md``
+    """
+    if pairs <= 0 or trainable <= 0:
+        return 0.0
+    return math.sqrt(pairs / trainable)
+
+
+def generations_before_a_climb_beats_a_wander(alignment: float) -> int:
+    """Return the generations a run needs before the climb passes the wander.
+
+    Each step turns the centre by one angle. The part of that turn which
+    points at the truth accumulates, so it grows with the generation count
+    times the alignment. The part which does not point at the truth
+    accumulates as a random walk, so it grows with the square root of the
+    generation count. The two are equal when the generation count reaches one
+    over the square of the alignment.
+
+    A run shorter than that answer spends more of its travel on wander than on
+    climb. **The answer is optimistic by a factor of four**, because the noise
+    of scoring halves the alignment and this function takes the alignment it is
+    given.
+    """
+    if alignment <= 0.0:
+        return 0
+    return math.ceil(1.0 / (alignment * alignment))
+
+
+WORLDS_A_SIGMA_NEEDS = {0.1: 35, 0.25: 6, 0.5: 3, 1.5: 6}
+"""How many worlds one candidate needs, for each sigma a measurement covered.
+
+A ranking can separate a candidate from its neighbours when the spread between
+the candidates exceeds the noise on one candidate's score. The figure is the
+square of the residual standard deviation over the square of the signal
+standard deviation, rounded up, and one measurement supplied both.[^1]
+
+References
+----------
+[^1]: Report on how sigma trades against the worlds each candidate plays,
+sections 4 and 6.
+``docs/research/how-sigma-trades-against-worlds-for-each-candidate.md``
+"""
+
+
+def worlds_a_sigma_needs(sigma: float) -> tuple[float, int]:
+    """Return the measured sigma nearest this one, and the worlds it needs.
+
+    A ranking needs the spread between the candidates to exceed the noise on
+    the score of one candidate. More worlds for each candidate lower that
+    noise, and a larger sigma raises both the spread and the noise. The number
+    of worlds a sigma needs is therefore a measured quantity and not a derived
+    one.
+
+    **The need does not rise with sigma.** It falls and then rises again,
+    because the spread stops growing above the middle of the measured range
+    while the noise keeps growing. So no interpolation between two measured
+    sigmas is safe, and this function answers with the nearest measured sigma
+    on a logarithmic scale. It gives that sigma back beside the count, so a
+    caller can say which measurement it read. The table beside this function
+    holds the counts.
+
+    A sigma of zero or below has no logarithm and no meaning, so it takes the
+    smallest sigma the measurement covered.
+    """
+    if sigma <= 0.0:
+        nearest = min(WORLDS_A_SIGMA_NEEDS)
+        return nearest, WORLDS_A_SIGMA_NEEDS[nearest]
+    nearest = min(
+        WORLDS_A_SIGMA_NEEDS, key=lambda measured: abs(math.log(sigma / measured))
+    )
+    return nearest, WORLDS_A_SIGMA_NEEDS[nearest]
+
+
+def configuration_notes(
+    sigma: float, worlds: int, pairs: int, trainable: int, generations: int
+) -> list[str]:
+    """Say what this configuration can and cannot reach, before a run spends.
+
+    **A run that is under-sampled for its sigma must say so on its first
+    lines.** The configuration the project ran before this gave each candidate
+    fewer worlds than its sigma needed, so every generation of it ranked
+    candidates on too few worlds. Nothing said so, and the run finished before
+    anyone derived the number.[^1]
+
+    The notes also state the alignment of one step and the generations the run
+    needs before its climb passes its wander. **Neither note fails a run.** A
+    figure a reader can act on is worth more than a refusal, because the
+    reader may want the run anyway.
+
+    References
+    ----------
+    [^1]: Report on how sigma trades against the worlds each candidate plays,
+    section 7.
+    ``docs/research/how-sigma-trades-against-worlds-for-each-candidate.md``
+    """
+    notes = []
+    nearest, needed = worlds_a_sigma_needs(sigma)
+    given = "1 world" if worlds == 1 else f"{worlds} worlds"
+    notes.append(
+        f"sigma {sigma:g} needs {needed} worlds for each candidate, "
+        f"measured at sigma {nearest:g}, and this run gives {worlds}"
+    )
+    if worlds < needed:
+        notes.append(
+            f"this run is under-sampled for its sigma: the spread between "
+            f"the candidates does not exceed the noise on one candidate at "
+            f"{given}"
+        )
+    alignment = step_alignment(pairs, trainable)
+    breaks = generations_before_a_climb_beats_a_wander(alignment)
+    notes.append(
+        f"one step of {pairs} pairs over {trainable} trainable weights aligns "
+        f"{alignment:.4f} with the truth, and scoring noise halves that"
+    )
+    if generations < breaks:
+        notes.append(
+            f"this run is mostly wander: the climb passes the wander after "
+            f"{breaks} generations and this run asks for {generations}"
+        )
+    return notes
 
 
 def carries_information(spread: float) -> bool:
@@ -251,15 +535,16 @@ def carries_information(spread: float) -> bool:
     spread of zero means the score did not depend on the candidate, so the
     ranking ranks a set of equal numbers and the update carries nothing.
 
-    **A ranking of equal numbers is not a ranking of ties.** The rank of a
-    score comes from the order of the sort, and the sort is stable, so an
-    equal set ranks by candidate index. Every plus half then ranks below its
-    own minus half by the same amount, and the update becomes a fixed step
-    along a direction the noise alone chose.
-
     A world where no policy can matter produces exactly this. One faction of
     three holds a seat, or a seat reaches no food, and the game ends the same
     way whatever any candidate does.
+
+    **This guard is no longer the only defence, and it is still worth having.**
+    A ranking that gives a tied score the mean of its positions gives every
+    candidate of an equal generation one rank, so every pair weight is zero
+    and the agreement is zero as well. The guard saves the draw of the
+    perturbations, and it names the generation in the log, which the agreement
+    alone would not.
     """
     return spread > 0.0
 
@@ -369,73 +654,164 @@ class EvolutionStrategy:
             self.pairs,
         )
 
-    def step(self, centre: np.ndarray, gradient: np.ndarray) -> np.ndarray:
-        """Move the centre one learning rate along the weighted sum.
+    @property
+    def norm_ceiling(self) -> float:
+        """Return the largest length the search lets an unnormalised centre reach.
 
-        The rank shaping already threw away the scale of the reward, so the
-        length of the weighted sum carries no information worth keeping. The
-        search therefore takes a step of a fixed size along the direction, and
-        the learning rate is the fraction of the centre that one generation
-        moves.
+        A kind whose choice survives a scaling holds its centre at unit length,
+        so this bound governs no such kind and the search never applies it
+        there.
+
+        A kind whose choice does not survive a scaling keeps the length its
+        centre reached, and that length rises over a run. A step of many
+        thousand dimensions sits near a right angle to the centre, so one
+        generation multiplies the length by about the square root of one plus
+        the learning rate squared. **A rising length saturates the ``tanh``
+        layers**, so a late generation reads a coarser function of the
+        observation than an early one, and that works against what the run is
+        trying to learn.
+
+        The bound is a multiple of the length of the untrained shell. The
+        shell comes from one fixed seed, so the trainer and every worker
+        process derive the same bound from the same shell, and no second
+        declaration site holds it.
+
+        **The multiple is the growth of a run whose cost the project has
+        seen.** One audit measured a run of twenty generations at a learning
+        rate of 0.3 and found the length grew by 2.37, and it called the
+        saturation of that run modest.[^1] A bound of twice the shell keeps
+        every run inside the range that audit covered. A larger bound would
+        let a long run reach a saturation nobody has measured.
+
+        References
+        ----------
+        [^1]: Report on what is wrong with training and evaluation, item 8.
+        ``docs/research/what-is-wrong-with-training-and-evaluation.md``
+        """
+        return NORM_CEILING_OVER_SHELL * centre_scale(self.shell.flat())
+
+    def bounded(self, centre: np.ndarray) -> np.ndarray:
+        """Scale the centre back to the ceiling when the step took it past.
+
+        The direction of the centre is what the run trained, so the bound
+        keeps it and changes the length alone.
+
+        **A resumed centre longer than the ceiling comes back to the ceiling
+        on its first step.** That changes the function the policy computes,
+        which is the price of any bound on a kind whose choice does not
+        survive a scaling. Such a centre is the saturated case this bound
+        exists to prevent, so the search shortens it rather than leaving it.
+        """
+        length = float(np.linalg.norm(centre))
+        ceiling = self.norm_ceiling
+        if length <= ceiling:
+            return centre
+        return centre * (ceiling / length)
+
+    def step(
+        self, centre: np.ndarray, gradient: np.ndarray, agreement: float
+    ) -> np.ndarray:
+        """Move the centre along the summed direction, as far as the agreement says.
+
+        The rank shaping throws away the scale of the reward, and that is
+        correct: one lucky episode must not move the weights further than the
+        population is wide. **It does not follow that the search should throw
+        away how far the candidates agreed.** The search took a step of a fixed
+        length before this, so a generation that pointed a little of the way
+        toward the truth moved the centre exactly as far as one that pointed
+        perfectly. An audit derived what that cost: over twenty generations at
+        a learning rate of 0.3 the directed part of the travel was 15.8 degrees
+        and the undirected part was 74.7, so the centre wandered 4.7 times
+        further than it climbed.[^1]
+
+        The agreement is a number from zero to one, and the search multiplies
+        the learning rate by it. **The learning rate therefore keeps its
+        meaning and becomes a bound**: it is the largest fraction of the
+        centre that one generation may move, and a generation reaches it only
+        by splitting every pair to the ends of the ranking. One lucky
+        generation cannot throw the centre further than that.
 
         A kind whose choice survives a scaling holds its centre at unit
-        length. The learning rate is then already that fraction, and the
-        search normalises again after the step.
+        length. The learning rate is then already the fraction, and the search
+        normalises again after the step.
 
         A kind whose choice does not survive a scaling takes the fraction from
-        the length of the centre, and the search never normalises it. **The
-        length of such a centre is a trainable quantity and not a free one.**
+        the length of the centre, and the search holds that length under a
+        ceiling rather than letting it rise over a run.
 
-        That length grows over a run. A step of many thousand dimensions sits
-        near a right angle to the centre, so one generation multiplies the
-        length by about the square root of one plus the learning rate squared.
-        A run of the length this project takes pays that as a slowly rising
-        saturation of the ``tanh`` layers, and a much longer run would pay it
-        as a policy that saturates. A search that ran for thousands of
-        generations needs a bound on the length, and this one states none.
+        References
+        ----------
+        [^1]: Report on what is wrong with training and evaluation, items 5 and
+        13. ``docs/research/what-is-wrong-with-training-and-evaluation.md``
         """
         direction = unit(gradient)
+        travel = self.learning_rate * agreement
         if self.holds_unit_centre:
-            return unit(centre + self.learning_rate * direction)
-        return centre + self.learning_rate * centre_scale(centre) * direction
+            return unit(centre + travel * direction)
+        return self.bounded(centre + travel * centre_scale(centre) * direction)
 
     def update(self, centre: np.ndarray, generation: int, scores: np.ndarray) -> Update:
-        """Rank the scores, step along the ranked sum, and report both.
+        """Rank the scores, step as far as they agreed, and report both.
 
-        A generation of equal scores moves nothing. The rank of an equal score
-        is the index of the candidate, so the ranking would give every plus
-        half a lower rank than its own minus half. The weighted sum of the
-        perturbations is then a direction drawn from the noise alone, and the
-        step would move the centre as far as an informed generation moves it,
-        in a direction no episode chose.
+        A generation of equal scores moves nothing. The spread guard stops it
+        first, and the ranking would stop it as well: every candidate takes
+        the mean of the positions the tied scores occupy, so every pair weight
+        is zero and the generation agreed on nothing.
+
+        The step is the learning rate times the agreement, so a generation
+        whose candidates disagree moves the centre less than one whose
+        candidates agree. A generation that reaches only what pure noise
+        reaches moves the centre nowhere, and the report says so.
+
+        **A generation that moves nothing gives back the centre it was
+        given**, and never a rescaled copy of it. A rescaled copy differs in
+        the last bits, and a run that moved in the last bits no longer
+        compares against a stored score.
         """
+        alignment = step_alignment(self.pairs, centre.size)
         spread = float(scores.max() - scores.min())
-        informative = carries_information(spread)
-        if not informative:
+        if not carries_information(spread):
             return Update(
                 centre=centre,
                 spread=spread,
                 informative=False,
                 scores=scores,
                 ranks=np.zeros_like(scores),
+                agreement=0.0,
+                alignment=alignment,
             )
         ranks = rank_shape(scores)
+        agreement = generation_agreement(ranks)
+        if agreement <= 0.0:
+            return Update(
+                centre=centre,
+                spread=spread,
+                informative=False,
+                scores=scores,
+                ranks=ranks,
+                agreement=0.0,
+                alignment=alignment,
+            )
         noise = self.noise(centre, generation)
         gradient = np.zeros_like(centre)
         for index in range(self.pairs):
             weight = ranks[2 * index] - ranks[2 * index + 1]
             gradient += weight * noise[index]
-        moved = self.step(centre, gradient)
+        moved = self.step(centre, gradient, agreement)
         return Update(
             centre=moved,
             spread=spread,
             informative=True,
             scores=scores,
             ranks=ranks,
+            agreement=agreement,
+            alignment=alignment,
         )
 
 
 __all__ = [
+    "NORM_CEILING_OVER_SHELL",
+    "WORLDS_A_SIGMA_NEEDS",
     "EvolutionStrategy",
     "Optimiser",
     "Trainable",
@@ -443,10 +819,18 @@ __all__ = [
     "carries_information",
     "centre_scale",
     "choice_survives_scaling",
+    "configuration_notes",
+    "generation_agreement",
     "generation_noise",
+    "generations_before_a_climb_beats_a_wander",
+    "noise_agreement_sum",
     "pair_candidates",
+    "pair_weights",
+    "perfect_agreement_sum",
     "perturbation_scale",
     "rank_shape",
     "shell_policy",
+    "step_alignment",
     "unit",
+    "worlds_a_sigma_needs",
 ]

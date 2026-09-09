@@ -17,24 +17,46 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class TrainConfig:
-    """How long the training runs and how wide each generation is."""
+    """How long the training runs and how wide each generation is.
+
+    **Sigma is a relative size and never a length.** Each perturbation has
+    unit length before the search scales it, and the search scales it by the
+    length of the centre. So sigma is the fraction of the centre that one
+    candidate moves. The search states the length, and this states the
+    fraction. **This is the only declaration of the fraction**, and every
+    caller that wants the default asks this field for it.
+
+    A measurement fixed the value. It varied sigma over four settings against
+    one trained centre, and 0.5 had the largest signal, the best ratio of
+    signal to noise, and the highest rank agreement between two disjoint
+    world sets. It also needed the fewest worlds for each candidate. A larger
+    sigma found worse candidates outright, and the value the project ran
+    before this needed more worlds than the run gave it.[^1]
+
+    The learning rate is the largest fraction of the centre that one
+    generation moves. A generation reaches it only when the ranking splits
+    every antithetic pair to the ends of the order, and the search moves a
+    lesser fraction for a generation whose candidates agreed less.[^2]
+
+    The worker count is a per process count, whatever the shard count is. A
+    run of five processes with it at twelve asks for sixty workers on the
+    machine.
+
+    References
+    ----------
+    [^1]: Report on how sigma trades against the worlds each candidate plays,
+    section 7.
+    ``docs/research/how-sigma-trades-against-worlds-for-each-candidate.md``
+
+    [^2]: The search, the step and the agreement of a generation.
+    ``python/cachette/learn/search.py``
+    """
 
     generations: int = 12
     population: int = 16
     seeds_per_generation: int = 4
-    # Sigma is a relative size and never a length. Each perturbation has unit
-    # length before the search scales it, and the search scales it by the
-    # length of the centre, so sigma is the fraction of the centre that one
-    # candidate moves. **The search states the length, and this states the
-    # fraction.** A measurement on real decisions of a trained policy fixed
-    # the working range, and it is far above the value a run would reach by
-    # analogy with a gradient method.
-    sigma: float = 1.5
-    # The fraction of the centre that one generation moves.
+    sigma: float = 0.5
     learning_rate: float = 0.3
-    # How many engine workers one process gives its batch. **This is a per
-    # process count, whatever the shard count is.** A run of five processes
-    # with this at twelve asks for sixty workers on the machine.
     workers: int = 4
     # How many worker processes score one generation. One process scores the
     # whole generation in the process that asked for it, and starts nothing.

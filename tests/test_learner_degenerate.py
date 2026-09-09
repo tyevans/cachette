@@ -202,6 +202,18 @@ def test_the_run_says_out_loud_that_a_generation_carried_no_information(
     A reader watches the log while a run works. A mean that equals the best
     reads like a population that agreed, so the run has to name the
     generation in words.
+
+    **The trainer is what must report the configuration, and not the search.**
+    A run that gives each candidate fewer worlds than its sigma needs, or that
+    is too short for the alignment of its steps, has to say so on its first
+    lines. This run gives one world and asks for one generation, so both notes
+    fire. A search that held those figures behind a function nobody calls
+    would pass every test of its own and would ship inert.[^1]
+
+    References
+    ----------
+    [^1]: Recurring defect shapes, shape 3.
+    ``.agents/rules/recurring-defects.md``
     """
     train(
         "t",
@@ -218,6 +230,10 @@ def test_the_run_says_out_loud_that_a_generation_carried_no_information(
     printed = capsys.readouterr().out
     assert "carried no information" in printed, printed
     assert "The centre does not move" in printed, printed
+    assert "under-sampled for its sigma" in printed, printed
+    assert "mostly wander" in printed, printed
+    assert "aligns" in printed, printed
+    assert "agreed" in printed, printed
 
 
 def test_a_generation_that_carried_no_information_moves_no_centre(
@@ -242,17 +258,38 @@ def test_a_generation_that_carried_no_information_moves_no_centre(
     assert np.array_equal(centres[0], centres[1])
 
 
+def index_order_ranks(scores: np.ndarray) -> np.ndarray:
+    """Rank the scores the way a stable sort ranked them before this change.
+
+    **This is the defect, restated so that a test can put it back.** A stable
+    sort gives a tied score the position it occupies, so an equal generation
+    ranks by candidate index. Every plus half then ranks below its own minus
+    half by the same amount.
+    """
+    order = np.argsort(np.argsort(scores, kind="stable"), kind="stable")
+    return order / (len(scores) - 1) - 0.5
+
+
 def test_the_old_trainer_moves_the_centre_from_an_equal_generation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The test above is able to fail.
 
-    The old trainer ranked every generation, whatever it scored. This puts
-    that behaviour back through one name and asserts that the centre then
-    moves on a generation where no candidate scored differently.
+    The old trainer ranked every generation, whatever it scored, and it ranked
+    a tied score by candidate index. **Both defects must go back**, because
+    either one alone leaves the centre where it was. A ranking that gives a
+    tied score the mean of its positions gives every candidate of an equal
+    generation one rank, so every pair weight is zero and the search reads no
+    direction to step along.
+
+    The two together move the centre. The index order gives every plus half a
+    lower rank than its own minus half, and the guard lets that ranking
+    through.
     """
     monkeypatch.setattr(search_module, "carries_information", lambda spread: True)
+    monkeypatch.setattr(search_module, "rank_shape", index_order_ranks)
+    monkeypatch.setattr(search_module, "generation_agreement", lambda ranks: 1.0)
     centres, rows = run_on_one_seed(tmp_path, SMALL_ONE_SEAT_SEED)
 
     assert [row["history"][-1]["spread"] for row in rows] == [0.0, 0.0]

@@ -184,8 +184,14 @@ esac
 # does: the probe then reports a figure for a world nobody trained in, and
 # that figure reads like a training cost. This launcher held two stale copies
 # of the strategy list once and a paid instance died on both.
+#
+# **The default names no sigma.** The trainer configuration declares the
+# fraction of the centre that one candidate moves, and this launcher takes it
+# rather than holding a copy. A copy here held the value the trainer ran
+# before a measurement lowered it, and nothing fails when the two disagree:
+# the paid run then searches at a radius the measurement rejected.
 default_args="--generations 20 --population 24 --seeds 6 --holdout 256 \
---sigma 1.5 --learning-rate 0.3 --validation 128 --validate-every 2"
+--learning-rate 0.3 --validation 128 --validate-every 2"
 train_args="${CACHETTE_TRAIN_ARGS:-$default_args}"
 
 # How many generations the whole run takes, read out of the arguments and

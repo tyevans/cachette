@@ -561,12 +561,21 @@ class GenerationRecord:
     each candidate, which a run reports whatever the search ranked, so that a
     reader sees both instruments on every generation.
 
-    The spread entry is the highest ranked score minus the lowest one. The
-    informative entry is false when that spread was zero, which means the
-    score did not depend on the candidate and the centre did not move.
+    The spread entry is the highest ranked score minus the lowest one.
+
+    **The informative entry is false when the centre did not move**, and two
+    things stop it. A spread of zero means the score did not depend on the
+    candidate. A generation that agreed no better than a ranking of pure noise
+    agrees leaves the search no direction to step along, and that generation
+    has a spread.[^1]
 
     The episodes entry is empty for a generation that a seated league played,
     because that path builds its worlds itself and reports no episode.
+
+    References
+    ----------
+    [^1]: The search, the agreement of a generation.
+    ``python/cachette/learn/search.py``
     """
 
     generation: int
