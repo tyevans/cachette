@@ -57,7 +57,7 @@ import numpy as np
 
 from .env import Env, EnvConfig, viable_seeds
 from .inspect import verb_of
-from .policy import LinearPolicy, MLPPolicy, encode_many
+from .policy import LinearPolicy, encode_many
 from .reward import Scoring
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
@@ -366,21 +366,7 @@ def fit_linear(data: Dataset) -> LinearPolicy:
     return LinearPolicy(fit_weights(features, data.targets))
 
 
-def fit_mlp(data: Dataset, hidden: int = 24) -> MLPPolicy:
-    """Fit the second layer of the network policy shape to a dataset.
-
-    The first layer of that shape is a fixed random projection that the
-    trainer does not move, so a supervised fit moves the second layer alone.
-    The fit therefore sees the projected features and stays convex.
-    """
-    observation_length = int(data.observations.shape[1])
-    action_length = int(data.targets.shape[1])
-    start = MLPPolicy.zeros(action_length, observation_length, hidden)
-    projected = np.tanh(encode_many(data.observations) @ start.first.T)
-    return MLPPolicy(start.first, fit_weights(projected, data.targets))
-
-
-def score(policy: LinearPolicy | MLPPolicy, data: Dataset) -> dict[str, float]:
+def score(policy: LinearPolicy, data: Dataset) -> dict[str, float]:
     """Report how often the policy names a command the controller gave.
 
     The command accuracy is the chance that the policy names the command a
@@ -426,7 +412,7 @@ def write_json(path: Path, payload: object) -> None:
 
 
 def main() -> int:
-    """Record the controller, fit both policy shapes, and measure them.
+    """Record the controller, fit the linear policy shape, and measure it.
 
     The run plays the built-in controller in the learner's seat over a set of
     recording seeds, fits a policy to what it did, then plays that policy on
@@ -449,7 +435,6 @@ def main() -> int:
     parser.add_argument("--fit-holdout", type=int, default=6)
     parser.add_argument("--holdout", type=int, default=24)
     parser.add_argument("--workers", type=int, default=16)
-    parser.add_argument("--hidden", type=int, default=24)
     parser.add_argument(
         "--play",
         action="store_true",
@@ -498,10 +483,10 @@ def main() -> int:
     print(f"  windows {len(data)}, commands {data.commands}", flush=True)
     print(f"  baseline {data.baseline()}", flush=True)
 
-    fits: dict[str, LinearPolicy | MLPPolicy] = {
-        "linear": fit_linear(fitting),
-        "mlp": fit_mlp(fitting, arguments.hidden),
-    }
+    # **This pass fits the linear shape alone.** A supervised fit needs a
+    # convex problem, and the structured policy is not one. A fit of it needs
+    # a gradient method, which this module does not hold.
+    fits: dict[str, LinearPolicy] = {"linear": fit_linear(fitting)}
     wanted = PolicyFit.of_env(probe)
     for name, policy in fits.items():
         path = arguments.out / f"imitate-{name}.npz"
@@ -547,7 +532,6 @@ def main() -> int:
 __all__ = [
     "Dataset",
     "fit_linear",
-    "fit_mlp",
     "fit_weights",
     "main",
     "record",

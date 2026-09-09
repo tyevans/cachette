@@ -48,7 +48,7 @@ def _action_version() -> int:
 def main() -> int:
     """Write one manifest for each fitted policy shape."""
     report = json.loads(REPORT.read_text())
-    for kind in ("linear", "mlp"):
+    for kind in ("linear",):
         name = f"imitate-obs3-{kind}.npz"
         path = ROOT / name
         fit = report["fits"][kind]

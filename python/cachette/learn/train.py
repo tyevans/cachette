@@ -61,7 +61,7 @@ import numpy as np
 
 from .config import TrainConfig
 from .env import Env, EnvConfig, viable_seeds
-from .policy import LinearPolicy, MLPPolicy, Policy, PolicyFit, load_policy
+from .policy import LinearPolicy, Policy, PolicyFit, load_policy
 from .presets import ObjectiveSchedule
 from .record import EpisodeRecord, GenerationRecord, PopulationRecord
 from .reward import Scoring, Weighting
@@ -184,7 +184,7 @@ class Checkpoint:
                 "tick_limit": self.env_config.tick_limit,
                 "horizon": self.env_config.horizon,
                 "decision_interval": self.env_config.decision_interval,
-                "hidden": self.hidden if self.kind == "mlp" else 0,
+                "hidden": 0,
             },
         )
 
@@ -334,9 +334,9 @@ def train(
     """Train one policy, and return what each generation scored.
 
     The kind entry names the policy the run trains. A linear policy scores
-    each action row from a weighted sum of the features. A network policy
-    puts one hidden layer between them, which lets it state a rule that two
-    features must hold together.
+    each action row from a weighted sum of the features. A structured policy
+    reads the ring stack and the entity tokens through shared weights, which
+    lets it state a rule that two features must hold together.
 
     The scoring entry is what the seat is rewarded for. One scoring holds for
     the whole run. A schedule moves between several, either at each
@@ -751,7 +751,6 @@ __all__ = [
     "Generation",
     "GenerationRecord",
     "LinearPolicy",
-    "MLPPolicy",
     "Optimiser",
     "Policy",
     "PolicyFit",

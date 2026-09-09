@@ -47,8 +47,9 @@ from pathlib import Path
 import numpy as np
 
 from cachette.learn.env import Env
-from cachette.learn.policy import MLPPolicy, Policy, RandomPolicy
+from cachette.learn.policy import Policy, RandomPolicy
 from cachette.learn.reward import Weighting
+from cachette.learn.structured import StructuredPolicy
 from cachette.learn.train import run_population
 
 # Fields that cannot inform a ranking, and why each is left out. A constant
@@ -133,7 +134,6 @@ def main() -> None:
     parser.add_argument("--policies", type=int, default=24)
     parser.add_argument("--seeds", type=int, default=8)
     parser.add_argument("--seed-start", type=int, default=60_000)
-    parser.add_argument("--hidden", type=int, default=24)
     parser.add_argument("--sigma", type=float, default=1.0)
     parser.add_argument("--workers", type=int, default=12)
     parser.add_argument("--out", type=Path, default=None)
@@ -159,9 +159,7 @@ def main() -> None:
     # owns, and nothing fails when the two disagree.
     probe = Env(WORLD, weighting)
     fields = candidate_fields(probe)
-    zero = MLPPolicy.zeros(
-        probe.action_length, probe.observation_length, arguments.hidden
-    )
+    zero = StructuredPolicy.of_catalogue(probe.action_length, probe.signals)
     size = zero.flat().size
     policies: list[Policy] = []
     for _ in range(arguments.policies - 1):
