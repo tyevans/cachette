@@ -940,6 +940,15 @@ impl Observation {
     /// unit position and after the last change to a unit faction. A pass
     /// placed earlier would answer for a world the step had already left.
     ///
+    /// # The three passes each carry their own span
+    ///
+    /// The whole rebuild is one stage, and three nested stages divide it. A
+    /// figure for the whole rebuild says which frame is slow. It does not say
+    /// which of the three passes spends the frame, and the three scale with
+    /// different things: the stamp pass with the observers, the block pass
+    /// with the stamps, and the apply pass with the blocks that a faction
+    /// sees.
+    ///
     /// # Errors
     ///
     /// Returns [`BridgeError::GridMismatch`] when the arena and the layout
@@ -954,8 +963,15 @@ impl Observation {
         if arena.grid() != self.grid {
             return Err(BridgeError::GridMismatch);
         }
-        let stamps = self.collect_stamps(arena);
-        let produced = self.rebuild_blocks(&stamps, terrain, threads);
+        let stamps = {
+            let _span = crate::stage::open(crate::stage::Stage::ObserveStamps);
+            self.collect_stamps(arena)
+        };
+        let produced = {
+            let _span = crate::stage::open(crate::stage::Stage::ObserveBlocks);
+            self.rebuild_blocks(&stamps, terrain, threads)
+        };
+        let _span = crate::stage::open(crate::stage::Stage::ObserveApply);
         self.apply(produced, tick);
         Ok(())
     }

@@ -72,6 +72,25 @@ const SEED: u64 = 0x0123_4567_89ab_cdef;
 /// The number of factions that every world in this benchmark holds.
 const FACTIONS: u16 = 8;
 
+/// How many factions the founded placement seats.
+///
+/// Each seated faction runs a controller, and the controllers are what keep
+/// the population alive across a long warmup. Four is the faction count that
+/// a world holds by default, so the founded placement measures the shape the
+/// engine is configured for rather than a shape this file invented.
+const FOUNDED_FACTIONS: u16 = 4;
+
+/// How many people the founded placement puts in each seated group.
+///
+/// A founding of nobody is refused, so the count is above zero.
+const FOUNDED_GROUP: u32 = 8;
+
+/// The housing that the founded placement gives each seat.
+///
+/// A seat without housing grows no population, and a founded world with no
+/// population measures nothing.
+const FOUNDED_HOUSING: u32 = 256;
+
 /// The largest number of samples that one row takes.
 const MAX_SAMPLES: usize = 9;
 
@@ -86,6 +105,15 @@ const ROW_BUDGET_NS: u128 = 10_000_000_000;
 
 /// The number of frames that a step row runs before it starts to measure.
 const WARMUP_FRAMES: usize = 2;
+
+/// How many frames one row of the `stage-cost` mode averages over.
+///
+/// The table is a sum, so a row there is an average and not a median. A
+/// single frame would carry whatever the operating system did during it.
+///
+/// That mode takes a frame count as an argument, and falls back to this
+/// value when the caller gives none.
+const DEFAULT_STAGE_COST_FRAMES: usize = 9;
 
 /// Reads the clock.
 ///
@@ -444,6 +472,44 @@ fn stage_rows(arguments: &[String]) {
 /// cargo bench --bench target_cost --features stage-cost -- stage-cost 4096x4096 1000000 12
 /// ```
 ///
+/// # It takes a warmup count and a frame count
+///
+/// The fifth argument is the warmup count and the sixth is the frame count.
+/// Both default to the values every other row of this file uses, so a
+/// command line that omits them keeps the meaning it had before they
+/// existed. The placement argument sits before them, so a caller that wants
+/// the counts states the placement as well.
+///
+/// ```text
+/// cargo bench --bench target_cost --features stage-cost -- stage-cost 48x48 4096 1 packed 200 20
+/// ```
+///
+/// **A stage whose cost grows with the age of the world reads high on a cold
+/// run.** A row is the sum over the measured frames divided by their count,
+/// so a build that happens once on the first measured frame appears as a
+/// per-frame cost of a fraction of its size. The preamble prints both
+/// counts, so a reader can never take a row without knowing what it averaged
+/// over.
+///
+/// The preamble also prints how many units are alive when the measure
+/// starts, and how many are alive when it ends. **A long warmup can empty
+/// the world.** A row from an empty world reports a small figure for every
+/// stage that walks the units, and it looks like a fast engine rather than
+/// like a world with nothing in it.
+///
+/// # The placement decides whether a long warmup is possible
+///
+/// The packed placement and the scattered placement both spawn a unit and
+/// then leave it. A unit has a bounded life, so those two worlds empty as the
+/// warmup grows past that life and no row after that point measures a
+/// populated world.
+///
+/// The founded placement seats one group for each faction and lets the
+/// controllers run. The settlements grow and they replace the units that die,
+/// so the population holds and a warmup of any length still measures a world
+/// with units in it. The founded placement ignores the unit count argument,
+/// because the controllers decide how many units exist.
+///
 /// # What the columns mean
 ///
 /// `frames` is how many frames the row averaged over. `entries` is how many
@@ -476,70 +542,81 @@ fn stage_cost_rows(arguments: &[String]) {
         .get(3)
         .and_then(|word| word.parse().ok())
         .unwrap_or(1);
-    let scattered = arguments.get(4).map(String::as_str) == Some("scattered");
-
-    /// How many frames one row averages over.
-    ///
-    /// The table is a sum, so a row here is an average and not a median. A
-    /// single frame would carry whatever the operating system did during it.
-    const FRAMES: usize = 9;
+    let placement = Placement::named(arguments.get(4).map_or("packed", String::as_str));
+    let warmup: usize = arguments
+        .get(5)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(WARMUP_FRAMES);
+    let frames: usize = arguments
+        .get(6)
+        .and_then(|word| word.parse().ok())
+        .unwrap_or(DEFAULT_STAGE_COST_FRAMES)
+        .max(1);
 
     println!("# stage cost rows. Each row is one named pass of a frame");
     println!("# recording\t{}", stage::is_recording());
-    println!(
-        "# placement\t{}",
-        if scattered { "scattered" } else { "packed" }
-    );
-    println!("# frames\t{FRAMES}");
+    println!("# placement\t{}", placement.name());
+    println!("# warmup_frames\t{warmup}");
+    println!("# frames\t{frames}");
     println!("# transparent_huge_pages\t{}", huge_page_setting());
+
+    let capacity = units.max(1024);
+    let mut config = extent.config(capacity);
+    if matches!(placement, Placement::Founded) {
+        config.faction_count = FOUNDED_FACTIONS;
+    }
+    println!("# faction_count\t{}", config.faction_count);
+    let mut world = World::new(config).expect("the extent must describe a world");
+    let placed = match placement {
+        Placement::Founded => found_every_faction(&mut world),
+        Placement::Scattered => populate_scattered(&mut world, units),
+        Placement::Packed => populate(&mut world, units),
+    };
+    for _ in 0..warmup {
+        world.step(threads).expect("the step must run");
+    }
+
+    let live_before = live_units(&world);
+    println!("# live_units_before\t{live_before}");
     println!(
         "stage\ttiles\tunits\tthreads\tframes\tentries\ttotal_ns\tns_for_each_frame\ttakes_threads\tnested"
     );
 
-    let capacity = units.max(1024);
-    let mut world = World::new(extent.config(capacity)).expect("the extent must describe a world");
-    let placed = if scattered {
-        populate_scattered(&mut world, units)
-    } else {
-        populate(&mut world, units)
-    };
-    for _ in 0..WARMUP_FRAMES {
-        world.step(threads).expect("the step must run");
-    }
-
     stage::reset();
     let start = now();
-    for _ in 0..FRAMES {
+    for _ in 0..frames {
         let log = world.step(threads).expect("the step must run");
         std::hint::black_box(log.len());
     }
     let wall = start.elapsed().as_nanos();
     let costs = stage::costs();
+    let live_after = live_units(&world);
 
     let tiles = extent.tiles();
-    let frames = FRAMES as u64;
+    let divisor = frames as u64;
     for stage in cachette_core::STAGES {
         let cost = costs.cost(*stage);
         println!(
-            "{}\t{tiles}\t{placed}\t{threads}\t{FRAMES}\t{}\t{}\t{}\t{}\t{}",
+            "{}\t{tiles}\t{placed}\t{threads}\t{frames}\t{}\t{}\t{}\t{}\t{}",
             stage.name(),
             cost.entries,
             cost.nanos,
-            cost.nanos / frames,
+            cost.nanos / divisor,
             stage.takes_threads(),
             stage.is_nested()
         );
     }
     let total = costs.total_nanos();
     println!(
-        "all_stages\t{tiles}\t{placed}\t{threads}\t{FRAMES}\t{FRAMES}\t{total}\t{}\ttrue\tfalse",
-        total / frames
+        "all_stages\t{tiles}\t{placed}\t{threads}\t{frames}\t{frames}\t{total}\t{}\ttrue\tfalse",
+        total / divisor
     );
     let wall = u64::try_from(wall).unwrap_or(u64::MAX);
     println!(
-        "frame_wall\t{tiles}\t{placed}\t{threads}\t{FRAMES}\t{FRAMES}\t{wall}\t{}\ttrue\tfalse",
-        wall / frames
+        "frame_wall\t{tiles}\t{placed}\t{threads}\t{frames}\t{frames}\t{wall}\t{}\ttrue\tfalse",
+        wall / divisor
     );
+    println!("# live_units_after\t{live_after}");
     println!(
         "# anon_huge_pages_bytes\t{}",
         smaps_rollup_kib("AnonHugePages:") * 1024
@@ -1231,6 +1308,79 @@ fn populate(world: &mut World, units: u32) -> u32 {
         }
     }
     placed
+}
+
+/// Which world one row of the `stage-cost` mode measures.
+///
+/// The placement decides the fixture and it decides the label the preamble
+/// prints. One value holds both, so a word the mode does not know stops the
+/// run instead of printing itself over a world it did not build.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Placement {
+    /// One unit on each admissible tile, from the first tile onward.
+    Packed,
+    /// One unit every few tiles, across the whole world.
+    Scattered,
+    /// One seated group for each faction, with the controllers running.
+    Founded,
+}
+
+impl Placement {
+    /// Returns the placement that one word names.
+    ///
+    /// # Panics
+    ///
+    /// Panics when the word names no placement. A row that measured a world
+    /// the caller did not ask for is worse than no row.
+    fn named(word: &str) -> Self {
+        match word {
+            "packed" => Self::Packed,
+            "scattered" => Self::Scattered,
+            "founded" => Self::Founded,
+            other => panic!(
+                "the fifth argument names a placement: packed, scattered or founded, not {other}"
+            ),
+        }
+    }
+
+    /// Returns the word that names this placement.
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Packed => "packed",
+            Self::Scattered => "scattered",
+            Self::Founded => "founded",
+        }
+    }
+}
+
+/// Seats one group for each faction of the world, and reports how many
+/// seats the world took.
+///
+/// The controller of a seated faction runs from the next step, so the
+/// settlements grow and they replace the units that die. A world built this
+/// way holds its population across a warmup of any length, and a packed world
+/// does not.
+fn found_every_faction(world: &mut World) -> u32 {
+    world.set_founding_housing(FOUNDED_HOUSING);
+    let outcomes = world.found_run_for_every_faction(FOUNDED_GROUP);
+    u32::try_from(
+        outcomes
+            .iter()
+            .filter(|outcome| outcome.is_seated())
+            .count(),
+    )
+    .unwrap_or(0)
+}
+
+/// Returns how many units of every faction are alive.
+///
+/// A stage that walks the units costs nothing in a world that holds none, so
+/// a row without this count cannot be told from a row of an empty world.
+fn live_units(world: &World) -> u32 {
+    let ceiling = world.config().faction_count.max(1);
+    (0..ceiling)
+        .map(|faction| world.population_of(FactionId(faction)))
+        .sum()
 }
 
 /// Returns the addresses that the scattered pattern places a unit on.

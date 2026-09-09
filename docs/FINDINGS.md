@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-680**
+**Next number: FND-683**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -17665,6 +17665,65 @@ that means the loss must cost less than half of what the win pays. A symmetric
 pair of outcome weights is the defect, and it is arithmetic rather than
 learning.
 
+### FND-682 — The observation pass held 96 percent of a frame in the cost table, and the fixture put it there
+
+**Believed.** The stage cost table reported the observation pass at about 32.5
+million nanoseconds against a frame wall of about 33.7 million, so one pass held
+96 percent of a frame. The suspicion was a cold run. The remembered layer of a
+faction only grows, so a one-time build on the first measured frame would divide
+across the measured frames and read as a per-frame cost.[^F682A]
+
+**True.** The cost is real and it is paid on every frame. It is not a cold-start
+artefact and the remembered layer does not cause it. The figure is a property of
+the fixture, which asks for 4096 units on a world of 2304 tiles and packs 1649
+of them in. The observation pass scales with the live observers, so a world at
+that density pays a large figure and a world the engine will run does not.
+
+The packed fixture also cannot be warmed. A unit has a bounded life and the
+packed placement spawns a unit and then leaves it, so the world empties. Every
+row taken at a warmup above that life measured a world with no units in it.
+
+**Evidence.** The stage cost mode now takes a warmup count and a frame count, so
+the same fixture can be measured at any age. Three nested stages now divide the
+observation pass.
+
+On the packed placement the pass costs 21.5, 21.8 and 22.0 million nanoseconds
+for each frame at warmups of 2, 20 and 80, with 1649 units alive throughout.
+At a warmup of 200 and of 400 it costs under 1000 nanoseconds, and the unit
+count is zero. The cost is flat across the whole life of the population, which
+is the shape a per-frame cost has and not the shape a one-time build has.
+
+On the founded placement, which seats four controller factions and lets them
+replace the units that die, the pass costs 61 thousand nanoseconds at a warmup
+of 2 with 32 units, and 723 thousand at a warmup of 800 with 118 units. The
+frame wall runs from 1.7 to 4.0 million nanoseconds. That agrees with the
+figures the project holds for a training tick, and the 33.7 million figure
+disagreed with them.
+
+The nested rows name the pass that spends the time. The block rebuild takes
+21.89 of the 21.99 million nanoseconds, which is 99.6 percent. The stamp
+collection takes 91 thousand. The apply pass, which writes the per-block clock
+of when a faction last saw a block, takes 5 thousand. **The clock was the
+leading suspicion and it is not the cause.**
+
+**What follows.** Three things.
+
+A benchmark row that walks the units must report how many units are alive. A row
+from an empty world reports a small figure for every such stage, and it reads as
+a fast engine rather than as a world with nothing in it. The stage cost mode now
+prints the count before the measure and after it.
+
+A fixture that spawns a unit and leaves it cannot be warmed past the life of a
+unit. A measurement that needs a settled world needs a world that replaces its
+dead, and seating the controllers is how this project builds one.[^F682B]
+
+The observation pass casts sight once for each block that an observer may reach,
+and it discards every tile outside that block. An observer whose sight box
+straddles four blocks therefore pays four full casts. Removing that redundancy
+changes which worker writes which block, and the record that governs the
+parallel passes requires disjoint outputs, so it is a decision and not a
+repair.[^F682C]
+
 ## References
 
 [^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
@@ -17708,3 +17767,6 @@ learning.
 [^F673A]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
 [^F674A]: The census table of the engine. `crates/cachette-core/src/world/census.rs`
 [^F675A]: ADR-0062, production and upkeep are rates attached to a site, the consequences. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+[^F682A]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+[^F682B]: Testing rules, a fixture supplies the input, section 2a. `.agents/rules/testing.md`
+[^F682C]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
