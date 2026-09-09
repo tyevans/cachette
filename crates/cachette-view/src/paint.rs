@@ -25,9 +25,10 @@
 //! # The condition of a unit
 //!
 //! A unit keeps the colour of its faction, and one mark says that a shortage
-//! holds it. The mark is a dot at half the radius, in one colour, over the
-//! disc of the faction. The faction table stays the only table of colours
-//! the viewer keys on a faction.[^4]
+//! holds it. The mark is a dot in one colour, over the core of the bead of
+//! the faction. The dot stays inside that core, so a marked unit keeps some
+//! of its faction colour and the outline of the bead stays whole. The faction
+//! table stays the only table of colours the viewer keys on a faction.[^4]
 //!
 //! **The picture cannot show a unit at the moment a shortage ends it.** The
 //! engine scans the death plane inside the step that takes the unit to the
@@ -530,11 +531,12 @@ pub fn resource_pip_colour(kind: ResourceKind) -> u32 {
     PIP_COLOURS[kind as usize]
 }
 
-/// Returns the colour of the rim the viewer draws around a unit disc.
+/// Returns the colour of the rim the viewer draws around a unit bead.
 ///
-/// The rim is what makes a unit visible over ground its own faction tints,
-/// and below sixteen pixels a tile it is most of the unit.[^1] A test reads
-/// this rather than a literal, so the rim has one declaration site.[^2]
+/// The rim is the inner of the two bands that separate a bead from the ground
+/// under it, and the halo is the outer one. Below sixteen pixels a tile the
+/// pair is most of the unit.[^1] A test reads this rather than a literal, so
+/// the rim has one declaration site.[^2]
 ///
 /// # References
 ///
@@ -543,6 +545,39 @@ pub fn resource_pip_colour(kind: ResourceKind) -> u32 {
 #[must_use]
 pub const fn unit_rim_colour() -> u32 {
     UNIT_RIM
+}
+
+/// Returns the colour of the halo the viewer draws around a unit bead.
+///
+/// The halo is the outer of the two bands that separate a bead from the
+/// ground under it. A test reads this rather than a literal, so the halo has
+/// one declaration site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+#[must_use]
+pub const fn unit_halo_colour() -> u32 {
+    UNIT_HALO
+}
+
+/// Returns the radius a unit bead draws at, for a tile of this width.
+///
+/// **This is the one statement of the radius, and the pass reads it here.**
+/// A test that repeated the arithmetic would be a second declaration site,
+/// and nothing would fail when the two disagreed.[^1]
+///
+/// The radius is three tenths of the tile, and the floor holds a bead visible
+/// below sixteen pixels a tile. Without the floor a bead is one pixel of the
+/// faction colour over ground that the same faction tints.[^2]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^2]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
+#[must_use]
+pub fn unit_radius(tile_width: f32) -> i32 {
+    ((tile_width * 0.3) as i32).max(UNIT_LEAST_RADIUS)
 }
 
 /// Returns the smallest weight at which the viewer draws the air overlay.
@@ -673,7 +708,7 @@ const OVER_CAPACITY: u32 = 0x00ff_2a1e;
 /// like, and it never will.[^1]
 ///
 /// The colour is far from every faction colour and from every ground colour,
-/// so a watcher reads the mark against the disc it sits on and against the
+/// so a watcher reads the mark against the bead it sits on and against the
 /// ground behind it. A test asserts that distance.
 ///
 /// # References
@@ -688,28 +723,31 @@ const SHORTAGE: u32 = 0x00f2_f0d8;
 /// ground and then reads the ring for the faction that took it.
 const FOUNDING_CORE: u32 = 0x0014_0b04;
 
-/// The smallest radius a unit disc takes, in pixels.
+/// The smallest radius a unit bead takes, in pixels.
 ///
-/// A disc of three tenths of the tile is one pixel across at the region
+/// A bead of three tenths of the tile is one pixel across at the region
 /// scale, in the colour of the faction, over ground the same faction tints.
-/// A watcher then reads a world of no people. The floor holds the disc above
+/// A watcher then reads a world of no people. The floor holds the bead above
 /// the ground speckle at every zoom.[^1]
+///
+/// **The floor stays at three, and the outline takes two of the three.** A
+/// floor of four would put a bead of nine pixels over a tile of eight, and
+/// the bead would then cover the ground it stands on and the mark of any site
+/// there.
+///
+/// The second band costs the core of a bead at the floor. A core of one pixel
+/// of radius covers nine pixels, against thirteen when one band took the
+/// outer pixel. The rounder bead mask pays part of that back: the whole bead
+/// covers thirty-seven pixels against twenty-nine, and it is seven pixels
+/// across either way. Nine pixels of the faction colour read at the region
+/// zoom, and a unit that no outline separates from the ground reads at no
+/// zoom at all.
 ///
 /// # References
 ///
 /// [^1]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
 const UNIT_LEAST_RADIUS: i32 = 3;
 
-/// The colour of the rim around a unit disc.
-///
-/// Every faction colour collides with the ground its own faction holds,
-/// because the tint and the disc carry one colour at two weights. The rim is
-/// darker than any ground colour, so the shape of a unit reads against the
-/// tint under it.[^1]
-///
-/// # References
-///
-/// [^1]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
 /// How wide a way draws at each level, as a share of the width of a tile.
 ///
 /// The level is the width, so a watcher tells a better road from a poorer one
@@ -735,7 +773,43 @@ const WAY_CROWN: u32 = 0x00f0_dcb4;
 /// The level at and above which a way draws a crown down its middle.
 const CROWNED_LEVEL: u8 = 2;
 
+/// The colour of the rim around a unit bead.
+///
+/// Every faction colour collides with the ground its own faction holds,
+/// because the tint and the bead carry one colour at two weights. The rim is
+/// darker than any ground colour, so the shape of a unit reads against the
+/// tint under it.[^1]
+///
+/// The rim is the inner of the two outline bands. The halo below is the outer
+/// one, and the two work as a pair.
+///
+/// # References
+///
+/// [^1]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
 const UNIT_RIM: u32 = 0x0008_0a0c;
+
+/// The colour of the halo around a unit bead.
+///
+/// **One outline colour cannot separate a unit from every background.** The
+/// rim above is darker than every ground colour, so it separates a bead from
+/// the open ground and from the dark page behind the map. It does not
+/// separate a bead from a bright background. The edge of a holding draws
+/// nearly the pure colour of the faction that holds it, and a pale faction
+/// colour there is brighter than the rim by less than the rim needs.[^1] An
+/// overlay wash is brighter still.
+///
+/// The halo is white and it sits outside the rim, so the two bands sit at the
+/// ends of the brightness range. A background is far from at least one of
+/// them, and it is furthest from both when it lies midway between them. A
+/// test states the bound at that worst background, so the bound holds for
+/// every background and not only for the grounds this map draws. A second
+/// test reads the ground from the picture the same camera draws without the
+/// unit.
+///
+/// # References
+///
+/// [^1]: PRD-0006, a place belongs to somebody. `docs/product/accepted/prd-0006-a-place-belongs-to-somebody.md`
+const UNIT_HALO: u32 = 0x00ff_ffff;
 
 /// The tile width from which a crowd shows its count as a badge, in pixels.
 ///
@@ -747,6 +821,12 @@ const UNIT_RIM: u32 = 0x0008_0a0c;
 ///
 /// [^1]: Research report 25, defect 4. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
 const CROWD_BADGE_TILE: f32 = 24.0;
+
+/// How many pixels of the radius of a bead the outline takes.
+///
+/// The halo takes the outer pixel and the rim takes the pixel inside it. The
+/// core of a bead is therefore its radius less this.
+const OUTLINE_BANDS: i32 = 2;
 
 /// The tile width from which a unit shows where it came from, in pixels.
 ///
@@ -1456,7 +1536,11 @@ impl<'a> Canvas<'a> {
             && y - reach < self.height as f32
     }
 
-    /// Fills a disc, for drawing a soldier.
+    /// Fills a disc, for drawing a junction of a way.
+    ///
+    /// The mask is the square of the radius, so a small disc is a diamond. A
+    /// junction is a joint in a ribbon and it takes the shape of the ribbon.
+    /// A mark on a unit takes the rounder bead mask instead.
     fn fill_disc(&mut self, cx: i32, cy: i32, radius: i32, colour: u32) {
         for row in -radius..=radius {
             for column in -radius..=radius {
@@ -1467,7 +1551,23 @@ impl<'a> Canvas<'a> {
         }
     }
 
-    /// Fills a disc divided into one wedge for each colour, inside a rim.
+    /// Fills a round mark of one colour, for a mark that sits on a unit.
+    ///
+    /// The mask is the bead mask, so a mark of two pixels is round and a mark
+    /// inside a bead keeps the shape of the bead.
+    fn fill_bead(&mut self, cx: i32, cy: i32, radius: i32, colour: u32) {
+        let reach = bead_reach(radius);
+        for row in -radius..=radius {
+            for column in -radius..=radius {
+                if column * column + row * row <= reach {
+                    self.put(cx + column, cy + row, colour);
+                }
+            }
+        }
+    }
+
+    /// Fills a bead divided into one wedge for each colour, inside two
+    /// outline bands.
     ///
     /// **A tile that two factions stand on shows both.** The pass used to
     /// paint one disc for each unit at the same centre, so the last unit the
@@ -1478,22 +1578,43 @@ impl<'a> Canvas<'a> {
     /// colour order, so the picture does not depend on the order the units
     /// arrived in.[^2]
     ///
+    /// **The outline takes the outer two pixels, the halo outside and the rim
+    /// inside.** One band cannot separate a bead from every background,
+    /// because a background may be brighter than that band or darker than it.
+    /// The halo is white and the rim is nearly black, so the pair sits at the
+    /// ends of the brightness range and a background is far from at least one
+    /// of them. A test states that bound and reads the ground from the
+    /// picture the same camera draws without the unit.[^3]
+    ///
+    /// The outline costs two pixels of the radius at every zoom, and never a
+    /// share of it. A bead is largest where a watcher already reads it, so a
+    /// band that grew with the radius would take the area the faction colour
+    /// needs and would buy nothing.
+    ///
     /// # References
     ///
     /// [^1]: Research report 25, defect 5. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    fn fill_wedges(&mut self, cx: i32, cy: i32, radius: i32, colours: &[u32], rim: u32) {
+    /// [^3]: PRD-0005, a watcher can tell what is happening and why. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
+    fn fill_wedges(&mut self, cx: i32, cy: i32, radius: i32, colours: &[u32], rim: u32, halo: u32) {
         if colours.is_empty() {
             return;
         }
-        let inner = (radius - 1).max(0);
+        let reach = bead_reach(radius);
+        // The halo is the first band and the rim is the last, so the core
+        // ends one band inside the halo and the whole outline is the constant
+        // above. A literal here would declare the band count a second time.
+        let inside_halo = bead_reach((radius - 1).max(0));
+        let inside_rim = bead_reach((radius - OUTLINE_BANDS).max(0));
         for row in -radius..=radius {
             for column in -radius..=radius {
                 let far = column * column + row * row;
-                if far > radius * radius {
+                if far > reach {
                     continue;
                 }
-                let colour = if far > inner * inner {
+                let colour = if far > inside_halo {
+                    halo
+                } else if far > inside_rim {
                     rim
                 } else {
                     colours[wedge_of(column, row, colours.len())]
@@ -1519,6 +1640,25 @@ impl<'a> Canvas<'a> {
             );
         }
     }
+}
+
+/// Returns the largest squared distance that a bead of this radius covers.
+///
+/// **A pixel is a square, and its centre sits half a pixel inside its edge.**
+/// A mask that compares the squared distance against the square of the radius
+/// therefore drops all but four pixels of the outer ring of a small bead, and
+/// a bead of three pixels draws as a spike rather than as a round thing. The
+/// bound here is the square of the radius plus half a pixel. That square is
+/// the square of the radius, plus the radius, plus a quarter, and the quarter
+/// changes no comparison, because a squared distance between two pixel
+/// centres is a whole number.
+///
+/// The rounder mask also makes a small bead larger without making it wider. A
+/// bead of radius three covers thirty-seven pixels under this bound and
+/// twenty-nine under the square of the radius, and it is seven pixels across
+/// either way.
+fn bead_reach(radius: i32) -> i32 {
+    radius * radius + radius
 }
 
 /// Returns the wedge that a pixel of a disc falls in.
@@ -2334,12 +2474,7 @@ pub fn draw_paced(
     // picture.
     canvas.overlay = reading;
 
-    // The floor holds a unit visible below sixteen pixels a tile, where a
-    // disc of three tenths of the tile is one pixel of the faction colour
-    // over ground that the same faction tints.[^14]
-    //
-    // [^14]: Research report 23, defect 1. `docs/research/reports/23-demonstration-readability-review-1.md`
-    let radius = ((camera.tile_width * 0.3) as i32).max(UNIT_LEAST_RADIUS);
+    let radius = unit_radius(camera.tile_width);
     // The table opens before the pass that paints and closes after it, so a
     // unit the pass did not paint is gone from it when the frame ends.
     motion.begin();
@@ -3244,11 +3379,23 @@ fn draw_crowd(canvas: &mut Canvas, camera: Camera, radius: i32, crowd: &mut Vec<
     for unit in crowd.iter() {
         let one = [FACTION_COLOURS[unit.slot]];
         let colours: &[u32] = if shared.len() > 1 { &shared } else { &one };
-        canvas.fill_wedges(unit.x as i32, unit.y as i32, radius, colours, UNIT_RIM);
+        canvas.fill_wedges(
+            unit.x as i32,
+            unit.y as i32,
+            radius,
+            colours,
+            UNIT_RIM,
+            UNIT_HALO,
+        );
     }
+    // The mark of a shortage sits inside the core, which is the radius less
+    // the two outline bands. A mark that reached the bands would cover the
+    // outline that separates the bead from the ground, and a third of the
+    // radius reaches them at the floor. The clamp holds it inside.
+    let mark = (radius / 3).clamp(1, (radius - OUTLINE_BANDS).max(1));
     for unit in crowd.iter() {
         if unit.short {
-            canvas.fill_disc(unit.x as i32, unit.y as i32, (radius / 2).max(1), SHORTAGE);
+            canvas.fill_bead(unit.x as i32, unit.y as i32, mark, SHORTAGE);
         }
     }
     if badged && count > 1 {
