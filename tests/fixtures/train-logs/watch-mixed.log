@@ -1,0 +1,54 @@
+  measuring 1 process(es) of 10 workers over 512 worlds each
+=== alpha (linear) ===
+=== beta (linear) ===
+=== gamma (structured) ===
+=== delta (structured) ===
+  alpha baseline working  decisions    43 live  233/256  ticks    107650 rate   3517.5 t/s [31s]
+  beta baseline waiting 60s for another process to measure the same number
+  gamma baseline waiting 60s for another process to measure the same number
+  delta baseline waiting 60s for another process to measure the same number
+  alpha controller measured return     1480.2 won  0.34
+  beta controller cached return     1480.2 won  0.34
+  gamma controller cached return     1480.2 won  0.34
+  delta controller cached return     1480.2 won  0.34
+  controller {'return': 1480.2, 'episodes': 256.0, 'won': 0.34}
+  alpha yardstick working  decisions    49 live  112/128  ticks     60200 rate   2006.1 t/s [30s]
+  beta yardstick working  decisions    49 live  112/128  ticks     60200 rate   2005.9 t/s [30s]
+  gamma yardstick working  decisions    49 live  112/128  ticks     60200 rate   2005.8 t/s [30s]
+  delta yardstick working  decisions    49 live  112/128  ticks     60200 rate   2006.6 t/s [30s]
+  alpha controller yardstick    1000.0
+  beta controller yardstick    2000.0
+  gamma controller yardstick    3000.0
+  delta controller yardstick    4000.0
+  alpha generation  0 working  decisions    18 live  512/512  ticks     92160 rate   2944.1 t/s [31s]
+  beta generation  0 working  decisions    18 live  512/512  ticks     92160 rate   2945.0 t/s [31s]
+  gamma generation  0 working  decisions    18 live  512/512  ticks     92160 rate   2995.6 t/s [31s]
+  delta generation  0 working  decisions    18 live  512/512  ticks     92160 rate   2993.9 t/s [31s]
+  alpha generation  0 mean     639.5 best    1518.9 spread   1264.4 abs-spread   1264.4 won  0.05 ticks 955290 refused  0.03 valid - [600s]
+  beta generation  0 mean    3533.8 best    6194.8 spread   4122.1 abs-spread   4122.1 won  0.05 ticks 955290 refused  0.03 valid - [600s]
+  gamma generation  0 mean    7151.2 best   12038.9 spread   7693.9 abs-spread   7693.9 won  0.05 ticks 955290 refused  0.03 valid - [600s]
+  delta generation  0 mean    8404.8 best   15465.4 spread  11862.9 abs-spread  11862.9 won  0.05 ticks 955290 refused  0.03 valid - [600s]
+  alpha generation  1 working  decisions    18 live  512/512  ticks     92160 rate   2944.1 t/s [31s]
+  beta generation  1 working  decisions    18 live  512/512  ticks     92160 rate   2945.0 t/s [31s]
+  gamma generation  1 working  decisions    18 live  512/512  ticks     92160 rate   2995.6 t/s [31s]
+  delta generation  1 working  decisions    18 live  512/512  ticks     92160 rate   2993.9 t/s [31s]
+  alpha generation  1 mean     884.5 best    1586.5 spread   1298.8 abs-spread   1298.8 won  0.30 ticks 852690 refused  0.00 valid    1200.4 [1200s]
+  beta generation  1 mean    4847.9 best    6837.6 spread   3818.3 abs-spread   3818.3 won  0.30 ticks 857980 refused  0.01 valid    1500.9 [1200s]
+  gamma generation  1 mean    9789.7 best   13363.1 spread   8950.2 abs-spread   8950.2 won  0.30 ticks 866540 refused  0.01 valid - [1200s]
+  delta generation  1 mean    8695.1 best   16484.1 spread  14137.7 abs-spread  14137.7 won  0.30 ticks 884010 refused  0.00 valid    4400.5 [1200s]
+  alpha generation  2 working  decisions    18 live  512/512  ticks     92160 rate   1000.0 t/s [31s]
+  beta generation  2 working  decisions    18 live  512/512  ticks     92160 rate   2000.0 t/s [31s]
+  gamma generation  2 working  decisions    18 live  512/512  ticks     92160 rate   3000.0 t/s [31s]
+  delta generation  2 working  decisions    18 live  512/512  ticks     92160 rate   9999.0 t/s [31s]
+  alpha generation  2 working  decisions    38 live  480/512  ticks    192160 rate   1000.0 t/s [61s]
+  beta generation  2 working  decisions    38 live  480/512  ticks    192160 rate   2000.0 t/s [61s]
+  gamma generation  2 working  decisions    38 live  480/512  ticks    192160 rate   3000.0 t/s [61s]
+  alpha generation  2 working  decisions    58 live  450/512  ticks    292160 rate   1000.0 t/s [91s]
+  beta generation  2 working  decisions    58 live  450/512  ticks    292160 rate   2000.0 t/s [91s]
+  gamma generation  2 working  decisions    58 live  450/512  ticks    292160 rate   3000.0 t/s [91s]
+  alpha generation  2 working  decisions    78 live  420/512  ticks    392160 rate   1000.0 t/s [121s]
+  beta generation  2 working  decisions    78 live  420/512  ticks    392160 rate   2000.0 t/s [121s]
+  gamma generation  2 working  decisions    78 live  420/512  ticks    392160 rate   3000.0 t/s [121s]
+  alpha generation  2 working  decisions    98 live  390/512  ticks    492160 rate   1000.0 t/s [151s]
+  beta generation  2 working  decisions    98 live  390/512  ticks    492160 rate   2000.0 t/s [151s]
+  gamma generation  2 working  decisions    98 live  390/512  ticks    492160 rate   3000.0 t/s [151s]

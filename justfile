@@ -288,16 +288,31 @@ train-throughput-local:
 #
 # Give the run directory that the launcher made. It holds the log, the price
 # and the machine, so this needs no other argument.
+#
+# The elapsed time is the wall clock since the run started, and the run
+# identifier carries that start in UTC. A reader that summed the per-strategy
+# generation seconds read six times the wall clock, and read zero before the
+# first generation finished.
 train-progress dir:
     @. {{dir}}/instance.env && ./scripts/train_progress.py {{dir}}/train.log \
         --price "$PRICE" --generations "$TOTAL_GENERATIONS" \
         --instance-type "$INSTANCE_TYPE" --zone "$ZONE" --run-id "$RUN_ID" \
+        --started "$(./scripts/train-started.sh {{dir}})" \
         --report {{dir}}/report.json
 
-# Print one screen of what a training run is doing. Made for a watch loop:
-#   watch -n1 just train-watch
+# Print one screen of what a training run is doing.
+#
+# This prints one screen and ends. Use `just train-screen` for the loop.
 train-watch dir="":
     @./scripts/train-watch.sh {{dir}}
+
+# Watch a training run, in colour, refreshing every second.
+#
+# This is the recipe to type. It passes the flag that makes `watch` read the
+# colour escapes, so a reader does not have to remember it. Set NO_COLOR for
+# plain text, and redirect the output of `just train-watch` for a clean file.
+train-screen dir="":
+    @CLICOLOR_FORCE=1 watch -c -n1 --no-title "./scripts/train-watch.sh {{dir}}"
 
 # Follow a training run this machine started, without ending it.
 train-attach dir:

@@ -315,9 +315,9 @@ def test_the_dashboard_renders_the_progress_line(
     printed = capsys.readouterr().out
     line = next(row for row in printed.splitlines() if "baseline working" in row)
     watch = _load("train_watch")
-    strategies, _ = watch.read(line.replace("test baseline", "conquer baseline"))
-    assert "conquer" in strategies
-    rendered = watch.render(strategies, None, 0.0, 60, 0.0, -1.0, "a run", 15)
+    reading = watch.read(line.replace("test baseline", "conquer baseline"))
+    assert "conquer" in reading.strategies
+    rendered = watch.render(reading, watch.Facts(heading="a run", generations=60))
     assert "baseline d" in rendered
     assert "no word yet" not in rendered
 
@@ -330,8 +330,7 @@ def test_a_waiter_that_gives_up_and_works_stops_reading_as_idle() -> None:
         "  land-net baseline working  decisions 12 live 8/16 ticks 400 "
         "rate 91.1 t/s [31s]\n"
     )
-    strategies, _ = watch.read(log)
-    rendered = watch.render(strategies, None, 0.0, 60, 0.0, -1.0, "a run", 15)
+    rendered = watch.render(watch.read(log), watch.Facts(heading="a run"))
     assert "baseline d12" in rendered
     assert "waiting on another process" not in rendered
 
@@ -342,6 +341,5 @@ def test_the_dashboard_renders_a_waiting_process() -> None:
     line = (
         "  land-net baseline waiting 60s for another process to measure the same number"
     )
-    strategies, _ = watch.read(line)
-    rendered = watch.render(strategies, None, 0.0, 60, 0.0, -1.0, "a run", 15)
+    rendered = watch.render(watch.read(line), watch.Facts(heading="a run"))
     assert "waiting on another process" in rendered
