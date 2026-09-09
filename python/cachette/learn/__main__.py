@@ -640,11 +640,19 @@ def main() -> int:
     # holdout runs once, at the end, so the whole cost is a few minutes
     # against a run of hours.
     parser.add_argument("--holdout", type=int, default=256)
-    # Sigma is a relative size, and its working range was measured rather
-    # than guessed. On the real decisions of a trained policy, a
-    # perturbation of 0.25 changed 0.8 percent of the choices and one of 1.5
-    # changed about a third of them.
-    parser.add_argument("--sigma", type=float, default=1.5)
+    parser.add_argument(
+        "--sigma",
+        type=float,
+        default=TrainConfig.sigma,
+        help=(
+            "the fraction of the centre that one candidate moves. The "
+            "trainer configuration holds the only declaration of the "
+            "default, and this argument reads it rather than restating it. A "
+            "measurement fixed the value against the signal it buys and the "
+            "worlds it needs. The run reports on its first lines whether the "
+            "world count covers the sigma it was given"
+        ),
+    )
     parser.add_argument("--learning-rate", type=float, default=0.3)
     parser.add_argument("--validation", type=int, default=6)
     parser.add_argument("--validate-every", type=int, default=3)
