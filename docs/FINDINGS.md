@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-712**
+**Next number: FND-713**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19171,3 +19171,54 @@ answered a different question than play.
 **What stays unverified.** This measures the inputs to a ranking, not where
 the ranking points. Whether the recommended pair trains better is unmeasured,
 and one centre of one style under one kind supplied every figure above.
+
+### FND-712 — The summed gradient carries no length, but it carries a rank statistic, and the register's claim was read wider than it was measured
+
+**Believed.** The register measured that the length of the summed gradient
+cannot scale a step. It compared the length against the floor that
+near-orthogonal directions put under it and found the ratio near one for a
+noise generation, for a perfect signal and for a whole generation of ties. The
+search therefore normalised the summed gradient to unit length and took a
+fixed step, and the docstring cited that measurement as the reason.
+
+**True.** The measurement is sound and the conclusion drawn from it was wider
+than the measurement. **The register measured the geometric length. It did not
+measure the rank statistic underneath it.**
+
+The directions of a generation are near orthogonal in a space of this
+dimension, so the squared length of the summed gradient is close to the sum of
+the squared pair rank differences. That sum is a statistic of the ranks alone,
+and it has two closed-form bounds in the population size: the mean over every
+assignment of ranks to halves, and the value a perfect split reaches. Verified
+against a brute-force enumeration of every permutation at 2, 3, 4 and 5 pairs,
+both forms are exact, and the ratio of the best to the mean rises 1.500,
+1.667, 1.750, 1.800 toward two as the pair count grows.
+
+So the length says nothing **beyond** the rank statistic, which is what the
+register measured, and the rank statistic itself separates a coherent
+generation from a noise one.
+
+**What the fixed step cost.** A generation of pure noise took a full step. The
+step now scales by the statistic placed between its own two bounds, and a
+pure-noise generation buys this fraction of a full step, over 4,000 draws:
+
+| population | fraction of a step noise buys | generations that move the centre not at all |
+|---|---|---|
+| 24 | 0.123 | 0.50 |
+| 64 | 0.071 | 0.50 |
+| 256 | 0.036 | 0.50 |
+
+The rule sharpens as the population grows, which is the opposite of the
+incumbent behaviour, where every generation moved the centre equally however
+little it knew.
+
+**Follows.** A register entry states what it measured. This one was correct
+and it was cited for a claim one step wider, and that step is where the fixed
+length came from. **When a record rules an approach out, check whether it
+ruled out the quantity or the use of it.**
+
+**What stays unverified.** The agreement a real generation reaches is not
+measured. The trainer now reports it on the generation line, so the first run
+answers it. Until then the size of the gain is unknown, and only the direction
+of it is established: the rule shrinks wander far more than it grows the
+climb, because a real generation's agreement is also well below one.
