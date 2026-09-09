@@ -104,7 +104,7 @@ FIELD = re.compile(r"(?P<key>[a-z][a-z-]*)\s+(?P<value>-?[\d.]+|-)")
 # one process scores whole.
 WORKING = re.compile(
     r"^\s+(?:(?P<name>\S+) )?(?P<what>generation\s+\d+|yardstick|baseline"
-    r"|validation\s+\d+)"
+    r"|validation\s+\d+|holdout\s+\d+)"
     r"(?: shard (?P<shard>\d+)/(?P<shards>\d+))?"
     r" working\s+decisions\s+(?P<decisions>\d+)\s+"
     r"live\s+(?P<live>\d+)/(?P<worlds>\d+)\s+"
@@ -619,11 +619,12 @@ def phase(reading: Reading, states: dict[str, str]) -> str:
     # A validation pass plays the seeds that never move for the generation
     # it names, so it is the tail of that generation and not a phase of its
     # own. A screen that named no phase for it said "between passes" while
-    # every core on the machine was busy.
+    # every core on the machine was busy. The held-out pass is the tail of
+    # the same generation, for the same reason.
     numbers = sorted(
         int(what.split()[-1])
         for what in passes
-        if what.startswith(("generation", "validation"))
+        if what.startswith(("generation", "validation", "holdout"))
     )
     if numbers:
         return f"training generation {numbers[0]}"

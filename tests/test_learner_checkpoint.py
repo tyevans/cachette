@@ -209,8 +209,8 @@ def test_a_run_with_no_validation_seeds_stores_no_best_score(
     """The file says that nothing chose this centre, rather than scoring it.
 
     A run with no validation seeds has no way to tell one centre from
-    another, so its best file is its latest file and the score entry holds
-    the quiet value. This states the input the resume test needs.
+    another, so its best file is its latest file and both selection entries
+    hold the quiet value. This states the input the resume test needs.
     """
     train(
         "t",
@@ -222,9 +222,10 @@ def test_a_run_with_no_validation_seeds_stores_no_best_score(
         validation=[],
     )
     _, meta = load_policy(tmp_path / "t.npz")
-    stored = meta["best_score"]
-    assert isinstance(stored, float)
-    assert math.isnan(stored), "a run that chose no centre scored one"
+    for key in ("best_selection_won", "best_selection_return"):
+        stored = meta[key]
+        assert isinstance(stored, float)
+        assert math.isnan(stored), f"a run that chose no centre stored a {key}"
 
 
 def test_a_resume_that_adds_validation_seeds_can_still_choose_a_centre(
@@ -263,9 +264,10 @@ def test_a_resume_that_adds_validation_seeds_can_still_choose_a_centre(
         resume=True,
     )
     assert result["best_generation"] >= 0, "the resumed run chose no centre"
-    chosen = result["best_validation"]
-    assert chosen is not None
-    assert math.isfinite(chosen), "the resumed run kept the quiet value"
+    for key in ("best_selection_won", "best_selection_return"):
+        chosen = result[key]
+        assert chosen is not None
+        assert math.isfinite(chosen), f"the resumed run kept the quiet {key}"
 
 
 def test_a_written_file_names_no_hidden_width_and_still_loads(

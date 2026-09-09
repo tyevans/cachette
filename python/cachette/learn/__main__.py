@@ -639,6 +639,28 @@ def main() -> int:
     parser.add_argument("--learning-rate", type=float, default=0.3)
     parser.add_argument("--validation", type=int, default=6)
     parser.add_argument("--validate-every", type=int, default=3)
+    # **The held-out pass must leave a figure behind before a run ends.** The
+    # validation seeds choose the centre, so a validation figure is a maximum
+    # over the passes of the run on the seeds that did the choosing. The
+    # held-out seeds choose nothing, and that pass used to run only after a
+    # strategy returned. A wall clock cap ended a paid run before any
+    # strategy returned, so no held-out figure existed for any of the four
+    # policies it published, and the index called the selection figure held
+    # out.
+    #
+    # The interval works in the way the validation interval does. Zero turns
+    # the periodic pass off, which leaves only the pass at the end.
+    parser.add_argument(
+        "--holdout-every",
+        type=int,
+        default=5,
+        help=(
+            "how many generations pass between two held-out measurements of "
+            "the best centre. The held-out seeds choose nothing, so this is "
+            "the only honest figure a run leaves behind before it ends. Zero "
+            "turns the periodic pass off"
+        ),
+    )
     parser.add_argument(
         "--decision-interval",
         type=int,
@@ -879,6 +901,7 @@ def main() -> int:
         "horizon": WORLD.horizon,
         "decision_interval": WORLD.decision_interval,
         "validation": validation,
+        "holdout_every": arguments.holdout_every,
         "sigma": arguments.sigma,
         "learning_rate": arguments.learning_rate,
         "learner_seats": list(learner_seats),
@@ -961,6 +984,8 @@ def main() -> int:
             resume=arguments.resume,
             validation=validation,
             validate_every=validate_every,
+            holdout=holdout,
+            holdout_every=arguments.holdout_every,
         )
         trained, _ = load_policy(Path(result["weights"]))
         untrained = no_op(kind)

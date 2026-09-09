@@ -127,8 +127,8 @@ def test_a_strategy_still_running_says_the_held_out_figure_is_not_in_yet() -> No
     """A validation figure must never be read as the held-out result."""
     running = FINISHED.split("  trained")[0]
     rendered = progress_module.render(progress_module.parse(running), 0.7628, 60)
-    assert "not measured until this strategy ends" in rendered
-    assert "validation -1995.5" in rendered
+    assert "held out   not measured yet" in rendered
+    assert "validation -1995.5, which chose the centre" in rendered
 
 
 def test_every_generation_becomes_one_record() -> None:
@@ -246,3 +246,112 @@ def test_a_finished_generation_ends_the_pass_it_reported() -> None:
     assert strategies["aggressive"].flight is not None
     rendered = progress_module.render(progress_module.parse(SHARDED), 0.7723, 100)
     assert "in flight  nothing, between passes" in rendered
+
+
+# A real run of two generations that took a held-out pass at every one of
+# them. The trainer prints the win share of both passes and the two behaviour
+# instruments, and the parser reads each field by name.
+WITH_HOLDOUT = (LOGS / "with-holdout.log").read_text(encoding="utf-8")
+
+# The same run, cut before the strategy ended. **This is the state the paid
+# run stayed in for its whole life**, because a wall clock cap ended it before
+# any strategy returned.
+RUNNING = WITH_HOLDOUT.split("  trained")[0]
+
+
+def test_the_verdict_renders_from_a_held_out_pass_taken_during_the_run() -> None:
+    """A run that never finishes a strategy still gets a verdict.
+
+    The dashboard used to print the verdict only from the row a finished
+    strategy leaves. A wall clock cap ended a paid run before any strategy
+    finished, so the verdict never rendered once and the screen showed a
+    shaped return for the whole run.
+    """
+    rendered = progress_module.render(progress_module.parse(RUNNING), 0.7628, 60)
+    assert "verdict    wins 0.500 against the controller's 1.000" in rendered
+    assert "loses to the controller" in rendered
+    assert "from the held-out seeds at generation 1, which chose nothing" in rendered
+
+
+def test_the_verdict_names_a_selection_figure_as_one() -> None:
+    """A run with no held-out pass yet says which seeds its figure came from.
+
+    The figure is then the win share of the seeds that chose the centre, so
+    it is a maximum over the passes of the run. The line must not read as a
+    measurement.
+    """
+    without = RUNNING.replace(
+        " holdout     962.3 holdout-won  0.50", " holdout - holdout-won -"
+    )
+    rendered = progress_module.render(progress_module.parse(without), 0.7628, 60)
+    assert (
+        "from the validation seeds at generation 1, which chose the centre" in rendered
+    )
+    assert "which selects" in rendered
+
+
+def test_the_verdict_can_come_out_the_other_way() -> None:
+    """The same comparison must be able to say that the policy beats the bar."""
+    winning = RUNNING.replace("holdout-won  0.50", "holdout-won  1.00")
+    rendered = progress_module.render(progress_module.parse(winning), 0.7628, 60)
+    assert "BEATS the controller" not in rendered, (
+        "an equal win share is not a win, so this fixture reaches nothing"
+    )
+    better = RUNNING.replace("holdout-won  0.50", "holdout-won  1.00").replace(
+        "'won': 1.0", "'won': 0.5"
+    )
+    assert "BEATS the controller" in progress_module.render(
+        progress_module.parse(better), 0.7628, 60
+    )
+
+
+def test_the_two_instruments_reach_the_generation_records() -> None:
+    """A reader of the table sees the two checks a finding named.
+
+    A policy that answers the same row at every decision has learned a
+    preference and not a policy. Both figures are instruments, so nothing
+    here fails a run on them.
+    """
+    rows = progress_module.rows(progress_module.parse(WITH_HOLDOUT), "run-1")
+    assert [row["most_common_share"] for row in rows] == [0.5, 0.45]
+    assert [row["preference_varies"] for row in rows] == [1.0, 1.0]
+    assert [row["holdout_won"] for row in rows] == [0.5, 0.5]
+    assert [row["validation_won"] for row in rows] == [0.0, 0.0]
+
+
+def test_the_holdout_heartbeat_reads_as_a_pass_in_flight() -> None:
+    """The held-out pass prints a heartbeat, and the reader must place it.
+
+    A pass whose name the reader does not know is dropped, so the dashboard
+    would report a working strategy as one between passes.
+    """
+    beat = (
+        "  conquer holdout  3 working  decisions  12 live    2/2    "
+        "ticks     2400 rate   1754.8 t/s [10s]\n"
+    )
+    progress = progress_module.parse(RUNNING + beat)
+    flight = progress.strategies[0].flight
+    assert flight is not None
+    assert flight.what == "holdout 3"
+
+
+def test_the_held_out_row_survives_a_generation_that_took_no_pass() -> None:
+    """The newest generation is not the newest held-out pass.
+
+    The trainer takes that pass at an interval. A reader that looked only at
+    the last row would report no held-out figure for every generation between
+    two intervals, which is most of them.
+    """
+    between = RUNNING.replace(
+        "valid    -140.8 valid-won  0.00 top-share  0.45 varies  1.00 "
+        "holdout     962.3 holdout-won  0.50",
+        "valid    -140.8 valid-won  0.00 top-share  0.45 varies  1.00 "
+        "holdout - holdout-won -",
+    )
+    parsed = progress_module.parse(between)
+    rows = parsed.strategies[0].generations
+    assert rows[-1].holdout is None, "the fixture still holds a pass on the last row"
+    assert rows[0].holdout is not None, "the fixture holds no earlier pass"
+    rendered = progress_module.render(parsed, 0.7628, 60)
+    assert "at generation 0, during the run" in rendered
+    assert "from the held-out seeds at generation 0, which chose nothing" in rendered

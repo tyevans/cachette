@@ -95,7 +95,13 @@ import numpy as np
 
 from .layout import ObservationLayout, RingBlock, TokenBlock
 from .picture import RingStack
-from .policy import FeatureNormalizer, PolicyFitError, encode, encode_many
+from .policy import (
+    FeatureNormalizer,
+    PolicyFitError,
+    encode,
+    encode_many,
+    masked_choices,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Mapping, Sequence
@@ -719,15 +725,20 @@ class StructuredPolicy:
 
     def choose(self, observation: np.ndarray, mask: np.ndarray) -> int:
         """Return the action integer of the highest-scoring legal row."""
-        scores = self.scores(encode(observation, self.normalizer)[None, :])[0]
-        scores = np.where(mask > 0, scores, -np.inf)
-        return int(np.argmax(scores))
+        scores = self.scores(encode(observation, self.normalizer)[None, :])
+        return masked_choices(scores, np.asarray(mask)[None, :])[0]
+
+    def scores_many(self, observations: np.ndarray) -> npt.NDArray[np.float64]:
+        """Return one unmasked score for each action row of each observation.
+
+        The choice masks the result, and the instrument that reads the
+        unmasked preference reads the same matrix.
+        """
+        return self.scores(encode_many(observations, self.normalizer))
 
     def choose_many(self, observations: np.ndarray, masks: np.ndarray) -> list[int]:
         """Return one action for each row of a stack of observations."""
-        scores = self.scores(encode_many(observations, self.normalizer))
-        scores = np.where(masks > 0, scores, -np.inf)
-        return [int(value) for value in np.argmax(scores, axis=1)]
+        return masked_choices(self.scores_many(observations), masks)
 
     def save(self, path: Path, meta: Mapping[str, object]) -> None:
         """Write the weights, the layout, the widths and the fit.

@@ -324,6 +324,40 @@ def encode_many(
     return np.concatenate([squashed, ones], axis=1)
 
 
+def masked_choices(scores: np.ndarray, masks: np.ndarray) -> list[int]:
+    """Return the highest-scoring legal row of each row of a score stack.
+
+    **This is the one declaration of how a mask meets a score.** Both policy
+    kinds choose this way, and the instrument that reads an unmasked
+    preference reads the same score matrix. A second copy of the masking
+    would be one rule stored twice, with nothing that fails when the copies
+    disagree.[^1]
+
+    References
+    ----------
+    [^1]: Recurring defect shapes, shape 1.
+    ``.agents/rules/recurring-defects.md``
+    """
+    legal = np.where(masks > 0, scores, -np.inf)
+    return [int(value) for value in np.argmax(legal, axis=1)]
+
+
+def preferred_rows(scores: np.ndarray) -> list[int]:
+    """Return the highest-scoring row of each row of a score stack, unmasked.
+
+    **The engine's legality answer is out of this.** A policy that holds one
+    fixed preference order over the action rows still emits many different
+    actions, because the mask removes the rows it cannot take. The unmasked
+    argmax is what separates a preference order from a policy: it changes
+    inside an episode only when the observation moved the scores.[^1]
+
+    References
+    ----------
+    [^1]: Findings register, FND-707. ``docs/FINDINGS.md``
+    """
+    return [int(value) for value in np.argmax(scores, axis=1)]
+
+
 class PolicyFitError(ValueError):
     """A stored policy does not fit the world a caller asked it to play.
 
@@ -1256,14 +1290,20 @@ class LinearPolicy:
     def choose(self, observation: np.ndarray, mask: np.ndarray) -> int:
         """Return the action integer of the highest-scoring legal row."""
         scores = self.weights @ encode(observation, self.normalizer)
-        scores = np.where(mask > 0, scores, -np.inf)
-        return int(np.argmax(scores))
+        return masked_choices(scores[None, :], np.asarray(mask)[None, :])[0]
+
+    def scores_many(self, observations: np.ndarray) -> np.ndarray:
+        """Return one unmasked score for each action row of each observation.
+
+        **This is the one place the linear score is computed for a stack.**
+        The choice masks the result, and the instrument that reads the
+        unmasked preference reads the same matrix.
+        """
+        return encode_many(observations, self.normalizer) @ self.weights.T
 
     def choose_many(self, observations: np.ndarray, masks: np.ndarray) -> list[int]:
         """Return one action for each row of a stack of observations."""
-        scores = encode_many(observations, self.normalizer) @ self.weights.T
-        scores = np.where(masks > 0, scores, -np.inf)
-        return [int(value) for value in np.argmax(scores, axis=1)]
+        return masked_choices(self.scores_many(observations), masks)
 
     def flat(self) -> np.ndarray:
         """Return every trainable weight as one vector."""

@@ -1,0 +1,15 @@
+training seeds 10, validation seeds [20001, 20002], holdout seeds 2
+
+=== controller baseline ===
+  controller {'return': 2062.4332173665366, 'episodes': 2.0, 'held_tiles': 12338.5, 'won': 1.0, 'lost': 0.0}
+
+=== conquer (linear) ===
+  conquer controller yardstick    -140.6 won  0.00
+  conquer generation  0 mean    -146.0 best    -139.5 spread     20.1 abs-spread     20.1 won  0.00 ticks 1200 refused  0.07 valid    -140.8 valid-won  0.00 top-share  0.50 varies  1.00 holdout     962.3 holdout-won  0.50 [4s]
+  conquer generation  1 mean    -138.2 best    -138.1 spread      0.1 abs-spread      0.1 won  0.00 ticks 1200 refused  0.00 valid    -140.8 valid-won  0.00 top-share  0.45 varies  1.00 holdout     962.3 holdout-won  0.50 [16s]
+  trained     return      962.3 tiles 12096.5 won  0.50 lost  0.50
+  untrained   return      962.3 tiles 12096.5 won  0.50 lost  0.50
+  random      return     1695.7 tiles 12183.8 won  0.83 lost  0.17
+  controller  return     2062.4 tiles 12338.5 won  1.00 lost  0.00
+
+wrote /tmp/tinyrun3/report.json in 45.6s
