@@ -4,10 +4,14 @@ This document is a **register**. It holds every value the learner seat needs
 and does not have. A design document and a decision record cite a row here and
 hold no figure.[^1] [^2]
 
-**Every value in this register is unset.** The reward weighs the things a
-faction gains. What those things are worth, and what winning is worth, are
-rules of the downstream game, and one blocker holds those rules.[^3] A guessed
-weight is a rule of a game nobody has written down.
+**Every reward weight in this register is unset.** The reward weighs the
+things a faction gains. What those things are worth, and what winning is
+worth, are rules of the downstream game, and one blocker holds those rules.[^3]
+A guessed weight is a rule of a game nobody has written down.
+
+**The world a run plays is set, and a probe measured it.** The world is not a
+rule of the downstream game. It is a choice of training run, a run states it
+on the command line, and a measurement answers it.
 
 A control plane module applies the weights. It states none of them, and it
 refuses to run while one of them is unset. The refusal names each unset weight
@@ -81,10 +85,14 @@ carries. A sum of changes over a whole episode collapses to the last reading
 less the first, so a change term contributes the same amount whatever the
 policy did in between.[^12]
 
-**A game that runs to the tick limit is a signal of indecisive play.** The
-engine compares held ground at the limit and records a winner, so such a game
-still ends won or lost. Weaker play shifts a game toward the limit, and a
-policy that does nothing at all guarantees it.
+**A game that runs to the tick limit ends won or lost.** The engine compares
+held ground at the limit and records a winner. Weaker play shifts a game toward
+the limit, and a policy that does nothing at all reaches it more often.
+
+**A game at the limit is not evidence of indecisive play on its own.** A limit
+below the tick a game resolves at ends a decisive game early, and one finding
+holds that correction with its distribution.[^17] Read this term as a reward
+for a fast win, and read the limit as a separate measurement.
 
 **The row below pays a win alone.** A term that paid the time left on any
 outcome would pay a faction for losing quickly, so a faction that gave up
@@ -127,6 +135,153 @@ states the derivation and marks the value provisional.
 | Layout revision integer | The policy fit of the control plane | unset, the record that adopts a layout revision | — | |
 | Window length of every change position, in ticks | The observation builder | unset, the record that adopts a layout revision | — | |
 
+## The world a training run plays
+
+A training run states its world on the command line: the extent in columns and
+rows, the faction count, the tick limit and the decision interval. **Every row
+below is set, and a probe measured it.**[^15] The launcher asks the trainer for
+the world through one flag, so it holds no copy of any of them.[^16]
+
+### What the extent buys, and what it does not
+
+**The observation and the action table do not grow with the extent.** The
+observation of a faction is a fixed-width table over an egocentric log-polar
+frame, and the action table names verbs with candidate coordinates rather than
+tiles.[^9] A probe read both lengths at five extents from 48 to 256 and got one
+pair of numbers. One trained policy therefore fits every extent, and a change
+of extent retires nothing.
+
+**The rings of the frame grow with the logarithm of the extent.** The ring
+index of a tile is the bit length of its hex distance from the centre, and the
+greatest hex distance in a rhombus world is the width plus the height less two.
+The rings a world can fill is therefore one more than the bit length of that
+distance, so **each doubling of the extent buys exactly one ring**. The frame
+holds 14 rings, which the target scale of 4096 by 4096 fills.
+
+| Extent | Tiles | Rings the world can fill | Rings a played world filled | Level 1 cells |
+|---|---|---|---|---|
+| 48 by 48 | 2304 | 8 | 7 | 4 |
+| 96 by 96 | 9216 | 9 | 8 | 9 |
+| 128 by 128 | 16384 | 9 | 9 | 16 |
+| 192 by 192 | 36864 | 10 | 9 | 36 |
+| 256 by 256 | 65536 | 10 | 10 | 64 |
+
+The filled column comes from the channel that says how much of a spatial cell
+lies inside the world, read from one seed. It is at or below the bound, because
+the frame is egocentric and a faction does not start in a corner. The level 1
+column divides each side by the block edge of 32 tiles and rounds up.
+
+### The room a faction has to grow
+
+**A larger world that still yields one settlement has bought nothing.** The
+probe plays whole episodes with the built-in controller in every seat and reads
+the settlement count of the learner's seat as the episode runs. The share of
+episodes in which that faction ever held more than one settlement rises with
+the extent, and so does the count it ends with.
+
+| Extent | Episodes | Episodes that founded a second settlement | Median settlements at the end | Median highest settlements | Median held tiles |
+|---|---|---|---|---|---|
+| 48 by 48 | 16 | 0.38 | 0.5 | 1.0 | 56 |
+| 96 by 96 | 16 | 0.63 | 1.5 | 2.5 | 716 |
+| 128 by 128 | 16 | 0.88 | 3.0 | 4.5 | 832 |
+| 192 by 192 | 12 | 0.75 | 9.5 | 10.0 | 3149 |
+| 256 by 256 | 12 | 0.92 | 6.5 | 7.5 | 1732 |
+
+**Half the episodes of a 48 by 48 world end with the seat holding nothing.**
+Eight of sixteen end at zero settlements. No episode of a 256 by 256 world
+does, and its median seat ends with six settlements. That is the measurement
+that says a larger world is worth its price.
+
+The rise is not monotone between 192 and 256, and twelve episodes cannot
+separate the two. Read the step from 48 to 128 as the signal, because it is
+large and it is monotone over three points.
+
+**The tick at which a faction founds its second settlement barely moves.** It
+is about 420 ticks at extent 48 and about 500 at every extent above it. A
+larger world does not delay the growth; it removes the ceiling on it.
+
+### The tick limit each extent needs
+
+The tick limit ends an episode that no victory ended, and the engine then
+compares held ground and names a winner. **A limit below the tick a game
+resolves at replaces the outcome with that comparison.** One finding holds the
+correction: the cluster of games at the limit is the limit and not indecisive
+play.[^17]
+
+The rows below come from episodes played under a tick limit of 12000, so the
+end tick each row reads is the tick the game resolved at. The controller arm
+gives every seat to the built-in controller. The idle arm holds the learner
+seat and plays the no-op at every decision, which is what an untrained policy
+does, and it brackets the other side of the limit.
+
+**Read the share of games that resolve under a candidate limit.** That is the
+quantity a limit is chosen against, and it needs no quantile of a small
+sample. A game that does not resolve under the limit still ends, by a
+comparison of held ground, which is the one ending a policy cannot aim at.
+
+| Extent | Arm | Episodes | Resolve by 2500 | by 4000 | by 5000 | by 6000 | by 8000 |
+|---|---|---|---|---|---|---|---|
+| 48 by 48 | controller | 16 | 0.62 | 0.88 | 0.88 | 0.88 | 0.94 |
+| 48 by 48 | idle | 16 | 0.69 | 0.88 | 0.88 | 0.88 | 0.88 |
+| 96 by 96 | controller | 16 | 0.19 | 0.31 | 0.62 | 0.81 | 0.81 |
+| 96 by 96 | idle | 16 | 0.38 | 0.50 | 0.88 | 1.00 | 1.00 |
+| 128 by 128 | controller | 16 | 0.25 | 0.69 | 0.81 | 0.94 | 0.94 |
+| 128 by 128 | idle | 16 | 0.31 | 0.75 | 0.94 | 0.94 | 1.00 |
+| 192 by 192 | controller | 12 | 0.17 | 0.67 | 0.83 | 0.92 | 1.00 |
+| 192 by 192 | idle | 12 | 0.25 | 0.58 | 0.83 | 1.00 | 1.00 |
+| 256 by 256 | controller | 12 | 0.25 | 1.00 | 1.00 | 1.00 | 1.00 |
+| 256 by 256 | idle | 12 | 0.08 | 0.58 | 0.92 | 1.00 | 1.00 |
+
+**The current limit of 2500 truncates most games at every extent above 48.**
+It truncates four games in five of a 96 by 96 world. A run at a larger extent
+that keeps this limit trains against a game that almost always ends on the
+ground comparison.
+
+**A larger world resolves sooner and more tightly, not later.** The highest
+end tick of a 256 by 256 world is 3676 over twelve controller episodes, and
+the highest of a 48 by 48 world is above 12000. A faction with room grows,
+and a faction that grows reaches a win path. The intuition that a larger
+world needs a longer game is wrong above extent 128, and the measurement is
+the reason to say so.
+
+| Extent | Arm | Median end tick | Upper quartile | Highest |
+|---|---|---|---|---|
+| 48 by 48 | controller | 1787 | 2749 | above 12000 |
+| 48 by 48 | idle | 1703 | 2603 | above 12000 |
+| 96 by 96 | controller | 4221 | 5725 | above 12000 |
+| 96 by 96 | idle | 3686 | 4442 | 5973 |
+| 128 by 128 | controller | 3675 | 4418 | 11858 |
+| 128 by 128 | idle | 2994 | 3672 | 6771 |
+| 192 by 192 | controller | 3520 | 4631 | 6006 |
+| 192 by 192 | idle | 3452 | 4772 | 5521 |
+| 256 by 256 | controller | 2763 | 3421 | 3676 |
+| 256 by 256 | idle | 3508 | 4333 | 5890 |
+
+**Sixteen and twelve episodes cannot state a ninetieth percentile.** Read the
+resolve share and the median. Read the highest as the tail and not as a bound.
+
+**Every end tick row above was measured with the renown target at 1000 units,
+and the target is now 50.** A lower target opens the renown path, so a game
+can end on it and every game ends at or before the tick it ended at before.
+The rows are therefore an upper bound on the current engine and are marked
+provisional. A repeat run of the probe replaces them.
+
+| Value | Read by | Set | Blocker | Derivation |
+|---|---|---|---|---|
+| Tick limit of a training run, at every extent from 48 to 256 | A training run | 6000, provisional, the world scale probe | — | The lowest round limit at which four fifths of the games of every measured extent and arm resolve, at renown target 1000 |
+| Extent of a training run | A training run | 48 by 48 by default, and any extent a caller names | — | The trainer default. The probe recommends a larger one |
+| Faction count of a training run | A training run | 3 by default, and any count a caller names | — | The trainer default |
+
+**One limit serves every extent measured.** A limit of 6000 gives a resolve
+share at or above 0.81 on every row of the table above, and at or above 0.92
+on every row from extent 128 upward. A limit of 8000 buys little and costs a
+third more ticks in every episode that runs to it.
+
+**A tick limit is not a cost figure.** It is a rule of the episode a run
+plays, and the engine is deterministic, so a limit measured on a development
+machine answers for the target platform unchanged.[^18] The cost of running
+under that limit is a machine figure, and the target register holds it.[^8]
+
 ## What this register does not hold
 
 **It holds no discount.** A discount belongs to the learning algorithm, and the
@@ -154,3 +309,7 @@ target platform measures it.
 [^12]: Findings register, FND-679. `docs/FINDINGS.md`
 [^13]: Findings register, FND-692. `docs/FINDINGS.md`
 [^14]: Findings register, FND-700. `docs/FINDINGS.md`
+[^15]: The world scale probe. `scripts/world_scale.py`
+[^16]: Findings register, FND-693. `docs/FINDINGS.md`
+[^17]: Findings register, FND-695. `docs/FINDINGS.md`
+[^18]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`

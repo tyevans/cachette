@@ -1660,10 +1660,11 @@ the boundary advances the decision interval in each live world. The script
 counts the live worlds at every crossing and multiplies, so the count is exact
 and no part of it comes from a mean.
 
-**A tick of one world size is not a tick of another.** The learner trains on a
-world of extent 48 by 48 with three factions, which is far smaller than the
-demonstration world. Every row must name the extent, the faction count and the
-decision interval beside the figure, or the figure compares nothing.
+**A tick of one world size is not a tick of another.** A training run states
+its extent, its faction count and its tick limit on the command line, and the
+launcher asks the trainer for them rather than holding a copy. Every row must
+name the extent, the faction count and the decision interval beside the
+figure, or the figure compares nothing.
 
 **Report the figure for each worker beside the total.** The evolution strategy
 plays one episode for each pair of a candidate and a seed, and the episodes
@@ -1677,8 +1678,17 @@ knowing before anybody rents a larger machine.
 | Ticks a second, whole batch, at the core count of the instance | The cost of a training run | unset, a run of the probe on the target | BLK-007 | |
 | Ticks a second for each worker, at one, a quarter, a half and all the cores | Whether the batch step divides | unset, the same run | BLK-007 | |
 | Dollars for each million ticks, at the spot price the run paid | A comparison between two instance types | unset, the same run | BLK-007 | |
+| Ticks a second, whole batch, at each extent a run may train on | Which extent a run can afford | unset, a run of the world scale probe on the target | BLK-007 | |
+| Dollars for each million ticks, at each extent a run may train on | Whether a larger world is worth its price | unset, the same run | BLK-007 | |
 
-The last row divides the price an hour by the throughput. Dollars an hour
+**The last two rows need a sweep over the extent, and one probe takes it.** A
+run states its extent on the command line, so the throughput of one extent
+answers for that extent alone. A probe measured the sweep on a development
+machine, and that machine has a different cache line size, so its figures are
+not evidence about the target.[^TPUT2] The local register holds what belongs
+to a development machine.[^3]
+
+The last of the first three rows divides the price an hour by the throughput. Dollars an hour
 compares two prices. Dollars for each million ticks compares two machines, and
 that is the figure that says whether a larger instance is worth what it costs.
 
@@ -1738,6 +1748,7 @@ commit what changed. Do not edit a row to make a later run agree with it.
 [^5]: The benchmark. `crates/cachette-core/benches/target_cost.rs`
 [^6]: The provisioning script. `scripts/graviton-benchmark.sh`
 [^TPUT1]: The learner throughput probe. `scripts/train_throughput.py`
+[^TPUT2]: The world scale probe. `scripts/world_scale.py`
 [^7]: Testing rules, section 3. `.claude/rules/testing.md`
 [^8]: ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^9]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`

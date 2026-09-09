@@ -18,12 +18,30 @@ resolve early, and the rest run to the tick limit with nothing in between.
 The register holds the figures, because a figure in a docstring decays and a
 register row does not.[^3]
 
+**The second cluster is the limit and not the play.** A probe replayed the
+same worlds under a tick limit far above the one a run uses, and the games
+that had reached the limit resolved well past it. A limit that is too low
+therefore reports a cluster of indecisive games that were not indecisive. The
+share of games that resolve under the limit of this run falls as the extent
+rises. A finding holds the measurement, and the register holds the limit and
+the resolve share of each extent.[^4] [^5]
+
 A horizon shorter than the tick limit truncates the episode, and a truncated
 episode reports no outcome. A policy therefore cannot be paid for a win it
 never reached.
 
 The horizon of this run covers the tick limit exactly, so every episode ends
 with a win or a loss.
+
+# The world is an argument of the run, and the launcher reads it
+
+A run states its extent, its faction count and its tick limit on the command
+line. One function sets all of them and derives the horizon, and it rebuilds
+the strategy table, because a level weight divides by the horizon.
+
+The launcher asks this module for the world through one flag, so it holds no
+copy. It held two copies of the strategy list once, and a paid instance died
+on both.[^6]
 
 # A league run scores a candidate against the seats it played
 
@@ -55,6 +73,10 @@ first two and loses to the third has learned to act, not to play.
 [^2]: The instrumental population script, which measures the end tick of each
 game. ``scripts/instrumental_population.py``
 [^3]: Findings register, FND-689. ``docs/FINDINGS.md``
+[^4]: Findings register, FND-695. ``docs/FINDINGS.md``
+[^5]: Reinforcement learning parameters, the world a training run plays.
+``docs/reference/rl-costs.md``
+[^6]: Findings register, FND-693. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -88,12 +110,19 @@ DECISION_INTERVAL = 10
 # ends won or lost.
 TICK_LIMIT = 2500
 
+# The extent of the world every strategy plays, in columns and in rows. The
+# world is square, and a run states one number for both sides.
+WORLD_EXTENT = 48
+
+# How many factions play one game, counting the learner seat.
+FACTION_COUNT = 3
+
 # The world every strategy plays. The horizon covers the tick limit, so the
 # horizon never ends an episode before the game does.
 WORLD = EnvConfig(
-    width=48,
-    height=48,
-    faction_count=3,
+    width=WORLD_EXTENT,
+    height=WORLD_EXTENT,
+    faction_count=FACTION_COUNT,
     seat=0,
     tick_limit=TICK_LIMIT,
     horizon=TICK_LIMIT // DECISION_INTERVAL,
@@ -105,16 +134,21 @@ WORLD = EnvConfig(
 CONTROLLER_WORLD = replace(WORLD, controlled=False)
 
 
-def use_decision_interval(interval: int) -> None:
-    """Set how many ticks one decision covers, everywhere it is read.
+def use_world(
+    extent: int,
+    faction_count: int,
+    tick_limit: int,
+    interval: int,
+) -> None:
+    """Set the world every strategy plays, everywhere the run reads it.
 
-    **The interval reaches four places and the horizon is derived from it.**
-    The world the strategies play holds it, the controller world holds it, the
-    horizon is the tick limit divided by it, and the level weights of the
-    strategy table divide by the horizon. A caller that sets one and not the
-    others ends an episode before the game ends, and nothing fails. This
-    function is the only place that derives the horizon, so the copies cannot
-    disagree.
+    **Five values reach one world and the horizon is derived from four of
+    them.** The world the strategies play holds them, the controller world
+    holds the same ones, the horizon is the tick limit divided by the
+    interval, and the level weights of the strategy table divide by the
+    horizon. A caller that sets one and not the others ends an episode before
+    the game ends, and nothing fails. This function is the only place that
+    derives the horizon, so the copies cannot disagree.
 
     **This rebuilds the strategy table rather than replacing the world of
     each row.** A level weight is paid on every decision, so a wider interval
@@ -125,15 +159,82 @@ def use_decision_interval(interval: int) -> None:
     The learner takes one action for each decision, and the built-in
     controller issues many commands in the same span, so a shorter interval
     gives the learner more of the say.
+
+    **The observation and the action table do not grow with the extent.** The
+    observation of a faction is a fixed-width table over an egocentric frame,
+    and the action table names verbs and candidate positions rather than
+    tiles, so a policy trained in one world fits another. A probe measured
+    both lengths over five extents and read one pair.[^1] The tick cost, the
+    tile count the pyramid summarises and the tick a game resolves at all do
+    grow, and the probe measured each.
+
+    References
+    ----------
+    [^1]: The world scale probe. ``scripts/world_scale.py``
     """
     global WORLD, CONTROLLER_WORLD, STRATEGIES
     if interval < 1:
         message = "the decision interval must be one tick or more"
         raise ValueError(message)
-    horizon = TICK_LIMIT // interval
-    WORLD = replace(WORLD, decision_interval=interval, horizon=horizon)
+    if extent < 1:
+        message = "the world extent must be one column and one row or more"
+        raise ValueError(message)
+    if faction_count < 2:
+        message = "a game needs two factions or more"
+        raise ValueError(message)
+    if tick_limit < interval:
+        message = "the tick limit must cover one decision or more"
+        raise ValueError(message)
+    horizon = tick_limit // interval
+    WORLD = replace(
+        WORLD,
+        width=extent,
+        height=extent,
+        faction_count=faction_count,
+        tick_limit=tick_limit,
+        decision_interval=interval,
+        horizon=horizon,
+    )
     CONTROLLER_WORLD = replace(WORLD, controlled=False)
     STRATEGIES = strategy_table(WORLD)
+
+
+def world_lines(world: EnvConfig) -> str:
+    """Return the world as one name and one value for each line.
+
+    **A launcher reads this rather than holding a world of its own.** The
+    launcher sizes its throughput probe from the world the run plays, and a
+    probe that measured a different extent would describe a world nobody
+    trained in. The launcher held two stale copies of the strategy list once,
+    and the run failed after it paid for the instance, so this flag exists to
+    keep the same shape from returning over the world.[^1]
+
+    The format is one name, one tab and one value, so a shell reads a field by
+    name rather than by position.
+
+    References
+    ----------
+    [^1]: Findings register, FND-693. ``docs/FINDINGS.md``
+    """
+    fields = {
+        "width": world.width,
+        "height": world.height,
+        "factions": world.faction_count,
+        "tick_limit": world.tick_limit,
+        "decision_interval": world.decision_interval,
+        "horizon": world.horizon,
+    }
+    return "\n".join(f"{name}\t{value}" for name, value in fields.items())
+
+
+def use_decision_interval(interval: int) -> None:
+    """Set how many ticks one decision covers, and hold the rest of the world.
+
+    This is the entry point a caller that changes only the interval calls. It
+    derives nothing of its own, so the interval and the horizon cannot
+    disagree between the two entry points.
+    """
+    use_world(WORLD.width, WORLD.faction_count, WORLD.tick_limit, interval)
 
 
 def use_play_styles(
@@ -549,6 +650,43 @@ def main() -> int:
             f"learner more of the say. Default {DECISION_INTERVAL}"
         ),
     )
+    # **The world extent reaches the launcher as well as the trainer.** The
+    # launcher sizes its throughput probe from the world the run plays, and it
+    # asks the trainer for that world rather than holding a copy. A launcher
+    # that held a copy measured the wrong world, and that shape has already
+    # cost this project a paid instance once, over the strategy list.
+    parser.add_argument(
+        "--world-extent",
+        type=int,
+        default=WORLD_EXTENT,
+        help=(
+            "how many columns and rows the world holds. The world is square, "
+            "so one number states both sides. A doubling of this buys one "
+            "more ring of the observation frame and about four times the "
+            f"tile count. Default {WORLD_EXTENT}"
+        ),
+    )
+    parser.add_argument(
+        "--factions",
+        type=int,
+        default=FACTION_COUNT,
+        help=(
+            "how many factions play one game, counting the learner seat. The "
+            "win share of a policy that plays no better than chance is one "
+            f"over this number. Default {FACTION_COUNT}"
+        ),
+    )
+    parser.add_argument(
+        "--tick-limit",
+        type=int,
+        default=TICK_LIMIT,
+        help=(
+            "how many ticks one episode runs before the engine compares held "
+            "ground and names a winner. A larger world takes longer to "
+            "resolve, so a limit that does not move with the extent ends "
+            f"every game at the limit. Default {TICK_LIMIT}"
+        ),
+    )
     # **The candidate pass answers one question, and it has answered it.**
     # The highest candidate of a generation is the highest of many draws on
     # a few worlds, so it is usually the luckiest and not the best. Playing
@@ -574,6 +712,16 @@ def main() -> int:
             "by spaces, and exit without training. A launcher asks for "
             "the names through this flag, so no launcher holds a list "
             "of its own"
+        ),
+    )
+    parser.add_argument(
+        "--print-world",
+        action="store_true",
+        help=(
+            "print the world this run would play, as one name and one value "
+            "for each line, and exit without training. A launcher asks for "
+            "the world through this flag, so no launcher holds a world of "
+            "its own"
         ),
     )
     parser.add_argument(
@@ -653,9 +801,14 @@ def main() -> int:
     )
     arguments = parser.parse_args()
 
-    # The interval is set before anything reads a world, so every strategy,
-    # the controller world and the report all state the same one.
-    use_decision_interval(arguments.decision_interval)
+    # The world is set before anything reads one, so every strategy, the
+    # controller world and the report all state the same one.
+    use_world(
+        arguments.world_extent,
+        arguments.factions,
+        arguments.tick_limit,
+        arguments.decision_interval,
+    )
 
     # The play styles replace the strategy table, so they are chosen before
     # anything reads the table. A run that names none keeps the built-in
@@ -673,6 +826,9 @@ def main() -> int:
 
     if arguments.print_strategies:
         print(" ".join(names))
+        return 0
+    if arguments.print_world:
+        print(world_lines(WORLD))
         return 0
     learner_seats = tuple(
         int(seat) for seat in arguments.league.split(",") if seat.strip()
