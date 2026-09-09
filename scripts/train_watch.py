@@ -59,15 +59,34 @@ def fields(body: str) -> dict[str, float | None]:
     return found
 
 
-# A heartbeat from inside a generation, for example:
+# A heartbeat from inside a long pass, for example:
 #   conquer generation  3 working  decisions 120 live 87/144 ticks 174000
 #   rate 1893.0 t/s [92s]
+#
+# **The pass names itself, and the screen holds no list of the passes.** The
+# controller baseline was added to this alternation after a run spent over
+# nine minutes on it in silence. Every strategy of that run looked stopped,
+# and the load average over a remote connection was the only evidence that
+# the machine was alive.
 WORKING = re.compile(
-    r"^\s+(?P<name>\S+) (?P<what>generation\s+\d+|yardstick|validation\s+\d+)"
+    r"^\s+(?P<name>\S+) (?P<what>generation\s+\d+|yardstick|baseline"
+    r"|validation\s+\d+)"
     r" working\s+decisions\s+(?P<decisions>\d+)\s+"
     r"live\s+(?P<live>\d+)/(?P<worlds>\d+)\s+"
     r"ticks\s+(?P<ticks>\d+)\s+rate\s+(?P<rate>[\d.]+) t/s\s+"
     r"\[(?P<seconds>[\d.]+)s\]"
+)
+
+# A process that waits for another process to measure the same baseline, for
+# example:
+#   land-net baseline waiting 60s for another process to measure the same
+#   number
+#
+# **A waiting process takes no ticks, so it cannot report a rate.** A line in
+# the heartbeat shape with a rate of zero would read as a process that
+# stopped, and this shape says what it is instead.
+WAITING = re.compile(
+    r"^\s+(?P<name>\S+) (?P<what>baseline) waiting (?P<seconds>[\d.]+)s"
 )
 
 # The controller yardstick, printed once for each strategy.
@@ -92,6 +111,10 @@ class Strategy:
         field(default_factory=list)
     )
     last_working: dict[str, str] | None = None
+    # The last line of a process that waits for another process to measure
+    # the controller baseline. It answers the same question the working line
+    # answers, and it reports no rate because a waiter runs no world.
+    last_waiting: dict[str, str] | None = None
     yardstick: float | None = None
     validations: list[float] = field(default_factory=list)
 
@@ -135,7 +158,19 @@ def read(text: str) -> tuple[dict[str, Strategy], dict[str, float] | None]:
             continue
         work = WORKING.match(line)
         if work:
-            named(work.group("name")).last_working = work.groupdict()
+            strategy = named(work.group("name"))
+            strategy.last_working = work.groupdict()
+            # **The last word decides what the screen says.** A process that
+            # waited and then measured the number itself prints working lines
+            # after its waiting lines, and a screen that kept the waiting line
+            # would report it as idle while it played.
+            strategy.last_waiting = None
+            continue
+        held = WAITING.match(line)
+        if held:
+            strategy = named(held.group("name"))
+            strategy.last_waiting = held.groupdict()
+            strategy.last_working = None
             continue
         yard = YARDSTICK.match(line)
         if yard:
@@ -234,6 +269,12 @@ def render(
                 f"{work['what']} d{work['decisions']} "
                 f"live {work['live']}/{work['worlds']} "
                 f"{float(work['rate']):.0f}t/s [{float(work['seconds']):.0f}s]"
+            )
+        if strategy.last_waiting:
+            held = strategy.last_waiting
+            now = (
+                f"{held['what']} waiting on another process "
+                f"[{float(held['seconds']):.0f}s]"
             )
         lines.append(f"  {name:<14}{body}  {now}")
 

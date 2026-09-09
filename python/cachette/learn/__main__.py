@@ -59,6 +59,7 @@ import time
 from dataclasses import asdict, replace
 from pathlib import Path
 
+from .baseline import controller_baseline
 from .env import Env, EnvConfig, viable_seeds
 from .policy import (
     LinearPolicy,
@@ -312,6 +313,40 @@ def report_behaviour(names: list[str], out: Path, holdout: int, workers: int) ->
     return 0
 
 
+def fill_baseline_cache(
+    names: list[str], holdout: list[int], workers: int, probe: Env
+) -> int:
+    """Measure the controller baseline of each named strategy into the cache.
+
+    **The launcher starts one trainer process for each strategy, and every one
+    of them needs this number.** Six processes that each measure it play the
+    same worlds six times, and each of them holds a sixth of the cores while
+    it does. This pass runs once, before any trainer starts, and it may hold
+    every core.
+
+    Two strategies that hold the same objective share one number. The second
+    call finds what the first wrote, so this loop needs no list of its own of
+    which objectives differ.
+    """
+    for name in names:
+        config, scoring, _ = STRATEGIES[name]
+        summary, source = controller_baseline(
+            replace(config, controlled=False),
+            first_scoring(scoring),
+            LinearPolicy.zeros(probe.action_length, probe.observation_length),
+            holdout,
+            workers,
+            probe.observation_version,
+            f"{name} baseline",
+        )
+        print(
+            f"  {name} controller {source} return {summary['return']:10.1f} "
+            f"won {summary['won']:5.2f}",
+            flush=True,
+        )
+    return 0
+
+
 def main() -> int:
     """Train each named strategy, measure it against the baselines, report."""
     parser = argparse.ArgumentParser(description="Train the learner seat.")
@@ -456,6 +491,16 @@ def main() -> int:
         action="store_true",
         help="read the stored policies and report what they do, and train nothing",
     )
+    parser.add_argument(
+        "--baseline-only",
+        action="store_true",
+        help=(
+            "measure the controller baseline of each named strategy into the "
+            "cache, and train nothing. The launcher runs this once with every "
+            "core before it starts one trainer for each strategy, so the "
+            "trainers read the number rather than measure it"
+        ),
+    )
     arguments = parser.parse_args()
 
     # The interval is set before anything reads a world, so every strategy,
@@ -489,8 +534,22 @@ def main() -> int:
 
     # The training pool and the holdout share no seed, so a reported figure
     # comes from a world the policy never trained on.
-    pool = viable_seeds(WORLD, arguments.generations * arguments.seeds + 8, 1000)
     holdout = viable_seeds(WORLD, arguments.holdout, 50_000)
+
+    # **The pass that only fills the cache trains nothing, so it takes no
+    # training pool.** The pool holds one set of seeds for each generation,
+    # and finding them builds a world for each candidate seed. This pass runs
+    # before every trainer of a run starts, and every second it takes is a
+    # second the training does not get.
+    if arguments.baseline_only:
+        return fill_baseline_cache(
+            names,
+            holdout,
+            arguments.workers,
+            Env(WORLD, first_scoring(STRATEGIES[names[0]][1])),
+        )
+
+    pool = viable_seeds(WORLD, arguments.generations * arguments.seeds + 8, 1000)
     # The validation seeds pick the checkpoint. They share nothing with the
     # training pool and nothing with the held-out set, so the figure the
     # report is judged on never chose the policy it reports.
@@ -539,19 +598,32 @@ def main() -> int:
             return MLPPolicy.zeros(actions, features, arguments.hidden)
         return LinearPolicy.zeros(actions, features)
 
-    # The controller baseline does not depend on the strategy, so the run
-    # measures it once and every strategy is reported against it. The
-    # weighting only scores the reading, and the reading is the same play.
+    # **The controller baseline is one number for the whole run, and one
+    # process measured it once for every strategy it trained.** The play is a
+    # function of the engine, the world, the seeds and the objective, and of
+    # nothing a run trains. The launcher starts one process for each
+    # strategy, so a run of six strategies paid for the same number twelve
+    # times: once before each strategy and once after it. A cache holds it
+    # now, keyed on every input, and a process that finds it pays nothing.
+    #
+    # The weighting reaches the key because the reading is weighted. The play
+    # does not change with the weighting, and the return does.
     controller_scoring = first_scoring(STRATEGIES[names[0]][1])
     print("\n=== controller baseline ===", flush=True)
-    report["controller"] = evaluate(
+    report["controller"], source = controller_baseline(
         CONTROLLER_WORLD,
         controller_scoring,
         no_op("linear"),
         holdout,
         arguments.workers,
+        probe.observation_version,
+        f"{names[0]} baseline",
     )
+    # **The line below is the interface the dashboard reads.** Two readers
+    # match it by shape, so the source of the number goes on its own line
+    # rather than inside this one.
     print(f"  controller {report['controller']}", flush=True)
+    print(f"  the controller baseline was {source}", flush=True)
     write_report(out / "report.json", report)
 
     for index, name in enumerate(names):
@@ -604,9 +676,15 @@ def main() -> int:
                 arguments.workers,
                 repeats=3,
             ),
-            "controller": evaluate(
-                CONTROLLER_WORLD, fixed, untrained, holdout, arguments.workers
-            ),
+            "controller": controller_baseline(
+                CONTROLLER_WORLD,
+                fixed,
+                untrained,
+                holdout,
+                arguments.workers,
+                probe.observation_version,
+                f"{name} baseline",
+            )[0],
         }
         result["holdout"] = measured
         report["strategies"][name] = result  # type: ignore[index]
