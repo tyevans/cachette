@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-694**
+**Next number: FND-695**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18310,3 +18310,46 @@ second answer appears.
 copy of something is evidence that somebody worried about it. It is not
 evidence that the copy is absent. This one was two lines above one of the two
 copies it denied.
+
+### FND-694 — The seat of a three faction training world is not fair, and every score the project reported could hold that bias
+
+**Believed.** The seat a learner plays was treated as a detail of the run. The
+balance register holds a seat share row, and it reads close to fair: over 32
+seeds at extent 256 with four factions, the four seats won 8, 10, 9 and 5
+games. The training harness gives one seat to the learner and keeps one for
+the built-in controller, and no reader asked whether that choice moves a
+score.
+
+**True.** The training world is not that world. It runs extent 48 with three
+factions, and its seats are not close to fair. Measured over the whole league,
+where player quality averages out by construction:
+
+| seat | won | share |
+|---|---|---|
+| 0 | 101 of 252 | 0.401 |
+| 1 | 95 of 252 | 0.377 |
+| 2 | 56 of 252 | 0.222 |
+
+Seat 2 wins at about half the rate of seat 0. **The gap between the best and
+the worst seat is larger than the gap between most pairs of players in the
+rating table it was measured beside.** A schedule that pins a player to a seat
+therefore measures the seat, and it reports the answer as a property of the
+player.
+
+**Evidence.** The rating tool plays every unordered triple of nine players
+over one world each, and each world hosts three cyclic rotations, so every
+player holds every seat an equal number of times. The seat shares above come
+from those 252 games. The tool refuses an unbalanced schedule, and a test
+proves the refusal: removing the rotation makes one player hold the seats 45,
+0 and 0 times, and three tests go red.
+
+The earlier register row is not wrong. It measures a different world, and it
+says so. **Two worlds, one belief, and nothing that failed when the belief was
+carried from one to the other.**
+
+**Follows.** A comparison between players must rotate the seat and must state
+that it did. A single-seat score is a statement about one seat of one world.
+
+The rotations here are cyclic and not the full six permutations, so the seat is
+cancelled and the neighbour is not. Which faction sits to a player's left is
+still unmeasured.

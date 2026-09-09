@@ -84,8 +84,8 @@ seat that a player of it could not see.
 
 # References
 
-[^1]: Findings register, FND-637, the seat measurement.
-``docs/FINDINGS.md``
+[^1]: Findings register, FND-694, the seat of a three faction training
+world is not fair. ``docs/FINDINGS.md``
 [^2]: PRD-0001, a faction sees only what it observes.
 ``docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md``
 """
