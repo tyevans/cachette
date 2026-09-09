@@ -105,6 +105,18 @@ def test_every_stored_policy_loads_against_the_world_the_index_names(
     This drives the reader a player drives. A test that only read the manifest
     beside a file would pass against a file whose weights the loader cannot
     place, because a manifest is prose that nothing derives.
+
+    **This test states that a file loads, and it states nothing about play.**
+    It once held both ingredients of the decisive measurement, and it asked
+    nothing about what the weights do.[^1] The test that reads what a stored
+    file does sits in another file.[^2]
+
+    References
+    ----------
+    [^1]: Findings register, FND-709. ``docs/FINDINGS.md``
+
+    [^2]: The sensitivity tests and the blinding guard.
+    ``tests/test_learner_policy_sensitivity.py``
     """
     _, stated = load_policy(path)
     policy, meta = load_policy(path, PolicyFit.of_world(a_world(stated)))
