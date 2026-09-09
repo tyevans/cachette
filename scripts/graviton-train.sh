@@ -178,7 +178,14 @@ esac
 # worlds as it has seeds, and one hundred and twenty-eight worlds on
 # sixty-four workers takes about two minutes against the ten minutes of a
 # generation.
-default_args="--generations 20 --population 24 --seeds 6 --holdout 256 \
+# **The default names the world.** The trainer's own default world is the one
+# the project trained on before it was measured, and a probe over five extents
+# then recommended a larger one. A launcher that names no world plays the
+# small one, so the recommendation reaches nothing and a run silently repeats
+# the world that left half its episodes holding no settlement. The register
+# holds the recommendation and the reasoning.
+default_args="--world-extent 128 --factions 3 --tick-limit 6000 \
+--generations 20 --population 24 --seeds 6 --holdout 256 \
 --sigma 1.5 --learning-rate 0.3 --validation 128 --validate-every 2"
 train_args="${CACHETTE_TRAIN_ARGS:-$default_args}"
 

@@ -63,11 +63,17 @@ use crate::unit_type::{UnitTypeId, UnitTypeTable, UNIT_TYPE_COUNT};
 /// only a reader touches states a capability the engine does not have.[^1]
 ///
 /// **This is a provisional value and not a measured one.** It is a quarter of
-/// one point. The renown target is one hundred points, so a champion reaches
-/// it after four hundred enemy units fall to its faction while that champion
-/// lives.[^2] A whole point for each unit would put renown ahead of
-/// domination in most runs, and domination is the path the game is meant to
-/// resolve on. A hundredth of a point would make the source inert again.
+/// one point. A champion therefore reaches the target after four times the
+/// target in enemy units fall to its faction, while that champion lives.[^2]
+/// A whole point for each unit would put renown ahead of domination in most
+/// runs, and domination is the path the game is meant to resolve on. A
+/// hundredth of a point would make the source inert again.
+///
+/// **This doc named a target of one hundred points and four hundred units,
+/// and neither figure was ever the target the register held.** The rate and
+/// the target are two values, and a doc that multiplies them out states the
+/// second one where nothing fails when it moves. The register holds the
+/// target and the arithmetic that follows from it.[^2]
 ///
 /// # References
 ///
