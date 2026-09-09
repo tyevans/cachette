@@ -108,12 +108,19 @@ CONTROLLER_WORLD = replace(WORLD, controlled=False)
 def use_decision_interval(interval: int) -> None:
     """Set how many ticks one decision covers, everywhere it is read.
 
-    **The interval reaches three places and the horizon is derived from it.**
-    The world the strategies play holds it, the controller world holds it, and
-    the horizon is the tick limit divided by it. A caller that sets one and
-    not the others ends an episode before the game ends, and nothing fails.
-    This function is the only place that derives the horizon, so the copies
-    cannot disagree.
+    **The interval reaches four places and the horizon is derived from it.**
+    The world the strategies play holds it, the controller world holds it, the
+    horizon is the tick limit divided by it, and the level weights of the
+    strategy table divide by the horizon. A caller that sets one and not the
+    others ends an episode before the game ends, and nothing fails. This
+    function is the only place that derives the horizon, so the copies cannot
+    disagree.
+
+    **This rebuilds the strategy table rather than replacing the world of
+    each row.** A level weight is paid on every decision, so a wider interval
+    gives fewer decisions and each one must pay more. A table that kept its
+    weights and took a new horizon would pay a fraction of its shaping, and
+    nothing would fail.
 
     The learner takes one action for each decision, and the built-in
     controller issues many commands in the same span, so a shorter interval
@@ -126,14 +133,7 @@ def use_decision_interval(interval: int) -> None:
     horizon = TICK_LIMIT // interval
     WORLD = replace(WORLD, decision_interval=interval, horizon=horizon)
     CONTROLLER_WORLD = replace(WORLD, controlled=False)
-    STRATEGIES = {
-        name: (
-            replace(config, decision_interval=interval, horizon=horizon),
-            scoring,
-            kind,
-        )
-        for name, (config, scoring, kind) in STRATEGIES.items()
-    }
+    STRATEGIES = strategy_table(WORLD)
 
 
 def use_play_styles(
@@ -181,14 +181,10 @@ def use_play_styles(
     }
 
 
-# The store total crosses as a raw Q16.16 integer, so its numbers are about
-# five orders of magnitude above a tile count. This weight brings one store
-# into the range of one territory.
-STORE_SCALE = 1.0e-5
-
 # What a win is worth against what the shaped terms pay over one episode. A
-# territory reward of one for each tile pays a few hundred over an episode,
-# so a terminal weight of this size makes the outcome the largest single
+# level term of one weight unit pays at most one on each decision, so it pays
+# at most the horizon over a whole episode. This terminal weight is therefore
+# above what any one shaped term can pay, and it stays the largest single
 # term without drowning the shaping that leads to it.
 WIN = 2000.0
 
@@ -222,101 +218,151 @@ LOSS = WIN / 10.0
 # [^2]: Findings register, FND-692. `docs/FINDINGS.md`
 EARLY = WIN / 2.0
 
+# How many settlements the founding ladder must keep worth founding. The
+# rise of the settlement level for one more settlement falls as the count
+# rises, so the ladder ratio below answers for a settlement count and no
+# more.
+SETTLEMENT_TARGET = 8
 
-STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
+# What the readiness to found a settlement pays, against what a settlement
+# pays. The engine sets one field when the settle verb is legal for the
+# faction now, which means a settler stands on ground the faction may build
+# on. Founding the settlement spends the settler and clears the field.
+#
+# **A readiness weight above this ratio pays a faction to hold the settler
+# and never found.** The bound is the rise of the settlement level for one
+# more settlement at the target count above. One test derives that bound from
+# the schema of the world and fails when this ratio passes it, so the two
+# cannot disagree.
+FOUND_READY = 0.003
+
+
+StrategyTable = dict[str, tuple[EnvConfig, "Scoring | ObjectiveSchedule", str]]
+
+# The signals each strategy below reads as a level, named once. A weighting
+# names a field of the observation schema, and the engine owns that name.
+_TILES = "held_tiles"
+_SETTLEMENTS = "settlements"
+_MAY_FOUND = "may_found"
+_STORE = "store_total"
+_PEOPLE = "population"
+
+
+def strategy_table(world: EnvConfig) -> StrategyTable:
+    """Return one strategy for each weighting this run trains against.
+
+    **Every shaped weight below reads a level and not a change.** An
+    evolution strategy sums the reward of every decision of the episode with
+    no discount, so a sum of changes collapses to the last reading less the
+    first. Every shaped weight of this table read a change once, so the
+    whole table trained against a terminal reward under weights that read as
+    dense.[^1] [^2]
+
+    A level weight reads the published value of one field divided by the unit
+    the engine published for it, so every level lies between minus one and
+    one. The engine compresses each count before it publishes one, so a
+    weight means the same thing over a tile total and over a store total.
+    That was not true of the change form: a weight there multiplied the raw
+    published value, and one weight of the table carried a factor of a
+    hundred thousand that the compression had already removed.[^2]
+
+    The world argument gives the horizon, which is how many decisions a level
+    weight is paid on. **The weights are therefore a function of the world
+    and not a constant.** A caller that sets the decision interval changes
+    the horizon, and this rebuilds the table against it.
+
+    References
+    ----------
+    [^1]: Findings register, FND-679. `docs/FINDINGS.md`
+    [^2]: Findings register, FND-700. `docs/FINDINGS.md`
+    """
+    level = WIN / max(world.horizon, 1)
+    found_ready = level * FOUND_READY
+
     # Win, and almost nothing else. The small territory term is the only
     # thing that separates two candidates that both lost, and without it the
     # first generations hold no signal at all.
-    "conquer": (
-        WORLD,
-        Weighting(
-            terms={"held_tiles": 0.1},
-            won=WIN,
-            lost=-LOSS,
-            drawn=0.0,
-            won_early=EARLY,
-        ),
-        "linear",
-    ),
-    # The same scoring as the conquest strategy, over the structured
-    # policy. This varies the policy and holds the reward fixed, so the pair
-    # measures what the structure is worth.
-    "conquer-structured": (
-        WORLD,
-        Weighting(
-            terms={"held_tiles": 0.1},
-            won=WIN,
-            lost=-LOSS,
-            drawn=0.0,
-            won_early=EARLY,
-        ),
-        STRUCTURED_KIND,
-    ),
-    # Take ground and hold it. Nothing else scores.
-    "land": (
-        WORLD,
-        Weighting(terms={"held_tiles": 1.0}, won=WIN, lost=-LOSS, drawn=0.0),
-        "linear",
-    ),
-    # The same scoring as the ground strategy, over the structured policy.
-    # **The pair measures the structure against a dense score.** The conquest
-    # pair measures it against a nearly ternary one, and that pair went flat
-    # after five generations while the ground strategy was still rising at
-    # sixty-seven. Neither pair alone says whether the policy or the density
-    # carried it.[^1]
     #
-    # [^1]: Findings register, FND-650. `docs/FINDINGS.md`
-    "land-structured": (
-        WORLD,
-        Weighting(terms={"held_tiles": 1.0}, won=WIN, lost=-LOSS, drawn=0.0),
-        STRUCTURED_KIND,
-    ),
-    # Fill the stores. Ground scores a little, for the same reason.
-    "wealth": (
-        WORLD,
-        Weighting(
-            terms={"store_total": STORE_SCALE, "held_tiles": 0.5},
-            won=WIN,
-            lost=-LOSS,
-            drawn=0.0,
-        ),
-        "linear",
-    ),
-    # The same scoring as the wealth strategy, over the structured policy.
-    "wealth-structured": (
-        WORLD,
-        Weighting(
-            terms={"store_total": STORE_SCALE, "held_tiles": 0.5},
-            won=WIN,
-            lost=-LOSS,
-            drawn=0.0,
-        ),
-        STRUCTURED_KIND,
-    ),
+    # **The settlement term is the one shaped term of this row that a policy
+    # reaches in several steps.** A faction founds a city by queueing a
+    # settler, waiting for it, and settling with it, and no other term of the
+    # table pays anything at any step of that chain. A city is how the engine
+    # grows a faction, so the chain leads to the win this row is about.
+    conquest = Weighting(
+        levels={
+            _TILES: level * 0.1,
+            _SETTLEMENTS: level * 0.5,
+            _MAY_FOUND: found_ready * 0.5,
+        },
+        won=WIN,
+        lost=-LOSS,
+        drawn=0.0,
+        won_early=EARLY,
+    )
+    # Take ground, and plant seats on it. The two terms carry one weight
+    # each, because one more settlement and one more tile both add the same
+    # amount to their own compressed magnitude at the first step. A
+    # settlement is then worth many tiles at the margin, because the tile
+    # count is far higher and the compression flattens with the count.
+    ground = Weighting(
+        levels={
+            _TILES: level * 1.0,
+            _SETTLEMENTS: level * 1.0,
+            _MAY_FOUND: found_ready,
+        },
+        won=WIN,
+        lost=-LOSS,
+        drawn=0.0,
+    )
+    # Fill the stores. Ground scores a little, because a faction with no
+    # ground fills nothing.
+    riches = Weighting(
+        levels={_STORE: level * 1.0, _TILES: level * 0.5},
+        won=WIN,
+        lost=-LOSS,
+        drawn=0.0,
+    )
     # Grow the people. Ground scores a little, because a faction with no
     # ground grows nobody.
-    "people": (
-        WORLD,
-        Weighting(
-            terms={"population": 3.0, "held_tiles": 0.25},
-            won=WIN,
-            lost=-LOSS,
-            drawn=0.0,
-        ),
-        "linear",
-    ),
-    # The same scoring as the people strategy, over the structured policy.
-    "people-structured": (
-        WORLD,
-        Weighting(
-            terms={"population": 3.0, "held_tiles": 0.25},
-            won=WIN,
-            lost=-LOSS,
-            drawn=0.0,
-        ),
-        STRUCTURED_KIND,
-    ),
-}
+    #
+    # **The population field and the live unit field publish one number.**
+    # Every decision of every episode a measurement played read the same
+    # value in both, so this row rewards the unit count under the name of the
+    # people. The row keeps its name, because a stored policy carries it.[^1]
+    #
+    # [^1]: Findings register, FND-702. `docs/FINDINGS.md`
+    people = Weighting(
+        levels={_PEOPLE: level * 3.0, _TILES: level * 0.25},
+        won=WIN,
+        lost=-LOSS,
+        drawn=0.0,
+    )
+    return {
+        "conquer": (world, conquest, "linear"),
+        # The same scoring as the conquest strategy, over the structured
+        # policy. This varies the policy and holds the reward fixed, so the
+        # pair measures what the structure is worth.
+        "conquer-structured": (world, conquest, STRUCTURED_KIND),
+        "land": (world, ground, "linear"),
+        # The same scoring as the ground strategy, over the structured
+        # policy. **The pair measures the structure against a dense score.**
+        # The conquest pair measures it against a nearly ternary one, and
+        # that pair went flat after five generations while the ground
+        # strategy was still rising at sixty-seven. Neither pair alone says
+        # whether the policy or the density carried it.[^1]
+        #
+        # [^1]: Findings register, FND-650. `docs/FINDINGS.md`
+        "land-structured": (world, ground, STRUCTURED_KIND),
+        "wealth": (world, riches, "linear"),
+        # The same scoring as the wealth strategy, over the structured policy.
+        "wealth-structured": (world, riches, STRUCTURED_KIND),
+        "people": (world, people, "linear"),
+        # The same scoring as the people strategy, over the structured policy.
+        "people-structured": (world, people, STRUCTURED_KIND),
+    }
+
+
+STRATEGIES: StrategyTable = strategy_table(WORLD)
 
 
 def report_behaviour(names: list[str], out: Path, holdout: int, workers: int) -> int:

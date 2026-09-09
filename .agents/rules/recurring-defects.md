@@ -46,10 +46,24 @@ declared beside the drag, and the keyboard never asked for it. The mouse was
 correct, so the rule looked like it was applied. A press for right then scrolled
 the map along the axis of the flat map while the picture stood turned.[^12]
 
+Local instance. The compression the engine writes a count under was declared
+twice. The engine divides the logarithm of a count by a divisor of 40 bits and
+scales the answer by a unit of 65536, and it publishes both numbers in the
+schema. The objective module held a cap of 40 bits and a unit of 65536 of its
+own. **The two copies agreed, so nothing looked wrong.** The module then applied
+its copy to a value the engine had already compressed, so a term over a
+population measured the logarithm of a logarithm. Eight times the people moved
+that term by one part in a hundred of its range.[^13]
+
 **Rule.** Declare a value once. When a second site must exist, add a check that
 fails when the copies disagree. Do not add a comment that names the winner. A
 comment that explains which copy loses is evidence that the second copy should
 not exist.
+
+**Rule.** Two copies that agree are still two copies. The failure of this shape
+is not that the numbers differ. It is that the second site applies the rule a
+second time, or stops applying it at all, and nothing reads the first site to
+find out.
 
 This project has several places where the shape will recur: a constant in Rust
 and the same constant in the Python control plane, an event layout and the
@@ -168,3 +182,4 @@ Before you claim work is done, check each line.
 [^10]: Findings register, FND-541. `docs/FINDINGS.md`
 [^11]: Findings register, FND-581. `docs/FINDINGS.md`
 [^12]: Findings register, FND-628. `docs/FINDINGS.md`
+[^13]: Findings register, FND-701. `docs/FINDINGS.md`

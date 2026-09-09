@@ -28,10 +28,16 @@ References
 ``.agents/rules/testing.md``
 
 [^4]: Blockers register, BLK-050. ``docs/BLOCKERS.md``
+
+[^5]: Findings register, FND-701. ``docs/FINDINGS.md``
+
+[^6]: Recurring defect shapes, shape 1.
+``.agents/rules/recurring-defects.md``
 """
 
 from __future__ import annotations
 
+import math
 from functools import cache
 
 import numpy as np
@@ -52,6 +58,7 @@ from cachette.learn import (
     ObjectiveVector,
     Optimisation,
     PlayStyle,
+    Signal,
     SignalCatalogue,
     StyleError,
     Term,
@@ -568,3 +575,111 @@ def test_a_probe_scoring_states_nothing() -> None:
     result = env.step(int(np.flatnonzero(mask)[0]))
 
     assert result.reward == 0.0
+
+
+def test_a_compressed_magnitude_term_takes_no_second_logarithm() -> None:
+    """A term over a count the engine compressed reads the published value.
+
+    The engine compresses every count before it publishes one. It divides the
+    logarithm of the count by a divisor it states, and it scales the answer by
+    a unit it states. A term that took its own logarithm of that value
+    measured the logarithm of a logarithm, which is nearly flat: eight times
+    the count moved such a term by a few hundredths of its range.
+
+    This asserts the shape of the term rather than a number. A count and
+    eight times that count must differ by three parts in the divisor, because
+    the compression is a base-two logarithm and eight is three doublings.[^5]
+
+    References
+    ----------
+    [^5]: Findings register, FND-701. ``docs/FINDINGS.md``
+    """
+    catalogue = a_catalogue()
+    signal = catalogue.signal("population")
+    form = signal.form
+    assert form is not None, "the schema must publish a form for the population"
+    assert form.log_base == 2, "this test assumes a base-two compression"
+    divisor = form.divisor_bits
+    assert divisor is not None
+
+    objectives = ObjectiveSet(
+        [
+            Objective(
+                name="people",
+                terms=(Term(signal=signal.name, kind=TermKind.MAGNITUDE),),
+            )
+        ],
+        catalogue,
+    )
+
+    def read(count: int) -> float:
+        observation = np.zeros(catalogue.observation_length, dtype=np.int64)
+        published = form.unit * math.log2(1.0 + count) / divisor
+        observation[signal.start] = round(published)
+        return objectives.read(observation).values["people"]
+
+    small = read(1_000)
+    large = read(8_000)
+    step = 3.0 / float(divisor)
+
+    assert large - small == pytest.approx(step, rel=0.01), (
+        "three doublings of the count must move the term by three parts in the divisor"
+    )
+
+
+def test_a_bounded_term_reads_its_unit_and_its_divisor_from_the_schema() -> None:
+    """Nothing in the objective module states the unit or the divisor.
+
+    The engine owns both, and it publishes them in the value form table of
+    the schema. A number written in the module would be a second declaration
+    of an engine rule, and nothing would fail when the engine moved and the
+    module did not.[^6]
+
+    This builds a catalogue whose signals carry no form at all, and asserts
+    that a bounded term over it refuses rather than falls back to a number of
+    its own.
+
+    References
+    ----------
+    [^6]: Recurring defect shapes, shape 1.
+    ``.agents/rules/recurring-defects.md``
+    """
+    bare = SignalCatalogue([Signal("count", 0, 1)], 4)
+    for kind in (TermKind.MAGNITUDE, TermKind.FIXED_POINT):
+        with pytest.raises(ObjectiveError, match="no unit and no divisor"):
+            ObjectiveSet(
+                [
+                    Objective(
+                        name="bounded",
+                        terms=(Term(signal="count", kind=kind),),
+                    )
+                ],
+                bare,
+            )
+
+
+def test_a_fixed_point_term_divides_by_the_published_unit() -> None:
+    """A share reads one at the top of the range the engine published.
+
+    The engine writes a share against a unit it states, and a term over such
+    a field divides by that unit. This reads the unit from the schema and
+    asserts that a value at the unit scores one.
+    """
+    catalogue = a_catalogue()
+    signal = catalogue.signal("held_share_world")
+    form = signal.form
+    assert form is not None
+    objectives = ObjectiveSet(
+        [
+            Objective(
+                name="ground",
+                terms=(Term(signal=signal.name, kind=TermKind.FIXED_POINT),),
+            )
+        ],
+        catalogue,
+    )
+    observation = np.zeros(catalogue.observation_length, dtype=np.int64)
+    observation[signal.start] = form.unit
+    assert objectives.read(observation).values["ground"] == 1.0
+    observation[signal.start] = form.unit // 4
+    assert objectives.read(observation).values["ground"] == pytest.approx(0.25)

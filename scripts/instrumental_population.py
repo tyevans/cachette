@@ -328,9 +328,12 @@ def rewarded_signals(scoring: Scoring) -> tuple[str, ...]:
 
     A weighting over single fields names its signals directly, and every one
     of them with a weight that is neither absent nor zero is a signal the
-    objective pays for. An objective vector under a play style names its
-    signals through the terms of the objectives the style weights, so this
-    walks those terms and keeps the denominator of a bounded term as well.
+    objective pays for. **A weighting names them in two entries.** One entry
+    weighs the change of a field since the previous decision, and the other
+    weighs the level of the field at each decision, so this reads both.[^A]
+    An objective vector under a play style names its signals through the
+    terms of the objectives the style weights, so this walks those terms and
+    keeps the denominator of a bounded term as well.
 
     **The names come from the objective and never from a list written here.**
     A list here would be a second declaration of what a run rewards, and
@@ -339,12 +342,23 @@ def rewarded_signals(scoring: Scoring) -> tuple[str, ...]:
 
     An objective that states itself in neither form gives no names, because
     nothing here can read it.
+
+    References
+    ----------
+    [^A]: Findings register, FND-700. ``docs/FINDINGS.md``
     """
-    terms = getattr(scoring, "terms", None)
-    if isinstance(terms, dict):
-        return tuple(
-            name for name, weight in terms.items() if weight is not None and weight
-        )
+    weighed: list[str] = []
+    for entry in ("terms", "levels"):
+        weights = getattr(scoring, entry, None)
+        if not isinstance(weights, dict):
+            continue
+        for name, weight in weights.items():
+            if weight is not None and weight and name not in weighed:
+                weighed.append(name)
+    if weighed:
+        return tuple(weighed)
+    if isinstance(getattr(scoring, "terms", None), dict):
+        return ()
     objectives = getattr(scoring, "objectives", None)
     style = getattr(scoring, "style", None)
     if objectives is None or style is None:

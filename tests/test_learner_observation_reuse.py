@@ -34,8 +34,12 @@ from cachette.learn.rollout import run_population
 
 # A weighting with every weight set, so the reward runs. The values are the
 # test's own and they state no rule of the downstream game.
+# The weighting states both shaped forms. A change weight reads two
+# readings and a level weight reads one, and each one reads the array the
+# decision built, so a fixture of one form would leave the other untested.
 WEIGHTING = Weighting(
     terms={"held_tiles": 1.0, "population": 0.5},
+    levels={"settlements": 2.0, "live_units": 0.25},
     won=100.0,
     lost=-100.0,
     drawn=0.0,
@@ -166,6 +170,12 @@ def test_a_reward_reads_the_same_numbers_from_an_array_a_caller_holds() -> None:
         )
         assert by_array.terms == by_world.terms, (
             "a reward must report the same terms from a passed array"
+        )
+        assert by_array.levels == by_world.levels, (
+            "a reward must report the same levels from a passed array"
+        )
+        assert any(share > 0.0 for share in by_array.shares.values()), (
+            "the fixture must hold a level above zero, or this measures nothing"
         )
         assert by_array.outcome == by_world.outcome, (
             "an outcome must not depend on who built the array"

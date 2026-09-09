@@ -23,10 +23,22 @@ decision record binds that rule and the normalisation of the combination.[^6]
 - A share divides the signal by a named denominator signal.
 - A signed relation divides the difference of two signals by the sum of their
   magnitudes, which bounds it without a chosen denominator.
-- A compressed magnitude maps the signal through a base-two logarithm against
-  a fixed 40-bit cap. It needs no denominator and it holds the sign.
-- A fixed-point value divides by the Q16.16 unit, for a signal the engine
-  already publishes as a share.
+- A compressed magnitude bounds the signal against the divisor the engine
+  published for its compression. It needs no denominator and it holds the
+  sign.
+- A fixed-point value divides by the unit the engine published for the field,
+  for a signal the engine already publishes as a share.
+
+**The unit and the divisor come from the schema.** The engine compresses a
+count before it publishes it. It states the base, the offset, the divisor and
+the unit of that compression.
+
+This module held a unit and a divisor of its own once. Both agreed with the
+schema, so the scale of a stored score does not move for reading them from it.
+The second application of the rule agreed with nothing: a compressed magnitude
+term took a logarithm of a value the engine had already taken the logarithm of.
+Eight times the people then moved a population term by one part in a hundred of
+its range.[^8]
 
 The research report prefers a share to a compressed magnitude for a reward
 term, because the derivative of a compressed magnitude falls with the
@@ -46,7 +58,7 @@ and no golden file moves when a researcher changes a weight.
 
 The engine owns the layout of the observation and states it in a schema.[^5]
 The signal catalogue is the one reader of that schema, and this module reads
-every signal through it.[^6] **No field name appears in this module.** A name
+every signal through it.[^7] **No field name appears in this module.** A name
 written here would be a second declaration of what the engine publishes, and
 nothing would fail when the engine moved and this did not. A term therefore
 names its signal as data, and a term that names a signal the world does not
@@ -74,9 +86,11 @@ table.
 and D2.
 ``docs/adrs/draft/adr-0196-a-reward-is-a-bounded-weighted-objective-vector.md``
 
-[^6]: ADR-0154, the observation and the action of a faction are
+[^7]: ADR-0154, the observation and the action of a faction are
 schema-declared bounded tables the engine owns, decision D1.
 ``docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md``
+
+[^8]: Findings register, FND-701. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -95,20 +109,15 @@ if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
 
     from .signals import Signal, SignalCatalogue
 
-# The Q16.16 unit. A signal the engine publishes as a share carries this as
-# its full value, and the engine owns that choice.
-FIXED_POINT_UNIT: Final = 65536.0
-
-# The structural cap of a compressed magnitude, in bits. It admits any
-# quantity below 1.1 times 10 to the twelfth, which is above every total the
-# engine can reach at the target scale. This is a property of the compression
-# and not a budget, so it is stated here rather than in a register.
-MAGNITUDE_CAP_BITS: Final = 40.0
-
 # The bounds every term obeys. A share never goes below zero, and the other
 # three kinds hold the sign of the quantity they read.
 UPPER: Final = 1.0
 LOWER: Final = -1.0
+
+# The value form a compressed magnitude is written under. A term asks the
+# schema for this form when the field it reads carries no compression of its
+# own, and the schema states the divisor.
+_MAGNITUDE_FORM: Final = "magnitude"
 
 
 class ObjectiveError(ValueError):
@@ -118,6 +127,68 @@ class ObjectiveError(ValueError):
     replaces was a caller carrying a name from one part of the project into
     another that spells it differently.
     """
+
+
+@dataclass(frozen=True)
+class Scale:
+    """How the engine wrote the field one term reads.
+
+    The engine publishes the value form of every field of the observation,
+    and that form carries the unit the value was written against and the
+    divisor a compressed magnitude was divided by.[^1] This holds what a
+    bounded term needs of one such form, read from the schema when the term
+    binds.
+
+    **Nothing in this module states a unit or a divisor.** A number written
+    here would be a second declaration of a rule the engine owns, and nothing
+    would fail when the engine moved and this did not.[^2]
+
+    The compressed entry says that the engine already took the logarithm. A
+    published value of such a field, divided by the unit, is the logarithm of
+    the quantity over the divisor, so a term over it needs no logarithm of
+    its own. A term that took a second one measured the logarithm of a
+    logarithm, which is flat: eight times the people moved such a term by one
+    part in a hundred of its range.[^3]
+
+    References
+    ----------
+    [^1]: ADR-0154, the observation and the action of a faction are
+    schema-declared bounded tables the engine owns, decision D1.
+    ``docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md``
+
+    [^2]: Recurring defect shapes, shape 1.
+    ``.agents/rules/recurring-defects.md``
+
+    [^3]: Findings register, FND-701. ``docs/FINDINGS.md``
+    """
+
+    unit: float
+    compressed: bool
+    divisor_bits: float | None = None
+
+    def compress(self, value: float) -> float:
+        """Return one published value as a bounded compressed magnitude.
+
+        A field the engine already compressed needs no logarithm here, so
+        this divides by the published unit. A field of a raw quantity takes
+        the logarithm against the published divisor, and a scale that holds
+        no divisor refuses rather than invent one.
+        """
+        if self.compressed:
+            return _clamp(value / self.unit, LOWER, UPPER)
+        if self.divisor_bits is None:
+            message = (
+                "this scale holds no divisor, so nothing here knows how many "
+                "bits one whole compressed magnitude spans"
+            )
+            raise ObjectiveError(message)
+        bits = math.log2(1.0 + abs(value))
+        size = min(bits / self.divisor_bits, UPPER)
+        return -size if value < 0.0 else size
+
+    def fraction(self, value: float) -> float:
+        """Return one published value as a bounded fraction of its unit."""
+        return _clamp(value / self.unit, LOWER, UPPER)
 
 
 class TermKind(Enum):
@@ -142,21 +213,43 @@ class TermKind(Enum):
         """Whether this kind reads a second signal to bound the first."""
         return self in (TermKind.SHARE, TermKind.RELATION)
 
-    def apply(self, numerator: float, denominator: float | None) -> float:
-        """Map one raw reading into the bounded range of this kind."""
+    @property
+    def needs_scale(self) -> bool:
+        """Whether this kind reads the published form of its own signal.
+
+        A share and a signed relation bound themselves against a second
+        signal, so neither needs the unit or the divisor of the engine. The
+        other two divide by one of them.
+        """
+        return self in (TermKind.MAGNITUDE, TermKind.FIXED_POINT)
+
+    def apply(
+        self, numerator: float, denominator: float | None, scale: Scale | None = None
+    ) -> float:
+        """Map one raw reading into the bounded range of this kind.
+
+        The scale entry carries the unit and the divisor the engine published
+        for the field this term reads. The two kinds that divide by one of
+        them refuse a reading without it, because a unit written here would
+        be a second declaration of a rule the engine owns.
+        """
         if self is TermKind.SHARE:
             return _clamp(
                 max(numerator, 0.0) / max(denominator or 0.0, 1.0), 0.0, UPPER
             )
         if self is TermKind.RELATION:
             other = denominator or 0.0
-            scale = max(abs(numerator) + abs(other), 1.0)
-            return _clamp((numerator - other) / scale, LOWER, UPPER)
+            span = max(abs(numerator) + abs(other), 1.0)
+            return _clamp((numerator - other) / span, LOWER, UPPER)
+        if scale is None:
+            message = (
+                f"a {self.value} term divides by the unit or the divisor the "
+                f"engine published, and it was given neither"
+            )
+            raise ObjectiveError(message)
         if self is TermKind.MAGNITUDE:
-            bits = math.log2(1.0 + abs(numerator))
-            size = min(bits / MAGNITUDE_CAP_BITS, UPPER)
-            return -size if numerator < 0.0 else size
-        return _clamp(numerator / FIXED_POINT_UNIT, LOWER, UPPER)
+            return scale.compress(numerator)
+        return scale.fraction(numerator)
 
 
 class Measure(Enum):
@@ -269,6 +362,7 @@ class _BoundTerm:
     term: Term
     signal: Signal
     against: Signal | None
+    scale: Scale | None
 
     def level(self, observation: np.ndarray) -> float:
         """Return the bounded value of this term at one observation."""
@@ -278,7 +372,7 @@ class _BoundTerm:
             if self.against is None
             else self.against.read(observation, self.term.against_aggregation)
         )
-        return self.term.kind.apply(numerator, denominator)
+        return self.term.kind.apply(numerator, denominator, self.scale)
 
     def read(self, observation: np.ndarray, previous: np.ndarray | None) -> float:
         """Return what this term contributes at one observation.
@@ -464,14 +558,52 @@ class ObjectiveSet:
 
 def _bind(term: Term, catalogue: SignalCatalogue, objective: str) -> _BoundTerm:
     """Resolve the signals of one term, and say what is on offer when it fails."""
+    signal = _signal(catalogue, term.signal, objective)
     return _BoundTerm(
         term=term,
-        signal=_signal(catalogue, term.signal, objective),
+        signal=signal,
         against=(
             None
             if term.against is None
             else _signal(catalogue, term.against, objective)
         ),
+        scale=(_scale(signal, catalogue, objective) if term.kind.needs_scale else None),
+    )
+
+
+def _scale(signal: Signal, catalogue: SignalCatalogue, objective: str) -> Scale:
+    """Read the unit and the divisor the engine published for one signal.
+
+    The form of the signal states the unit. It states the divisor as well
+    when the engine compressed the field, and a field of another form takes
+    the divisor of the compressed magnitude form the layout publishes.
+
+    A layout that publishes neither refuses. **The refusal is the point.** A
+    default written here would be a second declaration of an engine rule, and
+    a run under a schema that had moved would score a reward on the old rule
+    and report nothing.
+    """
+    form = signal.form
+    published = catalogue.value_forms
+    compression = published.get(_MAGNITUDE_FORM)
+    unit = None if form is None else float(form.unit)
+    divisor = None if form is None else form.divisor_bits
+    if divisor is None and compression is not None:
+        divisor = compression.divisor_bits
+    if unit is None and compression is not None:
+        unit = float(compression.unit)
+    if unit is None or divisor is None:
+        message = (
+            f"the objective {objective!r} reads {signal.name!r} as a bounded "
+            f"quantity, and the schema of this world states no unit and no "
+            f"divisor for it. The layout publishes the forms "
+            f"{sorted(published)}."
+        )
+        raise ObjectiveError(message)
+    return Scale(
+        unit=unit,
+        divisor_bits=float(divisor),
+        compressed=form is not None and form.invertible and form.uniform,
     )
 
 
@@ -495,15 +627,14 @@ def _clamp(value: float, lower: float, upper: float) -> float:
 
 
 __all__ = [
-    "FIXED_POINT_UNIT",
     "LOWER",
-    "MAGNITUDE_CAP_BITS",
     "UPPER",
     "Measure",
     "Objective",
     "ObjectiveError",
     "ObjectiveSet",
     "ObjectiveVector",
+    "Scale",
     "Term",
     "TermKind",
 ]

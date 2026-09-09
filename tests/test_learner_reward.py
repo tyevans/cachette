@@ -27,6 +27,10 @@ References
 ``.agents/rules/recurring-defects.md``
 
 [^6]: Findings register, FND-692. ``docs/FINDINGS.md``
+
+[^7]: Findings register, FND-679. ``docs/FINDINGS.md``
+
+[^8]: Findings register, FND-700. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -49,6 +53,7 @@ from cachette.learn import (
     UnsetWeightError,
     Weighting,
 )
+from cachette.learn.signals import SignalCatalogue
 
 # A world small enough to run to a game end inside a test, and wide enough
 # that the seeding seats a faction in it.
@@ -467,3 +472,240 @@ def test_a_world_with_no_tick_limit_leaves_no_time_on_a_clock() -> None:
 
 def test_the_register_holds_one_row_for_each_timing_term() -> None:
     assert _register_rows("## The terminal timing terms") == list(TIMING_ROWS)
+
+
+def one_level(name: str, weight: float | None) -> Weighting:
+    """Return a weighting that weighs the level of one field and no outcome."""
+    return Weighting(levels={name: weight}, won=0.0, lost=0.0, drawn=0.0)
+
+
+def a_published_unit(world: World, name: str) -> float:
+    """Return the unit the engine published for one field of the observation.
+
+    A test that wrote the unit here would hold a second copy of an engine
+    rule, and nothing would fail when the engine moved and the test did
+    not.[^5]
+    """
+    form = SignalCatalogue.of_world(world).signal(name).form
+    assert form is not None, f"the schema must publish a form for {name}"
+    return float(form.unit)
+
+
+def a_trajectory(seed: int, weighting: Weighting, ticks: int) -> tuple[float, ...]:
+    """Play one world and return what the reward paid on each decision.
+
+    The caller sums the answer to get the undiscounted episode return, which
+    is what an evolution strategy ranks a candidate by.
+    """
+    world = a_seeded_world(seed)
+    reward = Reward(world, 0, weighting)
+    paid: list[float] = []
+    for _ in range(ticks):
+        world.step(1)
+        paid.append(reward.read(world).value)
+    return tuple(paid)
+
+
+def test_a_level_weight_reads_the_level_and_a_change_weight_reads_the_change(
+    seed: int,
+) -> None:
+    """The two shaped forms read two quantities of one field.
+
+    A level weight pays the bounded value of the field on every decision. A
+    change weight pays the movement of the published value, and the two
+    therefore pay different numbers on the same decision.
+    """
+    world = a_seeded_world(seed)
+    level = Reward(world, 0, one_level("held_tiles", 1.0))
+    change = Reward(world, 0, one_term("held_tiles", 1.0))
+    for _ in range(3):
+        world.step(1)
+    from_level = level.read(world)
+    from_change = change.read(world)
+
+    assert from_level.shares["held_tiles"] > 0.0, "the fixture must hold ground"
+    assert from_level.shares["held_tiles"] <= 1.0, "a level is bounded by its unit"
+    assert from_level.levels["held_tiles"] == from_level.shares["held_tiles"]
+    assert from_level.shaped == from_level.levels["held_tiles"]
+    assert from_change.changes["held_tiles"] > 0
+    assert from_level.value != from_change.value
+
+
+def test_a_level_weight_scales_the_contribution(seed: int) -> None:
+    world = a_seeded_world(seed)
+    single = Reward(world, 0, one_level("held_tiles", 1.0))
+    doubled = Reward(world, 0, one_level("held_tiles", 2.0))
+    for _ in range(3):
+        world.step(1)
+    one = single.read(world)
+    two = doubled.read(world)
+    assert one.value > 0.0
+    assert two.value == pytest.approx(2.0 * one.value)
+
+
+def test_a_level_weight_of_zero_contributes_nothing_while_the_level_holds(
+    seed: int,
+) -> None:
+    """The defect put back. The level is read, and the weight holds it at zero."""
+    world = a_seeded_world(seed)
+    reward = Reward(world, 0, one_level("held_tiles", 0.0))
+    for _ in range(3):
+        world.step(1)
+    step = reward.read(world)
+    assert step.shares["held_tiles"] > 0.0, "the fixture must still hold ground"
+    assert step.levels["held_tiles"] == 0.0
+    assert step.value == 0.0
+
+
+def test_two_runs_of_one_endpoint_score_alike_under_a_change_weight() -> None:
+    """The paired run: one seed, two run lengths, one pair of endpoints.
+
+    An evolution strategy sums the reward of every decision with no discount.
+    A sum of changes therefore collapses to the last reading less the first,
+    so **a change weight scores a whole episode by its endpoints alone.**
+
+    This plays one seed for a short run and for a run nearly four times as
+    long. The field reaches the same value in both, so the two runs share
+    their endpoints and differ only in how long they held that value. The
+    change weight scores them identically, which is the defect. The level
+    weight scores the longer run higher, because its sum is the area under
+    the curve of the field.[^7]
+
+    References
+    ----------
+    [^7]: Findings register, FND-679. ``docs/FINDINGS.md``
+    """
+    short = 40
+    long_run = 150
+    change_short = a_trajectory(RUNNING_SEED, one_term("held_tiles", 1.0), short)
+    change_long = a_trajectory(RUNNING_SEED, one_term("held_tiles", 1.0), long_run)
+    level_short = a_trajectory(RUNNING_SEED, one_level("held_tiles", 1.0), short)
+    level_long = a_trajectory(RUNNING_SEED, one_level("held_tiles", 1.0), long_run)
+
+    world = a_seeded_world(RUNNING_SEED)
+    unit = a_published_unit(world, "held_tiles")
+    reward = Reward(world, 0, one_level("held_tiles", 1.0))
+    first = reward.read(world).shares["held_tiles"]
+    for _ in range(short):
+        world.step(1)
+    ended_short = reward.read(world).shares["held_tiles"]
+    for _ in range(long_run - short):
+        world.step(1)
+    ended_long = reward.read(world).shares["held_tiles"]
+
+    assert ended_short > first, "the fixture must raise the field"
+    assert ended_short == ended_long, (
+        "the fixture must reach the same endpoint on both runs, or the two "
+        "runs are not a pair"
+    )
+
+    assert sum(change_short) == pytest.approx((ended_short - first) * unit, abs=1.0)
+    assert sum(change_long) == pytest.approx(sum(change_short)), (
+        "a change weight scores two runs of one endpoint alike"
+    )
+    assert sum(level_long) > 2.0 * sum(level_short), (
+        "a level weight must pay for the time the field held its level"
+    )
+
+
+def test_a_change_weight_pays_on_almost_no_decision_of_an_episode() -> None:
+    """The density of the two shaped forms, counted decision by decision.
+
+    A change weight pays only where the field moved. The field of this
+    fixture moves once, when the seeding seats the faction, and holds after
+    that. A change weight therefore pays one number for a whole episode, and
+    an evolution strategy has nothing to climb between the first decision and
+    the last.
+
+    A level weight pays on every decision. This counts both, so the claim is
+    a measurement of the fixture and not a reading of the arithmetic.[^8]
+
+    References
+    ----------
+    [^8]: Findings register, FND-700. ``docs/FINDINGS.md``
+    """
+    ticks = 40
+    changes = a_trajectory(RUNNING_SEED, one_term("held_tiles", 1.0), ticks)
+    levels = a_trajectory(RUNNING_SEED, one_level("held_tiles", 1.0), ticks)
+
+    silent = [index for index, paid in enumerate(changes) if paid == 0.0]
+    assert len(silent) > ticks // 2, (
+        "the fixture must hold the field still on most of its decisions"
+    )
+    assert all(levels[index] > 0.0 for index in silent), (
+        "a level weight must pay while a change weight is silent"
+    )
+    assert all(paid > 0.0 for paid in levels)
+
+
+def test_a_field_cannot_be_read_as_a_level_and_as_a_change_at_once() -> None:
+    with pytest.raises(TermError, match="belongs in one entry"):
+        Weighting(
+            terms={"held_tiles": 1.0},
+            levels={"held_tiles": 1.0},
+            won=0.0,
+            lost=0.0,
+            drawn=0.0,
+        )
+
+
+def test_a_weighting_of_change_weights_alone_says_that_it_telescopes() -> None:
+    """A weighting reports the defect, so a check can refuse it.
+
+    Nothing failed while the whole strategy table held change weights alone,
+    because a change weight is a legal weight and reads as dense. This
+    property is what a check reads.[^8]
+
+    References
+    ----------
+    [^8]: Findings register, FND-700. ``docs/FINDINGS.md``
+    """
+    assert one_term("held_tiles", 1.0).telescopes
+    assert not one_level("held_tiles", 1.0).telescopes
+    assert not Weighting(
+        terms={"held_tiles": 1.0},
+        levels={"settlements": 1.0},
+        won=0.0,
+        lost=0.0,
+        drawn=0.0,
+    ).telescopes
+    assert not Weighting(terms={}, won=1.0, lost=-1.0, drawn=0.0).telescopes
+
+
+def test_a_level_weight_that_names_no_field_of_the_schema_is_refused(
+    seed: int,
+) -> None:
+    world = a_seeded_world(seed)
+    with pytest.raises(TermError):
+        Reward(world, 0, one_level("no_such_field", 1.0))
+
+
+def test_a_level_weight_over_many_positions_is_refused(seed: int) -> None:
+    world = a_seeded_world(seed)
+    with pytest.raises(TermError):
+        Reward(world, 0, one_level("relation", 1.0))
+
+
+def test_a_finished_episode_pays_no_level(seed: int) -> None:
+    """A run that has ended pays nothing, and the level rows still report.
+
+    A level term is paid on every decision, so a reader of a finished episode
+    must see zero rather than the last level again. The row set does not
+    change, because a caller that reads a different set of names on the last
+    row cannot combine the rows.
+    """
+    world = a_seeded_world(ENDING_SEED)
+    weighting = Weighting(levels={"held_tiles": 1.0}, won=1.0, lost=-1.0, drawn=0.0)
+    reward = Reward(world, 0, weighting)
+    step = reward.read(world)
+    for _ in range(ENDING_BOUND):
+        if step.done:
+            break
+        world.step(1)
+        step = reward.read(world)
+    assert step.done, "the fixture must reach a game end"
+    after = reward.read(world)
+    assert after.value == 0.0
+    assert after.levels == {"held_tiles": 0.0}
+    assert after.shares == {"held_tiles": 0.0}
+    del seed

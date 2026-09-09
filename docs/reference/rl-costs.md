@@ -51,6 +51,14 @@ A caller may weigh any other field of the observation array that holds one
 position. The rows above are the terms the project reserved, and the module
 names the same eight.
 
+**A weight over a change telescopes, and the same eight names take a weight
+over a level.** An evolution strategy sums the reward of every decision of the
+episode with no discount, so a sum of changes collapses to the last reading
+less the first. A change weight therefore pays one number for a whole episode.
+A level weight is paid on every decision, and it divides the published value by
+the unit the engine published for that field. The rows above answer for either
+form, and one finding holds the measurement.[^14]
+
 ## The terminal outcomes
 
 A terminal outcome is paid once, when the run ends. Three outcomes end a run.
@@ -145,3 +153,4 @@ target platform measures it.
 [^11]: Research report 42, what a policy should be able to see, section 9. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
 [^12]: Findings register, FND-679. `docs/FINDINGS.md`
 [^13]: Findings register, FND-692. `docs/FINDINGS.md`
+[^14]: Findings register, FND-700. `docs/FINDINGS.md`
