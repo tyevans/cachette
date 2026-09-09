@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-711**
+**Next number: FND-712**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19107,3 +19107,67 @@ statement about that policy, and never as a statement about the balance, until
 a player that can use the path has been measured on it. One episode of this
 world costs 23.7 seconds passive and 34.0 seconds acting on sixteen cores,
 which is the basis any run sizing must use.
+
+### FND-711 — Sigma was set from the choice-change rate, which is not the quantity the ranking needs, and a partial tie resolves by candidate index
+
+**Believed.** The perturbation radius was 1.5 centre lengths. The recorded
+reasoning is that a radius of 0.25 changed 0.8 percent of a trained policy's
+choices while 1.5 changed about a third, and that a radius which changes too
+few choices leaves every candidate with the same score, so the ranking carries
+nothing. The register also held that a whole-generation tie is the tie worth
+guarding, and the search guards exactly that.
+
+**True.** The choice-change rate is real and it is not the quantity the
+ranking needs. **The quantity the ranking needs is the spread of the
+candidates' scores**, and nobody measured it at a small radius.
+
+Measured over one fixed centre of the structured kind, 8 candidates as 4
+antithetic pairs sharing four unit directions, 8 shared worlds each, under a
+real play style:
+
+| sigma | choices changed | signal sd | residual sd | signal over noise at 8 worlds | worlds needed | rank agreement of two 4-world sets |
+|---|---|---|---|---|---|---|
+| 0.1 | 0.0035 | 6.55 | 38.70 | 0.48 | 35 | 0.476 |
+| 0.25 | 0.0072 | 19.57 | 47.86 | 1.16 | 6 | −0.095 |
+| 0.5 | 0.1117 | 37.30 | 58.49 | 1.80 | 3 | 0.905 |
+| 1.5 | 0.4116 | 31.95 | 71.95 | 1.26 | 6 | 0.857 |
+
+A radius of 0.25 changes under one percent of the choices and still spreads
+the candidate means across 72 points. **An episode of six thousand ticks
+amplifies a handful of early decisions**, so a small radius does not tie the
+scores. The inference from the choice-change rate to the score spread was the
+error, and the measurement it rested on was sound.
+
+**A large radius also finds worse candidates.** Against a centre of 100.63
+the population mean falls from 98.19 at 0.1 to 51.03 at 1.5, and the best
+single candidate falls from 125.36 to 107.62. So the incumbent radius cost
+candidate quality as well as locality, and bought no spread.
+
+**The incumbent pair was under-sampled by its own arithmetic.** A radius of
+1.5 needs six worlds for each candidate to lift the signal over the noise and
+the trainer gave it four. Nothing said so.
+
+**The tie guard fires only on a whole-generation tie.** Two of eight
+candidates scored exactly equal at a radius of 0.25 and again at 0.5. The
+guard passed, and the stable sort then ordered the tied candidates by
+candidate index into the step. **A partial tie is the common case, so the
+candidate index has been biasing the direction of every generation that held
+one.**
+
+**Read the rank agreement with its error.** The rank correlation over eight
+candidates carries a standard error of 0.378. The figures at 0.5 and 1.5
+differ from zero and they do not differ from each other, and the figure at
+0.25 is consistent with zero while its signal-to-noise ratio says the signal
+exceeds the noise. **Those two statistics do not corroborate at that radius**,
+and a reader must not take either alone.
+
+**Follows.** Set the radius to 0.5. Warn when a configuration is
+under-sampled for its radius, on the first lines of a run rather than after
+the money is spent. Break a partial tie without the candidate index. **And
+read a proxy as a proxy**: the choice-change rate answered a different
+question than the one the radius needed, in the same way that a shaped return
+answered a different question than play.
+
+**What stays unverified.** This measures the inputs to a ranking, not where
+the ranking points. Whether the recommended pair trains better is unmeasured,
+and one centre of one style under one kind supplied every figure above.
