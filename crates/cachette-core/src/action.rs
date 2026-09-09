@@ -22,18 +22,33 @@
 //!
 //! Five verbs of the enumeration name nothing at all: a board rewrite, a
 //! negotiation step, a carrier assignment, a project send and a
-//! founding.[^4] Two more name something that the engine itself resolves at
-//! the tick the action applies. A campaign takes the objective the engine
-//! chooses for that faction, and a crossing takes the tile the engine
-//! surveys for it. **The schema gives those two no position either.** A
-//! position that carried the objective or the tile would state a second time
-//! what the engine already answers, and the engine's answer is the one that
-//! acts.[^4] [^5]
+//! founding.[^4] A crossing names something that the engine itself resolves
+//! at the tick the action applies: it takes the tile the engine surveys for
+//! that faction. **The schema gives it no position.** A position that
+//! carried the tile would state a second time what the engine already
+//! answers, and the engine's answer is the one that acts.[^4] [^5]
 //!
 //! Four verbs take an argument that no engine rule supplies. A gather order
 //! names a resource kind, a build order names an upgrade category, a
 //! relation move names another faction, and a queue order names a unit type.
 //! Each of those is one candidate position.
+//!
+//! # One verb names a place
+//!
+//! A campaign declares one place position. The position carries a cell of the
+//! egocentric frame that the observation reads, and it names the region the
+//! engine resolves the objective within.[^10] It never carries the objective
+//! itself, so the rule that forbids a second declaration of the engine's own
+//! answer holds.[^4]
+//!
+//! **The first value of the place enumeration names the whole frame.** It
+//! says that the engine resolves over every cell, which is the answer the
+//! verb gave before the position existed. The built-in controller's own
+//! choice therefore lands on that row, and the verb set does not move.[^10]
+//!
+//! A crossing and a settling also act on a place, and neither declares a
+//! position. Both take their target from a keyed sample of the world, and a
+//! place position may not narrow a draw.[^10]
 //!
 //! **No verb of the enumeration carries a quantity, so no verb declares a
 //! bucket position.**[^6] The balance register therefore holds no bucket
@@ -41,10 +56,12 @@
 //!
 //! # Every bound comes from the world parameters
 //!
-//! The bound of a position is a fixed enumeration count or the faction count
-//! of the world. **No bound follows the population.**[^3] A faction that
-//! holds a million units reads a table of the same length as a faction that
-//! holds none. The table therefore stays small, and the answer that says
+//! The bound of a position is a fixed enumeration count, the cell count of
+//! the egocentric frame, or the faction count of the world. **No bound
+//! follows the population, and no bound follows the world extent.**[^3]
+//! [^10] A faction that holds a million units reads a table of the same
+//! length as a faction that holds none, and a world of four thousand tiles
+//! declares the same table as a world of sixteen million. The table therefore stays small, and the answer that says
 //! which of its rows are legal stays small with it.
 //!
 //! # The no-op row
@@ -71,10 +88,54 @@
 //! [^7]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 //! [^8]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 //! [^9]: ADR-0002, state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+//! [^10]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decisions D1, D2, D4 and D5. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
 
+use crate::obs_ring::RING_STACK_CELLS;
 use crate::resource::RESOURCE_KIND_COUNT;
 use crate::unit_type::UNIT_TYPE_COUNT;
 use crate::upgrade::UPGRADE_CATEGORY_COUNT;
+
+/// The place value that names the whole egocentric frame.
+///
+/// The first value of a place enumeration names no cell. It says that the
+/// engine resolves the place over every cell, which is the answer the verb
+/// gave before the position existed. The built-in controller's own choice
+/// therefore lands on this row.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decision D2. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+pub const PLACE_ANYWHERE: u32 = 0;
+
+/// The values that a place position holds.
+///
+/// The count is the cells of the egocentric frame, plus the whole-frame
+/// value. **The ring module derives the cell count from the sector rule of
+/// the frame, so this bound follows nothing about the world.**[^1] A place
+/// value above the whole-frame value names cell `value - 1` of that frame.
+///
+/// # References
+///
+/// [^1]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decision D4. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+pub const PLACE_COUNT: u32 = RING_STACK_CELLS + 1;
+
+/// Returns the cell of the egocentric frame that one place value names, and
+/// nothing when the value names the whole frame.
+///
+/// **This is the one statement of the mapping.** The legality answer and the
+/// verb both read it, so neither holds a second copy of the offset.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[must_use]
+pub const fn place_cell(place: u32) -> Option<u32> {
+    if place == PLACE_ANYWHERE || place >= PLACE_COUNT {
+        None
+    } else {
+        Some(place - 1)
+    }
+}
 
 /// The version of the action table layout.
 ///
@@ -88,7 +149,7 @@ use crate::upgrade::UPGRADE_CATEGORY_COUNT;
 /// # References
 ///
 /// [^1]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D4. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
-pub const ACTION_VERSION: u32 = 1;
+pub const ACTION_VERSION: u32 = 2;
 
 /// One verb of the action table.
 ///
@@ -147,6 +208,13 @@ pub enum CandidateKind {
     Faction,
     /// A row of the unit type table.
     UnitType,
+    /// A cell of the egocentric frame the observation publishes, offset by
+    /// the whole-frame value.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decisions D1 and D2. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+    Place,
 }
 
 impl CandidateKind {
@@ -158,20 +226,30 @@ impl CandidateKind {
             Self::Category => "category",
             Self::Faction => "faction",
             Self::UnitType => "unit_type",
+            Self::Place => "place",
         }
     }
 
     /// Returns the ceiling on the candidate list, for one world shape.
     ///
-    /// Three of the four are fixed enumeration counts. The fourth is the
-    /// faction count of the world, which the world fixes at construction.
-    /// **Not one of them follows the population.**
+    /// Three of the five are fixed enumeration counts. One is the cell count
+    /// of the egocentric frame, which the ring module derives from the
+    /// sector rule of that frame. The last is the faction count of the
+    /// world, which the world fixes at construction.
+    ///
+    /// **Not one of them follows the population, and not one of them follows
+    /// the world extent.**[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decision D4. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
     const fn bound(self, shape: ActionShape) -> u32 {
         match self {
             Self::Resource => RESOURCE_KIND_COUNT as u32,
             Self::Category => UPGRADE_CATEGORY_COUNT as u32,
             Self::Faction => shape.faction_count,
             Self::UnitType => UNIT_TYPE_COUNT as u32,
+            Self::Place => PLACE_COUNT,
         }
     }
 }
@@ -226,9 +304,14 @@ impl Verb {
     /// A verb whose content the engine resolves at the tick the action
     /// applies declares none.[^1]
     ///
+    /// A campaign declares one place position. The position names the region
+    /// the engine resolves the objective within, and never the objective
+    /// itself, so the engine still resolves the content.[^2]
+    ///
     /// # References
     ///
     /// [^1]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+    /// [^2]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decisions D1 and D2. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
     #[must_use]
     pub const fn positions(self) -> &'static [CandidateKind] {
         match self {
@@ -236,8 +319,8 @@ impl Verb {
             Self::Build => &[CandidateKind::Category],
             Self::Relation => &[CandidateKind::Faction],
             Self::Queue => &[CandidateKind::UnitType],
+            Self::Campaign => &[CandidateKind::Place],
             Self::NoOp
-            | Self::Campaign
             | Self::Advertise
             | Self::Trade
             | Self::Carry

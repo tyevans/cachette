@@ -443,7 +443,7 @@ impl PyWorld {
     /// - `candidate`, a string. The kind of thing the candidate list of the
     ///   position holds.
     /// - `bound`, an integer. The ceiling on that candidate list. **No bound
-    ///   follows the population.**
+    ///   follows the population, and no bound follows the world extent.**
     /// - `stride`, an integer. How far one step of the position moves the
     ///   action integer.
     ///
@@ -451,9 +451,17 @@ impl PyWorld {
     /// `first + sum(argument * stride)`, and it reverses that by division.
     ///
     /// **A verb whose content the engine resolves declares no position.** A
-    /// campaign and a crossing each name a place, and the engine chooses
-    /// that place at the tick the action applies, in the way it chooses it
-    /// for the built-in controller.[^2]
+    /// crossing names a place, and the engine chooses that place at the tick
+    /// the action applies, in the way it chooses it for the built-in
+    /// controller.[^2]
+    ///
+    /// **A position whose candidate kind is `place` names a cell of the
+    /// egocentric frame.** Its value zero names the whole frame, and the
+    /// engine then resolves the place over every cell. A value above zero
+    /// names cell `value - 1` of that frame, and the observation schema
+    /// gives the cells of each ring of the same frame under `ring_cells`.
+    /// **The bound is a constant of the frame**, so a policy trained on one
+    /// world names the same place on a world of another size.[^3]
     ///
     /// # Errors
     ///
@@ -463,6 +471,7 @@ impl PyWorld {
     ///
     /// [^1]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D1. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
     /// [^2]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+    /// [^3]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decisions D1, D2 and D4. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
     fn action_schema<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
         let world = self.lock();
         let schema = world.action_schema();

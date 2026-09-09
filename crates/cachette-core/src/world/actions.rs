@@ -6,15 +6,96 @@
 //! because the integer means nothing without all of them.
 
 use super::World;
-use crate::action::{ActionSchema, ActionShape, Verb};
+use crate::action::{place_cell, ActionSchema, ActionShape, Verb, PLACE_ANYWHERE, PLACE_COUNT};
 use crate::campaign;
 use crate::controller::{self, ControllerCommand};
+use crate::hex::Axial;
 use crate::holding::Holder;
+use crate::obs_ring::{cell_of_delta, RING_STACK_CELLS};
 use crate::production::QueueOrder;
 use crate::resource::ResourceKind;
 use crate::types::{Entity, FactionId, TileIdx};
 use crate::unit_type::UnitTypeId;
 use crate::upgrade::UpgradeCategory;
+
+/// One settlement that a campaign of one faction could march on.
+///
+/// The row carries the cell of the egocentric frame that the settlement falls
+/// in, so the objective of one place is a filter over these rows and not a
+/// second walk over the settlements.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decision D3. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+struct CampaignCandidate {
+    /// The cell of the egocentric frame the settlement falls in.
+    cell: u32,
+    /// The hex distance from the seat of the marching faction.
+    distance: u32,
+    /// The settlement slot, which breaks a tie on the distance.
+    slot: u32,
+    /// The tile the settlement stands on.
+    tile: TileIdx,
+    /// One when the settlement is the faction's own and stands on ground an
+    /// enemy holds, so a march on it is a relief.
+    relief: u8,
+}
+
+/// Returns the objective that a campaign takes over one set of candidates.
+///
+/// **A relief comes before a take.** The rule is the controller's own, and
+/// this function is its one statement for the action table. The nearest site
+/// wins, and the settlement slot breaks a tie, so the answer is a property of
+/// the arena and never of a visit order.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+fn nearest_objective(candidates: &[&CampaignCandidate]) -> Option<TileIdx> {
+    let key = |candidate: &&CampaignCandidate| (candidate.distance, candidate.slot, candidate.tile);
+    campaign::nearest_site(
+        candidates
+            .iter()
+            .filter(|candidate| candidate.relief == 1)
+            .map(key),
+    )
+    .or_else(|| {
+        campaign::nearest_site(
+            candidates
+                .iter()
+                .filter(|candidate| candidate.relief == 0)
+                .map(key),
+        )
+    })
+}
+
+/// What every per-row legality question of one faction shares.
+///
+/// One action and one legality answer both build this once. The campaign
+/// objective of every place therefore has one statement for one tick, and the
+/// answer and the verb cannot disagree about it.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decision D3. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+struct ActionContext {
+    /// The campaign objective of each place value, in ascending place order.
+    campaign_objectives: Vec<Option<TileIdx>>,
+}
+
+impl ActionContext {
+    /// Returns the campaign objective of one place value, and nothing when
+    /// the faction observes no settlement it could march on there.
+    ///
+    /// Answers nothing for a value at or above the bound of the position, so
+    /// a caller that decoded a wider integer refuses rather than acts.
+    fn campaign_objective(&self, place: u32) -> Option<TileIdx> {
+        self.campaign_objectives
+            .get(place as usize)
+            .copied()
+            .flatten()
+    }
+}
 
 /// The action table, the legality answer, and the verb that takes one
 /// action integer.
@@ -42,12 +123,25 @@ use crate::upgrade::UpgradeCategory;
 /// # The answer names no target the faction cannot see
 ///
 /// Two verbs act on a place: a campaign marches at an objective, and a
-/// crossing sends at a tile. The engine resolves both, so neither carries an
-/// argument position.[^2] **The engine resolves both through the readers
+/// crossing sends at a tile. **The engine resolves both through the readers
 /// that answer for one faction.** A campaign objective is a settlement the
 /// faction has observed, and a crossing target is a place the faction has
 /// observed. A learner therefore cannot learn from a legality byte that a
 /// settlement it has never seen stands somewhere.[^4]
+///
+/// # A campaign names the region it marches in
+///
+/// A campaign declares one place position. The position carries a cell of
+/// the egocentric frame the observation reads, and its first value names the
+/// whole frame.[^6] The engine still chooses the objective, by the rule it
+/// already owns, over the settlements that fall in the named cell.
+///
+/// **One reader answers the objective of every place at once.** The legality
+/// answer reads that list and the verb reads the same list, so the two cannot
+/// disagree about which settlement a cell holds.[^7]
+///
+/// A crossing keeps no place position. It takes its target from a keyed
+/// sample of the world, and a place position may not narrow a draw.[^6]
 ///
 /// # Determinism
 ///
@@ -63,6 +157,8 @@ use crate::upgrade::UpgradeCategory;
 /// [^3]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 /// [^4]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
 /// [^5]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+/// [^6]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decisions D1, D2 and D5. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+/// [^7]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decision D3. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
 impl World {
     /// Returns the declared layout of the action table of this world.
     ///
@@ -90,6 +186,12 @@ impl World {
     /// The answer holds only what the faction observes. **No argument
     /// widens it.**[^2]
     ///
+    /// A verb is asked once whether it could act at all, and then once for
+    /// each row it holds. A verb with no argument position therefore costs
+    /// one question. The context below answers every place of the campaign
+    /// verb in one pass, so the rows of that verb cost one pass and not one
+    /// pass each.
+    ///
     /// Returns `None` when the number names no faction of this world.
     ///
     /// # References
@@ -102,18 +204,17 @@ impl World {
             return None;
         }
         let schema = self.action_schema();
+        let context = self.action_context(faction);
         let mut answer = vec![0u8; schema.length() as usize];
-        // A verb is asked once whether it could act at all, and then once
-        // for each row it holds. A verb with no argument position therefore
-        // costs one question.
         for row in schema.rows() {
-            let allowed = self.verb_is_legal(faction, row.verb);
+            let allowed = self.verb_is_legal(faction, row.verb, &context);
             for offset in 0..row.rows {
                 let action = row.first + offset;
                 let Some((_, arguments)) = schema.decode(action) else {
                     continue;
                 };
-                let legal = allowed && self.arguments_are_legal(faction, row.verb, &arguments);
+                let legal =
+                    allowed && self.arguments_are_legal(faction, row.verb, &arguments, &context);
                 answer[action as usize] = u8::from(legal);
             }
         }
@@ -147,7 +248,8 @@ impl World {
         let Some((verb, arguments)) = schema.decode(action) else {
             return false;
         };
-        let applied = self.apply_verb(faction, verb, &arguments);
+        let context = self.action_context(faction);
+        let applied = self.apply_verb(faction, verb, &arguments, &context);
         // **An action leaves the world readable.** A verb of the table
         // founds a city, spends a settler, or changes the faction of a unit,
         // and each of those moves the arena past the derived unit
@@ -180,7 +282,14 @@ impl World {
     /// without reading its arguments.
     ///
     /// The verbs that declare no argument position answer here alone.
-    fn verb_is_legal(&self, faction: FactionId, verb: Verb) -> bool {
+    ///
+    /// The campaign arm reads the objective of the whole frame, which is the
+    /// objective the verb took before the place position existed. **The
+    /// cohort refusal does not follow the objective**, beyond the objective
+    /// standing inside the world, and every settlement stands inside the
+    /// world. One cohort question therefore answers every place of the verb,
+    /// and the place arm below reads the cell alone.
+    fn verb_is_legal(&self, faction: FactionId, verb: Verb, context: &ActionContext) -> bool {
         match verb {
             // The no-op changes nothing, so nothing can refuse it.
             Verb::NoOp => true,
@@ -189,8 +298,8 @@ impl World {
             // the set below holds live units only.
             Verb::Gather | Verb::Build => !self.faction_units(faction).is_empty(),
             Verb::Relation => self.speaker_of(faction).is_some(),
-            Verb::Campaign => self
-                .observed_campaign_objective(faction)
+            Verb::Campaign => context
+                .campaign_objective(PLACE_ANYWHERE)
                 .and_then(|tile| self.grid.address_of(tile))
                 .is_some_and(|address| {
                     self.campaign_cohort(faction, address, self.campaigns.cohort_size())
@@ -210,7 +319,21 @@ impl World {
     ///
     /// A verb with no argument position answers yes here, because the check
     /// above already read its whole refusal.
-    fn arguments_are_legal(&self, faction: FactionId, verb: Verb, arguments: &[u32]) -> bool {
+    ///
+    /// The campaign arm asks whether the faction observes a settlement it
+    /// could march on in the named cell of the egocentric frame.[^1] It reads
+    /// the same list the verb reads, so the two cannot disagree.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decision D3. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+    fn arguments_are_legal(
+        &self,
+        faction: FactionId,
+        verb: Verb,
+        arguments: &[u32],
+        context: &ActionContext,
+    ) -> bool {
         let first = arguments.first().copied().unwrap_or(u32::MAX);
         match verb {
             Verb::Gather => u8::try_from(first)
@@ -240,8 +363,8 @@ impl World {
                 .ok()
                 .and_then(UnitTypeId::from_u8)
                 .is_some(),
+            Verb::Campaign => context.campaign_objective(first).is_some(),
             Verb::NoOp
-            | Verb::Campaign
             | Verb::Advertise
             | Verb::Trade
             | Verb::Carry
@@ -257,10 +380,22 @@ impl World {
     /// through, so a learner reaches no store the controller cannot
     /// reach.[^1]
     ///
+    /// **A place the verb cannot honour is a refusal.** The campaign arm
+    /// reads the objective of the named cell alone. It finds none, changes
+    /// nothing, and reports that it did not act. The caller above writes the
+    /// log row for the refusal, and no arm falls back to another cell.[^2]
+    ///
     /// # References
     ///
     /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-    fn apply_verb(&mut self, faction: FactionId, verb: Verb, arguments: &[u32]) -> bool {
+    /// [^2]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decision D6. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+    fn apply_verb(
+        &mut self,
+        faction: FactionId,
+        verb: Verb,
+        arguments: &[u32],
+        context: &ActionContext,
+    ) -> bool {
         let first = arguments.first().copied().unwrap_or(0);
         match verb {
             Verb::NoOp => true,
@@ -289,8 +424,8 @@ impl World {
             }
             Verb::Campaign => {
                 let cohort = self.campaigns.cohort_size();
-                let Some(address) = self
-                    .observed_campaign_objective(faction)
+                let Some(address) = context
+                    .campaign_objective(first)
                     .and_then(|tile| self.grid.address_of(tile))
                 else {
                     return false;
@@ -351,54 +486,63 @@ impl World {
         })
     }
 
-    /// Returns the objective that one faction would march on, over the
-    /// settlements it has observed.
+    /// Returns the campaign objective of one faction for every place value,
+    /// in ascending place order.
+    ///
+    /// **This is the one statement of the campaign objective rule.** The
+    /// legality answer reads this list and the verb reads the same list, so
+    /// the two cannot disagree about which settlement a cell holds.[^1]
+    ///
+    /// The first entry holds the objective the engine resolves over the whole
+    /// frame, which is the objective the verb took before the place position
+    /// existed.[^2] The entry of a place above it holds the objective the
+    /// engine resolves over one cell of the egocentric frame alone.
+    ///
+    /// **The cell of a settlement comes from the frame the observation
+    /// reads.** The centre, the ring rule and the sector rule have one
+    /// statement in the engine, so a cell index names the same ground in the
+    /// array a policy reads and in the integer that policy emits.[^2] [^3]
     ///
     /// **This reads the tiles the faction has seen, and never the world.**
     /// The controller reads the whole world for its own factions, and a
     /// learner may not, because a legality byte that answered from the whole
     /// world would tell the learner that a settlement stands somewhere it
-    /// has never looked.[^1]
+    /// has never looked.[^4]
     ///
-    /// The rule is the controller's own: a relief comes before a take, and
-    /// the nearest site wins with a tie to the lowest slot.
+    /// The rule inside a cell is the controller's own: a relief comes before
+    /// a take, and the nearest site wins with a tie to the lowest slot. The
+    /// distance runs from the seat of the faction, as it does for the
+    /// controller, and never from the centre of the frame.
     ///
     /// # References
     ///
-    /// [^1]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
-    fn observed_campaign_objective(&self, faction: FactionId) -> Option<TileIdx> {
+    /// [^1]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decision D3. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+    /// [^2]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decisions D1 and D2. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+    /// [^3]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^4]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
+    fn observed_campaign_objectives(&self, faction: FactionId) -> Vec<Option<TileIdx>> {
+        let none = || vec![None; PLACE_COUNT as usize];
         let count = self.config.faction_count.max(1);
-        let seat = self.grid.address_of(self.seat(faction)?)?;
+        let Some(seat) = self
+            .seat(faction)
+            .and_then(|tile| self.grid.address_of(tile))
+        else {
+            return none();
+        };
         if self.campaigns.live(faction).is_some() {
-            return None;
+            return none();
         }
         let at_war =
             |other: FactionId| other != faction && self.relations.war_between(faction, other);
         if !(0..count).any(|other| at_war(FactionId(other))) {
-            return None;
+            return none();
         }
+        let centre = self.frame_centre(faction);
         let observed = |tile: TileIdx| {
             self.grid
                 .address_of(tile)
                 .and_then(|address| self.grid.index_of(address))
                 .is_some_and(|index| self.observation.has_seen(faction, index))
-        };
-        let sites: Vec<(u32, FactionId, TileIdx)> = self
-            .settlements
-            .iter()
-            .filter_map(|site| {
-                Some((
-                    self.settlements.slot_of(site)?,
-                    self.settlements.faction(site)?,
-                    self.settlements.tile(site)?,
-                ))
-            })
-            .filter(|(_, _, tile)| observed(*tile))
-            .collect();
-        let distance = |tile: TileIdx| {
-            self.grid
-                .address_of(tile)
-                .map_or(u32::MAX, |address| seat.distance(address))
         };
         let holder_at_war = |tile: TileIdx| {
             self.grid
@@ -407,21 +551,49 @@ impl World {
                 .and_then(Holder::faction)
                 .is_some_and(at_war)
         };
-        let relief = campaign::nearest_site(
-            sites
-                .iter()
-                .filter(|(_, owner, tile)| *owner == faction && holder_at_war(*tile))
-                .map(|(slot, _, tile)| (distance(*tile), *slot, *tile)),
-        );
-        if relief.is_some() {
-            return relief;
+        let mut candidates: Vec<CampaignCandidate> = Vec::new();
+        for site in self.settlements.iter() {
+            let (Some(slot), Some(owner), Some(tile)) = (
+                self.settlements.slot_of(site),
+                self.settlements.faction(site),
+                self.settlements.tile(site),
+            ) else {
+                continue;
+            };
+            let Some(address) = self.grid.address_of(tile) else {
+                continue;
+            };
+            if !observed(tile) {
+                continue;
+            }
+            let relief = owner == faction && holder_at_war(tile);
+            if !relief && !at_war(owner) {
+                continue;
+            }
+            let delta = Axial::new(address.q - centre.q, address.r - centre.r);
+            candidates.push(CampaignCandidate {
+                cell: cell_of_delta(delta),
+                distance: seat.distance(address),
+                slot,
+                tile,
+                relief: u8::from(relief),
+            });
         }
-        campaign::nearest_site(
-            sites
-                .iter()
-                .filter(|(_, owner, _)| at_war(*owner))
-                .map(|(slot, _, tile)| (distance(*tile), *slot, *tile)),
-        )
+        let mut by_cell: Vec<Vec<&CampaignCandidate>> = vec![Vec::new(); RING_STACK_CELLS as usize];
+        for candidate in &candidates {
+            if let Some(bucket) = by_cell.get_mut(candidate.cell as usize) {
+                bucket.push(candidate);
+            }
+        }
+        let whole_frame: Vec<&CampaignCandidate> = candidates.iter().collect();
+        (0..PLACE_COUNT)
+            .map(|place| match place_cell(place) {
+                None => nearest_objective(&whole_frame),
+                Some(cell) => by_cell
+                    .get(cell as usize)
+                    .and_then(|bucket| nearest_objective(bucket)),
+            })
+            .collect()
     }
 
     /// Returns the tile one faction would send its water-crossing units at,
@@ -470,6 +642,22 @@ impl World {
         standing
             .iter()
             .any(|(unit, category)| self.build_refusal(*unit, *category).is_ok())
+    }
+
+    /// Builds what the per-row legality questions of one faction share.
+    ///
+    /// The build resolves the campaign objective of every place in one pass,
+    /// so the rows of that verb cost one pass and not one pass each. The
+    /// caller of one action builds the same context, so the answer and the
+    /// verb read one list.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decision D3. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+    fn action_context(&self, faction: FactionId) -> ActionContext {
+        ActionContext {
+            campaign_objectives: self.observed_campaign_objectives(faction),
+        }
     }
 
     /// Reports whether one faction would found a city or walk a settler this

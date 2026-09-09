@@ -345,7 +345,17 @@ impl World {
     /// A faction that holds no tile takes the centroid of its units instead,
     /// and that walk costs its unit count. A faction that holds neither takes
     /// the centre of the world, which costs nothing.
-    fn frame_centre(&self, faction: FactionId) -> Axial {
+    ///
+    /// **The action table reads this centre too.** A place argument of a verb
+    /// carries a cell of this frame, so a cell index names the same ground in
+    /// the array a policy reads and in the integer that policy emits. One
+    /// function states the centre, and both callers read it.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0197, a verb names a place by a cell of the egocentric frame the observation publishes, decision D1. `docs/adrs/draft/adr-0197-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    pub(crate) fn frame_centre(&self, faction: FactionId) -> Axial {
         let grid = self.grid();
         let mut sum_q = 0i64;
         let mut sum_r = 0i64;
