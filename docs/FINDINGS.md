@@ -25,6 +25,7 @@ precedent.[^1]
 **Next number: FND-703**
 **Next number: FND-703**
 **Next number: FND-695**
+**Next number: FND-696**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18197,6 +18198,58 @@ the term. This row records the arithmetic and the reasoning, and it does not
 claim a behaviour change.
 
 ### FND-700 — Every shaped weight of the strategy table telescoped, so eight strategies trained against a terminal reward
+
+**Believed.** The eight rows of the strategy table held dense rewards. Each row
+named a field and a weight, one row weighed the ground and another weighed the
+people, and the run compared what those rewards taught. One finding had already
+stated that a change term telescopes under an undiscounted episode return, and
+the project read that as a statement about one timing term.[^F700A]
+
+**True.** It was a statement about every shaped weight the reward module held.
+The module offered one shaped form, and that form was the change of a field
+since the previous decision. An evolution strategy sums the reward of every
+decision of the episode with no discount, so the shaped part of every row
+collapsed to the weight times the change of the field from the first reading to
+the last. **All eight rows therefore trained against a terminal reward.** No
+weight of any row could make the signal dense, because density was not a
+property the weights could reach.
+
+**Evidence.** A run of the ground row over a seeded world paid a shaped total of
+11951.0 for the episode. The published tile field read 0 at the first decision
+and 11951 at the last. The two numbers are equal because the sum of the changes
+is the change of the endpoints. The people row paid 15579.0 on its population
+weight, which is three times the endpoint change of 5193. A run of 40 decisions
+paid a reward on one decision and nothing on the other 39, because the field
+moved once, when the seeding seated the faction, and held after that.
+
+**The endpoints alone also score two runs of one seed the same.** One seed
+played for 40 decisions and for 150 decisions reached the same published tile
+value, and the change form scored both at 9384.0. A level form scored them at
+5.728 and at 21.478.
+
+**Follows.** The reward now takes a level weight beside its change weight. A
+level weight is paid on every decision, so the episode pays the area under the
+curve of the field, and a policy that reaches a level sooner scores more. A
+level divides the published value by the unit the engine published for the
+field, so it states no bound of its own and every level weight carries one unit.
+
+Every row of the strategy table now states level weights. **Every stored score
+of every strategy is therefore incomparable with a score measured after this
+change.**[^F700B]
+
+**One weight was wrong by five orders of magnitude, for the same reason.** The
+wealth row scaled its store weight by one part in a hundred thousand, and a
+comment said that the store total crosses as a raw Q16.16 integer. It does not.
+The engine compresses every count before it publishes one, so the store total
+and the tile count cross in the same range. The store term paid 0.4 over an
+episode against 5975.5 for the ground term of the same row, so the wealth
+strategy was a ground strategy under another name.
+
+**A check now fails when a row telescopes.** A weighting reports whether its
+shaped weights are all change weights, and one test reads that for every row.
+Nothing failed before, because a change weight is a legal weight and reads as
+dense.[^F700C]
+
 ### FND-697 — The settle target and the settle verb kept two lists of the places taken
 
 **Believed.** The choice of where a faction sends its settlers applied the
@@ -18539,3 +18592,42 @@ they count and when they agree.
 
 [^F695A]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
 [^F695B]: Blockers register, BLK-159. `docs/BLOCKERS.md`
+
+### FND-699 — A field added between the pass and its marker made every working line invisible, and the watch screen reported an idle machine
+
+**Believed.** The watch screen was taken to say what a training run is doing.
+It reads the heartbeat each scoring process prints, and it holds a pattern for
+that line. The pattern named the pass, then the word `working`, then the
+fields.
+
+**True.** The trainer started splitting a generation over several processes,
+and it now prints the shard between the pass and the marker. The pattern
+matched no heartbeat after that. The screen then reported zero ticks a second
+across zero working processes, named the phase "between passes", and said
+"ended generation 0, nothing started since" for every strategy. The machine
+was at about 13700 ticks a second across eight busy processes, each about
+seven tenths of the way through generation 1.
+
+Two more readings were wrong at the same moment. A validation pass named no
+phase, so a run inside one read as a run between passes. The heartbeat clock
+divided by the count of strategies, so a strategy of two shards read as twice
+as talkative as a strategy of one, and one round of silence read as more than
+two.
+
+**Evidence.** A real log of the run held 238 heartbeats for generation 1 and
+no result for it. The screen of that log, rendered before the change, said
+"0 ticks/s across 0 working processes". The same log after the change says
+"13729 ticks/s across 8 working shards of 4 strategies", and each strategy
+reads "generation 1 68% of 1024 worlds 2/2 shards". A fixture holds those real
+lines, and reverting the shard field turns four tests red.
+
+**What follows.** Read the marker, never the fields. A finished pass and a
+pass in flight open with the same words, so the only stable difference is the
+marker, and both readers of the log now test it first. A line that carries the
+marker and that no pattern can read raises a count that the screen prints, so
+the next field the trainer adds is visible rather than silent.
+
+The derived figures were already right. The count of finished generations, the
+spend for each generation and the estimate of the time left read the same
+before and after on the real log, because a substring test had kept the
+heartbeats out of them. That test is now the explicit marker.

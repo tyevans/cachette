@@ -318,7 +318,7 @@ def test_the_dashboard_renders_the_progress_line(
     reading = watch.read(line.replace("test baseline", "conquer baseline"))
     assert "conquer" in reading.strategies
     rendered = watch.render(reading, watch.Facts(heading="a run", generations=60))
-    assert "baseline d" in rendered
+    assert "baseline 0% of " in rendered
     assert "no word yet" not in rendered
 
 
@@ -331,7 +331,7 @@ def test_a_waiter_that_gives_up_and_works_stops_reading_as_idle() -> None:
         "rate 91.1 t/s [31s]\n"
     )
     rendered = watch.render(watch.read(log), watch.Facts(heading="a run"))
-    assert "baseline d12" in rendered
+    assert "baseline 50% of 16 worlds 91t/s d12 [31s]" in rendered
     assert "waiting on another process" not in rendered
 
 

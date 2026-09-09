@@ -54,6 +54,18 @@ BASELINE_DONE = (LOGS / "watch-baseline-done.log").read_text(encoding="utf-8")
 # second. The fourth said 9999 once and then stopped speaking.
 MIXED = (LOGS / "watch-mixed.log").read_text(encoding="utf-8")
 
+# A real sharded run, read at the moment the screen failed on it. Four
+# strategies score generation 1 in two processes each, and the trainer prints
+# one heartbeat for each shard. The log also holds the shared controller
+# baseline, which names no strategy, and generation rows that carry the
+# `abs-spread` field between the spread and the win share.
+IN_FLIGHT = (LOGS / "sharded-in-flight.log").read_text(encoding="utf-8")
+
+# The same real log, read at the moment every strategy was inside generation
+# 1 and none had reached the validation seeds. This is the moment the screen
+# reported an idle machine, so it is the moment the tests read.
+MID_GENERATION = "\n".join(IN_FLIGHT.splitlines()[:88]) + "\n"
+
 ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 
@@ -90,7 +102,7 @@ def test_a_finished_baseline_pass_is_not_a_live_process() -> None:
     reading = watch.read(BASELINE_DONE)
     assert sorted(reading.strategies) == ["alpha", "beta", "delta", "gamma"]
     rendered = screen(BASELINE_DONE)
-    assert "0 ticks/s across 0 working processes" in rendered
+    assert "0 ticks/s across 0 working shards of 0 strategies" in rendered
     assert "5152" not in rendered
     assert "4 working" not in rendered
     for name in ("alpha", "beta", "gamma", "delta"):
@@ -107,7 +119,7 @@ def test_a_strategy_that_stopped_speaking_leaves_the_machine_rate() -> None:
     marked as the last thing it said, and never reaches the machine rate.
     """
     rendered = screen(MIXED)
-    assert "6000 ticks/s across 3 working processes" in rendered
+    assert "6000 ticks/s across 3 working shards of 3 strategies" in rendered
     assert "15999" not in rendered
     quiet_row = next(row for row in rendered.splitlines() if row.startswith("  delta"))
     assert "QUIET, last said" in quiet_row
@@ -133,7 +145,7 @@ def test_a_quiet_log_makes_every_strategy_quiet() -> None:
     needs no clock here.
     """
     rendered = screen(MIXED, log_quiet=600.0)
-    assert "0 ticks/s across 0 working processes" in rendered
+    assert "0 ticks/s across 0 working shards of 0 strategies" in rendered
     assert "the run last wrote 600s ago" in rendered
 
 
@@ -351,3 +363,167 @@ def test_a_trainer_that_gains_a_column_still_parses() -> None:
     reading = watch.read(text)
     assert len(reading.strategies["alpha"].done) == 2
     assert reading.strategies["alpha"].done[-1].won == pytest.approx(0.30)
+
+
+def test_a_sharded_generation_in_flight_is_shown_with_its_progress() -> None:
+    """A generation that runs must not read as a strategy that stopped.
+
+    This is the defect exactly. The trainer gained a shard field between the
+    generation and the marker, so no heartbeat matched. Four strategies were
+    each about seven tenths of the way through generation 1 on eight busy
+    processes, and the screen said "0 ticks/s across 0 working processes"
+    and "ended generation 0, nothing started since" for every one of them.
+    """
+    rendered = screen(MID_GENERATION, log_quiet=4.0)
+    assert "0 ticks/s" not in rendered
+    assert "13729 ticks/s across 8 working shards of 4 strategies" in rendered
+    assert "ended generation 0" not in rendered
+    assert rendered.count("2/2 shards") == 4
+    assert "training generation 1" in rendered
+    for name in ("aggressive", "defensive_expansionist", "trade_led", "wonder_rush"):
+        assert name in rendered
+    assert "generation 1 68% of 1024 worlds 2/2 shards 3478t/s d463 [401s]" in rendered
+
+
+def test_the_shards_of_one_pass_combine_into_one_reading() -> None:
+    """Two shards of one generation are one pass, not two.
+
+    The shards hold disjoint parts of the population, so the worlds add. The
+    shards run at the same time on different cores, so the rates add. The
+    pass ends with its slowest shard, so the elapsed time is the longest.
+    """
+    reading = watch.read(MID_GENERATION)
+    work = reading.strategies["aggressive"].last_working
+    assert work is not None
+    assert work.what == "generation 1"
+    assert work.heard == 2
+    assert work.expected == 2
+    assert work.worlds == 1024
+    assert work.live == 163 + 167
+    assert work.rate == pytest.approx(1759.6 + 1718.7)
+    assert work.decisions == 234 + 229
+    assert work.seconds == pytest.approx(401.0)
+    assert work.share == pytest.approx((1024 - 330) / 1024)
+
+
+def test_a_pass_in_flight_never_becomes_a_finished_generation() -> None:
+    """A heartbeat carries no result, so it must not reach a derived figure.
+
+    The pattern for a finished generation matches a heartbeat as well. The
+    marker is what tells them apart, and the count of finished generations
+    is the figure that every estimate of cost and time divides by.
+    """
+    reading = watch.read(MID_GENERATION)
+    assert sum(len(s.done) for s in reading.strategies.values()) == 4
+    for strategy in reading.strategies.values():
+        for row in strategy.done:
+            assert row.generation == 0
+    assert progress_module.parse(MID_GENERATION).generations_done == 4
+
+
+def test_a_heartbeat_of_an_unnamed_pass_is_reported_and_not_parsed() -> None:
+    """A pass this screen cannot name must raise a count, not vanish.
+
+    The trainer names its own passes, and it has added one before. A screen
+    that silently dropped the line would report an idle run on a full
+    machine, which is the failure this whole screen exists to prevent.
+    """
+    invented = (
+        MID_GENERATION + "  aggressive rollout  7 working  decisions   12 live  40/64  "
+        "ticks     900 rate   30.0 t/s [11s]\n"
+    )
+    reading = watch.read(invented)
+    assert reading.unread == 1
+    assert sum(len(s.done) for s in reading.strategies.values()) == 4
+    rendered = screen(invented, log_quiet=4.0)
+    assert "1 lines say a pass is working and this screen cannot read them" in rendered
+
+
+def test_the_shared_controller_baseline_is_shown_and_then_dropped() -> None:
+    """One process measures the baseline for every strategy and names none.
+
+    A run spent minutes in this pass while the screen said the trainer had
+    said nothing. The pass has a terminal line, and after it the frozen
+    heartbeat must stop counting as work.
+    """
+    early = "\n".join(IN_FLIGHT.splitlines()[:20]) + "\n"
+    rendered = screen(early, log_quiet=2.0)
+    assert "shared    baseline 53% of 256 worlds 4317t/s d162 [60s]" in rendered
+    assert "which one process measures for every strategy" in rendered
+
+    alone = "\n".join(IN_FLIGHT.splitlines()[:3]) + "\n"
+    assert "measuring the shared controller baseline" in screen(alone, log_quiet=2.0)
+
+    assert watch.read(IN_FLIGHT).shared is None
+    assert "shared    " not in screen(IN_FLIGHT, log_quiet=4.0)
+
+
+def test_a_sharded_strategy_is_not_called_quiet_while_it_works() -> None:
+    """The heartbeat clock counts shards, so shards must not read as silence.
+
+    Each strategy prints one line for each shard every round. A clock that
+    divided by the strategy count read one round of a two-shard run as more
+    than two rounds of silence, and called every healthy strategy quiet.
+    """
+    reading = watch.read(MID_GENERATION)
+    for strategy in reading.strategies.values():
+        assert watch.rounds_behind(reading, strategy) < watch.QUIET_ROUNDS
+    assert "QUIET" not in screen(MID_GENERATION, log_quiet=4.0)
+    assert screen(MID_GENERATION, log_quiet=600.0).count("QUIET") == 4
+
+
+def test_the_two_readers_agree_about_which_lines_are_in_flight() -> None:
+    """Both readers hold the marker, so a check must fail when they differ.
+
+    The progress feed and the watch screen each parse the log. One value in
+    two places needs a check that fails when the copies disagree.
+    """
+    for line in IN_FLIGHT.splitlines():
+        assert watch.in_flight(line) == progress_module.in_flight(line), line
+    flights = {
+        strategy.name: strategy.flight
+        for strategy in progress_module.parse(IN_FLIGHT).strategies
+    }
+    for name, strategy in watch.read(IN_FLIGHT).strategies.items():
+        work = strategy.last_working
+        flight = flights[name]
+        if work is None:
+            assert flight is None
+            continue
+        assert flight is not None
+        assert (flight.what, flight.worlds, flight.live) == (
+            work.what,
+            work.worlds,
+            work.live,
+        )
+
+
+def test_one_round_of_silence_from_a_sharded_strategy_is_not_a_stall() -> None:
+    """The heartbeat clock counts shards, so a shard must not read as silence.
+
+    This composes real heartbeat lines into three rounds, and one strategy
+    misses the last two of them. A clock that divided by the strategy count
+    read those two rounds as four, called the strategy quiet, and dropped its
+    rate from the machine total. The clock that counts shards reads them as
+    one. No real log of the run reached this case, so the rounds here are
+    built from real lines rather than found.
+    """
+    beats = [
+        line
+        for line in MID_GENERATION.splitlines()
+        if " generation  1 shard " in line and " working " in line
+    ][-8:]
+    assert len(beats) == 8
+    silent = [line for line in beats if not line.startswith("  trade_led ")]
+    assert len(silent) == 6
+    composed = MID_GENERATION + "\n".join(beats + silent + silent) + "\n"
+
+    reading = watch.read(composed)
+    behind = {
+        name: watch.rounds_behind(reading, strategy)
+        for name, strategy in reading.strategies.items()
+    }
+    assert behind["trade_led"] == 1
+    assert max(behind.values()) < watch.QUIET_ROUNDS
+    assert "QUIET" not in screen(composed, log_quiet=4.0)
+    assert "4 of 4 strategies working" in screen(composed, log_quiet=4.0)
