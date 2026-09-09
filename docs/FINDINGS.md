@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-683**
+**Next number: FND-685**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -31,404 +31,6 @@ collisions in one session came from the gap between the two, and a finding holds
 the case.[^ALLOC2]
 
 ## A. Corrections to stated rules
-
-### FND-450 — A field over the level 1 cell lattice was believed to smear whatever it carried
-
-**Believed.** A quantity carried at level 1 granularity smears, because a cell
-covers a block of tiles and the block is large. A measurement of a fight at
-that granularity found the smear and the record refuses the granularity by
-name.[^F450A] [^F450B]
-
-**True.** The smear is a property of the thing carried, not of the lattice. A
-fight is an event between two units standing on one tile, so a cell is coarser
-than the thing being resolved and the answer spreads over a thousand tiles that
-were not in the fight. A weather field varies slowly over distance, so a cell
-samples it. Two units in one cell genuinely stand in the same weather.
-
-**Evidence.** The engine already carries a field at this pitch and nobody calls
-it smeared. The influence field is a plane over the same lattice, and a unit
-reads the cell it stands in.[^F450C] The difference between the two cases is
-whether the carried thing varies inside a block.
-
-**Follows.** Ask what varies inside a block before choosing a granularity. Do
-not read the combat answer as a rule about level 1. The weather record states
-the argument rather than citing the combat record for it.[^F450D]
-
-### FND-451 — A relaxation kernel taken from the influence solve would have lost water that nothing accounted for
-
-**Believed.** The weather spread could reuse the influence relaxation. Both are
-fields over the level 1 cell lattice, both read the six neighbours, and reusing
-the kernel would avoid a second machine for one shape.
-
-**True.** The influence kernel is not conservative. Its weights sum to less
-than the range, and the difference is what a cell loses on every pass, so an
-unforced field falls to nothing.[^F451A] That is correct for a reach. For a
-quantity it means water disappears and no reader can say where it went, and the
-product record asks that what leaves one place arrive at another exactly, with
-no loss to rounding and no gain.[^F451B]
-
-**Evidence.** The weather field now runs a transfer kernel instead. A cell
-hands each neighbour a truncated integer share and the receiver adds the same
-integer, so the pass conserves exactly. The world invariant check reads a
-running account and fails when the totals disagree, and the account balances at
-every frame of a forty-eight frame run.
-
-**Follows.** A field is not one thing. A reach and a quantity need different
-kernels, and the shared part is the lattice and the neighbour walk. Ask whether
-the carried thing has to balance before reusing a solver.
-
-### FND-452 — Conservation and decay looked like a contradiction, and the resource account already held the answer
-
-**Believed.** A weather condition cannot both conserve exactly and end on its
-own. A storm that conserves stays for ever, and a storm that decays loses
-quantity that nothing accounts for.
-
-**True.** The two hold together when the thing that leaves is counted. Water
-leaves the air onto the ground, and it leaves the ground into a running total.
-The sum of the air, the ground and that total is invariant, and a storm still
-ends.
-
-**Evidence.** The project had already solved this shape for a resource. A unit
-that dies takes its load out of the world, and the world records where the load
-went rather than letting it disappear.[^F452A] The weather account is the same
-pattern with a different name.
-
-**Follows.** When a rule seems to force a choice between conservation and
-change, add the account rather than dropping the conservation. Look for a
-running total that already exists for the same shape.
-
-### FND-453 — A world of one level 1 cell made a gate test pass for the wrong reason
-
-**Believed.** A twenty-four by twenty-four world is a good small fixture for a
-verb that gates on the ground of a level 1 cell. It is cheap to step and it
-holds no open water, which is what the effect test needed.
-
-**True.** The block edge is thirty-two tiles, so a world that narrow is one
-level 1 cell. Every address in it names the same cell, so a gate that refuses a
-place outside the faction's ground can never refuse anything, and a test of the
-refusal passes only because the second faction holds nothing at all.
-
-**Evidence.** The test that names one held place and one unheld place in the
-same call did not refuse. It succeeded, because both places named one cell. The
-fixture moved to a sixty-four by sixty-four world, which holds four cells and
-still holds no open water, and the test then refused as it should.
-
-**Follows.** A fixture for a rule that works at level 1 must be wider than the
-block edge, or it measures nothing. State the property in the fixture and
-assert it, so that a change to the block edge fails the fixture rather than the
-assertion.
-
-### FND-454 — A test matched the singular form of a message, and a change that made the plural true read as no event at all
-
-**Believed.** The demonstration prints one line when a unit is promoted, and a
-test that searches the output for that line proves a promotion happened before
-the picture was drawn.
-
-**True.** The line reads one way for one promotion and another way for more
-than one. The test searched for the singular form only. A change that made
-three units promote in one frame therefore produced a promotion and read as no
-promotion at all.
-
-**Evidence.** Adding weather changed what units gather, which changed what they
-earn, which moved the first promotion from one unit at a later tick to three
-units at an earlier one. The output held the line and the test failed. The test
-now matches the part of the message that both forms share.
-
-**Follows.** Do not assert on a rendered sentence that varies with a count. If
-a test must read printed output, match the invariant part of the message, or
-read the number the message was built from.
-
-### FND-327 — The demonstration drew and stepped at one rate, and a record said so as if it were a property of the viewer
-
-**Believed.** The viewer runs after the step, on the stepping thread, so the
-drawing rate and the tick rate are one number.[^F218B] The Python
-demonstration says the same in its own docstring.
-
-**True.** The first half is a property of the viewer and it still holds. Every
-draw follows the steps of that frame, on one thread. The second half described
-the loop that existed when the record was written. It is not a property of the
-viewer, because the caller owns the loop and decides how many steps a frame
-runs.[^F327B]
-
-**Evidence.** The demonstration now steps the engine as many times each frame
-as a clock says, and it draws once. A paused world runs no step and still
-draws, so the camera moves and the panel reads while the tick stands still.
-
-**Follows.** A watcher can stop the world, run it at four speeds, and ask for
-exactly one tick. That last one matters because the engine keeps its logs for
-one tick, so a promotion or a rationing was readable for one thirtieth of a
-second and no longer.
-
-**The record is not edited here.** ADR-0067 is accepted, and the sentence sits
-in prose that describes the viewer correctly. A worker who supersedes it should
-say that the caller owns the number of steps in a frame.
-
-### FND-306 — A check that prints its failure while the commit lands looks exactly like a check that never ran
-
-**The symptom is the finding.** A commit landed on the trunk holding conflict
-markers. The marker check had run in the same command, and its failure text had
-scrolled past on the way. That is what a working check looks like when
-something discards its answer, and it is also what a check looks like when it
-does not run. Nothing in the output distinguishes the two.
-
-**Believed, twice, and wrong both times.** The first explanation was that the
-check reports a failure and exits zero. The second was that the check skips a
-worktree's own files when it runs from inside that worktree, because a worktree
-path is in its skip list. Two readers reached for "the check is broken" before
-"my shell discarded its answer", because the symptom points that way.
-
-**Both are false, and the check is sound.** A probe put a real marker in a file
-inside a worktree and ran the check from inside that worktree. It named the
-file, named all three lines, and exited 1. The skip list holds the path of a
-worktree nested inside the tree being scanned, not the tree itself, because the
-root is derived from the location of the script. The skip is also gated on the
-scan being the root.
-
-**The cause is the shell that called it.** The check ran on the left of a pipe,
-inside a chain that continues on success. A pipeline exits with the status of
-its last command, so the status belonged to the command reading the output and
-not to the check. The chain continued and the commit landed.
-
-The failure text is written to the error stream, so it printed past the reader
-and was visible the whole time. It was read as noise from the merge that ran in
-the same chain.
-
-**How to take the measurement again.** An example prices every stage on a
-world of a given extent, group and thread count, and prints the state hash
-beside the split so a sweep is also a determinism check.[^F300B]
-**Evidence.** The same check, on the same file, two ways:
-
-```
-python3 scripts/check_conflict_markers.py | tail -2 && echo REACHED
-  ... 3 failures
-  REACHED
-python3 scripts/check_conflict_markers.py > /dev/null && echo REACHED
-  ... 3 failures
-  (nothing)
-```
-
-**The defect appeared inside the attempt to verify it.** The second reader ran
-the probe piped through a reader of its output, saw exit zero, and concluded
-the check was blind. Unpiped, the same tree gives exit 1. So a status was
-masked by a pipeline during the checking of a claim about a status masked by a
-pipeline.
-
-**Follows.** Four things.
-
-**Read the symptom as ambiguous, not as evidence.** Failure text with a
-successful outcome has three possible causes: the check did not run, the check
-ran and cannot see, or the check ran and something threw away its verdict. The
-output is identical in all three. Anyone who names one of them without a probe
-is guessing, and two readers guessed wrong in one night.
-
-**Never put a gate on the left of a pipe.** Redirect its output if the output
-is long. A gate exists to stop the next command, and a pipe takes that away
-without saying so.
-
-**A failure that prints and does not stop looks exactly like a check that does
-not run.** That is why the first two explanations both blamed the check. The
-symptom carries no information about which of the three causes produced it, so
-the next person to see it will guess as well unless they probe.
-
-**Probe the check before you blame it.** Both wrong explanations were reasoned
-from reading the source. The right one took one command and a temporary file.
-Putting the defect back is the rule for a test, and it is the rule for a check
-that is under suspicion.[^13]
-
-### FND-305 — The stage apparatus flags a stage that gains from threads it does not take, and not one that loses by taking them
-
-**Believed.** The stage table finds a wrong `takes_threads` declaration. The
-benchmark states the rule in its own documentation: a stage declared `false`
-that improves with the thread count means the declaration is wrong. The table
-prints the declaration beside the measurement in every row so that a reader can
-compare them.
-
-**True in one direction only.** The rule names one case and there are two. A
-stage declared `false` that improves is caught. A stage declared `true` that
-gets worse is the same class of error, it costs more, and nothing looks for it.
-The declaration and the measurement disagree in both cases.
-
-**Evidence.** The influence solve is declared as taking a thread count. On a
-256 by 256 world it is 5.9 times slower at twelve threads than at one, and it
-is still 7.6 times slower at twelve threads on a world of 1,048,576 tiles. The
-register holds the sweeps.[^F305A]
-
-**The instrument was built the same night, to find this class of error, and it
-stayed silent.** The table printed the declaration and the cost of the stage in
-adjacent columns, at one thread and at twelve, and reported no note. A reader
-who ran it saw the rows and read nothing wrong in them, because the
-documentation told them which direction to look.
-
-**Follows.** Three things.
-
-**A rule that names one direction of a symmetric test teaches the reader to
-look one way.** The cost of the omission is not that the check missed
-something. It is that a person holding the output missed it too.
-
-**The declaration is a value with two declaration sites and no check.** The
-source states `takes_threads` and the measurement states what threading did.
-Nothing fails when the two disagree, which is the first recurring defect
-shape.[^13]
-
-**The repair is a rule, not a constant.** A speedup far from one in either
-direction is the signal. A stage that declares it threads and measures slower
-threaded fails the same comparison as one that declares it does not and
-measures faster.
-
-### FND-300 — The influence solve gets slower as the thread count rises, on a small world
-
-**Believed.** A stage that takes a thread count runs faster with more threads.
-The stage register declares `influence_solve` as taking one, and the target
-scale measurement agrees: it is 12.68 milliseconds and 5.25 percent of a 241
-millisecond frame at 16.7 million tiles and twelve threads.
-
-**True at the target extent, and the reverse on a small world.** On the
-demonstration world the solve costs more with every thread added. Measured on
-an x86-64 development machine, 256 by 256 tiles, 256 units, four factions, the
-mean of 120 frames after 30 warm-up frames:
-
-| Threads | The frame | `influence_solve` | Its share |
-|---|---|---|---|
-| 1 | 36.314 ms | 9.343 ms | 25.7 percent |
-| 2 | 30.229 ms | 11.465 ms | 37.9 percent |
-| 4 | 35.786 ms | 19.749 ms | 55.2 percent |
-| 8 | 55.716 ms | 37.313 ms | 67.0 percent |
-| 12 | 81.471 ms | 55.482 ms | 68.1 percent |
-
-The solve is 5.9 times slower at twelve threads than at one, and the frame is
-2.7 times slower at twelve than at two. **The solve also costs more in absolute
-terms on the small world than on the target one**, 55.5 milliseconds against
-12.7, on a world with 256 times fewer tiles.
-
-**How to take the measurement again.** An example prices every stage on a
-world of a given extent, group and thread count, and prints the state hash
-beside the split so a sweep is also a determinism check.[^F300B]
-
-**The cause is the shape of the parallel section, not the arithmetic in it.**
-One relaxation pass opens a thread scope for each faction, and a solve runs a
-fixed count of passes, so a frame opens the pass count multiplied by the
-faction count of them. At the target extent each spawned thread relaxes
-thousands of cells and the spawn is paid back. On the demonstration world each
-one gets a handful of cells and the spawn is the whole cost.
-
-**The guard that exists cannot catch it, by design.** The code holds a thread
-back only when the cell count is at or below the thread count, and it says why:
-the rule reads the two numbers the caller already supplied and holds no
-constant of its own. A world of this extent has far more cells than twelve, so
-the guard never fires and every scope spawns.
-
-**The solve does not cross over at any extent measured.** A second sweep took
-three extents at one thread and at twelve. The frame crosses over between
-65,536 and 262,144 tiles, where other stages start to carry the win. The solve
-itself is still 7.6 times slower with twelve threads than with one at 1,048,576
-tiles, so the extent at which threads pay this stage is above a million cells
-of world.
-
-**The determinism holds.** The state hash is identical at one thread and at
-twelve, at every extent measured, so this is a cost defect and not a
-correctness one.
-
-**The absolute figures are noisy and the direction is not.** The machine ran
-other builds throughout, and one point measured 81 ms in one sweep and 192 ms
-in another. Every point in both sweeps has the same sign.
-
-
-**The scope count is most of the cost and it is not the cause of the
-inversion.** A change that opens one thread scope for each pass instead of one
-for each faction in each pass was built and measured, and it was not taken. It
-removes twenty-four of the thirty-two scopes a frame opens. Measured on an
-x86-64 development machine, 256 by 256 tiles, four factions, the mean of 120
-frames after 30 warm-up frames:
-
-| Threads | Solve, one scope for each faction | Solve, one scope for each pass |
-|---|---|---|
-| 1 | 8.761 ms | 2.732 ms |
-| 4 | 47.167 ms | 6.055 ms |
-| 12 | 179.561 ms | 15.447 ms |
-
-**The spawn is about three quarters of the solve at every thread count, and
-the solve is still 5.7 times slower at twelve threads than at one after it is
-gone.** Removing the scopes does not move the sign. It follows that the spawn
-is a large fixed cost and that threading this stage loses on this world for a
-second reason as well.
-
-**The change was not taken, and the reason is a record and not a measurement.**
-The version measured above gives each faction a scratch plane of its own, so
-the write half of the solve grows with the faction count. An accepted record
-decides against exactly that and names its own reopening condition.[^F300C]
-The figures stay here as evidence about the cause. They are not a proposal.
-
-**The determinism holds across the change.** The state hash reads
-`9d81e94936b9f445` at one, four and twelve threads, before and after, on the
-same world and the same commit.
-
-**Follows.** Three things.
-
-**A stage declared as taking a thread count can still lose by taking one.** The
-stage apparatus states that a measured speedup far from one on a stage declared
-`false` means the declaration is wrong. It checks one direction. A negative
-speedup on a stage declared `true` is the same class of error and nothing looks
-for it.
-
-**A measurement taken only at the target extent cannot see this shape.** Every
-frame figure in this project was taken at the target extent, where the defect
-is invisible. The small end is a different regime and it had never been
-measured.
-
-**The demonstration is slow for this reason and for no other.** Both front ends
-ask for the smaller of the machine's parallelism and twelve. Asking for fewer
-would make the demonstration between two and three times faster today with no
-engine change, and that is the reason not to change the requested frame rate.
-The repair belongs in the solver, so that no caller has to know. An item holds
-it.[^F300A]
-
-### FND-293 — No golden scenario reached a promotion, and the files still moved
-
-**Believed.** A golden file that moves when a subsystem lands is evidence that
-the golden set covers the subsystem. The state hash is exact and
-order-sensitive, so a file that moved saw the change.
-
-**True that it moved, and false that it covered anything.** All eight golden
-files moved when the promotion work landed. **None of the eight promoted
-anybody.** The files moved because three new unit columns and two new schedules
-enter the state hash, which happens whatever the pass does. A change to the
-promotion rule itself would have moved nothing.
-
-**The evidence.** The gathering scenario is the only one that gathers, and
-gathering is what the promotion reads. A temporary assertion that it produced a
-character failed. A second probe printed the reason: the best unit in that
-scenario gathers 5 over the frames it runs, against a default threshold of 24.
-Every other scenario gathers nothing at all, so no unit in the golden set has
-ever had a deed to its name.
-
-**The repair was in the scenario, not in the engine.** The gathering scenario
-already states its own recovery periods, on the stated ground that a period is
-a parameter of the kind and the engine holds no test value. The threshold is
-the same kind of parameter, so the scenario now states it too, at a value this
-world reaches. Two mutations confirm the file now guards the behaviour: ranking
-the candidates by identity instead of by deeds moves the file, and promoting
-nobody trips the assertion.
-
-**Follows.** Three things.
-
-**A golden file that moved is not evidence that a golden file covers.** A
-change that widens the hashed state moves every file, and it looks exactly like
-a change that altered behaviour. The question to ask is not whether the file
-moved but whether the scenario reaches the pass, and the answer to that is an
-assertion in the fixture rather than a diff.
-
-**Assert the case in the scenario, in the same place the parameters are set.**
-The gathering scenario already carried two such assertions, for a stored take
-and for a recovery, each written after a fixture covered half a rule while
-looking complete. This is the third of the same kind, and the pattern is worth
-following rather than rediscovering.
-
-**The same gap is open for the positions and nothing has closed it.** Item 0279
-records that no golden scenario reaches the position pass. The promotion case
-was found and repaired in the same round; the position case still stands, and
-the two together say that a new pass should be assumed uncovered until a
-scenario asserts otherwise.
-
 
 ### FND-001 — A monoid needs EXACT associativity
 
@@ -523,99 +125,6 @@ an unproductive recipe table before release. Runtime insolvency is an explicit
 ledger comparison. One piece survives: comparing solved gross output against
 productive capacity gives **structural** insolvency, distinct from financial.
 
-### FND-085 — A rule that bans a measurement can leave a real cost unowned
-
-**Believed.** That every cost figure in this project belongs to the target
-platform, and that no measurement exists there, was a complete rule about
-cost. It reads as complete. It is stated as a general fact about figures, and
-two rules enforce it.
-
-**True.** The rule governs one quantity: how the engine performs at the target
-scale. A second quantity exists, and the rule is silent about it. How long a
-contributor waits for the gate suite is a property of the development loop,
-and the machine that runs it owns that. The silence read as a prohibition, so
-nothing owned the cost.
-
-**Evidence.** The golden state hash test grew as each subsystem entered the
-state hash, four in one session, until it dominated a debug run of the suite.
-No gate, no register and no budget noticed. The rule that would have caught an
-equivalent regression at the target does not apply to a development machine,
-and no other rule did.
-
-**Follows.** Two things.
-
-The project now keeps two registers with different standing. A figure from one
-is never evidence about the other. The separation is a file boundary rather
-than a note in a shared file, so a row cannot drift across it. The blocker
-about the target stays open, because it is about the target.
-
-**The general shape is the part worth keeping.** A rule that correctly refuses
-a class of figure can leave a legitimate quantity with no owner. When the
-project bans a measurement, ask what the ban also silences.
-
-
-### FND-675 — The economy period was believed to cancel over a span, and the holding term ended that
-
-**Believed.** The stored rate is what one tick earns and the engine multiplies
-it by the period to get one application, so two worlds on different periods
-reach the same total over a whole number of periods and differ only part way
-through one. The accepted record that attaches a rate to a site states this as
-a consequence, and one Python test asserted the equality.[^F675A]
-
-**True.** The first half holds and the second does not. The rate is still what
-one tick earns and an application still pays for the period. The upkeep now
-carries a holding term derived from what the store holds at the application, so
-a longer period takes that term from a store read fewer times, and the two runs
-part company.[^F672B]
-
-**Evidence.** One site on a world of 16 tiles a side, a base production of one
-unit, a store starting empty, eight ticks. A period of one earns 372374 in the
-Q16.16 scale and a period of four earns 380928, a difference of 2.3 percent.
-The coarser period earns more, which is the direction the discretisation
-predicts. The term that ends the cancellation arrived in 60c33a2a, which
-switched the upkeep sink on. Whether the equality ever passed in the suite was
-not established, because the suite was not run when that change landed.
-
-**What follows.** The draft record for the derived rate now carries this
-consequence.[^F672B] **The accepted record still states the equality as exact,
-so it now says something false.** It has many dependents and the retcon window
-has passed, so the repair is a reviewer's call: either a superseding record or
-an in-place amendment under the registry rule.[^8] Nothing in the tree
-fails while it stands, because a record is prose.
-
-The statement that survives, and that a test may assert, is that the period
-scales an application and not the rate. The two defects the equality protected
-against both move a span total by a factor of four: a rate spent once for each
-application earns a quarter, and a period paid for twice earns four times as
-much. A bound of a factor of two on either side excludes both and admits the
-holding term.
-
-## B. Claims refuted
-
-### FND-420 — The gatherable resource catalogue cannot grow at run time
-
-**Believed.** A caller can build a world with any number of resource kinds,
-and the engine reads the number the caller gave.
-
-**True.** The number of gatherable kinds is a constant that the compiler
-fixes, and the code uses it as an array length. What one site wants is a row
-of that length, and the table that maps work onto a commodity is a row of that
-length as well.[^F420A] The kind numbering also reaches the state hash, the
-gather event and a sort key, so a renumbering invalidates every golden
-file.[^F420B]
-
-**Evidence.** A search of the tree for the constant finds it as the length of
-two arrays in the position module and of four more in the resource module and
-the world. The resource module states in its own prose that the numbering is
-stable, and it names the three readers that make it so.[^F420B]
-
-**Follows.** A luxury is a second tier and not a fourth kind. A luxury is a
-presence, so the engine holds a set of bits for each tile rather than a column
-of amounts. The set is one word, so its width bounds the catalogue and no
-array length changes. The control plane names the luxuries when it seeds the
-world, and the gatherable catalogue stays fixed.[^F420C]
-
-
 ### FND-007 — The promotion and demotion problem does not exist
 
 **Believed:** materialising plausible level-0 detail from a level-1 summary,
@@ -677,699 +186,6 @@ grounds.
 
 **Follows:** formation membership is an ownership column with a reverse index.
 
-### FND-159 — A one-byte influence cell loses the field to truncation when the solve iterates
-
-**Believed.** An influence cell is one byte against a fixed reference. The
-research measured the usable gradient of that cell at about 4.4 octaves, which
-it states covers the decision range of every consumer, and it gives a reach of
-about 35 cells.[^F159A]
-
-**True.** The measurement holds for a plane that is computed once. It does not
-hold for a plane that an iterated relaxation writes back into itself. Each
-pass narrows the accumulator to the cell, and the narrowing truncates, so a
-small value loses a whole step on every pass. The tail does not decay at the
-rate the stencil sets; it decays to zero.
-
-**Evidence.** One fixture, one stencil, one source at the ceiling, run to rest
-at one thread on the development machine. With a one-byte cell the field
-reached four cells and every cell beyond that held zero. With a two-byte cell,
-and nothing else changed, the field reached thirteen cells and fell smoothly
-over all of them. The reach is a property of the arithmetic, so it does not
-depend on the machine.
-
-**Follows.** The cell is two bytes wide, and the record states the reason
-beside the decision.[^F159B] The research finding is right about the gradient a
-consumer reads and wrong about the gradient the solve can carry, and the two
-are different quantities.
-
-**The general shape.** A width argument made for a value that is written once
-does not carry to a value that is written repeatedly into itself. Ask how many
-times the narrowing happens before anybody reads it.
-
-### FND-160 — The thread-count test does not guard a fixed iteration count
-
-**Believed.** The two determinism tests catch a solver that stops on a
-convergence test, because a convergence test is the defect the record names
-and the thread-count test is the highest-value test in the project.[^F160A]
-
-**True.** They do not. A convergence test that reads an exact integer
-comparison gives the same answer at every thread count, because the comparison
-does not depend on how the work was split. Both runs stop after the same pass,
-both produce the same field, and the thread-count test compares them and finds
-them equal.
-
-**Evidence.** The perturbed build stops the influence solve when a pass changed
-nothing. Under it the influence thread-count assertion passes, at one thread
-against twelve, over a field solved to rest. The assertion that fails is the
-one that reads the pass count. A second perturbation was needed to give the
-thread-count assertion a failure mode, and it is a different defect: a pass
-that reads a neighbour outside the run it is filling as nothing.[^F160B]
-
-**Follows.** **A fixed iteration count needs its own test, and that test reads
-the count.** This is the case the testing rule states in the general: a defect
-that repeats gives one answer on every thread and on every run, and a test
-which compares two runs cannot see it.[^F174A] The rule named a draw keyed on
-the wrong field. A solver that stops early is the same shape.
-
-
-### FND-319 — The package says its verb interface is not written, and a verb ran
-
-**Believed.** The Python package states in its own top-level docstring that it
-is a stub, that it re-exports the compiled module, and that the selector
-interface, the verb interface and the view scope are not written yet.
-
-**True.** The selector interface is not written. The other two are. The
-compiled module carries set-valued verbs and columnar reads, and the worked
-example in the project orientation calls both.[^F319A]
-
-**Evidence.** The example in the orientation document was run unchanged
-against the installed package. It built a world, spawned a set of units, gave
-one gather order, stepped the world at four threads, checked the invariants,
-and read a state hash, two column dictionaries and a gather count. It printed
-a tick and a gather count and raised nothing.
-
-```
-grep -n "are not written yet" python/cachette/__init__.py
-grep -n "fn spawn_soldiers\|fn order_gather\|fn event_log_columns" crates/cachette-py/src/lib.rs
-```
-
-**Follows.** The one sentence the package writes about itself is wrong about
-two of the three things it names, and nothing fails, because a docstring is
-prose. This is the shape the recurring defect rule names last: a document that
-no longer describes the code.[^F319B] It is also the need that product record
-0021 states, and that record cites the same shape as the cost it must
-carry.[^F319C]
-
-**The repair is not made here.** The sentence and the documentation of this
-package are one statement, and correcting the sentence alone would create a
-second place that states what the package holds. The worker who chooses how
-this package is documented owns both.
-
-
-### FND-481 — Three of the thirteen unbound economy names already cross to Python inside a report
-
-**Believed.** Thirteen names govern the economy of the engine, and no binding
-and no Python line reaches any of them.
-
-**True.** Ten of the thirteen reach no caller. The other three already cross,
-inside a report that a binding already builds. The production rate and the
-upkeep rate of a site cross as two entries of the economy report of that site.
-The stock a tile started with crosses as one entry of the tile report.[^F320C]
-
-**Evidence.** Read on 3 September 2026. `grep -rn "\bproduction_rate\b\|\bupkeep_rate\b\|\boriginal_stock\b" crates/cachette-py/src python tests scripts`
-reported three lines, all of them inside the bindings crate: two in the site
-economy report and one in the tile report. The same search over the other ten
-names reported nothing.
-
-**Follows.** A second binding for any of the three would be a second
-declaration site for one value, which is the defect shape this project keeps
-meeting.[^22] The work that bound the ten write knobs published no reader
-for the three, and pointed the doc comment of each write at the report that
-already answers it. A caller therefore has one place to read a rate and one
-place to write it.
-
-### FND-483 — A zero in the seat census was read as empty positions, and it means that no position exists
-
-**Believed.** The demonstration world at tick 200 held 32 ranked positions with
-16 of them filled, and a zero `seats_filled` at the end of a game meant that
-positions stood open with no holder. Item 0278 states the first figure, and it
-is now stale.[^F483A]
-
-**True.** Every position that exists has a holder at every measured tick. This
-holds in a run with the controller on, and in a run where every faction is
-externally controlled. The census row `seats_filled` counts the positions that
-exist and have a holder, summed over the sites.[^F483B] A zero in it means that
-no position exists.
-
-A site opens positions in proportion to what it lacks. The share function
-subtracts the store from the target for each kind of work, and it opens nothing
-when no kind is short.[^F483C] Every site starts with the default preference,
-which is 65536 raw, or 1.0 in Q16.16, for every kind.[^F483D] Stores climb to
-hundreds, so a site that lacks nothing opens nothing. All three kinds of work
-map to commodity 0, so one surplus closes every kind at once.[^F483E]
-
-**Evidence.** A read-only probe on 5 September 2026, on one development machine
-(ty001-ubuntu), with seed 81985529216486895, extent 256, four factions, and
-four threads. The probe script lived outside the tree and is not kept. With the
-controller on, the seat count over ticks 0 to 2000 read 0, 16, 16, 8, 8, 0, 0,
-0, 0. With every faction external, it read 0, 24, 24, 16, 16, 8, 8, 8, 0. At
-every sample the count of positions equalled the count of holders. Two of the
-four sites held no position by tick 200 at this seed. This is one
-development-machine run, and it says nothing about the target platform.
-
-**Follows.** Three things.
-
-The census cannot tell "no position opened" from "a position opened and stands
-empty". A `seats_open` row beside `seats_filled` would, and the census is a
-reader, so the row is a reader change.
-
-The seeding layer sets no store target, so the default of 1.0 governs a site of
-64 people. Whether a site keeps its positions open once its store passes the
-target is a behaviour decision. It belongs to the record that governs the
-position pass, and not to a reader.[^F483F] Backlog item 0483 holds the work.
-
-The figure in item 0278 is stale, which is defect shape 2: a document names a
-measured figure, and nothing fails when the tree moves past it.[^F483G] The item
-is not edited here, because its argument does not depend on the figure.
-
-
-### FND-564 — The border of the weather lattice was believed to be starved, and it is retentive
-
-**Believed.** The weather lattice is exactly the size of the world, so air
-leaves through one edge and nothing arrives through the other. The cells beside
-an edge are therefore starved of water, and a margin of simulated cells around
-the world will raise the water they hold.
-
-**True.** A bare border holds **more** water in the air than a border with a
-margin, not less. The transport pass skips a direction that names no
-neighbour, and it skips both halves of that direction: the cell does not take
-from the outside, and it also does not give to the outside. So a border cell of
-a bare lattice cannot lose water off the map. It is retentive, and the retention
-is not physics. It is the shape of the loop.
-
-What a bare border lacks is upwind, not water. Nothing carries a mass onto it,
-so the water it holds is the water it lifted, and the field there does not move
-as the field inside moves.
-
-**Evidence.** A probe ran one terrain three times over one padded lattice at
-the per-tile pitch, and changed only the ground under the margin. An empty
-margin gave the lowest border water, a mirror margin gave more, and an ocean
-margin gave the most. A separate probe ran the same world at a range of margin
-widths and read the border water, which fell slightly as the margin widened.
-The commit body holds both tables and the commands that produced them.
-
-**What follows.** Do not measure a border repair by the water the border holds.
-The bare reading is inflated by an artefact, so the repaired field reads lower
-and looks worse. Measure the structure instead: whether every cell a reader can
-see has a full set of neighbours, and whether the field at the edge moves as the
-field inside moves.
-
-A test that asserted more border water after the margin was written and it
-failed. The test in the tree asserts the neighbour property, which is the thing
-the margin buys and which fails at margin zero.
-
-### FND-569 — The polar cloud failure was read as a margin defect, and it was a test that indexed a plane at a world address
-
-**Believed.** Two branches that were each correct alone met and broke the
-poles. One branch gave the weather lattice a margin of mirrored cells on all
-four sides. The other made the capacity of the air fall with the temperature.
-Together they left the polar land at a mean of 8 parts of a sky in 255, against
-a bar of 16. The reading was that the pole gained the power to export water at
-the moment its capacity collapsed, and that the mirror beyond the pole is a
-sink that never gives anything back. Forcing the margin to zero made the test
-pass, which was read as proof.
-
-**True.** The margin costs the poles almost nothing. The test walked the whole
-lattice, took the whole-lattice address of each cell as a world address, and
-read the cloud plane at that index. The margin sits between the two, so the
-walk was wrong by the margin width in both axes. It sampled cells beyond the
-north pole as polar land, and it lost most of the southern band, because a
-world address test rejects a row past the world. The margin-to-zero measurement
-did not test the field. It made the wrong walk correct again.
-
-**Evidence.** The latitude probe carried the same defect and was repaired
-first. Repaired, it read the polar bands at 36 parts of a sky over all cells
-and 25 over the inland cells with the margin present, and at 38 and 27 with the
-margin forced to zero. A reflecting edge at the north and the south moved
-neither figure. The acceptance test then passed with the walk repaired and no
-change to the field at all. The commit body holds the three probe tables and
-the commands.
-
-**Follows.** Three things.
-
-**A plane over a padded lattice has two address spaces, and nothing fails when
-a reader confuses them.** The lattice offers one map between them, and every
-reader must go through it. This is the redundant declaration shape: one
-position held in two coordinate systems with no check that they agree.[^38]
-
-**A repair that makes a test pass is not a diagnosis.** Setting the margin to
-zero changed the field and the test's own arithmetic at the same time. When one
-switch moves two things, it names neither.
-
-**Measure a claim about a band with an instrument that reads that band.** The
-probe and the test shared the defect, so the probe could not have caught it.
-Repair the instrument before you trust what it says about the subject.
-
-
-### FND-578 — The cloud over a polar interior came from a capacity floor of two drops, and not from water that reached it
-
-**Believed.** An earlier repair made the capacity of the air fall with the
-temperature, and an acceptance test then found cloud over the polar land of a
-landlocked world. The reading was that water now reaches a high latitude and
-stands there as cloud, and that the poles are no longer structurally
-cloudless.[^F570A]
-
-**True.** The cloud a watcher saw was a ratio with a floor of two drops under
-it. Cloud is the air of a cell against what the air of that cell can hold, and
-the earlier curve gave the coldest cell a capacity of two drops. One drop
-standing over a polar cell therefore painted half a sky. The published
-saturation curve gives the same cell about fifty drops, and the same water then
-covers a fiftieth of the sky.[^F570B]
-
-**Evidence.** The published curve was fitted at eight temperatures the report
-states, and it matches every one of them. On the landlocked fixture the polar
-land then held a mean of 4 parts of a sky in 255 against a bar of 16, and the
-air plane held nothing at all over the first band of rows. On a world whose
-polar rows hold open sea, the same code held 114 parts over all cells and 46
-over the inland cells. So the water supply decided the answer, and the curve
-did not. The commit body holds both probe tables and the commands.
-
-**Follows.** Three things.
-
-**A ratio with a small denominator is not a measurement of the numerator.** The
-test read a share and took it for a quantity. A share against a floor says
-almost nothing about how much water arrived.
-
-**A polar continental interior is a desert, and that is the published
-behaviour.** The air of a cold cell holds very little, so the poleward
-transport rains out most of what it carries. The driest place on the Earth is
-the interior of a polar continent.
-
-**A fixture must supply the input the assertion needs.** A test that asks
-whether a model destroys the water reaching a pole must give the pole water.
-The landlocked fixture supplied none, so it measured the fixture.[^F487C]
-
-
-### FND-582 — The flat observation array carries one win threshold and not the other
-
-**Believed.** Item 0516 put the victory claim into the observation array of a
-faction, so the array now carries every quantity a win reader compares. A
-learner that reads the array can therefore tell how close each path is.[^F582A]
-
-**True.** The array carries the tick limit, which is the threshold of the
-territory path. It carries no renown target, which is the threshold of the
-renown path. The renown reader fires for the first faction whose best renown
-reaches that target, and a learner that reads the array alone cannot tell how
-far it is from it.[^F582B]
-
-**Evidence.** Read on 6 September 2026 from the schema of a world of extent 32
-with three factions. The field list holds the tick and the tick limit as two
-fields, and it holds the best renown with no matching target. The world states
-the target through a public accessor, so the value exists and the array omits
-it. The commit body holds the command.
-
-**What follows.** The omission is an asymmetry and not a rule. The reward of a
-faction reads the array, so it can weigh the best renown and it cannot weigh
-the distance to the target. A later item may add the field. Until then, a
-caller that wants the distance reads the target from the world, which is a
-public rule of the game and not a fact about a rival.
-
-### FND-583 — A faction that loses every unit is not eliminated, because it keeps its ground
-
-**Believed.** A faction that loses every unit and every person is eliminated.
-Its run is over, so a reward may pay a terminal value for the elimination and
-stop the episode there.
-
-**True.** Such a faction keeps its held tiles and its seat. The territory reader
-compares held tiles at the tick limit, so the faction may still win. A terminal
-that fired on the loss of the last unit would end an episode the faction could
-still win.
-
-**Evidence.** Measured on 6 September 2026 on one development machine
-(ty001-ubuntu, x86-64), over nine seeds at two and three factions, on a world of
-extent 24, to 800 ticks or to the game end. A faction that had been alive and
-then held no unit and no person appeared in 4907 sampled tick and faction pairs.
-In none of them did the same faction reach zero held tiles. On one seed the
-faction with no unit at all held 187 tiles against the winner's 179. No
-ever-alive faction reached zero on all four of held tiles, seats held, live
-units and population. The commit body holds the probe and the command.
-
-**What follows.** The reward of a faction states three terminal outcomes and no
-elimination. It reports one boolean beside them, which is true while the faction
-holds a unit or a person. A caller that wants to stop a run early reads it. A
-faction the seeding never seated reads the same boolean, because it holds the
-same nothing.
-
-### FND-625 — The trainer does not write its weights after every generation
-
-**Believed.** The trainer checkpoints every generation, so a run stopped part
-way keeps what it has learned. A person who wants to end a run early can do so
-and keep the weights.
-
-**False as stated, and false in two different ways.** The trainer writes the
-weights only from inside its validation pass. That pass runs every few
-generations, and it writes only when the centre scored better than the best
-centre it has seen. **A run with no validation seeds writes nothing at all
-until a whole strategy finishes.** A run with validation seeds writes nothing
-until the first validation, and after that it keeps the best centre rather than
-the newest one.
-
-**Evidence.** A probe drove the trainer directly on a small world, over three
-generations, and watched the weights file from another thread. With no
-validation seeds the file never appeared while the run was going. It appeared
-only after the loop ended. With validation seeds, and a validation every
-generation, the file appeared 2.4 seconds into a 6.8 second run. The commit
-body holds the probe. A run under way on a development machine agrees. It
-started at 07:31, its first two generations ended at 07:39 and 07:47, and it
-first wrote its weights file at 07:49, which is its first validation.
-
-**What follows.** **A launcher that offers to stop a run early must refuse a
-configuration that would make an early stop lose everything.** The training
-launcher reads the validation count out of the trainer arguments. It stops
-before it creates anything when that count is zero.[^F625A] It also states, in
-the text a person confirms, which generation the first checkpoint lands on.
-
-Keeping the best centre rather than the newest one is correct, because an
-evolution strategy walks and a walk can end downhill. The defect is the claim,
-and not the behaviour.
-
-
-### FND-626 — Every upgrade was believed to be a mark in the middle of one tile
-
-**Believed.** An upgrade is a thing that stands on a tile. Both renderers
-therefore tinted the whole cell and drew a small shape in the middle of it. A
-report measured the readability of that pair and the drawing followed it, and a
-test asserted that a finished road washes the whole tile.[^F626A]
-
-**False for a road.** A road is a way. It runs from somewhere to somewhere, it
-joins another road at a junction, it bends, and it ends. A coloured cell says
-that a tile carries the road property. It does not draw a road, and a watcher
-cannot read where a road goes from a set of coloured cells.
-
-**Evidence.** Two pictures of one network, drawn from the same world. The first
-gives each road tile a tint and a bar. A watcher reads seven coloured cells and
-cannot say which of them are one road. The second draws a ribbon from the
-middle of each tile out to the middle of each edge it shares with a road, and a
-watcher follows the run, the branch and the junction. The commit body holds the
-command that made both.
-
-**What follows.** **A category is either a way or a thing that stands, and the
-drawing asks which.** The set is declared once, and both renderers and the
-tests read that one declaration.[^F626B] A way draws a ribbon that crosses the
-tile boundary, so it is drawn after every tile is painted rather than tile by
-tile. A thing that stands keeps the tint and the shape that the report chose.
-
-The test that asserted a finished site washes its tile now names a category
-that stands, because the claim was never about a road.
-
-Below the width at which a ribbon reads, the engine renderer still tints a road
-tile. A tint is the only mark a tile a few pixels wide can carry, and that is a
-statement about the zoom and not about what a road is.
-
-
-
-### FND-627 — The sky was drawn as though the world wrapped
-
-**Believed.** The sky pass reads the cloud of a point further down the page and
-the shadow of a point across it. Both readings rolled off one edge of the page
-and back onto the other, in both renderers, and a comment said that the shader
-rolled the field the way the array renderer does. The two agreed, so nothing
-failed.
-
-**The world does not wrap.** A neighbour outside the world is absent, and the
-edge of the world is an edge.[^F627A] A point off the page is not a point of
-another part of the world. It carries no cloud.
-
-**A shadow falls on something.** The cloud is drawn above the tallest ground,
-so its hatch crosses bare paper on purpose. The shadow crossed the paper with
-it and multiplied the paper down, which drew a grey copy of the terrain beside
-the terrain.
-
-**Evidence.** A world drawn at the camera that fits it, with paper visible
-beside the map. The roll drew a wedge of cloud hatch on the paper below the
-map, hard-edged, shaped like ground that stands on the far side of the world. A
-frame drawn with the sky switched off carried no mark on the paper at all,
-which is what separated the sky from every other pass. The commit body holds
-the counts and the commands.
-
-**What follows.** **A pass that reads a neighbouring point must ask whether
-that point exists.** The sky now reads nothing off the page, and its shadow
-lands on ground alone. The cloud itself still crosses the paper above the map,
-because a cloud stands above the ground and a watcher reads it there.
-
-The silhouette still rolls a mask by one point, and that roll is inert: the
-ground stops short of the edge of the page by a margin, so the mask is false on
-both sides of it.
-
-**The clamp in the shader was not the cause.** Every reader of the page clamps
-a point to the nearest edge texel rather than answering that the point is
-absent. A build that answered the empty value instead drew a frame identical to
-the clamped one, and every agreement test passed unchanged. The clamp is
-reachable only by the neighbour taps of the tone and of the silhouette, and
-those mirror the edge handling of the array renderer on purpose.
-
-### FND-633 — The keyboard was believed to scroll the map the way the hand does
-
-**Believed.** The renderer says how a step across the frame reaches the ground,
-and the callers ask it. The rule is written once, beside the drag.
-
-**Only the drag asked it.** The keyboard called the pan verb of the camera
-directly, with no turn taken out. The sketch renderer stands the page at an
-angle, so a press for right scrolled the map along the axis of the flat map and
-the drawing went somewhere that is not right. The mouse was correct the whole
-time, which is why the rule looked like it was applied.[^F590A]
-
-**Evidence.** The two call sites, one calling the renderer and one not. A
-quarter turn sends a sideways press down the map, and the camera moved along
-one axis alone before the repair.
-
-**What follows.** One method on the run answers the question, and both callers
-reach it. **The rule may be applied to the press rather than to the pixels the
-press asks for**, because the step the engine takes is one length on both axes
-and the rule is linear with no constant term. A pan verb that scaled its two
-axes differently would break that, and the repair would then have to work in
-pixels.
-
-
-
-## C. Defects found in specified rules
-
-### FND-460 — The shortfall log could not hold an entry, because nothing outside a Rust test ever set an upkeep rate
-
-**Believed.** The engine records a shortfall when a site cannot pay its upkeep.
-The world holds the log, the log holds a plain data event, and the rate pass
-fills it on every scheduled step.
-
-**True.** The rate pass filled it on no step of any run a caller could make. An
-upkeep rate starts at zero for every site, and a site that spends nothing can
-never fall short. The founding sets a production rate from the food the survey
-read, and it sets no upkeep rate at all.[^F460A]
-
-**Evidence.** A whole-tree search for the writer found the core method, two
-Rust test files, and nothing else. No pass writes it. No binding exposed it.
-The commit body holds the search command.
-
-**Follows.** Two things.
-
-**A log is not reachable until its writer is reachable.** This work bound the
-shortfall log and the upkeep rate together, because binding the reader alone
-would have shipped a call that answers with an empty log for ever. That is the
-inert capability shape with an extra step in it: the reader is invoked, and the
-thing it reads is not.[^37]
-
-**The same question applies to every other log.** Ask what writes it, and ask
-whether a caller can reach that writer. The four other logs this work bound each
-have a writer that a step reaches on its own.
-
-### FND-461 — A small world feeds itself, so a log fixture built from one measures the fixture
-
-**Believed.** A world with soldiers, sites and the default need rule goes short
-by itself. Step it far enough and units ration, go hungry and starve.
-
-**True.** It depends on the extent and on the faction count. A world of two
-factions on 32 tiles a side fed itself for the whole of a run. Every unit held a
-full need, no site rationed, nobody starved, and nobody was promoted.
-
-**Evidence.** A probe stepped that world 400 times and recorded no entry in the
-rationed log, the starved log or the promotion log. The same probe on 64 tiles a
-side with four factions recorded entries in all three: the first rationing on
-step 10, the first promotion on step 40, and the first starvation on step 120.
-The commit body holds both runs.
-
-**Follows.** A test for a log of scarcity states the extent and the faction
-count as the thing that makes the case, and says so where a reader will look.
-The fixture rule already says not to model the typical case, and this is that
-rule reaching a subsystem it had not reached.[^84]
-
-### FND-411 — A unit ordered to a place stopped at a shoreline and never arrived, and it was not frozen
-
-**Believed.** A unit that the control plane sends to a place walks there. The
-field holds a direction for every cell between the unit and the destination,
-and the fall-back to a keyed draw stops the unit freezing, so the unit arrives
-in about as many frames as there are tiles between the two.[^F411A]
-
-**True.** It arrives only when the ground on the way is open. A field at the
-pitch of a block says which way a block should go, and it cannot say how one
-unit gets around the water in front of it. A record already states that
-consequence, and this is the first case that shows what it costs an ordered
-unit.[^F411B]
-
-**The unit is not frozen, and it does not arrive.** The two are different
-failures, and the fall-back answers only the first. The unit takes a step every
-frame, it wanders inside the cell it is stuck in, and it never crosses the
-barrier. A caller who watched it would see movement and no progress.
-
-**Evidence.** The demonstration extent at the shared seed. A unit was placed at
-one address and sent to the first open tile of the world, which lies about
-eighty tiles west. It walked west for about twenty tiles and then held a
-three-tile neighbourhood for the remaining four thousand frames. The direction
-of its cell pointed west for all of them, and the tile west of it is water. The
-diagnostic run is in the commit history of this branch, and the test that the
-work kept is the fixture rule that came out of it.[^F411C]
-
-**Follows.** Three things.
-
-**A test must not assert that a sent set arrives, unless the fixture proves the
-ground is open.** The fixture of this work walks the field from each candidate
-start and rejects a start whose walk meets ground that refuses it. Without that
-rule the test asserts a promise the engine does not make, and it fails on a seed
-rather than on a defect.
-
-**The verb is honest and the promise is narrower than it reads.** A caller sends
-a set toward a place. The engine does not promise that the set arrives, and the
-Python prose says what it does promise.
-
-**Routing around a barrier is a different claim and it needs a different
-field.** The reach that this work spreads is over cells, and the barrier is a
-tile. A backlog row holds the gap.[^F411D]
-
-### FND-410 — A control-plane order reached the movement pass behind the intent filter, so a unit that had chosen nothing could not be ordered anywhere
-
-**Believed.** An order from the control plane is another input to the step that
-moves a unit, so the movement pass can read it wherever it reads the other
-inputs. The pass opens by reading the intent of a unit and returning early when
-the unit holds none, and that early return looked like a filter on units that
-have nothing to do.[^F180A]
-
-**True.** It is a filter on units that have not chosen yet, which is a
-different set. The choice pass writes an intent only on the frame that the cell
-of a unit chooses, so a unit spawned between two choices holds none.[^F252D] An
-order read after that filter therefore reached no newly spawned unit at all, and
-reached every other unit only on the frames after its cell had chosen.
-
-**A caller cannot see the difference from outside.** The order is accepted, the
-call returns, and the unit stands still. Nothing fails, and the caller has no
-read that would say why.
-
-**Evidence.** A world with the choice schedule set to a long period. One unit
-was spawned, and the test asserted that it held no intent. It was then sent to a
-destination four cells away and the step was driven for 32 frames. With the
-order read after the intent filter, it held its starting tile for all 32. With
-the order read before the filter, it left on an early frame. The test is the
-record of it, and the commit body holds the command.[^F411C]
-
-**Follows.** Two things.
-
-**An order is not a preference, and it does not enter the pass where a
-preference enters.** A unit chooses an option by scoring, and an order from the
-control plane joins no score. It replaces the field that steers the step, and it
-replaces nothing else. The record states that.[^F410D]
-
-**A filter that looks like it drops idle units may drop unstarted ones.** The
-two sets differ only in the frames after a spawn and before a choice, and no
-fixture that spawns and then steps many frames reaches the difference. A test
-that wants the case must hold the choice off.[^23]
-### FND-421 — A constructor that makes an invalid value unrepresentable makes its own invariant check unfalsifiable
-
-**Believed.** An invariant check earns its place when the project can show
-that it fails on a defect.
-
-**True.** The luxury field has one constructor. That constructor sorts the
-placements, coalesces the repeats and refuses a bad argument, so no caller can
-build an unsorted field, a repeated tile or an empty entry. The part of the
-invariant check that tests those three things cannot fail, and no test can
-trip it.
-
-**Evidence.** A sweep put ten defects back, one at a time, and ran the tests
-after each one. Nine defects failed at least two tests. The tenth turned the
-field invariant check off, and every test stayed green.[^F421A]
-
-**Follows.** Keep the check, and do not count it as covered. Say in the report
-which guards a test reaches and which it does not.
-
-**The falsifiable check is the one between two copies of one fact.** The world
-compares level 1 of the variety against the field it was derived from. A
-defect that dropped one entry from the derivation failed nine tests, and the
-world invariant check was one of them. A check on a value that no caller can
-build is a guard for a future writer. A check between two copies is a test.
-
-
-### FND-326 — The panel cut one line kind of eight, and the other seven stayed inside it by luck
-
-**Believed.** The panel cuts a value that does not fit, so that text can never
-be written over the panel edge.[^F326A]
-
-**True.** One line kind cut its value. The title, the note, the heading, the
-legend row, the ground row and the founding row all wrote from the left margin
-with no right bound. The length of the text was the only thing holding them
-inside the rectangle.
-
-**Evidence.** One note of 32 characters had 30 glyphs of room, and the stored
-layout picture shows its ink two glyphs into the padding. The longest note that
-fits is 30 characters, and every note in the panel was under that bound by
-accident. No author had anything to tell them what the bound was, because the
-bound follows from the panel width and the glyph size and neither was written
-down where a writer would look.
-
-**Follows.** The cut now lives in one writer that takes a right edge, and every
-line kind of both the head-up display and the deck writes through it. An author
-cannot reach the map, whatever the text says. The bound is derived from the
-width and the glyph table, so nobody counts characters and nobody counts them
-wrongly.
-
-**A cut is still a defect.** A cut line states something other than what it was
-given, in silence. The check that reports one now covers every line kind, and
-one note was rewritten rather than left to be cut.
-
-### FND-328 — Nothing in the engine could say how many units a faction had left
-
-**Believed.** The panel reports the units of each faction, so a watcher sees
-how the factions stand.
-
-**True.** Every unit count the panel stated was a count of the window. The
-drawing pass counts what it painted, by colour, over the tiles the camera
-reached. No value anywhere in the engine held the population of a faction in
-the world, and nothing could compute one without reading every live unit.
-
-**Evidence.** A search of the world interface found `holding_of`, which gives
-the tiles a faction holds, and no counterpart for its people. The soldier arena
-held one total live count and no split by faction.
-
-**Follows.** A faction whose last unit starves vanishes from the picture with no
-number falling to zero anywhere. That is the one thing a watcher most wants to
-see, and the demonstration could not show it.
-
-**A count is not the fix; a maintained count is.** Counting the units of a
-faction reads every live unit, and at the target scale that is one million reads
-for one row of one panel, every frame, which the panel record forbids.[^F328A]
-The arena now maintains the count at the two sites that change a slot's live
-byte. That is one fact in two places, so the arena check recounts and compares,
-and it fails when the copies disagree.[^13]
-
-### FND-237 — The record check reads no source file when it runs in a worktree
-
-**Believed.** The record check reports a record that no other record and no
-source file cites. Running it from a worktree gives the same answer as running
-it from the main checkout.
-
-**True.** It reads no source file at all from a worktree. The check walks the
-tree for Rust and Python files and skips any path that holds a part named
-`.git`, `target` or `worktrees`. A worktree of this project lives under
-`.claude/worktrees/`, so every path below it holds that part and every source
-file is skipped.
-
-The effect is confined to the uncited note. The section check, the volatile
-figure check, the citation check and the registry check all read documents,
-and those are unaffected.
-
-**Evidence.** The file walk of the check was run against a worktree root with
-the same skip set. It returned zero Rust files. The same run reports the
-uncited note for twelve records, including one whose claim is cited from two
-source modules.
-
-**Follows.** **A filter that names a directory by its base name reaches every
-path that passes through it.** The skip set means "do not descend into a
-worktree from the main checkout". Inside a worktree it means "skip
-everything", because the root itself is inside one.
-
-**A check that reads nothing reports the same shape as a check that found
-nothing.** Zero files scanned and zero citations found produce the same note.
-Nothing distinguishes them, and the note reads as a finding about the record.
-A check that walks a tree should state how many files it read.[^37]
-
-The uncited note is a note and never a failure, so no gate went green that
-should have been red.[^237B] The cost is a false signal to whoever reads it.
-
 ### FND-011 — The progress accumulator overflows
 
 An unclamped accumulator lets a unit whose speed exceeds the local step cost
@@ -1413,1846 +229,6 @@ tick rate and width all at once.
 
 The likeliest defect in the field framework is writing a capacity cap as a
 sink. Caps are idempotent; sinks add twice.
-
-### FND-037 — A crossing time needs the terrain multiplier
-
-**Believed:** a dwell of 2 ticks and a capacity of 8 units give a crossing of
-12.5 seconds for a formation of 1,000 units.
-
-**True:** that arithmetic used the ordinary ground step cost for a mountain
-exit tile. It omitted the terrain multiplier. With the multiplier applied, the
-same combination gives a mountain crossing of about 50 seconds. The
-combination that meets the target is a dwell-2 baseline with a capacity-16
-crossing.
-
-**Evidence:** the movement timing note.[^3] It measured 12.9 seconds for the
-corrected combination. The closed-form throughput law gives 12.5 seconds for
-the same parameters. The 4-tick difference is unresolved and is recorded in
-the note.
-
-**Follows:** a crossing time is a function of three quantities, not two.
-Capacity, dwell and the terrain multiplier all enter it. **Check that a rate
-derivation names every multiplier on its path.**
-
-**Outcome, 2 September 2026. The terrain table now states the multiplier.**
-Every kind of ground answers a step multiplier beside its capacity, because
-the capacity and the multiplier describe the same tile.[^37HOME] The mountain
-kind carries two and every other kind carries one. The scale constants table
-holds the row and says the value is derived from the ratio of the two accepted
-crossing times.[^99] The value is derived, not measured, and nobody decided
-it directly.[^28] The forest kind and the hill kind carry the baseline,
-because no accepted crossing time separates them from level ground, and a
-register row holds that open choice.[^37NEXT]
-
-**The 4-tick difference has a candidate explanation, and it is unverified.**
-The closed-form law gives 125 ticks and the timing check measured 129. The law
-counts the steady state only. A formation pays two stages outside the steady
-state: the leading rank spends one dwell to enter the chokepoint before any
-unit leaves it, and the last rank spends one dwell to clear the exit tile
-after the steady state ends. Two dwells at the baseline dwell of 2 ticks is
-4 ticks, and 125 plus 4 is 129. The arithmetic matches exactly.
-
-**Mark this unverified.** The match is an arithmetic identity, not a
-measurement. The movement kernel does not exist, so nothing re-ran the check
-and nothing instrumented the entry tick or the clearing tick. **What would
-verify it:** run the same formation through the movement kernel when it
-exists, count the tick that the leading rank enters the chokepoint and the
-tick that the last rank leaves the exit tile, and confirm that the two stages
-cost one dwell each. A record must not state a crossing time as an exact
-figure until that check has run.
-
-### FND-035 — The float ban lint does not catch an inferred literal
-
-**Believed.** A lint enforces the boundary that keeps floating point out of
-simulated state. The project invariant says so plainly.
-
-**True.** The lint catches a named type. It does not catch `let x = 1.5;`,
-where the type is inferred and never written. It also cannot name the
-reassociating methods, because those do not resolve on the pinned toolchain,
-so a banned-method entry cannot refer to them.
-
-**Evidence.** The scaffolding work proved both gaps by injecting a float, and
-closed them with a script that reads the source directly.
-
-**Follows.** State the enforcement as two mechanisms, not one. A lint plus a
-script. An invariant that names one mechanism invites a reader to trust it
-alone. The word "lint" in the project instructions is now wrong on its own.
-
-### FND-081 — Two accepted records disagreed on whether a per-tile count exists
-
-**Believed.** The accepted records agreed about how admission reads the
-occupancy of a tile.
-
-**True.** They did not. ADR-0018 rejects an offset array, and it rests part of
-that rejection on the claim that a per-tile array of counts already exists,
-because admission needs the occupancy of a target and its departure count in
-one tick. ADR-0056 D3 states that admission reads occupancy from the derived
-structure and carries no per-tile array of its own. Both records are accepted.
-Both are cited by code.
-
-**Evidence.** An agent found the pair while it read ADR-0056 to write a
-superseding record. Neither record cites the other on this point, so nothing
-brought the two claims together. The check suite passed throughout, because a
-record is prose.
-
-**The code settles which claim is true, and it is not the one the first
-attempt assumed.** Admission builds a working set of segments over the tiles
-that some intent named, fills each from the derived structure, and discards
-the set at the end of the tick. That is what ADR-0056 D3 describes. No array
-over every tile exists, and none ever did.
-
-**The reads held more of the cost than the writes, and nothing predicted
-that.** A measurement on the target platform after the change found the frame
-1.92 times cheaper, and the merge that justified the work is a little over half
-of what the change returned. The larger single surprise is the level 1 rebuild,
-which costs 11.6 times less with nothing in it changed: it sums the value of
-every tile, and reading one tile used to be a binary search into a list holding
-an entry for almost every tile. The table holds the rows.[^F292C]
-
-**Follows.** Four things.
-
-**ADR-0018's stated reason is false, and it was never load-bearing.** The
-first answer to DEC-020 would have made it true by adding the array. The owner
-reversed that answer, so nothing adds one. ADR-0074 now records that no dense
-count exists, and it is the document a reader lands on when they meet the two
-claims. ADR-0018's rejection of the offset array stands on its other argument,
-that such an array must be exact everywhere before any query is correct, so
-its rebuild follows the tile count rather than the work.
-
-ADR-0018 is not superseded for this. It has four dependent records and eight
-citing source files, and the false sentence changes no decision it makes.
-Superseding a record over an aside is disproportionate, and a reader who meets
-the disagreement is served by the record that resolves it.
-
-A record that rejects an option on the strength of another record's mechanism
-must cite that record. ADR-0018 named a mechanism it did not own, and the
-mechanism did not exist.
-
-This is the same pair of records as FND-045, which found them disagreeing on
-whether a per-tile structure is affordable. One pair of records has now
-produced two findings. Read both before either record is amended again.
-
-
-### FND-086 — A product record stated a cost the engine never met
-
-**Believed.** The product record for a world worth looking at states that
-building a world must not cost a pass over every tile before the first frame.
-The record reached `Shaped`, and nobody had checked the statement against the
-code.
-
-**True.** The engine makes that pass. Building a world loops once for each
-tile, draws a value, and fills two vectors sized to the tile count. At the
-target scale that is a whole-world pass and two proportional allocations
-before anything is drawn.
-
-**Evidence.** An agent checked each statement of the record against the crate
-while it carried out the owner's ruling that every product record moves past
-`Shaped`. The columns that make the pass belong to the tile stub, not to the
-terrain the record introduced, so the record is false of the code by
-inheritance rather than by its own subject.
-
-**Follows.** Two things.
-
-**A checkable statement is not checked until somebody runs it.** The shaping
-gate asks for statements a reader can check. It does not ask anyone to check
-them, and the record passed every gate the project has while stating something
-untrue. The promotion review is where that gets caught, so a record must not
-reach `Shipped` on the strength of its citing items having closed.
-
-The record stays `Accepted` and an item tracks the repair. Accepting a need
-the engine does not meet is correct. Claiming the need is met would be the
-defect.
-
-### FND-087 — A product record can carry a structure without naming one
-
-**Believed.** The rule that a product record states a need and never states a
-structure is enforced by a check, and the check looks for a citation to a
-decision record.
-
-**True.** A record can fix a structure without citing anything. The record for
-parents and children said that units who are related and who live together
-form a household. That sentence decides that a household is a kinship
-grouping. The project has since decided the opposite: a household is every
-unit that carries one dwelling slot, and two strangers under one roof are one
-household.
-
-**Evidence.** An agent found the sentence while it checked the record against
-the newly closed decision. Every check passed before and after, because the
-record cites no decision record and names no data structure. The structural
-claim sat in ordinary prose about people.
-
-**Follows.** Two things.
-
-**Read a product record for the choices its wording forecloses, not only for
-the structures it names.** A need stated in terms of who and what is still
-capable of deciding how, and the check cannot see it.
-
-A structural decision that contradicts a product record must send someone back
-to the record. This one did, and the record was corrected in the same pass.
-Had the decision landed without that reading, the two documents would have
-disagreed quietly, which is the shape that costs every future decision made
-from either.
-
-### FND-186 — A panel test could not tell the stock left from the stock the ground gave
-
-**Believed.** A test that read the panel's two stock numbers back against the
-engine proved that the panel states what a tile still holds. The panel prints
-"what is left, of what the ground gave", and the test compared both numbers
-against the engine's own readers.
-
-**True.** The test could not tell the two apart. Its fixture was a world in
-which nobody had gathered, and in such a world the stock left equals the stock
-the ground gave, for every tile. A panel that read the generated stock into
-both rows passed it.
-
-**Evidence.** The defect was put back: the panel's reader for the stock left
-was changed to call the reader for the generated stock. Every test in the file
-stayed green.[^F186A] A second test was written that gathers first and then
-asserts that the two numbers differ. With that test present, the same
-substitution fails.
-
-**Follows.** This is the shape the testing rule already names: a fixture that
-models the typical case supplies no extreme, so the assertion never receives
-the input that would fail it.[^23] The rule needed no change. What it
-needed was the falsification, and the falsification found the hole in one run.
-
-The general form is worth stating. **When a panel prints two numbers that are
-usually equal, a fixture in which they are equal tests neither.** The engine
-holds several such pairs: the stock and the generated stock, the demand and
-the grant of a ration, the production and the upkeep of a site. A test of any
-of them needs a world in which the pair has come apart.
-
-### FND-187 — The food of a tile shades it more than the height does, within one kind of ground
-
-**Believed.** The viewer shades a tile by its height, and a second, smaller
-term rides on top. The second term was the tile stub value, and it was chosen
-to be small against the height range so that the ripple never hid the ground.
-
-**True.** The height range of one kind of ground in one world is far narrower
-than the full height range. In a 128 by 128 world at one seed, the tallest
-plain tile and the shortest plain tile were 26249 and 40476 in the fixed-point
-range, which is about twelve of the fifty-six brightness steps the height is
-given. Any second term wider than twelve steps therefore decides the order of
-two tiles of one kind.
-
-**Evidence.** The colour now reads the food stock, over thirty-four steps. A
-test that compared the tallest and the shortest plain tile then failed: the
-shorter tile carried food and drew brighter.[^F187A] The test was repaired by
-holding the food at zero, which is the isolation it always needed and did not
-have.
-
-**Follows.** A watcher reads the food of a tile more strongly than its relief,
-within one kind of ground. That is the trade this project chose, because the
-food is what the product record asks a watcher to see and the relief is
-readable across kinds by hue.[^F187B] Any later shading term must state which
-of the two it is willing to dominate.
-
-A test that compares two tiles on one property must hold the others fixed. The
-height test did not, and it passed only because the term it ignored was small.
-
-### FND-350 — The constructor's prose is written in Rust and reaches no Python object
-
-**Believed.** The prose of a member the compiled module provides lives in the
-Rust doc comment, and the reference is generated by importing the module, so a
-member that carries a doc comment publishes its prose.[^F350A]
-
-**True.** That holds for a method, for a property and for a class. It does not
-hold for the constructor. The binding library does not copy the doc comment of
-the constructor onto the class, onto `__init__` or onto `__new__`. The prose is
-written, it is good, and no Python reader can reach it.
-
-**Evidence.** The constructor of `World` carries a doc comment of twenty-six
-lines. It explains the extent, the seed, the faction count, the fact that a new
-world holds no unit, and the reservation of unit storage. Measured against the
-installed module on 3 September 2026: `World.__doc__` is the single line
-`A simulated world.`; `World.__init__.__doc__` is the CPython default
-`Initialize self.  See help(type(self)) for accurate signature.`; and
-`World.__new__.__doc__` is the CPython default `Create and return a new
-object.  See help(type) for accurate signature.` The signature itself does
-reach Python: `World.__text_signature__` reports every argument and every
-default, and `inspect.signature` reads it.
-
-Two fresh readers graded the published page cold. Both led with the same
-complaint: no constructor is documented, so a reader cannot write line three of
-a program.[^F350B] [^F350C] One graded the first action 1 of 5. The site
-configuration also filters out every member whose name begins with two
-underscores, which removes `__init__` even when it carries prose, so two
-mechanisms drop the same paragraph.[^F350D]
-
-**Follows.** A member whose prose lives only in a constructor doc comment
-publishes nothing, and nothing fails. Put the constructor's prose in the class
-doc comment, which does reach `__doc__`. The guard that checks the built site
-against the module must also check that the class prose is more than one
-line.[^F350A]
-
-This is the second declaration site shape in a new place: the prose exists and
-the reader gets a different, shorter copy, with nothing that fails when the two
-disagree.[^13]
-
-### FND-351 — The engine does not report the seed or the faction count, and a second declaration site was already built to hold them
-
-**Believed.** The world is the unit of simulation, and it holds its own
-configuration. A caller that built a world can ask the world what built it.
-
-**True.** The world reports `width`, `height`, `tile_count`, `tick`,
-`event_count`, `gather_count`, `soldier_count` and `settlement_count`. It
-reports neither the seed nor the faction count, and the constructor takes both.
-
-**Evidence.** Measured against the installed module on 3 September 2026:
-`hasattr(world, "faction_count")` is `False`, and no property of that name and
-no property named `seed` appears in the bindings crate. The agent protocol
-server already carries the gap: it declares a frozen dataclass of the four
-construction values, and that dataclass says in its own docstring that the
-engine does not report the seed or the faction count back, so the store keeps
-them.[^F351A] A fresh reader found the same gap from the published page and
-recovered the faction count from the length of a returned array, which copies an
-array to learn a number the constructor took.[^F351B]
-
-**Follows.** This is the redundant declaration shape, in this repository,
-today.[^13] One value lives in the engine and in a Python dataclass, and
-nothing fails when the copies disagree. A researcher who must reproduce a run
-reads the seed from a Python object that the engine cannot check.
-
-Add `seed` and `faction_count` as properties of the world. A constructor
-argument that the object cannot report back forces every caller to keep it, and
-each of those is a copy.
-
-### FND-352 — The engine checks the range of a kind and cannot check its meaning, so it refuses two of the five wrong values
-
-**Believed.** Three integer scales share the name `kind`, and the reference page
-carries the hazard in prose. The page states the numbering in the conventions
-section and restates it at six members.
-
-**True.** The engine checks that the number names a resource kind, which is a
-range check over three values. Three of the five ground kinds fall inside that
-range, so the engine accepts them in full and the caller gets a legal, wrong
-order. Prose has been tried and the restatements do not make a call site
-readable.
-
-**Evidence.** Measured against the installed module on 3 September 2026, over
-64 soldiers. `World.order_gather(units, 4)` raised `VerbError` with the message
-`4 names no resource kind`, which is the mountain ground kind. `World
-.order_gather(units, 2)` was accepted in full, and the number 2 is stone in the
-resource numbering and forest in the ground numbering.
-
-The same shape is on the write side of the fixed-point scale, and there the
-engine cannot check at all. A target of `1` is legal and means one part in
-65536, and the caller who wrote it meant one.[^F352A]
-
-**Follows.** A range check cannot separate two numberings that overlap. A named
-type can, and it costs nothing at run time because an enumeration member of the
-integer kind is an integer. The enumeration must be generated from the compiled
-module rather than written in Python, or it becomes the second declaration site
-this register keeps recording.[^13]
-
-Research report 20 holds the design and the argument against the
-alternatives.[^F352B]
-
-### FND-360 — The core holds a general build verb, and no binding and no Python line calls it
-
-**Believed.** The control plane can found a settlement and nothing else that
-builds. A god game that wants to build things needs a build verb the engine does
-not have.
-
-**True.** The world type is public on four build methods: order a build for one
-unit and one kind, stop that order, report it, and remove a finished upgrade at
-an address. The store behind them is sparse and holds one entry for each tile
-that carries an upgrade.[^F360A] The bindings crate names none of the four, and
-neither does any Python file.
-
-**Evidence.** Measured on 3 September 2026 in this worktree. `grep -c
-"order_build\|destroy_upgrade\|stop_build" crates/cachette-py/src/lib.rs`
-reported 0. `grep -rn "order_build\|destroy_upgrade\|return_direction" python
-tests --include "*.py"` reported no line. `grep -n "    pub fn "
-crates/cachette-core/src/world.rs` reported all four on the world type.
-
-**Follows.** The build verb the downstream game wants is a binding, not an
-engine feature. This is the imported shape of a capability that nothing
-invokes: the mechanism is built, its own tests pass, and nothing reaches
-it.[^F331C] A gap in the boundary and a gap in the engine need different work,
-and the project should not price this one as the second.
-
-### FND-361 — Territory is one of the best-modelled things in the engine, and it reaches Python one tile at a time
-
-**Believed.** Territory ownership is an example of what a god game needs and
-this engine does not model.
-
-**True.** A tile carries one holder, and the holder is one faction or nobody.
-The world stores one faction mask for each block of tiles, so a query for one
-faction skips every block that does not name it. Each faction carries a running
-total of the ground it holds, maintained by the rule that changes a
-holder.[^F361A] The core answers the holder of an address, the mask near an
-address, the count for a faction, the blocks a faction holds and the tiles a
-faction holds.
-
-**Evidence.** Read on 3 September 2026 from the holding module of the core and
-from the public methods of the world type. The bindings expose two of it: one
-scalar entry in the report for one address, and one count in a region summary.
-
-**Follows.** The gap is the boundary and not the model. A need stated as "the
-engine must model territory" would produce work the engine has already done.
-The need is a read, and a product record states it.[^F361B]
-
-### FND-362 — The presence question is a relation between factions, so it does not follow the population
-
-**Believed.** Asking which units of one faction stand on ground another faction
-holds costs the population, and it waits on the selector.
-
-**True.** The gate form of the question does not. The world admits at most 63
-factions, and the reference table says the ceiling was chosen so that a relation
-is one plane and a presence set is one word.[^F362A] The answer for the whole
-world is therefore one set of factions for each faction. The engine already
-rebuilds the derived position of the population at every barrier, and that pass
-already visits every unit and its tile, so deriving the relation adds one read
-for each unit and allocates nothing. The combine is a union of sets, which has
-an identity, is associative and is commutative, so the fold gives one answer at
-any thread count.
-
-**Evidence.** Read on 3 September 2026. `grep -n "FACTION_CEILING"
-crates/cachette-core/src/types.rs` reported `pub const FACTION_CEILING: u16 =
-63`. The scale constants table states the reason for the ceiling in its own
-words.
-
-**Follows.** Separate the gate from the set. The gate is a fixed-size read that
-a large world cannot slow down, and it needs no selector. Naming which units are
-present is the wider question and it is the selector's. A design that folded the
-two together would hold the cheap answer behind the expensive one.
-
-### FND-363 — The return field is built, and the record that describes it reads as a proposal
-
-**Believed.** A record describes a reach field that would give ordered movement
-without a per-unit search, and building it is future work.
-
-**True.** The core answers a return direction for a faction and an address, and
-it answers an exit direction for an address and an option. Both are
-implemented. What is missing is not the field. It is that the seed set is fixed
-at every live site of the faction, so the control plane cannot name a
-destination.[^F363A]
-
-**Evidence.** Read on 3 September 2026. `grep -n "    pub fn "
-crates/cachette-core/src/world.rs` reported `return_direction` and
-`exit_direction` on the world type. No line of the bindings crate and no Python
-file names either.
-
-**Follows.** "Move units somewhere" is a settable seed set and not a new
-mechanism. Reading the record's status as the state of the code costs the
-project a large estimate for a small change. A draft record that the code
-already implements should say so, and this one does not.
-
-### FND-370 — The presence relation cannot ride on the bridge rebuild, because that rebuild runs before the holding spreads
-
-**Believed.** Deriving the presence relation rides on the pass that already
-visits every unit and the tile it stands on. A research report named that pass
-as the rebuild of the unit-to-tile bridge, which runs at the frame
-barrier.[^F370A]
-
-**True.** The bridge rebuild is the wrong place, for two reasons that the
-report did not weigh. The barrier runs before the holding spreads, so a fold
-there reads the holders of the previous tick. The barrier also runs before the
-starvation reap, so a fold there names a unit that the same frame ends, and
-every read for the rest of that frame is then refused as stale. The fold is its
-own stage at the end of the step, after the last structural change and after
-the spread.[^F370B]
-
-**Evidence.** Read on 3 September 2026 from the step of the world type. The
-barrier stage sits above the holding spread stage, and the reap sits below both.
-The record now states the placement and why.[^F370B]
-
-**Follows.** "It rides on a pass that already runs" is an argument about the
-cost term and not about the position. The cost term survives: the fold reads
-three unit columns and one tile column once, and allocates one row array for
-each thread. Nothing here was measured, and one blocker governs every cost
-figure in this project.[^28]
-
-### FND-371 — A derived relation moves no golden state hash, and that is the check that it is derived
-
-**Believed.** Nothing. The project had no relation between factions, so nobody
-had asked what one does to the state hash.
-
-**True.** The golden state hash did not move when the presence relation was
-added. That is the expected result and it is also the evidence: the relation
-reaches no state, so it reaches no hash. A relation that had moved the hash
-would have been stored rather than derived, against the record.[^F371A]
-
-**Evidence.** `cargo test --package cachette-core --test golden_state_hash` was
-green before and after the change, with no regeneration of the golden file.
-
-**Follows.** For any future derived structure, an unmoved golden hash is a
-cheap check that the structure is derived. A moved hash is a question to answer
-before the work is done, not a file to regenerate.
-
-### FND-372 — One visiting unit takes the tile it visits, so a naive presence fixture measures the spread rule
-
-**Believed.** A test of the presence relation places a unit of one faction on a
-tile another faction holds, steps, and reads the answer.
-
-**True.** That fixture does not produce the case. A unit raises seven for a
-claim on the tile it stands on, and the holder of a tile raises one for each
-neighbour that holds with it. A lone visitor therefore beats a holder that
-draws only on its six neighbours, and the tile changes hands in the same step,
-before the fold runs. The relation then correctly reports nothing, and the test
-fails for a reason that has nothing to do with the relation.[^F372A]
-
-**Evidence.** Found while writing the presence tests on 3 September 2026. The
-fixture now places three units of the holder on the visited tile beside the
-guest, and it asserts the holder of the tile under the guest before it reads
-the relation.
-
-**Follows.** A test about a read over the holding must fix the holding first,
-or it measures the spread rule. State the assertion about the fixture, not only
-the assertion about the answer.
-
-### FND-373 — A fixture whose guest sits in the last chunk cannot catch a combine that is not order-free
-
-**Believed.** A test that runs one scenario at three thread counts and compares
-the answers catches a combine that depends on the partition.
-
-**True.** It does not, when the interesting unit sits in the last chunk of the
-arena at every thread count. The presence test spawned the guest last, so the
-guest had the highest arena slot. A combine that took the last slot and dropped
-every other one gave the right answer at one thread and at twelve, and the
-comparison passed.
-
-**Evidence.** Found by putting the defect back on 3 September 2026. The join of
-the presence fold was changed from a union to an assignment, and the
-thread-count test stayed green. The fixture now spawns a further batch of units
-after the guest, so the guest sits in a middle chunk, and the same defect then
-fails the test.
-
-**Follows.** A thread-count comparison is only as good as where the fixture
-puts the value under test. Ask which chunk holds it, and put something after
-it. This is the fixture rule applied to a parallel join.[^23]
-### FND-380 — A unit builds on ground of any faction, and the rule that says otherwise reaches no code
-
-**Believed.** The project orientation states that a unit builds only on ground
-that its own faction holds. It states it as an answered question, beside the
-one owner question about building that stays open.[^F380A]
-
-**True.** Nothing checks the holder. The pass that collects the build intents
-of a step reads the build order of each live unit and the tile it stands on,
-and it reads no holder and no faction. The verb that gives the order reads
-none either. A unit of one faction therefore builds on ground that another
-faction holds, and it finishes.
-
-**Evidence.** Measured on 3 September 2026, through the installed package, in
-a world of 64 by 64 tiles at the seed 7. A founding run gave both factions
-ground. After 20 steps faction 1 held 662 open tiles. One soldier of faction 0
-was spawned on one of them, at the address (16, 9), and given the order to
-build a road. After 12 steps the tile reported the road finished, and it
-reported faction 1 as its holder.
-
-`grep -n "fn build_intents" -A 25 crates/cachette-core/src/world.rs` shows the
-whole input of the pass: the live set, the build order, and the tile.
-
-**Follows.** The rule is a simulation rule, so the core owns it and no binding
-may add it. A binding that checked the holder would be a second declaration
-site of a rule the step does not hold, and the step would go on building
-whenever anything else gave an order.[^13] A backlog item holds the work,
-and the decisions register holds where the rule belongs.[^F380C] [^F380D]
-
-The doc comment of the verb states what the engine does rather than what the
-project intends, because a record of an intent as a fact is the shape the scope
-rule names.[^10]
-
-### FND-381 — A finished terrace changed nothing that the control plane could read
-
-**Believed.** The upgrade store is the mark a unit leaves on a tile, and a
-watcher reads the mark from the tile.
-
-**True.** Before this change no read of the boundary reported an upgrade. The
-report of one tile carried the ground, the stock, the value, the holder and the
-capacity, and the capacity is the only entry an upgrade touched. A road raises
-the capacity, so a finished road was visible as a larger number with no stated
-cause. A terrace raises the gather bonus and touches no entry of that report,
-so a finished terrace was invisible in every read of the ground. A caller could
-infer it only from the resource log, by watching units take more than before.
-
-**Evidence.** Read on 3 September 2026. The capacity of a kind and the gather
-bonus of a kind are two tables in the upgrade module, and the terrace row of
-the capacity table is empty. The report of one tile in the bindings crate set
-ten keys before this change, and none of them named an upgrade.
-
-**Follows.** A build that a watcher cannot see is a build nobody can repair.
-The report of one tile now carries the kind, the work done and whether the work
-is finished. Binding a write verb is not finished when the write lands: the
-work is finished when a caller can read the result back.
-### FND-390 — A fight resolved at the level 1 cell smears, and a fight resolved at the tile does not
-
-**Believed.** Nobody knew. Two factions had never been run into contact in this
-engine, and a blocker held the gap.[^F390A]
-
-**True.** The band that holds the middle 90 percent of the casualties is 1 tile
-wide at the tile, in every arrangement measured. It runs from 1 to 30 tiles wide
-at the level 1 cell, against a block edge of 32 tiles. The furthest casualty of a
-cell resolution stood 36 tiles from the nearest enemy, which is further than the
-block edge because the block diagonal is longer than its side. Between 67 and 72
-percent of the casualties of a cell resolution stood on a tile that held no
-enemy at all.
-
-**Evidence.** A harness runs four arrangements of two armies in a world of
-128 by 96 tiles, resolves 24 frames at each granularity, and reports the
-band.[^F390B] It ran on an x86-64 development machine. The figures are a shape
-and not a cost, so the target platform would report the same numbers.
-
-**The casualty rule is a model and the geometry is the engine.** The engine
-holds no contest, so the harness supplies a provisional rule that removes up to
-one unit for each side of each contested resolution unit in each frame. The
-world, the terrain, the unit arena, the faction column, the unit-to-tile bridge
-and the block layout are the engine.
-
-**Follows.** Resolve a fight at the tile. The cell keeps the job the sketch gave
-it, which is deciding where an army goes.[^F390C] The measurement closes the
-blocker and settles the decision row that waited on it.[^F390D]
-
-### FND-391 — A thin fixture reports no smear, and it would have closed the blocker with the wrong answer
-
-**Believed.** One arrangement of two armies is enough to measure the band.
-
-**True.** It is not. The same rule, over the same world, reports a cell band of
-1 tile for two armies two tiles deep, and 30 tiles for one army that fills a
-level 1 cell against an enemy at one corner of it. An arrangement with nothing
-behind the front has nothing to smear, so it cannot show the defect that the
-blocker asked about.
-
-**Evidence.** The harness runs a two-tile arrangement beside three deeper
-ones.[^F390B] The two-tile arrangement reports a band of 1 tile and no casualty
-away from an enemy, at the granularity that every other arrangement smears at.
-
-**Follows.** This is a local instance of the shape the testing rule names: a
-fixture that models the typical case supplies no extreme.[^23] A measurement
-that decides between two designs states which arrangement it measured, and it
-measures the arrangement that would fail.
-
-### FND-392 — Ordinary ground holds eight units, so a full tile refuses the enemy that would fight it
-
-**Believed.** A design sketch resolves a fight for each tile as a table over
-unit types, without a stated bound on the table.
-
-**True.** The capacity of ordinary ground is 8 units, and the admission rule
-reads that capacity and not the faction. So a contest at one tile reads at most
-8 units in total across every faction and every type. A tile that already holds
-8 units of one faction offers no room, so no enemy can stand on it, and a rule
-that needs the two factions on one tile never fires against a packed army.
-
-**Evidence.** Read on 3 September 2026. `grep -n "ORDINARY_CAPACITY"
-crates/cachette-core/src/terrain.rs` reported `const ORDINARY_CAPACITY: u32 =
-8`, and the passability of a kind is that capacity above zero. A search of the
-admission pass for the word `faction` returned nothing.
-
-**Follows.** A per-tile table is small, which is the good half. The other half
-is a game rule that nobody has stated: whether a contest reads the tile alone,
-or the tile and its neighbours. A decision row holds it.[^F392A]
-
-### FND-393 — The threshold after the sum fails the acceptance test at eleven bowmen
-
-**Believed.** The order of the threshold and the sum matters. The research
-judged the sketch sound and stated the reasoning rather than a number.[^F393A]
-
-**True.** With an effect of 10 for each bowman and a threshold of 100 on the
-tank, the threshold applied before the sum gives zero at every count, including
-one million. The same numbers with the threshold applied after the sum give
-zero at four bowmen and a positive result at eleven. So the acceptance test
-survives one order and fails the other, and it fails at a count a player reaches
-in an ordinary game.
-
-**Evidence.** Two folds over integers, in a model.[^F390B] **This is a model
-and not the engine.** A unit carries no type and no strength, so the engine
-cannot express either side of the test.
-
-**Follows.** The order is the whole mechanism, and a record must state it as an
-order rather than as a threshold. The cliff that the order buys is stated with a
-number in the same harness: a crowd of 1000 whose effect is 99 against a
-threshold of 100 does nothing, and the same crowd at 101 does everything.
-### FND-400 — A contest was said to need a count structure sized by three counts, and the tile form needs none
-
-**Believed.** A contest needs a count for each faction and each type, at
-whatever granularity the fight uses. That structure is the largest new thing
-the design asks for, and its size is the product of three counts, so it must be
-sized on purpose.[^F400A]
-
-**True.** The tile form needs no such structure at all. The resolution builds
-the counts for one tile, from the units standing on that tile, and it discards
-them before it reads the next tile. The list holds one entry for each pair of a
-faction and a type that the tile carries, so its length follows the occupancy of
-the tile and never the faction count or the type count. One buffer for each
-thread serves the whole world.
-
-**Evidence.** Built on 3 September 2026. The resolution walks the derived unit
-structure block by block, and the counts of a tile live in one reused vector
-per thread. The world gained no field for them. The claim the report made is
-correct for a resolution at the level 1 cell, which would have to hold the
-counts of every cell at once, and the project chose the tile.[^F400B]
-
-**Follows.** A design that resolves at the tile is cheaper in storage than the
-report estimated, and not only in the width of the killing. Read a storage
-estimate against the granularity it assumed, because the two options here differ
-by a whole structure rather than by a constant.
-
-### FND-401 — The death plane was documented as safe under any parallel marking, and it is safe only under a slot partition
-
-**Believed.** The plane is dense, so a marking pass writes into disjoint words
-and the plane is identical at any thread count. The doc comment of the plane
-states that as a property of the plane.[^F401A]
-
-**True.** It is a property of the pass that was written first, and not of the
-plane. That pass partitions the unit slots, so each thread owns whole words. A
-pass that partitions something else does not own whole words: the resolution of
-a meeting partitions the tiles, and two tiles held by two threads can hold units
-whose slots share one word.
-
-**Evidence.** Built on 3 September 2026. The resolution gives each thread its
-own plane and joins them by a bitwise union, which is commutative and
-associative. A shared plane would have needed an atomic write, and an atomic
-write would have been correct here by luck rather than by the argument the doc
-comment gives.
-
-**Follows.** A doc comment that states a safety property must name the pass that
-supplies it. A second caller reads the property, believes it holds for its own
-partition, and writes a data race that a single-threaded test cannot see. The
-plane now documents both cases and offers the union.
-
-### FND-402 — A fight was designed to fire when two factions share a tile, and admission makes that state unreachable
-
-**Believed.** Two factions meet when they stand on one tile, so a contest fires
-on co-occupation. The design brief for the contest said so, and the research
-report that shaped it describes a fight over the units of one place.[^F400A]
-
-**True.** Admission enforces the capacity of a target tile by reading the
-capacity of the ground and the number of units standing there. **It never reads
-the faction.** A tile that an army has filled therefore refuses every unit,
-including every enemy, so two factions cannot come to share a tile by walking.
-A rule that fired only on co-occupation would never fire against an army that
-packed itself to capacity, which is exactly the state a fight is about.
-
-**Evidence.** Read on 3 September 2026. The admission pass fills a segment
-table with the capacity of each target and the number of units the derived
-structure reports standing on it, and it grants an intent only while the second
-is below the first. No line of it reads the faction column. A parallel
-measurement of the front line found the same fact from the other direction, and
-the merge of the two branches must fold that row and this one into one.
-
-**Follows.** Contact is adjacency. A unit reaches every unit of another faction
-on its own tile and on the six tiles beside it, so nobody has to enter
-anything.[^F402B] The alternative was a rule that lets an enemy enter a full
-tile, and it was rejected: it supersedes an accepted record and it makes the
-capacity mean nothing at the one moment it exists for.[^F274D]
-
-**A design that fires on a state can be correct and still never fire.** Ask
-what produces the state, not only what the state is. The brief, the research
-report and the first implementation all passed their own tests, because a spawn
-may over-fill a tile and every fixture spawned.
-### FND-430 — Every resource kind credits one commodity, so a store cannot say what a contract delivered
-
-**Believed.** A settlement store holds a quantity for each commodity, and the
-three resource kinds a unit carries reach three separate totals.
-
-**True.** The store holds one commodity, and the table that maps a resource
-kind to a commodity names commodity zero three times. A unit that delivers
-wood and a unit that delivers stone raise one number. The store therefore
-answers how much arrived and never what arrived.
-
-**Evidence.** Read on 3 September 2026. `grep -n "COMMODITY_COUNT: usize"
-crates/cachette-core/src/site.rs` reported `pub const COMMODITY_COUNT: usize =
-1`. `grep -n "WORK_COMMODITY" crates/cachette-core/src/position.rs` reported
-`[CommodityId(0), CommodityId(0), CommodityId(0)]`.
-
-**Follows.** A trade contract states the resource kind exactly, in its own row
-and in its own event, because the store cannot state it. A caller that wants to
-know what a contract moved reads the contract row and never the store. A second
-commodity would change the mapping table and no code outside it, so this is a
-present fact rather than a permanent one.
-
-### FND-431 — The delivery pass carries no stage span, so a pass that moves a quantity is invisible to the cost table
-
-**Believed.** Every pass the step runs opens a stage, so the frame cost table
-accounts for the whole frame.
-
-**True.** The pass that moves a carried load into a store opens no stage. The
-step calls it between two stages and its cost falls into neither. The stage
-list is a declaration, and a pass that declares nothing is absent from every
-cost report the project takes.
-
-**Evidence.** Read on 3 September 2026. `grep -n "self.deliver(threads)"
-crates/cachette-core/src/world.rs` reported one call site, and the lines around
-it hold no `stage::open`. Every other pass in the step is wrapped in one.
-
-**Follows.** The contract settlement pass follows the same precedent, so two
-passes that move a quantity are now outside the table. A backlog item holds the
-repair, and it must add both at once rather than one.[^F431A]
-
-### FND-432 — Presence for one ordered pair needs no derived relation
-
-**Believed.** Answering whether a unit of one faction stands on ground another
-faction holds waits on a derived presence relation, because the answer for the
-whole world is a fold over every unit at the barrier.
-
-**True.** The whole-world answer does. **One ordered pair does not.** The
-soldier arena holds a faction column and a tile column, and the holding holds a
-holder column over the tiles. A walk over the live units that stops at the
-first match answers one pair exactly, from primary state alone, with nothing
-stored and nothing derived.
-
-**Evidence.** Read on 3 September 2026. The trade verbs answer the gate this
-way and their tests pass. `grep -n "pub fn holders"
-crates/cachette-core/src/holding.rs` reported the holder column, and `grep -n
-"pub fn faction_column" crates/cachette-core/src/soldier.rs` reported the
-faction column.
-
-**Follows.** A capability that needs the gate ships before the relation lands,
-and it holds no second copy of the answer, so the relation replaces the walk
-with a one-bit read and changes no behaviour. Read a missing derived structure
-as a cost question and not as a capability question.
-
-### FND-433 — The arena revision means more than a structural change, and the presence relation depends on that
-
-**Believed.** The revision of the unit arena counts structural changes. The
-doc comment says a spawn, a despawn and a move each raise it by one, and it
-explains that an order and an intent do not, because the derived unit
-structure maps a tile to the units on it and neither of those moves a unit.
-
-**True.** The revision is what every structure derived from the arena checks
-its own freshness against, and the derived unit structure is not the only one.
-The presence relation is folded from the faction column, and it refuses a read
-when the revision has moved on. A write to the faction column that left the
-revision alone would give that relation a stale answer that passed its own
-freshness check.
-
-**Evidence.** Read on 3 September 2026 while adding conversion. `grep -n
-"built\|revision" crates/cachette-core/src/presence.rs` showed the relation
-recording the revision it folded at, and refusing a read when the value moved.
-The conversion pass writes the faction column and moves no unit, so it fits the
-class the doc comment says does not raise the revision.
-
-**Follows.** A faction change raises the revision. The derived unit structure
-does not read the faction column, so it rebuilds for nothing on a frame that
-converted somebody. That is the conservative side of one counter, and a second
-counter would be one fact in two places with nothing that fails on
-disagreement.[^22] Read the revision as "a derived structure must look
-again", not as "a unit was created, removed or moved".
-
-### FND-434 — A doc comment that enumerates the write sites of a maintained count goes stale the moment a third one arrives
-
-**Believed.** The per-faction live count of the unit arena has exactly two
-write sites. Its doc comment says the arena maintains it where a slot becomes
-live and where a slot stops being live, and it names those two moments as the
-reason a caller never counts a population.
-
-**True.** Conversion is a third site. It is neither a birth nor a death, and it
-moves a unit from one count to another. The sentence became false the moment
-that site existed, and nothing in the build failed, because the sentence is
-prose.
-
-**Evidence.** Added on 3 September 2026. The arena check recounts the live
-column against the maintained count and compares, so the omission of the
-update would have failed loudly. The sentence that describes where the update
-happens would not have.
-
-**Follows.** The check is what protects the count. The doc comment is what
-protects the reader, and it decays on a different schedule. Do not enumerate
-the write sites of a maintained value in prose. State the invariant instead,
-and name the check that fails when it breaks.[^46]
-### FND-480 — The recovery rules govern every tick and stand outside the state hash
-
-**Believed.** Every value that a later frame reads enters the state hash, so
-two worlds that must diverge cannot hash the same.[^F160A]
-
-**True.** The rules that say how fast a depleted deposit returns do not enter
-it. The world folds the depletion ledger into the hash, and that fold writes
-the entries of the ledger and not the rule set beside them. A caller may
-replace the whole rule set at any time. Two worlds that hold the same tiles,
-the same takes and different recovery periods therefore hash the same, and
-they diverge on the next tick that ages an entry.
-
-**Evidence.** Read on 3 September 2026. The fold of the depletion ledger
-writes the entry count and then the key, the taken amount and the anchor tick
-of each entry.[^F480B] It never reads its own rule field. The whole-world fold
-calls it once and writes nothing else about depletion.[^F480C] The recovery
-pass reads the rule field on every tick.[^F480D]
-
-**Follows.** The golden state test can pass over a change that a caller made
-to the recovery rules, until the difference has already reached a stored take.
-The hash then reports the effect and never the cause, one or more ticks late.
-The repair is one line in the fold, and it moves every golden file because it
-changes the hash chain, so a backlog item holds it on its own.[^F480E]
-
-**This is a defect the boundary work found and did not repair.** The work that
-found it was a binding, and a binding must not move a golden file. The finding
-is the handover.
-
-
-### FND-486 — Every founded unit carries the worker row, whose attack is zero, so a meeting kills nobody
-
-**Believed.** A faction that the seeding founds holds units that can fight. A
-campaign raises a cohort out of those units, and a war between two factions
-costs each side units. A fallen log that stays empty over a run therefore means
-that the two sides never met.
-
-**True.** The seeding gives every founded unit the worker row, and the worker
-row holds an attack of zero.[^F486A] A world builds with the default table, and
-a spawned unit takes the default type, which is row zero of it.[^F486B] The
-seeding founds one group for each faction, and it spawns every person of the
-group through that one call.[^F486C]
-
-The contest pass tests each ordered pair of types before it adds anything. The
-attack of the attacker must exceed the armour of the defender.[^F486D] The
-record states that a pair which fails the test contributes exactly zero,
-however many attackers stand on the tile.[^F486E] The worker row holds an
-attack of zero and an armour of zero, so a worker never penetrates a worker.
-
-Two paths give a unit another type. The type verb sets a set of units. The
-campaign raise sets its cohort to the soldier row, whose attack is one, so a
-raised cohort does kill a worker.[^F486F] Nothing else in a seeded run changes
-a type.
-
-**Evidence.** Read on 5 September 2026, at commit 4f5ed11. The default type
-constant names the worker row. The worker row holds zero in the attack column
-and zero in the armour column. The penetration test compares the two columns
-with a strict inequality. The soldier arena writes the default type on every
-spawn, and the founding calls that spawn for each person of the group.
-
-A readability review of a 1500-tick run of the demonstration reports the same
-fact from the other end. The run produced no fight, and the reviewer had to
-define a type before a fight could be pictured.[^F486G] This work read the code
-and did not run the demonstration.
-
-The harnesses that count the fallen define their own rows first. The
-thread-count harness writes two fighter rows over the default table before it
-spawns anything.[^F486H] That is a second reading of the same fact.
-
-**Follows.** Four things.
-
-**The unit clause of the domination reader cannot fire through combat in the
-demonstration world.** That clause ends a game when every rival holds no
-unit.[^F486I] A contest is the path that empties a faction, and a contest
-between workers kills nobody. The seat clause is unaffected, because it reads
-the holder of a seat tile.
-
-**A fallen log that reads zero reports the seeding and not the contest.** The
-subsystem census holds no row for the fallen, so a reader must open the log to
-see the zero at all.[^F486J] A census row beside the others would make it
-visible. That is the shape FND-483 records for the seat count, where a zero
-meant that no position existed rather than that no position was filled.[^F486K]
-
-**A fixture built from the demonstration world measures the fixture.** The
-testing rule names this shape. A fixture that models the typical case supplies
-no extreme, so the assertion never receives the input that would fail
-it.[^F486L] A combat test seeded the way the demonstration is seeded passes
-whatever the contest pass does.
-
-**A table of four filled rows is one row until something assigns the rest.**
-The record states that zero in a column means cannot.[^F486M] The seeding
-reaches one of the four rows, so three of them describe a unit that the
-demonstration never holds. Backlog item 0491 holds the work.[^F486N]
-
-### FND-497 — The window settings were applied in an order the window library refuses, and no test could see it
-
-**Believed.** The demonstration applies its video settings to an open window,
-and the settings name what the window could not do rather than failing in
-silence.[^F497A] The order of the three calls did not matter, because each one
-sets an independent property.
-
-**True.** The order decides whether the window takes the call at all. The
-window library refuses a size while the window is fullscreen, and it refuses by
-raising.[^F497B] The settings sent the size first, so the key that left
-fullscreen set the size while the window was still fullscreen. The library
-raised, and the raise passed through the key handler and stopped the change.
-The refusal list never saw it, because the code guarded only against a method
-the window does not have.
-
-**True, second part.** The surface took its size from the setting, and a
-fullscreen window is the size of the screen. The picture therefore stayed the
-size of the windowed surface inside a full screen. The window picture was built
-once from the first surface and held a fixed pitch, so a surface of a new size
-handed it a buffer of the wrong length.
-
-**Evidence.** The project owner reported both faults from a run. The library
-raises from the base window class, before any platform code runs, whenever the
-fullscreen state is on.[^F497B] An existing test drove the settings against a
-fake window, and it asserted the wrong order as correct, because the fake took
-every call.[^F497C]
-
-**Follows.** Three things.
-
-**A fake that accepts every call tests the caller against a window that does
-not exist.** The fake must refuse what the real library refuses. The test that
-covers this now raises from the fake exactly where the library raises.
-
-**Name a refusal that arrives as a raise, not only one that arrives as a
-missing method.** A promise to name what could not be done must cover every way
-the other side says no.
-
-**The window path of the demonstration has no test that opens a window, because
-the gate has no display.** Everything the window path can be tested without a
-window is now tested: the order of the calls, the refusal, the size the surface
-follows, and the rebuild of the picture. What stays untested is the part that
-needs a real window: that the library moves the window to the screen size, that
-the size the window reports after a call is the size it drew at, and that the
-picture reaches the screen. Someone tests those on a machine with a display, or
-in the gate under a virtual display server, by opening the window, pressing the
-two keys and comparing the frame the window drew against the frame the file
-writer wrote for the same world and camera.[^F497D]
-
-### FND-520 — A search shaped around how a fact is consumed cannot see a declaration site that restates the fact as types
-
-**Believed.** Item 0153 asks that Python read an event without repeating its
-layout. A read-only audit reported the item done. It searched the Python
-package for the three ways a layout gets repeated, which are a buffer read, a
-structure unpack and a structured array type, and it found none of
-them.[^F590A] It concluded that no second declaration site remained.
-
-**True.** The negative result is correct and the conclusion does not follow.
-No Python module reads a byte of an event, and the runtime path was and is
-sound: the bindings return one array for each field under the field name, the
-fixed-point value crosses as a signed integer, and the identity crosses
-whole.[^F520B] Two declaration sites remained, and neither reads a byte.
-
-**The first is the type stub of the compiled module.** It held one typed
-dictionary for each event log, and each one listed the field names and the
-element widths in declaration order. That is the layout of the event, restated
-as types.[^F520C]
-
-**The second is the binding layer.** Each method that returns the columns of a
-log listed the fields of its event by hand, one line for each column. The copy
-is in Rust rather than in Python, which is why a search of the Python package
-could not reach it.[^F520D]
-
-**The general shape.** A search shaped around how a fact is consumed finds a
-consumer. It does not find a second declaration of the fact in a form that
-consumes nothing. A type annotation, a schema, a fixture and a stub are all
-declarations rather than reads. Search for the fact, not for the operation.
-
-**What follows.** Ask what the fact is, then search for every place it is
-stated, in every language of the tree. The recurring defect rule names one
-fact in more than one place as the through-line of the shapes it lists, and
-this finding is an instance of missing one of the places rather than of the
-shape itself.[^F520E]
-
-**The copies agreed.** No mismatch existed on the day the mechanism was
-written. This is prevention and not repair, and a reader who finds no defect
-in the history must not conclude that the mechanism was pointless.
-
-### FND-521 — The event column classes of the type stub now generate, and the rest of it does not
-
-**Believed.** The register records that nothing in the tree generates the type
-stub of the compiled module, and that no job compares it against the
-module.[^F321A] The stub says the same of itself.
-
-**True as far as it goes, and now narrower.** A class that holds the columns
-of an event carries a marked block of annotations. A script writes that block
-from the field declaration that the engine reports, and a test runs the same
-script in check mode.[^F521B] A field added to an event therefore fails a test
-until the block follows.
-
-**What stays exposed.** Every other declaration in the stub is hand-written.
-Every method signature of the world type and of the camera type, every typed
-dictionary that does not describe an event, and every alias are unchecked
-against the module. A signature there can disagree with the module and nothing
-fails. The earlier row stands for that part.[^F321A]
-
-**Evidence.** Adding a field to an event, and declaring it, leaves the stub
-short. The check prints the missing annotation and exits non-zero, and the
-test that runs it goes red.
-
-### FND-584 — The heat scale ran cold because two terms were written down, and the repair was to derive both
-
-**Believed.** The four terms that drive the temperature of a cell were balanced
-so that they reach the bottom of the heat scale together and the top of it
-together. The sun term reserves a swing, and that swing is the sum of the two
-amplitudes its two parts carry.
-
-**True.** The sum of the two parts never reaches the sum of the two amplitudes.
-The belt of a latitude peaks at the equator, where the season contributes
-nothing. The season peaks at the middle latitudes, where the belt contributes
-nothing. So the highest sum the geometry holds is a little over half of the
-reserved swing, and the top of the scale was out of reach.
-
-**A second term was wrong beside it, and the first repair exposed it.** A whole
-sky took away about three times the published net effect of cloud. The equator
-is the wettest band of the world, so the cloud cooled the equator far more than
-the dry poles. The equator therefore stood colder than the subtropics, and the
-latitude order of the temperature was inverted at its warm end.
-
-**Evidence.** A probe grades the land of a world against the published Köppen
-thresholds. Before the repair no land graded tropical on either seed, and
-between 44 and 58 percent graded ice cap. After it the land grades tropical near
-the equator, desert in the subtropics, continental at the middle latitudes and
-tundra and ice at the poles. The commit body holds both grades, both seeds, the
-mean land temperature of each band, and the command that produced them.
-
-**The defect was put back twice.** A test asserts that the sun term reaches the
-reserved swing at each end, and it fails when the normaliser is written down
-rather than derived. A second test asserts that a whole sky is worth the
-published effect of cloud on the scale the sun states, and it fails when the
-cloud swing is written down.
-
-**Follows.** Three things.
-
-**A term normalised on each part is not normalised on the sum.** Two parts that
-each span a range do not span the sum of the two ranges, unless they peak
-together. Normalise against the reach of the sum, and measure that reach from
-the thing that produces it.
-
-**The heat base did not move.** A base carries the same degrees to a pole that
-it carries to the equator. Raising it was the obvious repair, and it would have
-flattened the latitude gradient rather than restoring the warm equator. The
-defect was the shape of one term and the size of another.
-
-**Five of the weather defects this project has found were a value written down
-where it should have been derived.** Both halves of this one are that shape
-again.
-### FND-592 — The way between two settlements was believed to be planned, and the branch that planned it could never run
-
-**Believed.** The plan solver chose a way between the seat of a faction and
-another settlement of that faction. The solver held a loop over the
-settlements, the decision record names a way between one site and another, and
-a test asserted that a faction with two cities zoned a way between them.[^F545D]
-
-**True.** The branch was inert. The solver anchored one window on the seat, and
-it asked that window for the cost of reaching each other settlement. The window
-radius is a balance value and the founding rule keeps two settlements of one
-faction apart by a distance that is more than twice it. Every settlement
-therefore lay outside the window, the window answered no cost, and the branch
-skipped every candidate on every tick of every world.
-
-**The test could not see it.** The fixture founded its second city inside the
-window radius, and it asserted that the pair sat inside the radius. The founding
-verb never places a second city there, so the fixture modelled a world the
-engine does not build. The fixture measured the window, not the way.[^F496G]
-
-**Evidence.** A run of the demonstration world over four seeds reports the
-distance between each pair of settlements of one faction. The least distance in
-every run equals the founding distance, and no run holds a pair inside the
-window radius. A separate run counts the pairs that a standing road joins, and
-it counts none.
-
-**What follows.** A way between two settlements chains a fixed number of fixed
-windows, each aimed at the far end. A fixture for a way places its two
-settlements at least the founding distance apart, and the assertion that the
-pair sits inside the radius is the wrong assertion. Two values that must agree
-were declared in two files with nothing that fails when they disagree, which is
-the first recurring shape.[^F487B]
-
-### FND-593 — A way was believed to stand wherever a unit walks
-
-**Believed.** A way between two places follows the cheapest path over ground
-that admits a unit. The path search refuses a tile that admits nobody, and
-nothing else was thought to bar a way.
-
-**True.** A unit walks the mountain and a road does not fit the mountain. The
-ground fit of the joining category admits the plain, the forest and the hill,
-and the mountain admits a unit at the ordinary capacity. A way whose cheapest
-path crosses high ground therefore holds a tile that no unit can ever build.
-The plan holds that project, the build pass refuses it on every tick, and the
-two settlements at the ends stay apart while the plan reads as though it joined
-them.
-
-**Evidence.** A fixture founded two cities sixteen steps apart and ran nine
-hundred ticks. The road that touched the seat grew to about a hundred tiles and
-stopped eleven steps short of the far city, and the count did not move over a
-further two thousand one hundred ticks. The way crossed high ground, and the
-tiles on it were never built.
-
-**What follows.** The window a way reads admits only ground the joining
-category fits. The window a deposit and a yield read is unchanged, because
-those two ask where a unit may go and not where a road may stand. A pair of
-settlements that no such ground joins now yields no project, which is a plan
-that says nothing rather than a plan that lies.
-
-### FND-644 — The observation reader refuses to answer once three policies have acted, and the demonstration is the first caller that reaches it
-
-**Believed.** A faction observation is a read. It answers at any tick, for any
-faction, whatever the factions did on the tick before. The learner environment
-reads it after every decision and never sees it refuse.
-
-**True.** The reader answers `None` and the binding raises a view error, once
-three seated policies have run their verbs for about a hundred ticks. The
-message says that the world cannot describe its own units.[^F644A] A world that
-runs the same ticks with nobody acting does not reach it, and a world with one
-seated policy does not reach it inside five hundred ticks.
-
-**Evidence.** Three probes on one world of 48 tiles a side, three factions, one
-thread, at seed `0x0CAC4E770472`. The first stepped 400 ticks with every faction
-externally controlled and nothing acting, and read every observation on every
-tick. It did not raise. The second seated one stored policy on faction zero,
-stepped 500 ticks and took 51 decisions. It did not raise. The third seated
-three stored policies, one for each faction, and raised at tick 110 after 34
-decisions. No renderer ran in any of the three, so the drawing pass is not
-involved.
-
-**What follows.** The demonstration can seat a stored policy, and a watcher
-cannot yet watch one play to the end of a game. The condition is engine side,
-because the three probes differ only in how many factions acted through the
-engine verb. The verbs the policies ran were the settling verb, the queue verb
-and the build verb, so the derived unit structure is the thing to look at
-first.[^F644B] An item holds the repair.[^F644C]
-
-
-### FND-673 — Two tests read a cropped weather array as if it were the whole account
-
-**Believed.** A weather array is the weather of the world. The sum of the
-ground array therefore equals the ground total, and the centre of the air array
-is the centre of the water in the air.
-
-**True.** The engine steps a margin of weather cells outside the world so that
-the border has real upwind. The totals hold the margin, because the water
-account balances only when they do, and the arrays crop it away. The sum of an
-array is therefore at or below its total, and it falls below as soon as water
-crosses the border.[^F673A]
-
-**Evidence.** On a coastal world of 128 tiles a side, after 32 steps of 4
-ticks, the ground array sums to 32242 drops against a ground total of 79452.
-The margin holds 59 percent of the ground water.
-
-A god-strike at the centre of a world 32 weather cells across reaches both
-borders on the second step. By the eighth step 36450 drops of 393586 are
-outside the reading, and the losses on the two sides are of the same order, so
-the measured centre of the air had moved against the wind. A test that
-integrated eight steps therefore accused the wind reader of swapping an axis it
-had not swapped.
-
-**What follows.** A test that reads a cropped array must either compare it
-against the same cells read one at a time, or prove that the quantity has not
-reached the border. The two tests now do one each, and the second asserts the
-proof so that a longer span fails on the margin rather than on the axis.
-
-**The shape.** A reader that crops needs a guard and not a comment. Both
-bindings said in their doc comments that the reading crops the margin away, and
-both tests were written against them anyway. A sentence in a doc comment does
-not fail.
-
-### FND-674 — A list of engine names in a test is a second declaration site, and it decayed by nine rows
-
-**Believed.** A test that lists the names of an engine table pins the public
-interface, so a name that leaves the table fails in the suite rather than in a
-watcher's terminal.
-
-**True.** The list is a second declaration site of the thing it checks. The
-census table in the engine carries a doc comment that says it is the only
-declaration of the list, and that names a test as one of the readers of the
-table.[^F674A] The binding builds the dictionary from that table, so the only
-disagreement the list can find is one the table itself introduced.
-
-**Evidence.** The table grew from 31 rows to 40. Nine names went in the middle,
-so the list and the table diverged at index nine and the test failed. Nothing
-else broke. Two tests read the list, and one of them was checking that a
-printed run names every row, which is derivable from the census of a world of
-the same shape.
-
-**What follows.** Derive the list from the tree in the test. Pin by name only
-the names the test itself reads, which is the interface that test depends on.
-What is left for the boundary is what the boundary can get wrong on its own: a
-repeated key, a value of the wrong type, and an order that moves between two
-readings of one world.
-
-## D. Cost estimates that were wrong
-
-### FND-222 — A frame at the target scale costs eleven times its budget
-
-**Believed:** nothing. No measurement existed on the target platform, so the
-project had no figure for the cost of a frame at the target scale. The frame
-budget of 100 milliseconds is derived from the tick rate and the tile edge,
-and nobody had checked the engine against it.
-
-**True:** one frame at 16,777,216 tiles and 1,000,000 units costs a median of
-1,135 milliseconds on two Graviton3 hardware threads. That is 11.4 times the
-budget. One thread costs 1,861 milliseconds, so a frame holds 1.86
-core-seconds of work.
-
-**The cost is two straight lines.** A tile costs 78 ns for each frame on one
-thread and a unit costs 557 ns. The two constants predict the target scale row
-to one part in two hundred. The unit count is therefore the larger half of the
-frame at the target scale, and it holds 1,000,000 units against 16,777,216
-tiles.
-
-**Evidence:** the target platform register holds the run, the machine, the
-commit and every row.[^F222]
-
-**Follows:** the tile pass ran 1.81 times faster on two threads and the unit
-passes ran 1.35 times faster, so the half of the frame that is larger is also
-the half that scales worse.
-
-**The two constants in this entry are weaker than it says.** A pre-registered
-prediction later missed by 6.2 percent, and FND-240 holds it. Read them as an
-approximation good to about ten percent. The measured rows in this entry and
-in FND-224 do not move, because neither is computed from a constant. The measured world held no settlement, so every
-figure above is a lower bound.
-
-**This entry first said the budget needs at least 19 cores at perfect
-efficiency. A later run on 16 cores refuted the reasoning behind that
-sentence, and FND-224 holds the correction.** Perfect efficiency is not
-available: the unit passes reach a floor and stop.
-
-### FND-224 — The frame budget is out of reach on any core count
-
-**Read FND-330 before quoting a figure from this entry.** The 500 millisecond
-frame and the 300 millisecond floor below are superseded. Later work made the
-frame 177.9 milliseconds at the target scale on 12 threads. The title of this
-entry still holds, because the budget is 100 milliseconds and the frame is
-above it.
-
-**Believed:** FND-222 divided 1.86 core-seconds by a budget of 100
-milliseconds and concluded that 19 cores would reach it. That reasoning
-assumed the work divides.
-
-**True:** it does not all divide. A run on 16 Graviton3 hardware threads gives
-a frame of 500 milliseconds at the target scale, which is 5.0 times the
-budget, at a speedup of 3.69 on 16 cores. **The unit passes reach a floor near
-300 milliseconds and gain nothing between 12 threads and 16.** The tile pass
-has no floor in the range measured and reached 6.13 on 16 threads.
-
-**A frame at the target scale therefore cannot fall below about 300
-milliseconds on this engine, whatever the core count.** The budget is 100
-milliseconds. No machine reaches it.
-
-**That floor is about twice as high as this entry says.** Every figure here
-was taken with the units packed into a band, and FND-245 shows a unit costs
-about twice as much at the density the project states. The conclusion holds
-under both patterns and the level does not.
-
-**Evidence:** the target platform register holds both runs, the machines, the
-commits and every row.[^F222] The unit half is the difference between a world
-of 1,000,000 units and a world of none, at 4,194,304 tiles, taken at five
-thread counts.
-
-**Follows:** buying a larger machine does not deliver the tick rate. Either a
-unit must cost less in a frame, or fewer units must do work in a frame. The
-project already holds the second shape as a design principle, because a
-set-valued command permits a cheaper algorithm than a per-entity loop. This is
-the first measurement that says the principle is load-bearing rather than
-tidy.
-
-**Two cautions.** The measured world held no settlement and no character, so
-the unit half is a lower bound and the floor may be higher. The step starts
-threads for each parallel stage rather than using a pool, so part of the floor
-may be that cost rather than the work.
-
-### FND-225 — The tiles hold the memory at the target scale, and the units do not
-
-**Read FND-246 before quoting a figure from this entry.** The 545 MB below is
-the figure at one thread. A machine needs about 960 MB.
-
-**Read FND-246 before quoting a figure from this entry.** The 545 MB below is
-the figure at one thread. A machine needs about 960 MB.
-
-**Believed:** memory at the target scale would be dominated by the entity
-tiers rather than by the tiles, on the reasoning that a tile is generated and
-only its change is stored. A derivation put the total at one to three
-gigabytes.
-
-**True:** a world of 16,777,216 tiles and 1,000,000 units holds **545 MB
-resident at one thread**, and 876 MB at 12. FND-246 holds the thread rows. The same world with no unit holds 456 MB, so the whole population
-of one million adds 89 MB. **A tile costs 27 bytes and a unit costs 89 bytes.**
-The tiles are five sixths of the total.
-
-**The generated-tile records are not contradicted.** Nothing stores a tile
-value or a tile stock. The 27 bytes are the columns the world does allocate
-for each tile, and one proposed item already names the holder column as one of
-them.[^F162D]
-
-**Building the world needs more than holding it.** The high water mark at the
-target scale is 872 MB against 545 MB resident, and the gap holds at every
-large extent. A machine sized to hold the world will fail to build it.
-
-**Evidence:** the target platform register.[^F222] Each point was measured by
-a process that built one world and exited, because a process that has already
-built a large world does not return the memory and would report the high mark
-of the run.
-
-**Follows:** the derived figure was high by a factor of two to six, and it was
-wrong about which half dominates. The measured world holds no settlement and
-no character, and the scale constants table names 5,000 settlements and 50,000
-living characters, with the character layer derived at about 85 MB. Adding
-those to 545 MB does not reach one gigabyte, so the shape of the answer is
-unlikely to change.
-
-### FND-240 — A pre-registered prediction refuted the two-constant model
-
-**Believed:** the cost of a frame is the tile count times a constant plus the
-unit count times a second constant. The register said the two constants
-predict the target scale row to one part in two hundred, and called that the
-strongest evidence in the run.
-
-**True:** the agreement was one point. A prediction written into the register
-and committed **before** the run that tested it named 396.6 milliseconds for
-16,777,216 tiles and 500,000 units at 12 threads, with a hit defined as five
-percent. The measurement is 371.9 milliseconds, which is 6.2 percent low and
-outside the band.
-
-**The cost of a unit is not one constant.** At 16,777,216 tiles it is 248 ns
-at 500,000 units and 270 ns at 1,000,000, so it rises with the population. The
-constant the prediction used came from a world of 4,194,304 tiles, where it is
-298 ns, so it depends on the extent as well.
-
-**Evidence:** the register holds the prediction, the band, the result and both
-commits.[^F222] The commit that states the prediction holds no result, and the
-commit after it holds the result, so the order of the two is the evidence.
-
-**Follows:** the two constants are an approximation good to about ten percent,
-and the register now says so. **The headline result does not move**, because
-it never rested on the model: the frame at the target scale, the tile pass and
-the unit passes are each measured rows, and the floor in the unit passes is a
-difference between measured rows.
-
-**The method is the finding as much as the result is.** A consistency check
-computed after the data is in hand cannot fail, and this one would have stood
-in the register as strong evidence. It cost ten cents and one commit ordering
-to learn that it was worth about a tenth of what it claimed.
-
-### FND-241 — The unit cost of a frame is not one stage, and most of it cannot be measured from outside
-
-**Believed:** the unit passes are 298 milliseconds at 12 threads, and finding
-which stage holds them would give the project one optimisation target.
-
-**True:** no single stage holds them. At the target scale, of 274 milliseconds
-of unit cost in a 521 millisecond frame, the choice scoring is 71
-milliseconds, one bridge rebuild is 26, the economy is 6, and **170
-milliseconds is a residual that the public interface cannot divide.** The
-largest part is the part nobody can name.
-
-**The residual holds** the movement intents, admission, the holder spread, the
-death scan, the part of the level 1 rebuild that reads the units, and the walk
-over every live unit inside the choice pass that the interval does not remove.
-
-**Evidence:** the register holds the rows.[^F222] Each part was priced by
-running a whole frame with a switch off and taking the difference, because the
-engine holds no instrumentation and the benchmark added none. Three switches
-exist on the public interface: the economy schedule, the choice interval, and
-the bridge rebuild, which is public and was priced directly.
-
-**A correction inside this finding.** The step calls the bridge refresh four
-times in a frame. The step held three refreshes when this was measured, and a
-first reading of that put the bridge at three rebuilds and 79 milliseconds. The
-refresh compares a revision counter and returns when the bridge is still
-accurate, so the measured frame pays one rebuild and the other refreshes are
-constant checks. The figure is 26 milliseconds, not 79.
-
-**Follows:** a stage that cannot be measured from the public interface is a
-stage nobody can prove they improved, and that may be why none of this has
-been optimised. Something must make the stages separable before the largest
-part of the unit cost can be worked on. Backlog item 0229 already asks for a
-stage measurement and names the constraint that a clock must not enter the
-engine.
-
-### FND-245 — The placement of the units doubles the cost of a frame
-
-**Believed:** the benchmark measured the engine at the target scale. The
-fixture placed the units by walking the world from the first tile and filling
-each tile that admits one.
-
-**True:** that pattern packs 1,000,000 units into a band across the top of the
-map at one unit for each tile, and leaves the rest of the world empty. It is
-about seventeen times denser than the target scale describes, because one
-million units over 16,777,216 tiles is one unit for each seventeen tiles.
-
-**A unit costs about twice as much at the density the project states.** The
-same frame, in one process on one machine from one build, under two placement
-patterns:
-
-| Threads | Unit cost packed, ms | Unit cost scattered, ms | Ratio |
-|---|---|---|---|
-| 1 | 578.5 | 1,363.4 | 2.36 |
-| 2 | 422.5 | 962.2 | 2.28 |
-| 4 | 329.5 | 746.5 | 2.27 |
-| 12 | 278.5 | 587.5 | 2.11 |
-
-**Evidence:** the register holds both patterns at every thread count.[^F222]
-
-**Follows:** every packed unit figure in the register is a lower bound. A frame
-at the target scale costs 835 milliseconds at 12 threads at the stated
-density, which is 8.4 times the budget, against 526 and 5.3 times packed.
-
-**The shape survives and the level does not.** The unit passes scale to 2.08
-on 12 threads packed and 2.32 scattered, so the conclusion in FND-224 that the
-budget is out of reach holds under both. The floor is about twice as high as
-that entry says.
-
-**The memory does not move**, at one part in four thousand between the two
-patterns.
-
-**This is the shape the testing rule names, found in a benchmark rather than
-in a test.** The rule says to ask what distribution the work needs rather than
-to copy a convenient world, and to put the defect back and watch the test stay
-green. Nobody asked it of this benchmark, and the fixture was chosen because
-it was easy to write.
-
-### FND-246 — A memory figure without a thread count is not usable
-
-**Believed:** a world at the target scale holds 545 MB. FND-225 states it and
-the register stated it without naming a thread count.
-
-**True:** 545 MB is the figure at one thread. The same world holds 572 MB at
-two threads and 876 MB at 12. The step gives each thread its own output slot,
-so the resident size grows with the thread count by about 30 MB for each
-thread.
-
-**The peak moves much less**, from 872 MB at one thread to 957 MB at 12,
-because the peak is set by the build and the build runs at one thread whatever
-the caller asks for.
-
-**Evidence:** the register holds the three rows.[^F222] Each was measured by a
-process that built one world and exited.
-
-**Follows:** a machine needs about 960 MB free to build and step a world at
-the target scale, not 545 MB. The conclusion of FND-225 does not change: the
-tiles still hold the memory and the units still do not, and both figures move
-together with the thread count.
-
-### FND-242 — A list that could not go stale had gone stale
-
-**Believed:** the budgets register carried a table of the records that still
-hold a derived cost figure in their bodies, naming ADR-0003, ADR-0005 and
-ADR-0006. The register said the record check carries the list, and that the
-check fails when an entry matches nothing, so the list cannot go stale.
-
-**True:** all three records hold no figure of any kind. The work that cleared
-them did not clear the table, so the table named three records as carrying
-figures they do not carry.
-
-**The safeguard was not what the register said it was.** The check carries a
-baseline of tolerated figures, and it is the baseline that fails when an entry
-matches nothing. The baseline is empty. Nothing reads the table in the
-register, so the table is prose like any other and always was.
-
-**Evidence:**
-
-```
-grep -oE "[0-9]+(\.[0-9]+)? ?(percent|ms|ns|byte)" docs/adrs/*/adr-000[356]*.md
-grep -cv "^#|^$" scripts/adr-volatile-baseline.txt
-```
-
-The first command finds nothing in any of the three records. The second
-reports that the baseline holds no entry.
-
-**Follows:** the table now says that no record holds a figure, and it names
-this finding. **A claim that a list is checked is worth nothing unless the
-reader can see what checks it.** This one named the check in a footnote, and
-the footnote pointed at a file that holds a different list for a different
-purpose. That is close enough to be convincing and far enough to be false.
-
-**This is defect shape 1 with the roles reversed.** The usual shape is one
-value in two places with nothing failing when they disagree. Here the second
-place was a safeguard that did not cover the first, and the register asserted
-that it did.
-
-### FND-255 — The collapse measurement measured the cell count, because every unit holds the same need
-
-**Believed:** counting the distinct pairs of level 1 cell and need against the
-live unit count would say how far a choice pass collapses if it decided for
-each cell rather than for each unit.
-
-**True:** the count returned a pair count exactly equal to the cell count, at
-every bucket width including the exact need, under both placement patterns.
-**The need column holds one value for all 1,000,000 units.** It is 65536,
-which is one in the fixed point scale, and it is the value a unit spawns with.
-
-The measured world holds no settlement, so no unit has a home to draw from and
-consumption never moves a need. The measurement therefore reports the units
-for each cell and nothing about the need.
-
-**What it does establish.** The geometry gives 14,970 occupied cells of 16,384
-for 1,000,000 units at the density the project states, so **66.8 is a ceiling
-on the collapse factor** and no need distribution can beat it. The packed
-figure of 740.2 is a property of a fixture that puts the whole population into
-8 percent of the cells.
-
-**What decides the real answer.** A cell holds 64 units at the median under
-the scattered pattern. The distinct pairs in a cell are the smaller of the
-units in it and the need values they take, so the collapse in the median cell
-is about 64 divided by the number of need buckets. At 4 buckets it is 16, at
-16 buckets it is 4, and at 64 buckets it is 1. **The need is a Q16.16 quantity
-and takes about four thousand million values, so unbucketed the collapse is 1
-and the rule buys nothing.** The bucket width is the mechanism, not a detail.
-
-**Evidence:** the register holds every row, both placements and all six bucket
-widths.[^F222] The counts come through the public crate interface, and the
-engine gained no instrumentation: the live units, the tile of a unit, the need
-of a unit and the block layout are all public. The pairs pack into one word
-and the count is a sort and a scan, so no hash iteration order reaches the
-result.
-
-**Follows:** the record must not carry a collapse figure from this run. The
-number it needs is how many need values coexist in one cell in a world that
-consumes, and no fixture in this project produces one, because that needs
-settlements, home sites and a running economy. **A ceiling of 66.8 and an
-unmeasured floor of 1 is what this run supports.**
-
-**This is the third fixture defect this benchmark has produced in one
-session.** The first packed the population into a band, the second placed 76
-percent of the units it was asked for, and this one measured a column that
-never changes. Each was found by looking at a number that was too clean.
-
-### FND-247 — A comparison that isolated one variable had two, and it was discarded
-
-**Believed:** the first placement comparison answered whether the fixture
-biased every unit figure. It ran the same frame under a packed and a scattered
-population and reported that the scattered one cost 86 percent more.
-
-**True:** it placed 762,599 units under the scattered pattern against
-1,000,000 under the packed one. The two rows differed in their population as
-well as in their placement, so a comparison built to isolate one variable had
-two, and neither row explained the other. **The result was discarded rather
-than reported with a caveat.**
-
-The cause was in the fixture and not in the engine. The scattered pattern
-walks the world at a stride and searched one stride for a tile that admits a
-unit. A stride at the target scale is sixteen tiles, and a run of sixteen
-tiles of water ends that unit's search while every later unit keeps its own
-target, so the shortfall accumulates. The cursor now never goes backwards and
-never stops early, so water costs a longer walk rather than a lost unit.
-
-**Evidence:** the discarded run reported 762,599 in its unit column, which is
-where the defect showed. The repaired run reports 1,000,000 under both
-patterns, and the corrected result is a 60 percent difference rather than 86.
-
-**Follows:** a caveat is not a substitute for a second run when the second run
-costs three cents and four minutes. The discarded numbers were in the right
-direction and would have supported the same conclusion, which is exactly why
-reporting them would have been wrong: **a result that happens to point the
-right way is not evidence, and publishing it teaches the reader that the
-apparatus was sound when it was not.**
-
-**The unit column is what caught it**, and it was in the output only because
-the benchmark reports what it placed rather than what it was asked for. A
-fixture that reports its request rather than its result cannot show this
-class of defect at all.
-
-### FND-248 — A guard that fires correctly is not evidence that the thing it guarded against was acceptable
-
-**Believed:** the teardown trap makes a launch safe to attempt, because a run
-that goes wrong terminates itself.
-
-**True:** the trap works, and it is not a licence. One command chained a source
-edit and an instance launch. The edit failed its assertion and wrote nothing.
-The launch went ahead against a benchmark mode that did not exist, so the
-instance built the tree, ran a sweep nobody asked for, and billed for it.
-
-The trap did its job. An interrupt terminated the instance, deleted the key
-pair and the security group, and the region was verified empty afterwards.
-**That is the good news and it is not the finding.**
-
-**Evidence:** the launch and its teardown are in the run log, and the commit
-that repaired the sequencing describes it.
-
-**Follows:** **an edit and a launch do not belong in one command.** The launch
-must depend on the edit having succeeded, and a shell that runs the next
-command after a failed one gives no such dependency. Separate them, or make
-the launch conditional on the edit's exit status.
-
-**The general shape.** A guard exists because the guarded action can go wrong.
-Once the guard is trusted, the action gets attempted more casually, and the
-guard is then load-bearing for cases it was never designed to cover. The trap
-was written for a build that fails and a connection that drops. It was not
-written for a launch that should never have happened, and it happened to
-cover that too. **Next time it may not.**
-
-### FND-249 — Three kinds of work, three kinds of scaling, measured on one machine
-
-**Believed:** the exit field derivation would either scale like the tile pass
-or floor like the unit passes, and which one it did would say whether the
-lattice claim survives its first instance.
-
-**True:** it does neither, and the reason was structural and readable before
-the run. The derivation takes no thread count, and its own documentation says
-the pass runs on the calling thread. A prediction saying so was written into
-the register and committed before the run, with a hit defined as a speedup
-inside 0.9 to 1.1 and a cost under 10 milliseconds.
-
-**All three predictions hold.** The derivation costs 2.15 milliseconds at 1,
-2 and 12 threads, flat to three figures, which is 132 ns for each of 16,384
-cells. The level 1 rebuild beside it reaches 11.59 times on 12 threads, which
-is 0.97 of the machine and the best scaling measured anywhere in this project.
-
-**The result that matters is the comparison, not any one row.** Three kinds of
-work, on one machine at one extent:
-
-| Work follows | Speedup on 12 threads |
-|---|---|
-| The cells | 1.00, and it does not need threads |
-| The tiles | 11.59 |
-| The population | 2.08 packed, 2.32 scattered |
-
-**Evidence:** the register holds the prediction, the rows and both
-commits.[^F222] The derivation was measured directly rather than by a
-difference, because the field, its constructor and the level it reads are all
-public. The engine gained no instrumentation. The units were scattered,
-because a packed population would flatter a per-cell claim in the direction
-the record wants to hear.
-
-**Follows:** work that follows the lattice is small enough not to need
-threads, and work that follows the tiles takes them almost perfectly. **Work
-that follows the population barely takes them at all**, and that is the half
-of the frame the project cannot currently reduce. The lattice claim is
-supported by its first instance.
-
-**One caution against reading this as a general law.** The exit field is flat
-because it is small, not because per-cell work cannot be large. A per-cell
-pass over 16,384 cells that did much more for each cell would want threads and
-would not have them, because the derivation takes no thread count and nothing
-would notice.
-
-### FND-261 — A count of what one layer asked for cannot see a generation below it
-
-**Believed.** The drawing generated the ground of every visible tile twice,
-and one of the two answers was a value it already held.[^F209C] A count of the
-grounds the drawing asks for would say whether the repair worked.
-
-**True.** The count says half of it. The counter stands in the drawing, so it
-counts the calls that the drawing makes into the core. It cannot see a
-generation that a reader below the drawing runs, and the second generation was
-exactly that: a stock reader that started from the address and generated the
-ground again to answer.
-
-A contributor can therefore put the defect back and no test fails. The drawing
-would call the reader that starts from the address alone, the picture would
-not change, and the count of grounds the drawing asked for would still equal
-the count of painted tiles.
-
-**Evidence.** Two defects were put back, one at a time, against the tests that
-claim the rule. A second generation written into the drawing was caught,
-because both calls increment the counter. A second generation written into the
-reader below was caught only by a test in the core crate, which gives the
-reader a ground the address does not carry and asserts that the answer follows
-the argument. No test in the drawing saw it.
-
-A third defect was put back and caught nothing. A test named "the count
-follows the window and not the world" was written first as a sweep over the
-zoom steps. The drawing was then made to walk every column of every visible
-row. The count still equalled the count of painted tiles, and the count still
-fell at each step in, because the rows were still held to the window. **The
-test measured less than its name claimed.** The test that replaced it draws one
-window at one tile size over two worlds of different sizes and requires the
-same count, which is the shape an existing test of the holder count already
-uses.[^F261B]
-
-**Follows.** **Put the defect back at each layer, not at the layer you were
-thinking about.** A count is evidence about the layer that holds the counter,
-and about no layer below it.
-
-**Name a test for what it proves, not for the property you want.** The test
-above was correct in every assertion it made and wrong in its name, and a
-reader would have taken the name as the guarantee.
-
-**A count of the generations that one frame runs does not exist, and an item
-holds it.**[^F261C] Until it does, the claim that the ground is generated once
-rests on two tests in two crates and on reading the one call site.
-
-### FND-257 — A check that searches for a moved path must first ask whether the path is a name
-
-**Believed:** the moved-path rule of the merge-defect check was ready for a
-merge. It reads the paths the change moved away from, searches the tree for
-each one, and reports every place that still names an old path. The rule is
-sound and the check passed every fixture and every real change until now.
-
-**True:** the rule searched for a path called `0` and reported 14571 failures,
-all of them false. The search is a fixed-string search. A path of one
-character is a substring of ordinary text, so the search matched every version
-field of a lock file. The check blocked a merge that held no moved-path defect
-at all.
-
-**The evidence is the run.** The merge of the benchmark branch deleted three
-files whose names are `0`, `40` and `600`. They are image dumps that a render
-script wrote to a numeric file name and that a commit then captured. The gate
-reported 14571 failures and named the lock file on every line.
-
-**What follows.** A search for a name needs two conditions that a fixed-string
-search does not carry. The name must be distinctive enough that a match means
-a reference, and the match must stand on its own rather than sit inside a
-longer name. The check now asks both.
-
-**The two conditions do different work, and the measurement says which does
-which.** The first repair asked both at once, and the tidier reading was that
-the second condition carried it. That reading is wrong. Over the tree at the
-merge, a fixed-string search for `0` matches 14588 lines. The
-stands-on-its-own condition alone leaves 2066 of them, because prose holds
-sentences such as "level 0 holds individual tiles". It annihilates the lock
-file only because a lock file holds no prose. **The distinctive-name condition
-is the one that carries this defect, and anyone who simplifies it away
-reopens it.**
-
-**The first form of the distinctive-name condition was too wide.** It searched
-for a path only when the path held a directory separator or a file extension.
-That rejects the bare number and it also rejects `justfile`, which 16 lines of
-this project name and which no prose holds by accident. A move of it reported
-nothing and the gate passed. The condition now asks the narrower question:
-can ordinary prose hold this token? A bare number can, a word cannot, so the
-check skips a path whose last segment is all digits and searches every other
-path. A bare number one directory down is the same defect and is skipped for
-the same reason.
-
-**A skipped path is reported, not dropped.** A moved file the check does not
-search for is still a moved file, and the check prints a note for it. The note
-says why the search did not run, so a reader can search by hand. A residual
-gap remains for a name that is neither a number nor distinctive, such as a
-one-letter file at the root. It is stated rather than closed, because no such
-file exists and an escape written before a real instance is a capability
-nobody invokes.[^37]
-
-**A match now survives a full stop that ends a sentence.** A full stop
-continues a name in `docs/a.md.bak` and closes one in "the detail is in
-docs/a.md." The two are told apart by the character after the stop. Prose that
-names a path outside a code span breaks the documentation rule, and it is
-therefore the prose most likely to be stale.
-
-**The rule now has a probe, and it did not before.** Each condition above was
-put back as a defect, one at a time, and the probe was run against it. The
-condition that shipped first fails exactly the case built for `justfile`. A
-probe is the thing that would have found this hole without anyone reasoning
-about it, and its absence is why two repairs were needed rather than one.
-
-**The shape.** This is the inert-capability shape inverted. The rule was not
-inert; it ran, and it ran on the first input that was outside the distribution
-its fixtures held. A fixture built from citation-shaped paths supplies no
-one-character name, so the assertion never received the input that would fail
-it.[^84] The defect lived at an extreme of the distribution, and the
-fixture modelled the typical case.
-
-**The cost of finding it was one gate, and then one review.** The check is
-nine hours old, this was its first live merge, and its first repair carried a
-second instance of the same shape.[^F257B] Both instances are one shape: a
-rule was narrowed against the input in front of it, and nothing measured what
-the narrowing cost on the inputs that were not.
-
-
-### FND-256 — The fixture of a benchmark is its least reviewed code and its most load-bearing
-
-**Believed:** the benchmark measured the engine. Its figures were reviewed, its
-method was stated, and its rows carried the machine, the commit and the date.
-
-**True:** three of its figures described the fixture rather than the engine,
-and all three were found in one session. None was found by reading the
-benchmark. Each was found by distrusting a number that looked too clean.
-
-| The defect | What it made false | How it showed |
-|---|---|---|
-| The population filled the first open tiles, packing 1,000,000 units into a band at one unit for each tile | Every unit figure, by about a factor of two | A reviewer asked what density the pattern gave |
-| The scattered pattern gave up at water and placed 762,599 units of 1,000,000 | A comparison built to isolate the placement | The unit column in the output |
-| The need column held one value for every unit, because no unit had a home to draw from | The whole collapse measurement | A pair count exactly equal to a cell count |
-
-**The transferable claim.** A benchmark's fixture is the least reviewed code
-in a project and the most load-bearing for every figure the benchmark
-produces. The measurement code gets read, because a figure is what people
-argue about. The world the measurement runs on gets written once, early, by
-whoever wanted a number, and then every later figure inherits it.
-
-**Evidence:** the register holds all three, with the corrected figures beside
-the ones they replaced.[^F222] FND-245 holds the placement, FND-247 holds the
-discarded comparison, and FND-255 holds the constant need column.
-
-**Follows:** the register now names the fixture beside every table, and its
-format rule demands the fixture as well as the machine. **A figure whose
-fixture is not named is not reproducible**, and that is a stronger statement
-than the one this project already makes about the machine.
-
-**Three tests, in the order they cost.** Ask what distribution the measurement
-needs, before writing the world. Make the fixture report what it produced
-rather than what it was asked for, because that is what caught the second
-defect. Distrust a number that is too round, too flat or exactly equal to
-another number, because that is what caught the first and the third.
-
-**The testing rule already said the first of those**, and it says it about
-tests rather than about benchmarks.[^23] Nobody applied it here, because a
-benchmark is not a test and the rule did not say the word. The rule is right
-and its scope was too narrow.
 
 ### FND-017 — A decision costs 4.1 nanoseconds, not 400
 
@@ -3299,292 +275,6 @@ A dense `u8` visibility counter costs about 868,000 cache-missing writes for
 each faction each tick at late-game scale, roughly 87 core-ms. The mechanism
 that existed to make fog cheap was the most expensive thing in the frame.
 
-### FND-309 — Four instruments in one night reported a figure about something other than what they measured, and not one of them said so
-
-**One of the four instances below is not recorded anywhere yet.** The first is
-FND-297, which the trunk holds and which this entry now cites.[^F314X] The
-fourth was reported and is being written by the worker who found it, so it is
-cited by description and owes a number. The citation check refuses a number the
-register does not hold, which is how the debt was noticed rather than shipped.
-
-**Believed.** An instrument that finishes and prints a number has measured the
-thing it was pointed at. A run that fails is visible, so a run that reports is
-a run that worked.
-
-**True.** Four instruments broke that in one night. Each returned a figure a
-reader could not tell from a valid one. In every case the invalid run was
-cheaper, cleaner or steadier than the valid one, so the wrong answer was the
-one a tired reader wants.
-
-| The instrument | What the figure described | What caught it |
-|---|---|---|
-| The local benchmark | A binary built two hours earlier | A probe printed nothing when it should have printed a line for each frame |
-| The gate timing harness | A gate that stopped early, priced as a gate that ran | Nothing. It was read out of the code before it cost a run |
-| The gate timing harness | A tree that changed under the run, because three branches merged into it | A person read the log |
-| The stage cost measurement | The code layout, not the change | Four stages the change never touched moved, and moved reproducibly |
-
-**Each was caught by a control outside the instrument, and three of those
-controls existed by accident.** The probe of the first was written for another
-purpose.[^309A] The moved stages of the fourth were nobody's control. The third
-was caught by a person reading a log at the right moment. Only the second was
-found on purpose, and it was found by reading rather than by running.
-
-**The second and third are the same instrument, and the interval between them
-is the point.** The stopped-gate hazard was read out of the code and repaired
-before it cost anything. The repaired instrument then met the tree-move hazard
-on its first live run. An apparatus meets its own failure modes sooner than
-anyone expects, and the repair paid for itself the same night.
-
-**The fourth instance carries the sharpest form of the rule.** This project
-builds with link-time optimisation and one code generation unit, so a change to
-any file relays the whole binary. One fixed tree measured twice gave 36.46 and
-29.07 milliseconds for one stage, a span of 25 percent, and one of those runs
-sat below both runs of the tree it was compared against. The same stage on the
-base tree repeats to 0.7 percent. Four stages the change never touched moved,
-and the compute-bound stages least sensitive to layout barely moved. So a
-single binary against a single binary cannot separate the change from the code
-layout, and every performance figure taken that night carries an unquantified
-layout term of up to about 8 percent.[^309B]
-
-**The discriminator is worth more than the figure.** A pair of runs is evidence
-only when the things that should not have moved did not. That test is what
-turned a plausible story about a slow memory host into a refuted one, and the
-worker refuted its own explanation rather than letting it stand.
-
-**Follows.** Three things.
-
-**An instrument must carry its own control, and the control must fail loudly.**
-Two were added to the gate timing harness. It now names every command line that
-failed and says in those words that the run is not a measurement, so a gate
-that stopped cannot read as a gate that is cheap. It also reads the commit
-before and after the run and reports when the two differ, so a table cannot
-describe a tree that never existed.[^309C]
-
-**State the discriminator beside the figure.** A figure with no stated way of
-being wrong is not a measurement, and the reader cannot supply one later. Every
-row above was saved by a discriminator, and three of those were luck.
-
-**A discipline is not a control.** The answer to a merge landing mid-run is not
-a rule that nobody merges during a run. That rule lives in one person's head at
-the end of a long night with four things moving, and this register exists
-because facts kept in heads do not survive. The answer is that the instrument
-reads the commit and says when it moved.
-
-**This is the same shape the testing rule states for a fixture, one level
-up.**[^309D] A fixture that supplies no extreme measures itself. An instrument
-with no control measures itself. In both the test passes, the number arrives,
-and nothing says which question was answered.
-
-### FND-330 — A stale frame figure sat in a blocker row and in a register, and nothing failed
-
-**Believed.** A frame at the target scale costs 500 milliseconds on the target
-platform. The blocker row about derived cost figures said so in its own words,
-and two sections of the target platform register concluded from it that a frame
-cannot fall below about 300 milliseconds on any core count.[^F222] [^28]
-
-**True.** The frame is 177.9 milliseconds at the target scale, on 12 threads,
-on a world whose units are scattered. Two later runs of a changed tree gave 167
-to 169 milliseconds. The register holds every row with its machine, its commit
-and its fixture.[^F222]
-
-**The two figures do not measure one thing, and that is part of the finding.**
-The 500 millisecond figure came from the first run, on 16 threads, on a world
-whose units were packed. A packed unit costs about half a scattered one, so the
-later figure is better than the difference between the two numbers shows. **A
-figure without its fixture is not comparable to another figure**, and this
-register already states that rule for its own rows.[^F222]
-
-**Evidence.** The stage tables in the target platform register, taken on 3
-September 2026 on `c7g.4xlarge` instances. The 500 millisecond figure entered
-the blocker row on the same date, from the first two runs of that day.
-
-**What follows. The register moved eleven times in one day and the prose did
-not move with it.** Every stage table carries a line that supersedes the tables
-above it. No such line reaches a document outside the register. The blocker row
-held the figure as its own sentence rather than as a citation, so no check could
-see it go stale, and a priority row carried an 836 millisecond frame as the
-denominator of a share for the same reason.
-
-**This strengthens the case for two open items and does not change either.**
-One item adds a check that fails when a document states a register in its own
-words.[^F258C] This is a fourth instance of that shape, and the first where the
-stale copy sits in a register row rather than in a report. The other item makes
-a check compare the two project orientation files.[^F259CHECK] It is the same shape
-at a smaller radius, and this instance says the family of phrases the first
-check reads must include a frame figure, not only the state of measurement.
-
-**A blocker row is not a place for a figure.** The scope rule states this for a
-decision record, and the reason is the same here: a row that quotes a number
-must be edited when the number moves, and nothing fails when nobody edits
-it.[^12] The row now cites the register and states no frame figure.
-
-## E. Layout and platform corrections
-
-### FND-277 — The residual was one pass nobody had named, and it was 61 percent of the frame
-
-**Believed.** The 170 milliseconds the stage split could not divide held
-several passes in roughly comparable parts. The register named six of them:
-the movement intents, admission, the holder spread, the death scan, the part
-of the level 1 rebuild that reads the units, and the walk over live units
-inside the choice pass.[^FND277A]
-
-**True.** It is one pass, and inside that pass it is one function. With every
-stage of a frame named and timed, the holding spread is 514.3 milliseconds of
-a 836 millisecond frame, which is 61.5 percent of the whole frame. The three
-largest stages together are 85.3 percent. The death scan is 0.04
-milliseconds, admission is 29.3, and the movement intents are 4.7.
-
-**Inside the spread, the candidate list is 49.1 percent of the whole frame**,
-and it runs on the calling thread. It walks every held tile and every live
-unit, pushes an index for each, then sorts several million indices and removes
-the duplicates. The half of the pass that decides takes a thread count and
-costs 71.1 milliseconds. The half that chooses what to decide about takes none
-and costs five and a half times as much.
-
-**Evidence.** Two runs on a Graviton3 instance at 16,777,216 tiles, 1,000,000
-units scattered, 12 threads. The first named every stage, and the second
-divided the largest one. Every stage is a row and the register holds
-them.[^FND277A] The sum of the stages is 835,957,085 nanoseconds against
-835,978,143 for the same frames timed from outside, so the part that is still
-unattributed is 0.0025 percent.
-
-The two runs measured the frame at 836.0 and 816.1 milliseconds under the same
-setting, so they differ by 2.4 percent. Read a share here as a proportion and
-not as an amount.
-
-**Follows.** Four things.
-
-**A split by subtraction finds only what has a switch.** The old method priced
-a pass by running a frame without it, and the holding spread has no switch, so
-the largest thing in the frame was invisible to the method that existed to
-find it. The residual was not a mixture. It was one pass that the instrument
-could not point at.
-
-**The next optimisation is not the one the backlog names.** Four items propose
-a change to the layout or the allocation, and the priority index put them
-above the item that made the frame measurable. The measurement moved the
-order: one pass is worth more than the four items together.
-
-**Prices go stale, and one in the register was stale by a factor of 125.** The
-same split measured the choice at 71.4 milliseconds and called it 26 percent
-of the cost of a unit. The choice now costs 0.571 milliseconds, because item
-0238 made the pass decide once for each pair of cell and need. Nothing failed
-when that figure went stale, and nothing would have.
-
-**One measurement is enough to name a pass and not enough to name the part of
-it that costs.** The first run said the spread was 61 percent. It took a
-second run, with three spans inside the spread, to say that one serial
-function is 49 percent of the frame. A stage is the unit that a reader can
-act on, and this one needed two.
-
-**This row is history, and the code no longer matches its present tense.**
-Backlog item 0291 replaced the list and the sort with a bit plane over the
-tiles, and gave the pass a thread count. The pass costs 16.7 milliseconds
-instead of 400.9, and a frame costs 463.4 milliseconds instead of
-825.4.[^FND277A] Two findings hold what that work corrected, and one of them
-shows that the figure this row rests on was read from the wrong
-world.[^F277B] [^F277C]
-
-### FND-278 — Huge pages are worth 3.9 percent, and they cost five times the memory the estimate gave
-
-**Believed.** Huge pages might explain part of the unattributed cost, and the
-memory they waste at the end of an allocation would be under one part in two
-hundred.[^FND278A]
-
-**True.** Both halves are answered, and the second was wrong. A frame at the
-target scale costs 3.9 percent less with the kernel giving 2 MB pages, and the
-resident set grows by 2.65 percent rather than by 0.5.
-
-**Evidence.** One run on a Graviton3 instance, one commit, one binary, three
-processes, one for each kernel setting. The register holds every row.[^FND277A]
-The frame fell from 835,978,143 nanoseconds under the default setting to
-803,042,781 under `always`. Of the resident set, 719,323,136 bytes sat on huge
-pages under `always` and none did under either other setting, so the setting
-demonstrably reached the process. The resident set grew by 27,889,664 bytes.
-
-**Follows.** Three things.
-
-**The prediction named the shape and the shape held.** The item said a
-translation cost would appear spread across every pass that touches a large
-array, and invisible to a split that measures stages. Three stages account for
-the whole 32.9 milliseconds and every other stage moved by less than half a
-millisecond. The three are the passes that write scattered over a large array.
-
-**A time row without an occupancy row is a claim rather than a
-measurement.** Two of the three settings gave this engine identical pages,
-because the engine calls no advice. Only the huge page column separates "the
-setting did nothing" from "huge pages do nothing", and they are different
-answers.
-
-**Two conditions that should be identical differed by 0.64 percent**, so that
-is the noise floor of this apparatus at one run for each condition. A result
-this size is worth quoting to one figure and not to two.
-
-
-### FND-235 — A stored watermark read nothing, because a sentinel already said it
-
-**Believed.** The record of descent needed a stored count of how many rows the
-Euler labels covered. A query about a row above that count would answer
-nothing rather than answering from a stale label.
-
-**True.** The count read nothing. The two label columns already mark an
-unlabelled row with an absent-value sentinel, which a birth writes and a
-relabel clears. The sentinel alone decides every answer. The stored count was
-a second declaration of the same fact, and the length of the Euler order was a
-third.
-
-**Evidence.** The watermark check was removed from the label reader and the
-whole suite stayed green: twelve tests, none of which could see the
-difference. The behaviour was covered. The declaration was redundant, and only
-removing it showed that.
-
-**Follows.** Two things.
-
-**A green suite after a removal is evidence about the removal, not about the
-test.** The suite proved the watermark unnecessary. It would equally have
-proved a necessary check unnecessary if no test reached the case, which is why
-the removal was paired with a test that does reach it: a character born after
-the relabel must answer nothing, and that test fails when the sentinel is
-wrong.
-
-**Count the declaration sites of a derived quantity before storing it.** The
-number of labelled rows is derivable from the Euler order length, and the
-label columns already answer per row. Neither needed a third site. The record
-now derives the count and stores nothing.[^235A]
-
-### FND-236 — The descent columns went to the record, not to the arena
-
-**Believed.** The backlog item said to add the descent columns to the
-character arena: the two parent edges, the house, and the two Euler
-labels.[^236A]
-
-**True.** Three of the five belong to the record of descent, and two were
-already there. Item 0067 had put the parent edges in a separate append-only
-record keyed on a descent identity rather than on a slot, and it gave the
-reason: the arena reuses a slot after a death, so a slot names a different
-character later.[^236B]
-
-The same reason governs the other three. A house on a slot column would be
-released when its holder died, so a dynasty would lose its founder and every
-dead member of its line. A Euler label on a slot column would be worse, since
-the father forest holds every character the world ever created and the labels
-must cover all of them. The character arena holds a reader for each, and the
-reader resolves the identity to a descent row.
-
-**Evidence.** A test removes a character and asserts that the record of
-descent still answers its house, and that a living descendant keeps the house
-of the dead ancestor.
-
-**Follows.** **A backlog item names the structure it expects, and the item may
-be wrong about it.** This one was written before the work that built the
-record, and it named the arena because that is where the columns sat when it
-was written. Read an item's structure name as its author's expectation and not
-as a constraint. A constraint lives in a record.[^16]
-
-This is the same shape as the misattribution that ADR-0021 now forbids: a
-sentence that names one home for a set of fields whose passes disagree about
-where they belong.[^236D]
-
 ### FND-022 — Array-of-structs for characters, struct-of-arrays for cohorts
 
 **Believed:** struct-of-arrays vectorises well, so use it everywhere.
@@ -3630,379 +320,6 @@ worst-case path error against 8.2 percent for an eight-connected square grid.
 
 Both are true. Diffusion likes hex; distance does not.
 
-### FND-137 — The event log crosses to Python as bytes with no layout
-
-**Believed:** the bindings publish the event log to Python, so a control plane
-reader can see what a step changed. The method returns the whole log as bytes,
-and the crate documents it as the log the determinism test compares.[^F137A]
-
-**True:** it publishes a buffer, not events. The field order, the field widths
-and the padding of an event live in the Rust source and nowhere else.[^F137B] A
-reader in Python must repeat that layout to get a field out of the buffer. The
-copy and the original then hold one fact in two places, and nothing fails when
-they disagree. The recurring defect rule names this pair as a place the shape
-will recur in this project.[^F137C]
-
-**Evidence:** the agent-facing protocol server was built over the existing
-bindings. Every other tool calls one method and returns what the engine said.
-The event log tool cannot, so it returns the bytes and a digest of them. An
-agent can prove that two runs emitted the same log and cannot see which tile
-changed.
-
-**Follows:** the bytes are enough to compare two runs and not enough to read
-one. Give Python the events from the place that declares them, by a column for
-each field, by a derived description of the layout, or by a query the engine
-answers. Do not add a format string to Python. A backlog item holds the
-choice.[^F137D]
-
-### FND-273 — The packed against scattered ratio measures the density, not the arena order
-
-**Believed.** The unit arena holds units in spawn order, nothing reorders it,
-and that is why a unit costs 2.11 times as much scattered as packed at 12
-threads. The backlog item took the ratio as the size of the prize for
-reordering the arena by cell.[^F273A] [^F273B]
-
-**True.** The ratio measures the placement of the units over the world. Both
-fixtures spawn in ascending tile order, so the arena is in cell order in both
-rows. One puts the units on consecutive tiles and the other puts them one in
-every seventeen. **A reorder of the arena cannot recover any part of that
-ratio, because the row that pays it already has the order the reorder would
-produce.**
-
-**Evidence.** A third fixture puts the units on the same tiles as the
-scattered row and spawns them in a permuted order, so the population is fixed
-and the arena order is the only thing that moves. The mean slot distance
-between two units next to each other in cell order is 108 in the ascending row
-and 83,269 in the permuted one, which is the decorrelation the item
-describes.[^F273C] The unit cost rises by 1.45 at one thread and 1.34 at four,
-not by 2.11. Both rows come from one process on one machine. The machine is a
-development x86-64 machine that other work shared, so the figures bound the
-shape of the effect and are not evidence about the target platform.[^28]
-
-**Follows.** Two things.
-
-**A benchmark that moves two variables together cannot price either.** The
-placement rows change the density and the arena order in one step, and the
-arena order happens not to move at all. The row that separates them is the one
-the decision needed.
-
-**The prize is real and it is smaller than the item claimed.** A drifted arena
-costs 1.24 to 1.45 on the unit half rather than 2.11, and only the part of
-that which survives the walk order is what a physical reorder would
-buy.[^F274A]
-
-### FND-274 — The unit pass is bound by the tile side, so the walk order costs more than the arena order
-
-**Believed.** A pass over the units of one cell is slow because the unit
-columns of those units sit far apart, and the fix is to move the units in the
-arena.[^F273A]
-
-**True.** The movement pass walks the live units and reads five things for
-each one. Four of them are on the tile side of the world: the exit of its
-cell, the address of its tile, the ground of its target, and the address of
-that target. One is on the unit side. **The tile side is the larger footprint
-by an order of magnitude, and the order that makes it ascending is the order
-of the walk, not the order of the arena.**
-
-Walking the arena in slot order reads the tile side at random once the arena
-has drifted. Walking in cell order reads it in ascending tile order whatever
-the arena holds. The bridge already sorts every live unit on the tile key once
-for each frame, at the barrier, so that order costs the frame nothing
-more.[^F274B]
-
-**Evidence, and what it does not cover.** The movement pass now walks the
-bridge order. The golden state hash did not move, at any scenario, and the
-whole suite stayed green.[^F274C]
-
-**The claim that no result reads the walk order was checked by perturbation
-and not by assertion.** The walk was reversed, and the golden hash still
-matched the stored file. Admission sorts what it receives on a total key of
-the target tile and the whole identity, so the same set in another order gives
-the same answer.[^F274D]
-
-**The size of the gain was not measured.** Four runs of the before and the
-after build, at four threads, gave ratios of the drifted unit cost to the
-packed one between 1.06 and 2.26, in both directions, with the two builds
-swapping places between runs. The development machine ran between eleven and
-fifty-seven runnable threads on sixteen cores while the runs took their
-samples, and the load moved by a factor of four inside one run. **The spread
-of the apparatus is larger than the effect it was measuring, so no figure here
-states what the change bought.** The measurement that would state it belongs
-on the target platform.[^28]
-
-**What the change rests on instead is structural and checked.** The pass reads
-four tile-side values for each unit. Walking in cell order makes those reads
-ascending in the tile index, and walking a drifted arena in slot order makes
-them random. That the penalty for a drifted arena exists at all is measured,
-in two independent runs of the before build: 1.24 and 1.34 at four threads,
-and 1.45 at one.
-
-**Follows.** Two things.
-
-**Ask what a pass reads before deciding where to move what it reads.** The
-item proposed moving the units. The larger of the two footprints was on the
-other side, and the order that fixes it was already built and thrown away
-every frame.
-
-**A change can be right and still unmeasured, and the report must say which.**
-The residual that only a physical reorder removes is now separable from the
-part the walk order removes, and both belong on a target-platform run before
-anyone spends a refactor on them.[^F274A]
-### FND-285 — The held ground of the demonstration world is 140 times smaller than the held ground of the benchmark world
-
-**Believed:** the holding covers a few tens of thousands of tiles. The register
-holds the figure. The demonstration world, founded for four factions with a
-group each, holds 7,866 tiles at tick 50 and 46,992 at tick 200.[^F285A] That
-figure was read as the size of a holding, and work on the candidate pass was
-planned from it: at 46,992 held tiles the pass would sort about 1.3 million
-indices, of which one million come from the units.
-
-**True:** the benchmark world holds 6,615,358 tiles after nine frames. That is
-39 percent of the world and 141 times the demonstration figure. The raw
-candidate list reaches 14,884,176 entries, of which 13.9 million come from the
-held tiles and one million from the units. **The units are 6.7 percent of the
-list, not 77 percent.**
-
-**The measurement.** A probe inside the candidate pass, printing the held
-count and the list length for each frame. Machine: the development machine,
-not the target platform, because the two counts are properties of the
-simulation and not of the processor. 16,777,216 tiles, 1,000,000 units
-scattered, 12 threads, ten frames.
-
-| Frame | Tiles held | Raw candidate entries | Distinct candidates |
-|---|---|---|---|
-| 1 | 0 | 1,000,000 | 998,551 |
-| 2 | 998,551 | 7,984,285 | 2,616,812 |
-| 5 | 3,218,758 | 12,724,736 | 4,355,868 |
-| 10 | 6,615,358 | 14,884,176 | 4,821,144 |
-
-**The cause is the population, and it is a fixture difference and not a
-defect.** The demonstration places 192 units on 16,777,216 tiles. The
-benchmark places 1,000,000 scattered. A unit takes the ground it stands on
-when nobody holds it, so the held ground grows with the units and then spreads
-from every seed at once. The two worlds are the same rule at two densities.
-
-**Follows.** Three things.
-
-**Do not carry a count from the demonstration world into a statement about the
-target scale.** The demonstration is built to look right, and the testing rule
-already says that a fixture chosen to look right supplies no extreme.[^84]
-The two worlds differ by four orders of magnitude in the population, and every
-derived quantity differs with it.
-
-**A figure in the register names the world it was measured in.** The row above
-does. The reading of it did not, and the reading is what reached a plan.
-
-**The unit walk was the wrong thing to remove.** The plan that came from the
-small figure proposed dropping the walk over the live units, because it looked
-like three quarters of the work. It is 6.7 percent. The sort was 68 percent
-and the walk over the held tiles was 31 percent, and both follow the held
-ground rather than the population.
-
-### FND-286 — A pass that allocates on every frame cost twelve milliseconds that no stage measures, and the mapping count is not the cause
-
-**Believed:** the cost of a buffer that a parallel stage allocates for each
-thread falls inside the stage that allocates it. The stage table would
-therefore see it.
-
-**True:** twelve milliseconds of it fall outside every stage. The candidate
-pass began allocating a bit plane of 2,097,152 bytes for each of twelve
-threads on every frame. The residual of the frame, which is the part no span
-measures, went from 22,202 nanoseconds to 12,196,680. Nothing else changed
-between the two runs.
-
-**Then the project believed the mapping count was the cause**, because giving
-back a mapping a thread has written reaches every core. **That is refuted.**
-Twelve mappings became one array of twelve chunks, which is one allocation
-instead of twelve, and the residual measured 11,739,029 nanoseconds. The two
-figures are the same to within the spread of this apparatus.
-
-**The measurement.** Machine C, `c7g.4xlarge`, Graviton3, 16,777,216 tiles,
-1,000,000 units scattered, 12 threads, nine frames, `stage-cost` feature.
-Three runs at one base commit, differing only in the tree.[^F286A]
-
-| The pass allocates | Residual, ns | Share of the frame |
-|---|---|---|
-| Nothing. It sorts a list | 22,202 | 0.0027 percent |
-| One plane for each thread | 12,196,680 | 2.74 percent |
-| One array of twelve chunks | 11,739,029 | 2.53 percent |
-
-**The cause is not identified, and this row says so rather than guessing
-again.** What is established is that the residual follows the allocation and
-not the number of mappings.
-
-**Follows.** Two things.
-
-**The plane should be held across frames rather than allocated in each one.**
-That is the change the evidence points at, and it is not made. It asks a
-design question the pass does not answer today: the holding is copied by a
-derive, and a buffer it holds would be copied with it, so the buffer needs a
-statement about what a copy of a holding means.
-
-**A saving of 384 milliseconds bought a cost of 12.** The trade is good and the
-cost is recorded so that it is not found again as a mystery.
-
-**This row's conclusion is wrong, and a later row corrects it.** The residual
-did not follow the allocation. The pass still allocates and the residual is back
-under half a millisecond.[^F277C]
-
-
-### FND-525 — A picture of the whole panel does not repeat, because the panel states the wall clock
-
-**Believed.** The demonstration writes one picture from one seed, and the
-engine gives one answer for one seed at any thread count. Two runs of one seed
-therefore give one picture, and a test may compare two picture files to prove
-that a change reached the frame.
-
-**True.** The whole panel states what the last step and the last frame cost,
-and those costs come from the wall clock.[^F525A] Two runs of one seed
-therefore give two different files, whatever else the runs did. A deck of named
-panels holds no cost row, and two runs of one seed give one file.
-
-**Evidence.** Two runs of one world, at one seed, one extent and one tick
-count, wrote two picture files that differ. The same two runs with a named
-deck wrote two identical files. The commit body holds the commands.
-
-**Follows.** Two things.
-
-**A test that compares two picture files must first assert that one
-configuration repeats.** Without that assertion the test passes on any pair of
-files, so it measures the wall clock rather than the change. Three tests of the
-deck were written that way, and each one stayed green when the wiring under it
-was removed. The repaired tests run the same configuration twice, assert the
-two files are equal, and only then assert that another configuration differs.
-
-**A picture is not simulated state.** The determinism rule binds the world and
-the event log, not the pixels the viewer paints. A cost row in a picture is
-correct and it is not a defect.
-
-### FND-526 — Three refined backlog items described work the tree already held
-
-**Believed.** The backlog held three refined items for the demonstration: one
-panel standard, a clock that separates the engine tick from the wall clock, and
-four panels that show the characters, the statistics, the events and a tile.
-An item in `refined/` states work that nobody has done.
-
-**True.** Every statement under `Done when` in the three items was already
-satisfied. The viewer holds one panel module that declares the geometry, the
-colours and the cut, and one list that registers every panel. The control plane
-holds the clock, the speed set, the pause and the single step. The four panels
-each exist as one file with its own tests.
-
-**Evidence.** The commit that gave the panel one standard, a deck and a clock
-is in the history, and later commits bound every panel to a key. The items
-stayed in `refined/` because nothing moves an item when the work lands under
-another item's number.
-
-**Follows.** Two things.
-
-**Read the tree before you start a refined item.** The item states a need at
-the moment it was written, and the tree is the current statement of what
-exists. Reading the item alone leads to a second implementation of a thing that
-already works, which is one fact in two places.[^F590A]
-
-**An item is not done until it moves.** A directory is a status, and a status
-that nobody sets is a register that decays.
-
-### FND-594 — The camera was believed to say where every renderer stands, and the sketch fits its own page instead
-
-**Believed.** The engine camera says where the view sits. It holds the size of
-a tile in pixels and the pixel offset of the tile at the origin, and every
-renderer draws the view that camera names. A control that moves the camera
-therefore moves what both renderers show, by the same amount.
-
-**True.** That holds for the flat map alone. The sketch renderer reads the
-camera only to name the window of tiles it must cover. It then fits that window
-to the frame with a scale of its own. The size of a tile on the camera reaches
-the picture through which tiles fall inside the frame, and through nothing
-else.
-
-Two things follow from that, and both are visible to a person.
-
-The window changes in whole tiles, because it comes from the address the camera
-gives nine corner pixels, widened by a margin. A pan of a few pixels therefore
-changes the sketch by nothing, and then by a whole tile.
-
-The fit is recomputed for each window, so a pan that changes the window by one
-tile also changes the scale of the page. Grab-and-move is exact on the flat map
-and approximate in the sketch, and no arithmetic in the control layer can
-change that.
-
-**Evidence.** The build pass takes the window and the frame size, derives its
-own scale from the two, and never reads the tile size of the camera. A drag of
-nine pixels for each frame at a tile size of twenty-four rebuilds the page on
-three frames out of six, and holds the page on the other three.
-
-**Follows.** Three things.
-
-**The camera is the one source of truth for where the view stands, and a
-renderer may still choose its own scale.** The two statements are not in
-conflict, and a reader who takes the first for a promise about pixels will be
-wrong about the second.
-
-**Do not make the sketch follow the camera scale in order to fix the drag.** A
-page keyed on a continuous camera rebuilds on every pixel of a pan. The whole
-tile window is what makes the page cacheable at all.
-
-**A renderer that composites on the graphics card can honour the camera
-exactly.** It has no page to cache and no rebuild to avoid, so the limit above
-belongs to the processor path and not to the design.
-
-
-## F. Sourcing
-
-### FND-595 — A test that names a handler cannot see that the window refuses to hold it
-
-**Believed.** The mouse controls were checked against the window library
-without a display. The check read the handler method names and compared them
-against the event names the library declares. That was called the strongest
-check a machine with no display can make.
-
-**True.** The library does not only call those methods. It holds the handler
-object by weak reference. A class that declares its attribute slots and names
-no weak reference slot cannot be referred to weakly, so the push raises
-`TypeError` before any name is read. The names were right and the push failed.
-
-**Evidence.** The demonstration raised `cannot create weak reference to
-'Controls' object` at the first window it opened. Adding the weak reference
-slot to the declared slots fixes it. Removing the slot again makes the new
-test fail with the same message the owner saw.
-
-**What follows.** A test that reads names is a test about names. When a
-library takes an object rather than calling a function, drive the real call:
-build the library's own dispatcher, push the handler onto it, and send one
-event. That needs no display and it catches what the name check cannot.
-
-### FND-596 — Every graphics test read a texture back, so none of them looked at the screen
-
-**Believed.** The device draws into a frame buffer of its own and reads the
-result back, so one path serves a window, a picture on a disk and a test with
-no display. The tests read the pixels back and compared them against the
-processor path, and they agreed. The graphics path was therefore held to work
-in a window.
-
-**True.** The device takes the application's context when the application has
-a window, because a second context would hold a second copy of every texture.
-Each pass points the frame buffer at a texture the device owns and leaves it
-pointed there. The window then presented into that texture instead of onto the
-screen, and the screen stayed black. The pixels the tests read were correct
-the whole time, because they came from the texture.
-
-**Evidence.** The demonstration drew a black window under the sketch flag on a
-machine with a display. Binding the frame buffer back to the window after the
-read fixes it. Removing that line again makes the new test fail, and the test
-reports the binding as 1 where it must be 0.
-
-**What follows.** A test that reads a target back proves the drawing is
-right. It cannot prove the screen shows it. When a module borrows a caller's
-state, test that the state is handed back, not only that the work was done.
-This is the second finding in one day where a test checked the work and not
-the hand-over.[^FND596A]
-
-**References**
-
-[^FND596A]: Findings register, FND-595. `docs/FINDINGS.md`
-
 ### FND-026 — Games do not document their implementations
 
 Eight subsystems across seven games are community-wiki only, with no developer
@@ -4036,266 +353,6 @@ description in the survey.
 - Versu is 2014, volume 6 number 2.
 - Tarn Adams edited *Procedural Generation in Game Design*; he did not write a
   chapter in it.
-
-### FND-082 — A register cited a record that did not support its claim
-
-**Believed.** The decisions register stated that the engine clears a lost
-site's units by scanning every unit, and it cited a record for that claim.
-
-**True.** The cited decision says that the location table is a dense array
-indexed by the slot, and that it is never a hash map. It says nothing about a
-scan from a site to its units. The claim is right and the citation does not
-reach it. The register also wrote the clear in the present tense. No
-settlement destruction path exists in the engine, so the clear it describes is
-not code. The only site-to-unit traversal in the tree is an invariant check.
-
-**Evidence.** An agent read the record while it confirmed that DEC-036 changed
-nothing. A second instance sits nearby: ADR-0067 cites a product requirement
-record in a footnote, and DEC-012 decided that a decision record cites no
-product record. That citation predates the decision.
-
-**Follows.** Two things.
-
-A footnote is a claim about a source. A reader who follows it and finds
-nothing loses more than the citation, because the register spent its
-authority. Check that the cited decision states the thing, not that the cited
-record covers the topic.
-
-**Write the tense the tree supports.** A register that describes intended code
-in the present tense reads as a description of the engine. That is the shape
-the scope rule names as recording an intent as a fact.
-
-
-## G. Process
-
-### FND-571 — A backlog item said that nothing in the engine held the sight rule, and three quarters of it was built
-
-**Believed.** Backlog item 0495 said that no column, no plane and no table held
-what a faction has observed, and that a search of the tree for the words of the
-subject returned one reserved bit, one doc comment and no storage. It listed
-four parts of the work and described all four as missing. The accepted record
-it implements says the same thing in its own context section.[^F568A] [^F568B]
-
-**True.** Three of the four parts were built before the item was taken. The
-observation module of the core crate holds the two layers, the four block
-forms, the rebuild and two of the three derived masks, and the step calls the
-rebuild on every ordinary tick with no flag and no gate.[^F568C] Only the
-readers were missing, and one of the three derived masks. The item was written
-before the module existed, and nothing moved it when the module landed.
-
-**Evidence.** A worker who took the item found the module and the pass. The
-audit of the learner surface had found the same thing a day earlier and stated
-it as its first claim.[^F568D] The priority index had been corrected and the
-item file had not, so the index and the item disagreed and nothing failed.
-
-**Follows.** An item in `proposed/` decays in the same way a summary decays. It
-states the state of the tree at the moment it was written, and nothing fails
-when the tree moves. **Read the code before you plan against a proposed item,
-and repair the item in the same change.** The priority index is the cheaper
-place to carry a state, because a check reads it and a worker reads it first.
-
-
-### FND-482 — Three trade records existed twice under two sets of numbers, and both sets were marked as drafts under review
-
-**Believed.** The registry held one record for each of the three trade claims:
-a negotiation is engine state, a terminal refusal closes a pair until a named
-tick, and a contract moves a quantity only when a unit carries it. Numbers
-0126 to 0128 held them.
-
-**True.** Numbers 0129 to 0131 held the same three files, byte for byte apart
-from the number in the title and in the footnotes that cite each other. A
-commit that restored the three records after a number collision wrote them
-under a second set of numbers, thirty-nine minutes after the first set was
-committed.[^F482A] Both sets carried the status `Draft`, both sets sat in the
-priority index as records waiting for review, and the Python binding cited the
-second set in three doc comments.
-
-**Evidence.** A diff of each pair shows one changed line in the title and one
-or two changed footnote lines, and nothing else. The whole-tree search below
-found every citation of the second set. It found four footnotes in the
-duplicate files themselves, three doc comments in one source file, and the
-three registry rows.
-
-```
-grep -rn "ADR-0129\|adr-0129\|ADR-0130\|adr-0130\|ADR-0131\|adr-0131" --exclude-dir=target --exclude-dir=.claude .
-```
-
-**Follows.** Three things.
-
-The second set is marked `Superseded` by the first, and the registry row names
-the twin. The files stay, because the registry keeps the file of a replaced
-record, and each carries a paragraph that names its twin.[^F482B] Every
-citation of the second set now points at the first.
-
-A restore after a collision is a sweep, and it needs the whole-tree search that
-every sweep needs. The restoring commit searched for the claims and not for the
-numbers, so it did not see that the claims already had numbers.
-
-The record check reports a number used twice only when two files share one
-number. Two numbers that share one claim pass it. A check that compared record
-titles across files would have failed here, and none exists.
-
-### FND-443 — A test that watches a dead identity refuse does not cover the column that carries the identity
-
-**Believed.** A log column that carries a unit identity is covered by a test
-that hands each entry back to the engine and asserts that the engine refuses
-it. The column holds dead identities, the engine refuses a dead identity, so a
-column that stopped carrying identities would go red.
-
-**True.** It stays green. The engine refuses a slot index for the same reason
-it refuses a dead identity: neither is an identity it gave out. A column that
-emitted the slot index of each fallen unit therefore passed the refusal test
-without a change. Only a test that compares the column against the identities
-the caller was given sees the difference.
-
-**Evidence.** The binding that exposes the fallen log was measured against its
-own tests. The unit column was changed to emit the low bits of each identity,
-which is the slot index. The test that asserts that every identity in the
-column refuses stayed green. The test that compares the set of fallen
-identities against the set the spawn verb returned went red, and it named both
-sets.[^F443A]
-
-**Follows.** Two things.
-
-**A refusal is evidence about the engine, not about the column.** A test that
-asserts a refusal covers the resolution rule. It says nothing about which
-number the column carried, because two different wrong numbers refuse alike.
-This is the shape of the finding that measured defence in depth, one layer
-further out.[^F443B]
-
-**A column of identities needs a round trip against a value the caller
-holds.** The caller of the spawn verb holds the identities the engine gave it.
-Comparing the column against that set is the only assertion here that fails
-when the column carries something else.
-
-
-### FND-239 — All four merge defects were already checked. What was missing was the timing
-
-**Believed.** A dispatcher produced four defects by hand in one day and none
-was caught until the gate ran, so a check for them did not exist.
-
-**True.** Every one of the four was already checked. The register check fails
-both on a number that names two entries and on a next-number line that
-disagrees with its own entries, which is two of the four.[^32] The footnote
-check fails on a label a document defines twice, which is the third.[^239A]
-The citation check fails on a footnote naming a path that does not resolve,
-which is the fourth.[^148]
-
-The four were not undetected. They were detected minutes later, over the whole
-tree, after the commit existed.
-
-**Evidence.** Each rule was found by reading the three scripts before writing
-a new one, and each was confirmed by staging the defect and watching the
-existing check fail. The four checks cost 1.0, 3.7, 7.7 and 4.0 seconds on a
-development machine, which is why they run in the gate and not at the commit.
-
-**Follows.** Three things.
-
-**Before writing a check, ask whether the rule is already checked and only the
-timing is wrong.** A check written on the assumption of a gap would have
-restated three rules that already had a home. Two copies of a rule drift, and
-nothing fails when they disagree.[^22] The check that was written imports the
-other two and calls them.
-
-**A slow check and a missing check fail the same way from the outside.** Both
-let the defect reach the commit. Whoever watches four defects survive until
-the gate reasonably concludes that nothing is watching. The distinction
-matters because the remedies differ: one needs a rule, the other needs a place
-to run an existing one.
-
-**One rule was genuinely new, and it is the narrow one.** No existing check
-ties a move to the citations of the path it moved from. The citation check
-overlaps without covering it, because it reads footnote paths under `docs/`,
-so a moved crate file named in a comment passes it. Scoping the new rule to
-the paths the change moves is what makes it both new and cheap.
-
-**A fifth instance arrived while the work was in progress, and nobody arranged
-it.** Merging the trunk into the branch that carries this check left four rows
-of the records priority index listed twice: one side had rewritten the table
-and the auto-merge kept both. The priority check caught it.[^239B] That is the
-same shape as a register naming one number twice, in a file that is not a
-register, found by the same mechanism the finding describes. The count of
-these defects is not four and it is not five. **Do not write the count down.
-Write the shape: a merge that keeps both sides of a table that one side
-rewrote.**
-
-
-### FND-238 — The gate prints ten screens of red when it passes
-
-**Believed.** A reader can tell a passing gate run from a failing one by
-reading its output. Red means something is wrong.
-
-**True.** A fully green `just check` prints ten test binaries reporting
-`FAILED` and ten `error: test failed` lines. They come from the probe
-recipes, whose passing condition is a non-zero exit, so the recipe marks each
-one and the gate exits zero with all of them red.[^238A] The probes exist for
-a good reason: a determinism test with no proven failure mode is
-decoration.[^238B] The cost is not the probes. It is that the gate has spent
-its whole vocabulary of alarm on its success path.
-
-**Evidence.** A worker read the block as a determinism defect and
-investigated it: decoded the event bytes, found two tile events in reverse
-order, traced the emission site, and ran the suite in isolation and under
-load. The investigation ended only when the reversed order turned out to be
-*exactly* reverse, which is what the probe feature injects and not what a
-thread-order defect produces. The dispatcher reports reading past the same
-block four times in one day, and recognising it only from having hit it
-early.
-
-**Follows.** Three things.
-
-**A check whose success prints as failure has no alarm left for a real
-failure.** The reader who has learnt to skim ten `FAILED` lines will skim the
-eleventh. This is the same shape as a gate left broken because it cannot
-pass: both train everyone to ignore the pipeline.[^238C]
-
-**The probe output is convincing, not merely noisy.** A reader who does not
-skim it loses time instead, because the injected defect is a plausible one by
-construction. The probe reverses the combine order, and reversed order is
-exactly what a result ordered by thread completion would look like.
-
-**What distinguished the probe from a real defect was the exactness.** A
-result taken from thread completion order varies between runs. A result that
-is exactly reversed, every time, on an idle machine and a loaded one, is a
-deliberate switch. Record that as the test to apply next time, because it is
-cheaper than decoding the bytes.
-
-This finding proposes no fix. The shape is the finding.
-### FND-223 — A sentence about the missing measurement reached ninety documents
-
-**Believed:** no measurement exists on the target platform. About ninety
-documents in this tree state that sentence in their own words, in a product
-record, in an accepted decision record, in a review, in a completed backlog
-item, in two reference registers, in the project orientation and in a doc
-comment in the engine.
-
-**True:** the sentence was true when each document was written. It stopped
-being true on 3 September 2026, when a benchmark ran on a Graviton instance
-and measured four operations. The blocker narrowed on the same day and did not
-close, so the sentence is wrong in the general case and right about most
-individual figures.
-
-**Evidence:** the search that found the sites, and the register that holds the
-figures.[^F222] [^28]
-
-```
-grep -rniE "no (measurement|benchmark)|nobody has measured|not been measured" --include="*.md" --include="*.rs" .
-```
-
-**Follows:** the sweep was not made, and the reason is not neglect. An
-accepted record does not change except in status, so repairing one needs a
-record that supersedes it.[^F223C] A review and a completed backlog item are
-records of a moment and are correct as written. The three documents that guide
-work today were repaired: the project orientation, the target register and the
-local register. Everything else cites the blocker register, and that row is
-now the current statement.
-
-**This is the shape FND-042 names, at the largest scale the project has seen.**
-A blocker that narrows leaves a false sentence in every document that stated
-the blocker in its own words. Nothing fails, because a document is prose. The
-defence is not a sweep. The defence is that a document states the blocker by
-citation and never in its own words.
-
 
 ### FND-028 — Concurrent agents collide on shared numbering
 
@@ -4399,6 +456,23 @@ own, from 3 to 21 per cent and from 57 to 82 per cent.
 **Follows.** Title a record with the claim it makes. Five of the six current
 drafts carry topic titles and are queued for retitling.
 
+### FND-035 — The float ban lint does not catch an inferred literal
+
+**Believed.** A lint enforces the boundary that keeps floating point out of
+simulated state. The project invariant says so plainly.
+
+**True.** The lint catches a named type. It does not catch `let x = 1.5;`,
+where the type is inferred and never written. It also cannot name the
+reassociating methods, because those do not resolve on the pinned toolchain,
+so a banned-method entry cannot refer to them.
+
+**Evidence.** The scaffolding work proved both gaps by injecting a float, and
+closed them with a script that reads the source directly.
+
+**Follows.** State the enforcement as two mechanisms, not one. A lint plus a
+script. An invariant that names one mechanism invites a reader to trust it
+alone. The word "lint" in the project instructions is now wrong on its own.
+
 ### FND-036 — Mutation testing found ten gaps that a passing suite did not
 
 **Believed.** A test suite that passes, with the gates green, covers the code
@@ -4415,6 +489,53 @@ unviable, 1 equivalent, after the gaps were closed.
 **Follows.** A green suite is evidence that the tests pass, not that they
 test. This matters most for the determinism tests, whose failure mode is
 invisible. That is why they now have a proven failure mode of their own.
+
+### FND-037 — A crossing time needs the terrain multiplier
+
+**Believed:** a dwell of 2 ticks and a capacity of 8 units give a crossing of
+12.5 seconds for a formation of 1,000 units.
+
+**True:** that arithmetic used the ordinary ground step cost for a mountain
+exit tile. It omitted the terrain multiplier. With the multiplier applied, the
+same combination gives a mountain crossing of about 50 seconds. The
+combination that meets the target is a dwell-2 baseline with a capacity-16
+crossing.
+
+**Evidence:** the movement timing note.[^3] It measured 12.9 seconds for the
+corrected combination. The closed-form throughput law gives 12.5 seconds for
+the same parameters. The 4-tick difference is unresolved and is recorded in
+the note.
+
+**Follows:** a crossing time is a function of three quantities, not two.
+Capacity, dwell and the terrain multiplier all enter it. **Check that a rate
+derivation names every multiplier on its path.**
+
+**Outcome, 2 September 2026. The terrain table now states the multiplier.**
+Every kind of ground answers a step multiplier beside its capacity, because
+the capacity and the multiplier describe the same tile.[^37HOME] The mountain
+kind carries two and every other kind carries one. The scale constants table
+holds the row and says the value is derived from the ratio of the two accepted
+crossing times.[^99] The value is derived, not measured, and nobody decided
+it directly.[^28] The forest kind and the hill kind carry the baseline,
+because no accepted crossing time separates them from level ground, and a
+register row holds that open choice.[^37NEXT]
+
+**The 4-tick difference has a candidate explanation, and it is unverified.**
+The closed-form law gives 125 ticks and the timing check measured 129. The law
+counts the steady state only. A formation pays two stages outside the steady
+state: the leading rank spends one dwell to enter the chokepoint before any
+unit leaves it, and the last rank spends one dwell to clear the exit tile
+after the steady state ends. Two dwells at the baseline dwell of 2 ticks is
+4 ticks, and 125 plus 4 is 129. The arithmetic matches exactly.
+
+**Mark this unverified.** The match is an arithmetic identity, not a
+measurement. The movement kernel does not exist, so nothing re-ran the check
+and nothing instrumented the entry tick or the clearing tick. **What would
+verify it:** run the same formation through the movement kernel when it
+exists, count the tick that the leading rank enters the chokepoint and the
+tick that the last rank leaves the exit tile, and confirm that the two stages
+cost one dwell each. A record must not state a crossing time as an exact
+figure until that check has run.
 
 ### FND-038 — The registers had no allocator, and two writers collided
 
@@ -4869,159 +990,6 @@ determinism test must be able to fail. Those are properties of the assertion.
 This is a property of the input. An assertion strong enough to catch the
 defect still catches nothing when the data never produces it.
 
-### FND-146 — A check across a boundary can be a tautology that reads as a cross-check
-
-**Believed.** A test that compares two views of one thing is a cross-check. If
-the engine hands a caller the same log twice, once as bytes and once as
-columns, then comparing the two proves the views agree, and the test fails when
-they stop agreeing.
-
-**True.** A comparison proves something only when both sides can be computed
-independently. A caller that holds one of the two views and no description of
-the other cannot compute the second side, so it compares a value against
-something derived from that same value. The comparison then holds for every
-input and fails for none.
-
-**Evidence.** A test of the new event columns compared the number of rows in a
-column against the length of the raw byte buffer, to prove the columns describe
-the same log the bytes do. Python holds no layout of an event, deliberately,
-because holding one is the defect the work removes. It therefore cannot know
-the width of an event. The assertion reduced to whether the byte length divides
-by the event count, which is whether a length divides itself. **No change to
-the layout, to the field order, or to the columns could have made it fail.**
-
-The shape is worse than an ordinary weak test, because the tautology was
-invisible. The test named two sources, read from both, and looked like the one
-check that guards a second declaration site.
-
-The same session produced a second instance in another subsystem: a terrain
-assertion that read two constants and never exercised the rule between them.
-
-**Follows.** Three things.
-
-**A test that cannot fail is worse than no test.** It occupies the place a real
-test would take and reports success forever. A missing test is visible to
-anyone who looks for it.
-
-**Before writing a comparison, name what computes each side.** If one side is
-derived from the other, the test measures nothing. If the caller cannot compute
-the second side at all, then the check belongs on the side of the boundary that
-can, or it does not belong.
-
-**A boundary drawn to remove a second declaration site removes the ability to
-check that site from outside.** That is the cost of the boundary and it is
-correct. Do not buy the check back by smuggling the layout into the test.
-
-### FND-147 — An API that cannot say where to act invites the caller to sweep
-
-**Believed.** The control plane rule is a matter of discipline. Python must not
-loop over entities, so a caller that sweeps the world has ignored the rule, and
-the repair is to write the caller properly.[^ORIENT2]
-
-**True.** A caller sweeps when it has no other way to find the thing it must
-act on. A rule that forbids a shape and offers no alternative is a wish. The
-rule loses to the absence of a read every time, because the read is what the
-caller needed and the rule is only prose.
-
-**Evidence.** A test had to produce one gather event. The gather resolve grants
-from the tile a unit stands on, and only when that tile holds the resource. The
-control plane has no read that answers which tile holds a resource. The test
-therefore put a unit on every open tile of a sixteen by sixteen world, ordered
-each one to gather, and let the engine find the ground.
-
-**The person who wrote that sweep had recorded the rule against sweeping in the
-same change.** Discipline was not the missing part. The read was.
-
-**The obvious repair is the same defect one layer out.** A per-tile call that
-answers whether a tile holds a resource moves the sweep from units to tiles,
-and the tile population is larger than the unit population. A caller that walks
-the world asking a question one tile at a time is the data plane, whatever the
-question is.
-
-**A second instance, through the type system rather than through a missing
-read.** The spawn verb returns the identities of the units it made, as one
-column. The type stub for the verbs that take units declared a sequence of
-integers, and a column is not a sequence of integers. A caller passing the
-column straight to the next verb would have been told to convert it, and every
-conversion of a mass-tier column is a loop.
-
-**Make the boundary accept what the boundary produces.** If a verb returns a
-column and the next verb refuses one, the API has instructed the caller to
-sweep. The instruction arrives as a type error rather than as missing
-functionality, which is why it is easy to satisfy in the wrong way.
-
-**A red gate does not point at the right repair.** The type check would have
-failed on the signature. A contributor could have satisfied it by writing a
-list around the column at the call site, which passes the gate and puts the
-loop back. The gate sees the narrow fault. It cannot see the consequence.
-
-**Follows.** Four things.
-
-**When a rule forbids a shape, check that the API offers the shape it wants
-instead.** The design says the caller builds a selector and the engine resolves
-it. A selector that names a place by a property is the missing piece here.
-Until something like it exists, every caller that needs a place will sweep, and
-each one will look like a discipline failure.
-
-**When you find yourself sweeping, do not add discipline. Ask which read is
-missing.** The sweep is a symptom and it names its own cause.
-
-**Check that a verb accepts what the verb before it returns.** Two instances
-here came from different mechanisms, one a missing read and one a type. Both
-made the honest call site impossible, and a caller that cannot write the honest
-call writes the sweep.
-
-**A rule with no mechanism is worth recording as unenforced.** A reserved
-registry row holds the claim that the API refuses the loop for a declared
-tier.[^F147A] Nothing implements it. A reader who meets the rule and not the
-gap concludes the project enforces something it does not.
-
-### FND-148 — A second check downstream can make an upstream check untestable
-
-**Believed.** A test that drives the public interface, watches a stale identity
-refuse, and sees a typed error covers the resolution that refused it. If
-resolution broke, the test would go red.
-
-**True.** It goes red only when nothing else refuses first. Two independent
-checks on one condition each stop the same defect, so removing either one
-leaves the other to answer, and every test above them stays green. The tests
-then measure the pair and cannot name which member did the work.
-
-**Evidence.** The engine resolves an identity a caller hands back by comparing
-the generation in the identity against the generation the arena holds. The
-comparison was deleted and the suites were run.
-
-Two Rust tests went red, and they are the two that assert on the refusal
-itself. Four stayed green, correctly: two exercise conditions the deletion did
-not touch, one resolves a live identity, and one reads the gather log.
-
-**On the Python side the read stayed green and only the write verbs went red.**
-Reading the tile of a dead unit still refused with the same typed error and the
-same message, because the arena compares the generation a second time when it
-reads a tile. The read is protected twice, so it cannot fail when one of the
-two is removed.
-
-The protocol client test stayed green for the same reason, and it asserts only
-that the tool reported an error. It would have stayed green even without the
-second check, because a refusal by any cause is still an error.
-
-**Follows.** Three things.
-
-**Defence in depth costs the ability to test each layer through the front
-door.** The second check is right and stays. What must change is the claim: a
-test above both checks demonstrates the behaviour and does not cover either
-check on its own.
-
-**Say which assertion caught the defect, in the test.** Both tests above now
-record what the experiment measured, so a later reader does not take the read
-as the coverage. A comment that names the measured result is worth more than
-one that restates the intent.
-
-**A test that asserts only that an error happened cannot tell one cause from
-another.** That is enough for an integration test whose claim is that the
-refusal reaches the caller. It is not enough for a test whose claim is that a
-particular check refused, and the two read alike.
-
 ### FND-052 — A register was restored from a copy, and an entry left silently
 
 **Believed.** A register is safe under parallel work as long as two writers do
@@ -5431,43 +1399,6 @@ perturbed in a way that changes the population.
 perturbed. Where it cannot hold, say so in the file rather than leaving a
 reader to wonder why one probe has a companion and the next does not.
 
-### FND-068 — The world's call to an arena invariant check cannot fail today
-
-**Believed.** The world's invariant check covers each entity arena, because it
-calls the check of every arena and refuses the world when one of them fails.
-Removing one of those calls would therefore break a test.
-
-**True.** It breaks no test. Every failure state that an arena check detects is
-unreachable from the public interface. The arena marks a slot live before it
-mints the identity, it advances the generation before it queues the slot, and
-it writes every column in one call. So a caller who drives the world can never
-put an arena into a state its own check rejects.
-
-**Evidence.** Found while building the character column set. The call to the
-character arena check was removed from the world, and the whole suite stayed
-green: the arena tests, the thread-count suite and the golden state hash all
-passed. The arena's own failure states are reached only by the unit tests
-inside the module, which write the columns directly.
-
-The soldier arena and the settlement arena have the same property. Nothing in
-the tree distinguishes the three.
-
-**Follows.** Three things.
-
-**Keep the call.** It is a guard against a future write path that edits the
-columns outside the arena, and the batched structural path will be exactly
-that. A guard for a path that does not exist yet is not the same as a
-capability nobody invokes.
-
-**Do not read a green suite as proof that the world-level call works.** The
-unit tests prove the check works. Nothing proves the world reaches it. Say
-which of the two a test proves.
-
-**The test that would close this needs a write path that can corrupt an
-arena.** Write it when that path exists, and not before, because a test that
-reaches through a private field pins the implementation rather than the
-behaviour.[^21]
-
 ### FND-063 — A refined item asked for a path that no record and no code held
 
 **Believed.** A backlog item that adds an entity shape can require the founding
@@ -5603,192 +1534,42 @@ with the population, and not with the world.** That is the property the product
 record asks for, and it is a consequence of the rule rather than of a limit
 somebody imposed.[^24] A later rule that lets a claim reach further than one
 tile loses this property, and it must state what replaces it.
-### FND-074 — A rule that divides a set of one has nothing to divide
+### FND-068 — The world's call to an arena invariant check cannot fail today
 
-**Believed.** A cohort is one row for the units of one kind in one place, and
-the kinds of a unit are content that does not exist yet. One kind was therefore
-enough to build the draw, and the rule that splits a store between the cohorts
-of one place could be written and tested against it.
+**Believed.** The world's invariant check covers each entity arena, because it
+calls the check of every arena and refuses the world when one of them fails.
+Removing one of those calls would therefore break a test.
 
-**True.** With one kind, a place holds one cohort. The split then has one part,
-the part is the whole, and no input reaches the remainder rule. The rule would
-have shipped inert, and its test would have measured the fixture rather than the
-rule.[^37]
+**True.** It breaks no test. Every failure state that an arena check detects is
+unreachable from the public interface. The arena marks a slot live before it
+mints the identity, it advances the generation before it queues the slot, and
+it writes every column in one call. So a caller who drives the world can never
+put an arena into a state its own check rejects.
 
-**Evidence.** The exactness test was written first and could not be made to
-fail. Every store that was short gave everything it held to the one cohort that
-asked, whatever the split rule said. The remainder loop was then deleted, and
-the whole suite stayed green.
+**Evidence.** Found while building the character column set. The call to the
+character arena check was removed from the world, and the whole suite stayed
+green: the arena tests, the thread-count suite and the golden state hash all
+passed. The arena's own failure states are reached only by the unit tests
+inside the module, which write the columns directly.
 
-**Follows.** **The cohort is keyed on the faction as well as the place.** That
-is not a device for the test. Two factions in one place must not pool a draw
-against a store that one of them holds, so the second key was already required
-and the inert split is what exposed it. **Before you write a rule over a set,
-ask what makes the set hold more than one member. If nothing does, the rule has
-no reader.**
-
-### FND-075 — A capped transfer must take what the split handed out
-
-**Believed.** A draw takes the smaller of what a store holds and what the
-cohorts asked for. That amount is the cap, so the store falls by the cap and
-the split then divides the cap between the cohorts.
-
-**True.** The cap and the sum of the shares are two statements of one quantity.
-While the split is exact they agree, and a split that lost a unit would take
-that unit out of the store and give it to nobody. The conservation check over
-the world compares the store column against the account of it, and both fall by
-the cap, so nothing fails.
-
-**Evidence.** The remainder loop was deleted from the split. The store still
-fell by the cap, the account still agreed with the column, and the conservation
-test stayed green. Only the test that reads the shares saw the loss.
-
-**Follows.** **Take from the source what the sinks received, and never what the
-transfer meant to give.** The store now falls by the sum of the shares, which
-makes the two copies one copy.[^38] A conservation check that reads only the
-source cannot see a quantity that left the source and reached nobody.
-
-### FND-079 — The event log publishes a stub as the owner of a tile
-
-**Believed.** The holder of a tile is the owner of that tile. An accepted
-record states it, the holding column carries it, and the viewer draws it.[^40]
-
-**True.** The engine ships two tile-owner facts, and the one it publishes as
-the owner is the one no rule ever writes. A second faction column is filled
-once at construction from the tile index and the faction count. It never
-changes, nothing writes it, and it covers open water as readily as open
-ground. It is private and has no public reader, so it looks contained.
-
-It escapes through the event log. The tile-changed event carries a faction
-field, and that field is documented as the faction that owns the tile. The
-event is public and it reaches the Python control plane, which has no other
-view of who holds anything.
-
-**Evidence.** The column is filled as the tile index modulo the faction count.
-The event's own documentation calls the field the owner. A developer who
-performs the comparison the product record asks for — a unit's faction against
-the owner the event reports — gets a confident wrong answer, and nothing
-fails. The comparison is type-correct and meaningless.[^41]
-
-**Follows.** **A private value with a public description is not private.** The
-doc comment is the interface. This is the second declaration site of shape 1,
-made worse: the two sites do not hold the same kind of fact, so they cannot be
-reconciled by choosing a winner. The stub goes, and the event carries the
-holder with a stated encoding for nobody.[^42]
-
-### FND-080 — A behavioural claim was defended by a test of constants
-
-**Believed.** Terrain influences where a holding spreads, and a test covers
-it. The test is named for the claim and it passes.
-
-**True.** The test asserts that water is never held, and that the claim
-threshold of plain is below hill and hill below mountain. The second assertion
-reads three constants and exercises no behaviour. The test also computes the
-held share for each terrain kind and then discards the result without
-asserting on it.
-
-The gradient it is named for is not defended.
-
-**This entry first named the wrong experiment, and the correction is a
-separate finding.**[^83] It said that flattening the claim threshold to the
-same value for every passable kind leaves the test green. It does not. The
-test reads the thresholds, so flattening them fails it on a comparison of two
-constants, without running the rule at all. The experiment that shows the test
-blind is to leave the thresholds ordered and stop the decision function from
-reading them. The conclusion above stands; only this line was wrong.
-
-**Evidence.** The behaviour is real and was observed over 40 ticks on a
-development machine, by recording the terrain of every unheld tile adjacent to
-a holding and whether the next tick took it. Plain converted every tile
-offered, hill about a third, mountain a small fraction, water none. The
-gradient exists in the system and no assertion holds it there.
-
-**Follows.** **Name a test for the claim and it will be read as covering the
-claim.** The testing rule already states that a determinism test cannot tell
-correct from consistently wrong; this is the same failure in an ordinary
-test.[^43] A test that reads a constant proves the constant was written down.
-Only a counted outcome proves the rule acts on it. This is the third instance
-in one session of one fact checked in a place that cannot see it go
-wrong.[^44] [^45]
-
-### FND-078 — A differential test cannot see a defect that moves both worlds alike
-
-**Believed.** A test that compares a world holding ground against the same
-world holding none proves that the holder layer draws the holder. The
-difference between the two pictures is the holding, so a wrong holder would
-change the difference.
-
-**True.** The difference is blind to any defect that tints both worlds
-identically. The holder layer was pointed at the rule of the stub tile faction
-column, which derives a faction from the tile index and reads no holder at all.
-That rule does not care whether a soldier stands anywhere, so it painted both
-worlds the same way and the difference stayed exactly as it was.
-
-**Evidence.** Two tests passed under the wrong column: the one asserting that a
-tile nobody holds draws as it did before, and the one asserting that open water
-never takes a holder colour. Four other tests failed, and all four read the
-holder back rather than comparing two worlds.[^39]
-
-**Follows.** **A differential assertion measures the difference, not the
-source.** When the property under test is where a value came from, one side of
-the comparison must read that value back. This is the same shape as FND-075,
-where a conservation check that read only the source could not see a quantity
-that left the source and reached nobody. Both are one fact checked in a place
-that cannot see it go wrong.
-
-### FND-072 — A layout finding named the tier when it meant one structure
-
-**Believed.** The character tier wants array-of-structs, and the character
-arena therefore has the wrong layout. The register states the correction as
-"the character pass is a random graph gather", and readers take the character
-pass to mean the descent and succession pass.[^25]
-
-**True.** Three things are wrong with that reading.
-
-The figure belongs to the vector report, not to the character report.[^26]
-[^27] The character report recommends struct-of-arrays for the character row
-and says in the same paragraph that the row size is an accounting figure and
-not a claim about locality.[^27]
-
-The pass is the personality influence pass, and the structure is a separate
-64-byte trait record that holds twelve current values and twelve anchor
-values. The vector report's own decision keeps the trait record in
-array-of-structs and says nothing about the identity columns.[^26] The two
-recommendations do not conflict. They cover different structures.
-
-The descent and succession pass is not a twelve-column gather. The character
-report lists its kernels: the eligibility filter is a map to a mask and a
-compaction scan, the ranking is a map to a key tuple and a sort, the child
-list rebuild is a counting sort, and a cadet split is a map over a contiguous
-range.[^27] Every one of those is a column pass. The two operations that do
-gather at random, the lowest common ancestor walk and the kinship recursion,
-read two or three columns for each node, and the report already budgets both
-as affordable.[^27]
-
-**Evidence.** A whole-tree search for the phrase found it in the vector report
-and in the merge notes, and never in the character report. The character arena
-holds five columns today and holds no parent edge, so the pass the finding is
-read to govern does not exist.
-
-A gather benchmark on a development machine measured the crossover as a
-function of the column count, not of the tier. Struct-of-arrays wins at one
-and at two columns, the two layouts meet near three, and array-of-structs wins
-above that. The figures are in the commit body. The machine is not the target,
-so the measurement fixes the shape of the curve and not the position of the
-crossover.[^28]
+The soldier arena and the settlement arena have the same property. Nothing in
+the tree distinguishes the three.
 
 **Follows.** Three things.
 
-**Scope a layout claim to the structure and to the pass, never to the tier.**
-This is the same shape as the finding that a constraint can be stated over a
-subject wider than itself.[^29]
+**Keep the call.** It is a guard against a future write path that edits the
+columns outside the arena, and the batched structural path will be exactly
+that. A guard for a path that does not exist yet is not the same as a
+capability nobody invokes.
 
-**Read FND-022 as scoped to the trait record.** Its closing line is correct
-and general: layout follows the access pattern. Its middle line names the
-tier, and the tier was never the subject.
+**Do not read a green suite as proof that the world-level call works.** The
+unit tests prove the check works. Nothing proves the world reaches it. Say
+which of the two a test proves.
 
-**Count the columns before you choose a layout.** The column count of the pass
-decides the answer. The name of the tier does not.
+**The test that would close this needs a write path that can corrupt an
+arena.** Write it when that path exists, and not before, because a test that
+reaches through a private field pins the implementation rather than the
+behaviour.[^21]
 
 ### FND-070 — A restored defect must be affordable, or the proof cannot run
 
@@ -5856,6 +1637,60 @@ input an assertion needs, and the founding is the thing that may not.[^36]
 **Search the tree for a shape, not for a name.** The pass was found by reading
 the demonstration for another reason. Nothing failed, because a whole-world
 loop is ordinary code and no check can tell a fixture from an engine.
+### FND-072 — A layout finding named the tier when it meant one structure
+
+**Believed.** The character tier wants array-of-structs, and the character
+arena therefore has the wrong layout. The register states the correction as
+"the character pass is a random graph gather", and readers take the character
+pass to mean the descent and succession pass.[^25]
+
+**True.** Three things are wrong with that reading.
+
+The figure belongs to the vector report, not to the character report.[^26]
+[^27] The character report recommends struct-of-arrays for the character row
+and says in the same paragraph that the row size is an accounting figure and
+not a claim about locality.[^27]
+
+The pass is the personality influence pass, and the structure is a separate
+64-byte trait record that holds twelve current values and twelve anchor
+values. The vector report's own decision keeps the trait record in
+array-of-structs and says nothing about the identity columns.[^26] The two
+recommendations do not conflict. They cover different structures.
+
+The descent and succession pass is not a twelve-column gather. The character
+report lists its kernels: the eligibility filter is a map to a mask and a
+compaction scan, the ranking is a map to a key tuple and a sort, the child
+list rebuild is a counting sort, and a cadet split is a map over a contiguous
+range.[^27] Every one of those is a column pass. The two operations that do
+gather at random, the lowest common ancestor walk and the kinship recursion,
+read two or three columns for each node, and the report already budgets both
+as affordable.[^27]
+
+**Evidence.** A whole-tree search for the phrase found it in the vector report
+and in the merge notes, and never in the character report. The character arena
+holds five columns today and holds no parent edge, so the pass the finding is
+read to govern does not exist.
+
+A gather benchmark on a development machine measured the crossover as a
+function of the column count, not of the tier. Struct-of-arrays wins at one
+and at two columns, the two layouts meet near three, and array-of-structs wins
+above that. The figures are in the commit body. The machine is not the target,
+so the measurement fixes the shape of the curve and not the position of the
+crossover.[^28]
+
+**Follows.** Three things.
+
+**Scope a layout claim to the structure and to the pass, never to the tier.**
+This is the same shape as the finding that a constraint can be stated over a
+subject wider than itself.[^29]
+
+**Read FND-022 as scoped to the trait record.** Its closing line is correct
+and general: layout follows the access pattern. Its middle line names the
+tier, and the tier was never the subject.
+
+**Count the columns before you choose a layout.** The column count of the pass
+decides the answer. The name of the tier does not.
+
 ### FND-073 — The remedy for a colliding allocator cannot be written in the register it protects
 
 **Believed.** A number collision between parallel workers is solved by the
@@ -5903,6 +1738,225 @@ number is derived at read time, or whose rows are numbered at merge, removes
 the window entirely. That is a change to three registers and their check, and
 it is not made here.
 
+
+### FND-074 — A rule that divides a set of one has nothing to divide
+
+**Believed.** A cohort is one row for the units of one kind in one place, and
+the kinds of a unit are content that does not exist yet. One kind was therefore
+enough to build the draw, and the rule that splits a store between the cohorts
+of one place could be written and tested against it.
+
+**True.** With one kind, a place holds one cohort. The split then has one part,
+the part is the whole, and no input reaches the remainder rule. The rule would
+have shipped inert, and its test would have measured the fixture rather than the
+rule.[^37]
+
+**Evidence.** The exactness test was written first and could not be made to
+fail. Every store that was short gave everything it held to the one cohort that
+asked, whatever the split rule said. The remainder loop was then deleted, and
+the whole suite stayed green.
+
+**Follows.** **The cohort is keyed on the faction as well as the place.** That
+is not a device for the test. Two factions in one place must not pool a draw
+against a store that one of them holds, so the second key was already required
+and the inert split is what exposed it. **Before you write a rule over a set,
+ask what makes the set hold more than one member. If nothing does, the rule has
+no reader.**
+
+### FND-075 — A capped transfer must take what the split handed out
+
+**Believed.** A draw takes the smaller of what a store holds and what the
+cohorts asked for. That amount is the cap, so the store falls by the cap and
+the split then divides the cap between the cohorts.
+
+**True.** The cap and the sum of the shares are two statements of one quantity.
+While the split is exact they agree, and a split that lost a unit would take
+that unit out of the store and give it to nobody. The conservation check over
+the world compares the store column against the account of it, and both fall by
+the cap, so nothing fails.
+
+**Evidence.** The remainder loop was deleted from the split. The store still
+fell by the cap, the account still agreed with the column, and the conservation
+test stayed green. Only the test that reads the shares saw the loss.
+
+**Follows.** **Take from the source what the sinks received, and never what the
+transfer meant to give.** The store now falls by the sum of the shares, which
+makes the two copies one copy.[^38] A conservation check that reads only the
+source cannot see a quantity that left the source and reached nobody.
+
+### FND-078 — A differential test cannot see a defect that moves both worlds alike
+
+**Believed.** A test that compares a world holding ground against the same
+world holding none proves that the holder layer draws the holder. The
+difference between the two pictures is the holding, so a wrong holder would
+change the difference.
+
+**True.** The difference is blind to any defect that tints both worlds
+identically. The holder layer was pointed at the rule of the stub tile faction
+column, which derives a faction from the tile index and reads no holder at all.
+That rule does not care whether a soldier stands anywhere, so it painted both
+worlds the same way and the difference stayed exactly as it was.
+
+**Evidence.** Two tests passed under the wrong column: the one asserting that a
+tile nobody holds draws as it did before, and the one asserting that open water
+never takes a holder colour. Four other tests failed, and all four read the
+holder back rather than comparing two worlds.[^39]
+
+**Follows.** **A differential assertion measures the difference, not the
+source.** When the property under test is where a value came from, one side of
+the comparison must read that value back. This is the same shape as FND-075,
+where a conservation check that read only the source could not see a quantity
+that left the source and reached nobody. Both are one fact checked in a place
+that cannot see it go wrong.
+
+### FND-079 — The event log publishes a stub as the owner of a tile
+
+**Believed.** The holder of a tile is the owner of that tile. An accepted
+record states it, the holding column carries it, and the viewer draws it.[^40]
+
+**True.** The engine ships two tile-owner facts, and the one it publishes as
+the owner is the one no rule ever writes. A second faction column is filled
+once at construction from the tile index and the faction count. It never
+changes, nothing writes it, and it covers open water as readily as open
+ground. It is private and has no public reader, so it looks contained.
+
+It escapes through the event log. The tile-changed event carries a faction
+field, and that field is documented as the faction that owns the tile. The
+event is public and it reaches the Python control plane, which has no other
+view of who holds anything.
+
+**Evidence.** The column is filled as the tile index modulo the faction count.
+The event's own documentation calls the field the owner. A developer who
+performs the comparison the product record asks for — a unit's faction against
+the owner the event reports — gets a confident wrong answer, and nothing
+fails. The comparison is type-correct and meaningless.[^41]
+
+**Follows.** **A private value with a public description is not private.** The
+doc comment is the interface. This is the second declaration site of shape 1,
+made worse: the two sites do not hold the same kind of fact, so they cannot be
+reconciled by choosing a winner. The stub goes, and the event carries the
+holder with a stated encoding for nobody.[^42]
+
+### FND-080 — A behavioural claim was defended by a test of constants
+
+**Believed.** Terrain influences where a holding spreads, and a test covers
+it. The test is named for the claim and it passes.
+
+**True.** The test asserts that water is never held, and that the claim
+threshold of plain is below hill and hill below mountain. The second assertion
+reads three constants and exercises no behaviour. The test also computes the
+held share for each terrain kind and then discards the result without
+asserting on it.
+
+The gradient it is named for is not defended.
+
+**This entry first named the wrong experiment, and the correction is a
+separate finding.**[^83] It said that flattening the claim threshold to the
+same value for every passable kind leaves the test green. It does not. The
+test reads the thresholds, so flattening them fails it on a comparison of two
+constants, without running the rule at all. The experiment that shows the test
+blind is to leave the thresholds ordered and stop the decision function from
+reading them. The conclusion above stands; only this line was wrong.
+
+**Evidence.** The behaviour is real and was observed over 40 ticks on a
+development machine, by recording the terrain of every unheld tile adjacent to
+a holding and whether the next tick took it. Plain converted every tile
+offered, hill about a third, mountain a small fraction, water none. The
+gradient exists in the system and no assertion holds it there.
+
+**Follows.** **Name a test for the claim and it will be read as covering the
+claim.** The testing rule already states that a determinism test cannot tell
+correct from consistently wrong; this is the same failure in an ordinary
+test.[^43] A test that reads a constant proves the constant was written down.
+Only a counted outcome proves the rule acts on it. This is the third instance
+in one session of one fact checked in a place that cannot see it go
+wrong.[^44] [^45]
+
+### FND-081 — Two accepted records disagreed on whether a per-tile count exists
+
+**Believed.** The accepted records agreed about how admission reads the
+occupancy of a tile.
+
+**True.** They did not. ADR-0018 rejects an offset array, and it rests part of
+that rejection on the claim that a per-tile array of counts already exists,
+because admission needs the occupancy of a target and its departure count in
+one tick. ADR-0056 D3 states that admission reads occupancy from the derived
+structure and carries no per-tile array of its own. Both records are accepted.
+Both are cited by code.
+
+**Evidence.** An agent found the pair while it read ADR-0056 to write a
+superseding record. Neither record cites the other on this point, so nothing
+brought the two claims together. The check suite passed throughout, because a
+record is prose.
+
+**The code settles which claim is true, and it is not the one the first
+attempt assumed.** Admission builds a working set of segments over the tiles
+that some intent named, fills each from the derived structure, and discards
+the set at the end of the tick. That is what ADR-0056 D3 describes. No array
+over every tile exists, and none ever did.
+
+**The reads held more of the cost than the writes, and nothing predicted
+that.** A measurement on the target platform after the change found the frame
+1.92 times cheaper, and the merge that justified the work is a little over half
+of what the change returned. The larger single surprise is the level 1 rebuild,
+which costs 11.6 times less with nothing in it changed: it sums the value of
+every tile, and reading one tile used to be a binary search into a list holding
+an entry for almost every tile. The table holds the rows.[^F292C]
+
+**Follows.** Four things.
+
+**ADR-0018's stated reason is false, and it was never load-bearing.** The
+first answer to DEC-020 would have made it true by adding the array. The owner
+reversed that answer, so nothing adds one. ADR-0074 now records that no dense
+count exists, and it is the document a reader lands on when they meet the two
+claims. ADR-0018's rejection of the offset array stands on its other argument,
+that such an array must be exact everywhere before any query is correct, so
+its rebuild follows the tile count rather than the work.
+
+ADR-0018 is not superseded for this. It has four dependent records and eight
+citing source files, and the false sentence changes no decision it makes.
+Superseding a record over an aside is disproportionate, and a reader who meets
+the disagreement is served by the record that resolves it.
+
+A record that rejects an option on the strength of another record's mechanism
+must cite that record. ADR-0018 named a mechanism it did not own, and the
+mechanism did not exist.
+
+This is the same pair of records as FND-045, which found them disagreeing on
+whether a per-tile structure is affordable. One pair of records has now
+produced two findings. Read both before either record is amended again.
+
+
+### FND-082 — A register cited a record that did not support its claim
+
+**Believed.** The decisions register stated that the engine clears a lost
+site's units by scanning every unit, and it cited a record for that claim.
+
+**True.** The cited decision says that the location table is a dense array
+indexed by the slot, and that it is never a hash map. It says nothing about a
+scan from a site to its units. The claim is right and the citation does not
+reach it. The register also wrote the clear in the present tense. No
+settlement destruction path exists in the engine, so the clear it describes is
+not code. The only site-to-unit traversal in the tree is an invariant check.
+
+**Evidence.** An agent read the record while it confirmed that DEC-036 changed
+nothing. A second instance sits nearby: ADR-0067 cites a product requirement
+record in a footnote, and DEC-012 decided that a decision record cites no
+product record. That citation predates the decision.
+
+**Follows.** Two things.
+
+A footnote is a claim about a source. A reader who follows it and finds
+nothing loses more than the citation, because the register spent its
+authority. Check that the cited decision states the thing, not that the cited
+record covers the topic.
+
+**Write the tense the tree supports.** A register that describes intended code
+in the present tense reads as a description of the engine. That is the shape
+the scope rule names as recording an intent as a fact.
+
+
+## G. Process
 
 ### FND-083 — A footnote label defined twice sends half its citations elsewhere
 
@@ -5958,6 +2012,155 @@ misses a call site. A repair that is too wide edits work that is not yours.
 
 Before a repair rewrites a file, confirm the file belongs to the change. An
 ignored directory is not empty, and the status command will not say so.
+
+### FND-085 — A rule that bans a measurement can leave a real cost unowned
+
+**Believed.** That every cost figure in this project belongs to the target
+platform, and that no measurement exists there, was a complete rule about
+cost. It reads as complete. It is stated as a general fact about figures, and
+two rules enforce it.
+
+**True.** The rule governs one quantity: how the engine performs at the target
+scale. A second quantity exists, and the rule is silent about it. How long a
+contributor waits for the gate suite is a property of the development loop,
+and the machine that runs it owns that. The silence read as a prohibition, so
+nothing owned the cost.
+
+**Evidence.** The golden state hash test grew as each subsystem entered the
+state hash, four in one session, until it dominated a debug run of the suite.
+No gate, no register and no budget noticed. The rule that would have caught an
+equivalent regression at the target does not apply to a development machine,
+and no other rule did.
+
+**Follows.** Two things.
+
+The project now keeps two registers with different standing. A figure from one
+is never evidence about the other. The separation is a file boundary rather
+than a note in a shared file, so a row cannot drift across it. The blocker
+about the target stays open, because it is about the target.
+
+**The general shape is the part worth keeping.** A rule that correctly refuses
+a class of figure can leave a legitimate quantity with no owner. When the
+project bans a measurement, ask what the ban also silences.
+
+
+### FND-086 — A product record stated a cost the engine never met
+
+**Believed.** The product record for a world worth looking at states that
+building a world must not cost a pass over every tile before the first frame.
+The record reached `Shaped`, and nobody had checked the statement against the
+code.
+
+**True.** The engine makes that pass. Building a world loops once for each
+tile, draws a value, and fills two vectors sized to the tile count. At the
+target scale that is a whole-world pass and two proportional allocations
+before anything is drawn.
+
+**Evidence.** An agent checked each statement of the record against the crate
+while it carried out the owner's ruling that every product record moves past
+`Shaped`. The columns that make the pass belong to the tile stub, not to the
+terrain the record introduced, so the record is false of the code by
+inheritance rather than by its own subject.
+
+**Follows.** Two things.
+
+**A checkable statement is not checked until somebody runs it.** The shaping
+gate asks for statements a reader can check. It does not ask anyone to check
+them, and the record passed every gate the project has while stating something
+untrue. The promotion review is where that gets caught, so a record must not
+reach `Shipped` on the strength of its citing items having closed.
+
+The record stays `Accepted` and an item tracks the repair. Accepting a need
+the engine does not meet is correct. Claiming the need is met would be the
+defect.
+
+### FND-087 — A product record can carry a structure without naming one
+
+**Believed.** The rule that a product record states a need and never states a
+structure is enforced by a check, and the check looks for a citation to a
+decision record.
+
+**True.** A record can fix a structure without citing anything. The record for
+parents and children said that units who are related and who live together
+form a household. That sentence decides that a household is a kinship
+grouping. The project has since decided the opposite: a household is every
+unit that carries one dwelling slot, and two strangers under one roof are one
+household.
+
+**Evidence.** An agent found the sentence while it checked the record against
+the newly closed decision. Every check passed before and after, because the
+record cites no decision record and names no data structure. The structural
+claim sat in ordinary prose about people.
+
+**Follows.** Two things.
+
+**Read a product record for the choices its wording forecloses, not only for
+the structures it names.** A need stated in terms of who and what is still
+capable of deciding how, and the check cannot see it.
+
+A structural decision that contradicts a product record must send someone back
+to the record. This one did, and the record was corrected in the same pass.
+Had the decision landed without that reading, the two documents would have
+disagreed quietly, which is the shape that costs every future decision made
+from either.
+
+### FND-089 — A deficit cannot recover under the default need rule
+
+**Believed.** A unit that fails its draw builds a deficit, and the deficit
+falls again when the shortage ends. The consumption kernel holds both
+directions, and the recovery rate is one of the four values of the rule.
+
+**True.** The recovery is unreachable under the default rule. A deficit falls
+only while the need of a unit is at or above the threshold. The need rises by
+the ration and falls by the decay, and the default rule sets the two equal, so
+a unit that receives its whole ration holds the need it has. A unit whose need
+reached zero holds at zero and never climbs back over the threshold. Its
+deficit rises at every application until the shortage ends the unit.
+
+**Evidence.** The test that watches a deficit rise and fall was written
+against the default rule and failed. It passes with a ration above the decay,
+and it then needs many more applications to clear the deficit than it took to
+build it. No kernel changed between the two runs.
+
+**Follows.** Three things.
+
+The equality of the ration and the decay is a content choice, and the register
+holds it. The choice now decides more than it did: with an end for a starving
+unit, the equality makes every shortage that reaches zero need fatal. A new
+row asks whether the default ration should exceed the decay.
+
+**A recovery path needs a test that reaches it.** The rise and the fall are
+one rule in the kernel, and a test of the rise alone passes while the fall is
+unreachable. State the rates the test needs rather than taking the default.
+
+The general shape is the one this register keeps returning to. Two content
+values that hold a relation decide a behaviour that neither of them names.
+
+### FND-093 — A rule behind an existing filter cannot be proved by the path that filters
+
+**Believed.** A new refusal is proved by a test that drives the whole engine
+path. Remove the refusal, and the test goes red.
+
+**True.** The test stays green when an earlier stage of the same path already
+refuses the case. The founding survey drops a candidate whose ground admits no
+unit, so the settlement refusal beneath it never receives a refused place. The
+run test removed the refusal and stayed green. It also stayed green when the
+survey filter itself was removed, because the score prefers good ground and
+chose a passable place anyway.
+
+**Evidence.** The settlement refusal on ground that carries no unit. Two tests
+that call the founding directly went red when the refusal was removed. The
+test that founds a whole run did not.
+
+**Follows.** Two things.
+
+**Name what each test proves.** A test that drives the layered path is a guard
+against a later change that removes an upper filter. It is not evidence that
+the lower rule works. Prove the lower rule at the call that reaches it.
+
+**A green test after a restored defect is a result, not a failure of the
+method.** It says the case does not reach the assertion. Report it rather than
+hiding it.[^55]
 
 ### FND-097 — A wide golden scenario paid its extent on every frame it did not need
 
@@ -6032,64 +2235,6 @@ the conditions in the row.[^47]
 **Serialise the suite before you compare two runs of it.** Two suites on one
 machine do not cost twice one suite, and neither figure is the cost of the
 suite.
-
-### FND-089 — A deficit cannot recover under the default need rule
-
-**Believed.** A unit that fails its draw builds a deficit, and the deficit
-falls again when the shortage ends. The consumption kernel holds both
-directions, and the recovery rate is one of the four values of the rule.
-
-**True.** The recovery is unreachable under the default rule. A deficit falls
-only while the need of a unit is at or above the threshold. The need rises by
-the ration and falls by the decay, and the default rule sets the two equal, so
-a unit that receives its whole ration holds the need it has. A unit whose need
-reached zero holds at zero and never climbs back over the threshold. Its
-deficit rises at every application until the shortage ends the unit.
-
-**Evidence.** The test that watches a deficit rise and fall was written
-against the default rule and failed. It passes with a ration above the decay,
-and it then needs many more applications to clear the deficit than it took to
-build it. No kernel changed between the two runs.
-
-**Follows.** Three things.
-
-The equality of the ration and the decay is a content choice, and the register
-holds it. The choice now decides more than it did: with an end for a starving
-unit, the equality makes every shortage that reaches zero need fatal. A new
-row asks whether the default ration should exceed the decay.
-
-**A recovery path needs a test that reaches it.** The rise and the fall are
-one rule in the kernel, and a test of the rise alone passes while the fall is
-unreachable. State the rates the test needs rather than taking the default.
-
-The general shape is the one this register keeps returning to. Two content
-values that hold a relation decide a behaviour that neither of them names.
-
-### FND-093 — A rule behind an existing filter cannot be proved by the path that filters
-
-**Believed.** A new refusal is proved by a test that drives the whole engine
-path. Remove the refusal, and the test goes red.
-
-**True.** The test stays green when an earlier stage of the same path already
-refuses the case. The founding survey drops a candidate whose ground admits no
-unit, so the settlement refusal beneath it never receives a refused place. The
-run test removed the refusal and stayed green. It also stayed green when the
-survey filter itself was removed, because the score prefers good ground and
-chose a passable place anyway.
-
-**Evidence.** The settlement refusal on ground that carries no unit. Two tests
-that call the founding directly went red when the refusal was removed. The
-test that founds a whole run did not.
-
-**Follows.** Two things.
-
-**Name what each test proves.** A test that drives the layered path is a guard
-against a later change that removes an upper filter. It is not evidence that
-the lower rule works. Prove the lower rule at the call that reaches it.
-
-**A green test after a restored defect is a result, not a failure of the
-method.** It says the case does not reach the assertion. Report it rather than
-hiding it.[^55]
 
 ### FND-100 — "A watcher can read it" was counted as "a watcher can see it"
 
@@ -6331,40 +2476,6 @@ frame.** A tile that drains below its capacity inside the frame admits for a
 reason the rule does not name, so a test built on a small over-fill measures the
 drain rather than the refusal. The suite that found this places enough units
 that the tile stays above its capacity through every frame.
-### FND-116 — Housing already has a residence column and an eviction path
-
-**Believed.** A unit belongs to nothing. Backlog item 0059 plans a new
-residence column on the soldier arena, and plans an eviction that clears the
-residents of a lost site. The product record states that a unit lives nowhere
-today.[^61]
-
-**True.** Both exist. The consumption work gave the soldier arena a home
-column that holds a slot of the settlement arena, with a reader and a writer
-on the arena and a wrapper on the world. Under the record that fixes a
-settlement to a tile and gives it the pooled store, the site a unit draws from
-and the place a unit lives are one fact, so a second column would be a second
-declaration of it.[^62] Destroying a settlement already clears the home of
-every unit that named the lost slot.
-
-**Evidence.** The soldier arena holds the column, its reader, its writer and
-its slice reader. The founding writes the home of every unit it places. The
-destroy path clears the home of every resident of the lost site. The
-consumption pass and the cohort rebuild both read the column.
-
-**Follows.** Three things.
-
-**Item 0059 extends the home column. It adds none.** A residence column beside
-the home column is the defect shape this register meets most often.[^63]
-
-**The eviction exists, and its cost shape is the open part.** The destroy path
-reads every unit of the world to find the residents of one site. That is a
-pass over the population for a fact that a reverse index would answer
-directly. Whether such an index exists is a decision, and the item names it.
-
-**A separation of the two facts is a later decision, not a default.** A unit
-that draws from one site and lives in another is a world the project may want.
-Nothing needs it today, and the item that needs it owns the record.
-
 ### FND-113 — A per-tick ageing pass that resets its clock recovers nothing
 
 **Believed.** A recovery that runs on every tick can hold its progress in the
@@ -6414,38 +2525,6 @@ guard, not evidence.[^64] Both rules stay in the code, because the second
 mechanism is an ordering that a later change can move, and neither costs
 anything. Neither is counted as covered.
 
-### FND-156 — The live filter of the household read cannot fail through the engine
-
-**Believed.** The household read must skip a dead unit, and a test can prove
-it by putting the defect back. A reader that walked every slot instead of
-every live unit would put a dead unit into a household.
-
-**True.** It would not. The unit arena clears the home of a slot when it frees
-it, and the arena invariant states that a slot which is not live holds no
-home. So a dead slot never names a dwelling, and the walk over every slot
-gives the same answer as the walk over the live units. The filter is a second
-guard against a case that a checked invariant already excludes.
-
-**Evidence.** The filter was replaced by a walk over the whole home column,
-rebuilding each identity from the slot and its generation. The whole household
-suite stayed green. Three other perturbations of the same function each failed
-at least two tests: a comparison that let a moved unit stay in the dwelling it
-left, a reversed read order, and a removed guard against the value that means
-no home.
-
-**Follows.** Two things.
-
-**The filter stays, and this row is why it has no test.** A reader that walked
-the whole column would be correct only for as long as the free path keeps
-clearing the home. That is a coupling to a distant mechanism, and nothing in
-the reader would say so. The live walk is the same walk the unit-to-tile
-bridge makes, and it is correct on its own terms.
-
-**A perturbation that changes no answer is a result, not a failed
-experiment.** It says the guard is redundant with something else. Record which
-mechanism already excludes the case, so that a later reader does not delete
-the guard and the mechanism in two separate changes.
-
 ### FND-115 — A fixture that asks for the first kind a tile carries selects one kind
 
 **Believed.** A fixture that walks the open tiles and takes, for each tile, the
@@ -6472,6 +2551,40 @@ them.
 **A fixture needs an assertion about itself.** This one was caught by a check
 that the run reached the case, not by reading the code, and the file it would
 have recorded would have looked correct for as long as anyone left it.[^55]
+### FND-116 — Housing already has a residence column and an eviction path
+
+**Believed.** A unit belongs to nothing. Backlog item 0059 plans a new
+residence column on the soldier arena, and plans an eviction that clears the
+residents of a lost site. The product record states that a unit lives nowhere
+today.[^61]
+
+**True.** Both exist. The consumption work gave the soldier arena a home
+column that holds a slot of the settlement arena, with a reader and a writer
+on the arena and a wrapper on the world. Under the record that fixes a
+settlement to a tile and gives it the pooled store, the site a unit draws from
+and the place a unit lives are one fact, so a second column would be a second
+declaration of it.[^62] Destroying a settlement already clears the home of
+every unit that named the lost slot.
+
+**Evidence.** The soldier arena holds the column, its reader, its writer and
+its slice reader. The founding writes the home of every unit it places. The
+destroy path clears the home of every resident of the lost site. The
+consumption pass and the cohort rebuild both read the column.
+
+**Follows.** Three things.
+
+**Item 0059 extends the home column. It adds none.** A residence column beside
+the home column is the defect shape this register meets most often.[^63]
+
+**The eviction exists, and its cost shape is the open part.** The destroy path
+reads every unit of the world to find the residents of one site. That is a
+pass over the population for a fact that a reverse index would answer
+directly. Whether such an index exists is a decision, and the item names it.
+
+**A separation of the two facts is a later decision, not a default.** A unit
+that draws from one site and lives in another is a world the project may want.
+Nothing needs it today, and the item that needs it owns the record.
+
 ### FND-119 — A watcher can never see a unit at the moment a shortage ends it
 
 **Believed.** The engine names three conditions, and a viewer that draws the
@@ -6968,56 +3081,6 @@ condition, and so did the brief that dispatched it. Neither would have been
 wrong about the outcome. Both would have been wrong about what the outcome
 proved.
 
-### FND-138 — A gate result read through a pipe reports the exit code of the pipe
-
-**Believed.** A gate run reports whether the gate passed. The command
-`just check` exits zero when every gate passes, so a run that exits zero
-passed.
-
-**True.** A shell pipeline exits with the status of its last stage. A gate
-piped into `tail` therefore exits with the status of `tail`, which is zero
-whatever the gate did. The gate can fail, or be killed, and the run still
-reads as a pass.
-
-The failure is silent in the direction that matters. A pipeline hides a red
-gate and never hides a green one, so the mistake only ever reports success.
-
-**Evidence.** Two instances in one session, made independently by two agents.
-
-The first ran the gate in the background through a pipe into `tail`. The task
-reported exit code zero, and the captured output was empty. An empty capture
-from a gate that prints hundreds of lines is what said the gate had not
-finished. The run had been killed, and `tail` had reported its own success.
-
-The second ran the gate on the trunk through a pipeline and reported a pass.
-The gate had been terminated by a signal, which the shell reports as 143, and
-the pipeline still reported zero.
-
-Neither instance was found by reading the exit code. The first was found
-because the capture was empty, and the second because the termination was
-noticed by other means.
-
-**Follows.** **Read the exit status of the command under test, and never of a
-pipeline it sits inside.** Run the gate, capture its status directly, and read
-the log afterwards.
-
-```
-just check > /tmp/gate.log 2>&1; echo "EXIT=$?"
-```
-
-Do not pipe a gate into `tail`, `grep` or `head` when the exit code is the
-thing being reported. A filter is safe only after the status is captured.
-
-**A capture that is empty or short is evidence, and not a formatting
-problem.** A gate prints hundreds of lines. A run that reports a pass and
-shows almost nothing did not finish.
-
-**The shape is one outcome read from a place that cannot see it go wrong.**
-The register holds that shape twice already, in a conservation check that read
-only the source of a transfer, and in a differential test that could not see a
-defect which moved both sides alike.[^95] [^96]
-
-
 ### FND-134 — A product record can state a structure, and the check cannot see it
 
 **Believed.** The product record check defends the rule that a product record
@@ -7110,6 +3173,81 @@ the three markers over the whole tree costs nothing and catches this class.
 **A register merges more often than any other file, because every worker
 updates one.** The registers are where this failure lands, and parallel work
 makes it more likely, not less.
+
+### FND-137 — The event log crosses to Python as bytes with no layout
+
+**Believed:** the bindings publish the event log to Python, so a control plane
+reader can see what a step changed. The method returns the whole log as bytes,
+and the crate documents it as the log the determinism test compares.[^F137A]
+
+**True:** it publishes a buffer, not events. The field order, the field widths
+and the padding of an event live in the Rust source and nowhere else.[^F137B] A
+reader in Python must repeat that layout to get a field out of the buffer. The
+copy and the original then hold one fact in two places, and nothing fails when
+they disagree. The recurring defect rule names this pair as a place the shape
+will recur in this project.[^F137C]
+
+**Evidence:** the agent-facing protocol server was built over the existing
+bindings. Every other tool calls one method and returns what the engine said.
+The event log tool cannot, so it returns the bytes and a digest of them. An
+agent can prove that two runs emitted the same log and cannot see which tile
+changed.
+
+**Follows:** the bytes are enough to compare two runs and not enough to read
+one. Give Python the events from the place that declares them, by a column for
+each field, by a derived description of the layout, or by a query the engine
+answers. Do not add a format string to Python. A backlog item holds the
+choice.[^F137D]
+
+### FND-138 — A gate result read through a pipe reports the exit code of the pipe
+
+**Believed.** A gate run reports whether the gate passed. The command
+`just check` exits zero when every gate passes, so a run that exits zero
+passed.
+
+**True.** A shell pipeline exits with the status of its last stage. A gate
+piped into `tail` therefore exits with the status of `tail`, which is zero
+whatever the gate did. The gate can fail, or be killed, and the run still
+reads as a pass.
+
+The failure is silent in the direction that matters. A pipeline hides a red
+gate and never hides a green one, so the mistake only ever reports success.
+
+**Evidence.** Two instances in one session, made independently by two agents.
+
+The first ran the gate in the background through a pipe into `tail`. The task
+reported exit code zero, and the captured output was empty. An empty capture
+from a gate that prints hundreds of lines is what said the gate had not
+finished. The run had been killed, and `tail` had reported its own success.
+
+The second ran the gate on the trunk through a pipeline and reported a pass.
+The gate had been terminated by a signal, which the shell reports as 143, and
+the pipeline still reported zero.
+
+Neither instance was found by reading the exit code. The first was found
+because the capture was empty, and the second because the termination was
+noticed by other means.
+
+**Follows.** **Read the exit status of the command under test, and never of a
+pipeline it sits inside.** Run the gate, capture its status directly, and read
+the log afterwards.
+
+```
+just check > /tmp/gate.log 2>&1; echo "EXIT=$?"
+```
+
+Do not pipe a gate into `tail`, `grep` or `head` when the exit code is the
+thing being reported. A filter is safe only after the status is captured.
+
+**A capture that is empty or short is evidence, and not a formatting
+problem.** A gate prints hundreds of lines. A run that reports a pass and
+shows almost nothing did not finish.
+
+**The shape is one outcome read from a place that cannot see it go wrong.**
+The register holds that shape twice already, in a conservation check that read
+only the source of a transfer, and in a differential test that could not see a
+defect which moved both sides alike.[^95] [^96]
+
 
 ### FND-140 — The gate suite is slow because the gate build does not optimise
 
@@ -7367,6 +3505,159 @@ correct, none needed judgement, and the whole sweep was one script. It still
 put a one-field change into 41 files, across three crates, two of which
 belonged to other workers at the time. The cost that matters is the merge
 surface, not the typing.
+### FND-146 — A check across a boundary can be a tautology that reads as a cross-check
+
+**Believed.** A test that compares two views of one thing is a cross-check. If
+the engine hands a caller the same log twice, once as bytes and once as
+columns, then comparing the two proves the views agree, and the test fails when
+they stop agreeing.
+
+**True.** A comparison proves something only when both sides can be computed
+independently. A caller that holds one of the two views and no description of
+the other cannot compute the second side, so it compares a value against
+something derived from that same value. The comparison then holds for every
+input and fails for none.
+
+**Evidence.** A test of the new event columns compared the number of rows in a
+column against the length of the raw byte buffer, to prove the columns describe
+the same log the bytes do. Python holds no layout of an event, deliberately,
+because holding one is the defect the work removes. It therefore cannot know
+the width of an event. The assertion reduced to whether the byte length divides
+by the event count, which is whether a length divides itself. **No change to
+the layout, to the field order, or to the columns could have made it fail.**
+
+The shape is worse than an ordinary weak test, because the tautology was
+invisible. The test named two sources, read from both, and looked like the one
+check that guards a second declaration site.
+
+The same session produced a second instance in another subsystem: a terrain
+assertion that read two constants and never exercised the rule between them.
+
+**Follows.** Three things.
+
+**A test that cannot fail is worse than no test.** It occupies the place a real
+test would take and reports success forever. A missing test is visible to
+anyone who looks for it.
+
+**Before writing a comparison, name what computes each side.** If one side is
+derived from the other, the test measures nothing. If the caller cannot compute
+the second side at all, then the check belongs on the side of the boundary that
+can, or it does not belong.
+
+**A boundary drawn to remove a second declaration site removes the ability to
+check that site from outside.** That is the cost of the boundary and it is
+correct. Do not buy the check back by smuggling the layout into the test.
+
+### FND-147 — An API that cannot say where to act invites the caller to sweep
+
+**Believed.** The control plane rule is a matter of discipline. Python must not
+loop over entities, so a caller that sweeps the world has ignored the rule, and
+the repair is to write the caller properly.[^ORIENT2]
+
+**True.** A caller sweeps when it has no other way to find the thing it must
+act on. A rule that forbids a shape and offers no alternative is a wish. The
+rule loses to the absence of a read every time, because the read is what the
+caller needed and the rule is only prose.
+
+**Evidence.** A test had to produce one gather event. The gather resolve grants
+from the tile a unit stands on, and only when that tile holds the resource. The
+control plane has no read that answers which tile holds a resource. The test
+therefore put a unit on every open tile of a sixteen by sixteen world, ordered
+each one to gather, and let the engine find the ground.
+
+**The person who wrote that sweep had recorded the rule against sweeping in the
+same change.** Discipline was not the missing part. The read was.
+
+**The obvious repair is the same defect one layer out.** A per-tile call that
+answers whether a tile holds a resource moves the sweep from units to tiles,
+and the tile population is larger than the unit population. A caller that walks
+the world asking a question one tile at a time is the data plane, whatever the
+question is.
+
+**A second instance, through the type system rather than through a missing
+read.** The spawn verb returns the identities of the units it made, as one
+column. The type stub for the verbs that take units declared a sequence of
+integers, and a column is not a sequence of integers. A caller passing the
+column straight to the next verb would have been told to convert it, and every
+conversion of a mass-tier column is a loop.
+
+**Make the boundary accept what the boundary produces.** If a verb returns a
+column and the next verb refuses one, the API has instructed the caller to
+sweep. The instruction arrives as a type error rather than as missing
+functionality, which is why it is easy to satisfy in the wrong way.
+
+**A red gate does not point at the right repair.** The type check would have
+failed on the signature. A contributor could have satisfied it by writing a
+list around the column at the call site, which passes the gate and puts the
+loop back. The gate sees the narrow fault. It cannot see the consequence.
+
+**Follows.** Four things.
+
+**When a rule forbids a shape, check that the API offers the shape it wants
+instead.** The design says the caller builds a selector and the engine resolves
+it. A selector that names a place by a property is the missing piece here.
+Until something like it exists, every caller that needs a place will sweep, and
+each one will look like a discipline failure.
+
+**When you find yourself sweeping, do not add discipline. Ask which read is
+missing.** The sweep is a symptom and it names its own cause.
+
+**Check that a verb accepts what the verb before it returns.** Two instances
+here came from different mechanisms, one a missing read and one a type. Both
+made the honest call site impossible, and a caller that cannot write the honest
+call writes the sweep.
+
+**A rule with no mechanism is worth recording as unenforced.** A reserved
+registry row holds the claim that the API refuses the loop for a declared
+tier.[^F147A] Nothing implements it. A reader who meets the rule and not the
+gap concludes the project enforces something it does not.
+
+### FND-148 — A second check downstream can make an upstream check untestable
+
+**Believed.** A test that drives the public interface, watches a stale identity
+refuse, and sees a typed error covers the resolution that refused it. If
+resolution broke, the test would go red.
+
+**True.** It goes red only when nothing else refuses first. Two independent
+checks on one condition each stop the same defect, so removing either one
+leaves the other to answer, and every test above them stays green. The tests
+then measure the pair and cannot name which member did the work.
+
+**Evidence.** The engine resolves an identity a caller hands back by comparing
+the generation in the identity against the generation the arena holds. The
+comparison was deleted and the suites were run.
+
+Two Rust tests went red, and they are the two that assert on the refusal
+itself. Four stayed green, correctly: two exercise conditions the deletion did
+not touch, one resolves a live identity, and one reads the gather log.
+
+**On the Python side the read stayed green and only the write verbs went red.**
+Reading the tile of a dead unit still refused with the same typed error and the
+same message, because the arena compares the generation a second time when it
+reads a tile. The read is protected twice, so it cannot fail when one of the
+two is removed.
+
+The protocol client test stayed green for the same reason, and it asserts only
+that the tool reported an error. It would have stayed green even without the
+second check, because a refusal by any cause is still an error.
+
+**Follows.** Three things.
+
+**Defence in depth costs the ability to test each layer through the front
+door.** The second check is right and stays. What must change is the claim: a
+test above both checks demonstrates the behaviour and does not cover either
+check on its own.
+
+**Say which assertion caught the defect, in the test.** Both tests above now
+record what the experiment measured, so a later reader does not take the read
+as the coverage. A comment that names the measured result is worth more than
+one that restates the intent.
+
+**A test that asserts only that an error happened cannot tell one cause from
+another.** That is enough for an integration test whose claim is that the
+refusal reaches the caller. It is not enough for a test whose claim is that a
+particular check refused, and the two read alike.
+
 ### FND-149 — A register can hold the comparison its own text forbids
 
 **Believed.** A register that states the rule for reading its rows protects a
@@ -7509,6 +3800,36 @@ running the new check against the real tree before wiring it into the gate,
 which is why the item asked for that run.[^146]
 
 
+### FND-154 — Completing an item is not idempotent, and it leaves two of everything
+
+**Believed.** An item is completed once. The guide gives four steps: fill in
+the outcome, update the registers, move the file, and set the status.[^149]
+Nothing says what to do when the step runs twice, because nothing expects it
+to.
+
+**True.** It runs twice. Four completed items each hold two `## Outcome`
+sections and two `## References` sections, one appended after the other. The
+second completion did not read the first. In two of the four the two reference
+sections are identical, in one the later section is a superset, and in one the
+same label names two different sources, so a marker in the body resolves to
+whichever definition a reader reaches first.
+
+**Evidence.** The footnote check found all four, because a second reference
+section defines a label the first already defines. Nothing else in the tree
+saw them. The commit that added the check names the four items. A parallel run
+produces this directly: two workers complete one item, or one worker completes
+it twice across a rebase.
+
+**Follows.** **The completion step must read the item before it writes.** An
+item that already holds an outcome is an item somebody already completed, and
+the second writer is either repeating work or contradicting it.
+
+This is adjacent to the item that fails when a merged item still reads as
+open.[^150] That item checks the status against what merged. The shape here is
+the other direction: the status is right and the document holds the work
+twice. A check that reads one item and finds one outcome section would catch
+it, and the footnote check catches it today only as a side effect.
+
 ### FND-155 — Two recipes checked the target and only the narrower one could pass
 
 **Believed.** The gate suite verifies that the engine compiles for the target
@@ -7544,6 +3865,93 @@ than restating its command.
 **A gate that cannot go green teaches a reader to skip it.** That is the reason
 the footnote check reports its ordering rule instead of failing on it, decided
 independently on the same day.[^151]
+
+### FND-156 — The live filter of the household read cannot fail through the engine
+
+**Believed.** The household read must skip a dead unit, and a test can prove
+it by putting the defect back. A reader that walked every slot instead of
+every live unit would put a dead unit into a household.
+
+**True.** It would not. The unit arena clears the home of a slot when it frees
+it, and the arena invariant states that a slot which is not live holds no
+home. So a dead slot never names a dwelling, and the walk over every slot
+gives the same answer as the walk over the live units. The filter is a second
+guard against a case that a checked invariant already excludes.
+
+**Evidence.** The filter was replaced by a walk over the whole home column,
+rebuilding each identity from the slot and its generation. The whole household
+suite stayed green. Three other perturbations of the same function each failed
+at least two tests: a comparison that let a moved unit stay in the dwelling it
+left, a reversed read order, and a removed guard against the value that means
+no home.
+
+**Follows.** Two things.
+
+**The filter stays, and this row is why it has no test.** A reader that walked
+the whole column would be correct only for as long as the free path keeps
+clearing the home. That is a coupling to a distant mechanism, and nothing in
+the reader would say so. The live walk is the same walk the unit-to-tile
+bridge makes, and it is correct on its own terms.
+
+**A perturbation that changes no answer is a result, not a failed
+experiment.** It says the guard is redundant with something else. Record which
+mechanism already excludes the case, so that a later reader does not delete
+the guard and the mechanism in two separate changes.
+
+### FND-159 — A one-byte influence cell loses the field to truncation when the solve iterates
+
+**Believed.** An influence cell is one byte against a fixed reference. The
+research measured the usable gradient of that cell at about 4.4 octaves, which
+it states covers the decision range of every consumer, and it gives a reach of
+about 35 cells.[^F159A]
+
+**True.** The measurement holds for a plane that is computed once. It does not
+hold for a plane that an iterated relaxation writes back into itself. Each
+pass narrows the accumulator to the cell, and the narrowing truncates, so a
+small value loses a whole step on every pass. The tail does not decay at the
+rate the stencil sets; it decays to zero.
+
+**Evidence.** One fixture, one stencil, one source at the ceiling, run to rest
+at one thread on the development machine. With a one-byte cell the field
+reached four cells and every cell beyond that held zero. With a two-byte cell,
+and nothing else changed, the field reached thirteen cells and fell smoothly
+over all of them. The reach is a property of the arithmetic, so it does not
+depend on the machine.
+
+**Follows.** The cell is two bytes wide, and the record states the reason
+beside the decision.[^F159B] The research finding is right about the gradient a
+consumer reads and wrong about the gradient the solve can carry, and the two
+are different quantities.
+
+**The general shape.** A width argument made for a value that is written once
+does not carry to a value that is written repeatedly into itself. Ask how many
+times the narrowing happens before anybody reads it.
+
+### FND-160 — The thread-count test does not guard a fixed iteration count
+
+**Believed.** The two determinism tests catch a solver that stops on a
+convergence test, because a convergence test is the defect the record names
+and the thread-count test is the highest-value test in the project.[^F160A]
+
+**True.** They do not. A convergence test that reads an exact integer
+comparison gives the same answer at every thread count, because the comparison
+does not depend on how the work was split. Both runs stop after the same pass,
+both produce the same field, and the thread-count test compares them and finds
+them equal.
+
+**Evidence.** The perturbed build stops the influence solve when a pass changed
+nothing. Under it the influence thread-count assertion passes, at one thread
+against twelve, over a field solved to rest. The assertion that fails is the
+one that reads the pass count. A second perturbation was needed to give the
+thread-count assertion a failure mode, and it is a different defect: a pass
+that reads a neighbour outside the run it is filling as nothing.[^F160B]
+
+**Follows.** **A fixed iteration count needs its own test, and that test reads
+the count.** This is the case the testing rule states in the general: a defect
+that repeats gives one answer on every thread and on every run, and a test
+which compares two runs cannot see it.[^F174A] The rule named a draw keyed on
+the wrong field. A solver that stops early is the same shape.
+
 
 ### FND-162 — The build made three passes, and the repair removed one of them
 
@@ -7621,36 +4029,6 @@ search.
 subtle. The gate command catches it in one run. It reached the trunk because
 the run did not happen, and the next worker paid for it by having to decide
 whether the failure was its own.
-
-### FND-154 — Completing an item is not idempotent, and it leaves two of everything
-
-**Believed.** An item is completed once. The guide gives four steps: fill in
-the outcome, update the registers, move the file, and set the status.[^149]
-Nothing says what to do when the step runs twice, because nothing expects it
-to.
-
-**True.** It runs twice. Four completed items each hold two `## Outcome`
-sections and two `## References` sections, one appended after the other. The
-second completion did not read the first. In two of the four the two reference
-sections are identical, in one the later section is a superset, and in one the
-same label names two different sources, so a marker in the body resolves to
-whichever definition a reader reaches first.
-
-**Evidence.** The footnote check found all four, because a second reference
-section defines a label the first already defines. Nothing else in the tree
-saw them. The commit that added the check names the four items. A parallel run
-produces this directly: two workers complete one item, or one worker completes
-it twice across a rebase.
-
-**Follows.** **The completion step must read the item before it writes.** An
-item that already holds an outcome is an item somebody already completed, and
-the second writer is either repeating work or contradicting it.
-
-This is adjacent to the item that fails when a merged item still reads as
-open.[^150] That item checks the status against what merged. The shape here is
-the other direction: the status is right and the document holds the work
-twice. A check that reads one item and finds one outcome section would catch
-it, and the footnote check catches it today only as a side effect.
 
 ### FND-168 — The phrase that FND-144 corrected is still in the comment above the code it corrected
 
@@ -7998,6 +4376,63 @@ consumer. Where a reader and a stored field are two paths to one value, pin
 both, or pin the stored field alone.
 
 
+### FND-186 — A panel test could not tell the stock left from the stock the ground gave
+
+**Believed.** A test that read the panel's two stock numbers back against the
+engine proved that the panel states what a tile still holds. The panel prints
+"what is left, of what the ground gave", and the test compared both numbers
+against the engine's own readers.
+
+**True.** The test could not tell the two apart. Its fixture was a world in
+which nobody had gathered, and in such a world the stock left equals the stock
+the ground gave, for every tile. A panel that read the generated stock into
+both rows passed it.
+
+**Evidence.** The defect was put back: the panel's reader for the stock left
+was changed to call the reader for the generated stock. Every test in the file
+stayed green.[^F186A] A second test was written that gathers first and then
+asserts that the two numbers differ. With that test present, the same
+substitution fails.
+
+**Follows.** This is the shape the testing rule already names: a fixture that
+models the typical case supplies no extreme, so the assertion never receives
+the input that would fail it.[^23] The rule needed no change. What it
+needed was the falsification, and the falsification found the hole in one run.
+
+The general form is worth stating. **When a panel prints two numbers that are
+usually equal, a fixture in which they are equal tests neither.** The engine
+holds several such pairs: the stock and the generated stock, the demand and
+the grant of a ration, the production and the upkeep of a site. A test of any
+of them needs a world in which the pair has come apart.
+
+### FND-187 — The food of a tile shades it more than the height does, within one kind of ground
+
+**Believed.** The viewer shades a tile by its height, and a second, smaller
+term rides on top. The second term was the tile stub value, and it was chosen
+to be small against the height range so that the ripple never hid the ground.
+
+**True.** The height range of one kind of ground in one world is far narrower
+than the full height range. In a 128 by 128 world at one seed, the tallest
+plain tile and the shortest plain tile were 26249 and 40476 in the fixed-point
+range, which is about twelve of the fifty-six brightness steps the height is
+given. Any second term wider than twelve steps therefore decides the order of
+two tiles of one kind.
+
+**Evidence.** The colour now reads the food stock, over thirty-four steps. A
+test that compared the tallest and the shortest plain tile then failed: the
+shorter tile carried food and drew brighter.[^F187A] The test was repaired by
+holding the food at zero, which is the isolation it always needed and did not
+have.
+
+**Follows.** A watcher reads the food of a tile more strongly than its relief,
+within one kind of ground. That is the trade this project chose, because the
+food is what the product record asks a watcher to see and the relief is
+readable across kinds by hue.[^F187B] Any later shading term must state which
+of the two it is willing to dominate.
+
+A test that compares two tiles on one property must hold the others fixed. The
+height test did not, and it passed only because the term it ignored was small.
+
 ### FND-190 — A per-cell field and a per-unit score search do not give the same answer
 
 **Believed.** A field that ranks the neighbours of a cell once gives the same
@@ -8134,409 +4569,6 @@ asserts no mark, and one fills it above the road and asserts the mark. The
 first fails when the ground reader is put back. This changes nothing about the
 register row, which is about the three callers that ask a different question.
 
-### FND-198 — A second layout of one reading loses the corrections the first one earned
-
-**Believed.** The panel and the cards read one readout, so they cannot
-disagree about a number. The readout is the single statement of what the view
-knows, and two layouts of it are two arrangements of the same facts.
-
-**True.** They cannot disagree about a number. They can disagree about which
-numbers to draw, and that is where a correction lives. The panel sizes its
-faction legend by the faction count of the world, because the colour table is
-larger than most worlds need and a legend sized by the table names a colour
-that no faction uses. The cards were written fresh and sized the legend by the
-table. In a world of four factions the cards named six, and two of them stood
-for nobody.
-
-**Evidence.** The defect was visible in the first render of the reference layer
-and in no test, because no test existed yet. The panel had the same defect once
-and its own helper carries the repair. The repair did not travel, because the
-new layout called no part of the old one.[^F198A]
-
-**Follows.** **When you write a second view of one model, list what the first
-view decided and not only what it read.** The readout carried the faction count
-and the new layout did not ask for it. A shared reading is not a shared
-judgement.
-
-The general form is the redundant declaration shape, one level up.[^22] Two
-layouts are two declaration sites for the question "which rows does a reader
-need", and nothing fails when they answer it differently. The repair here was
-to give the readout an accessor for the faction count, so both layouts ask the
-engine rather than guessing from a table.
-
-### FND-199 — The inspection tool cannot carry what the window stopped showing
-
-**Believed.** The window can drop a section because an agent inspection tool
-holds the same numbers. The tool speaks a protocol, holds a world between
-calls, and reports what the engine knows, so it is the natural home for detail
-that a window cannot afford.
-
-**True.** It reports the tick, the extent, the seed, the faction count, the
-tile count, the state hash and the event count. It reads the event log, the
-tile changes and the gather events. It spawns, despawns, orders a gather and
-names the tile of one unit. It has no reader for the founding survey, the level
-1 summary of a region, the store or the rate or the ration of a site, the
-choice explanation of a unit, the stock or the holder of a tile, the census of
-the ground, or the crowding counts. Those are most of what the panel
-holds.[^F199A]
-
-**Evidence.** The tools were counted while designing the overlay. Moving the
-panel's detail to that tool would have been about six new readers of work, and
-it would have blocked the overlay behind them.
-
-**Follows.** **The detail went to a rendered picture instead, which needed no
-new work.** One example already drew the whole panel to an image file at any
-height, with no display. A build recipe now names it, so the answer to "where
-did the detail go" is a command a person can run.
-
-The order of the work changed because of this. The agent tool still cannot show
-a watcher what the panel shows, and that is a separate item rather than a
-condition of the overlay.[^F199B]
-
-**A command name was shown to a person before it existed.** The name came from
-a mockup in a design conversation and not from the build file. It exists now,
-and a test compares the name the window prints against the recipes the build
-file defines, so the two cannot drift apart in silence.
-
-**Closed in the same round it was opened.** Another worker took the seven gaps
-this entry names and closed every one of them. The server now carries the
-founding survey, the level 1 summary of a region, the store and the rate and
-the ration of a site, the choice explanation of a unit, the stock and the
-holder of a tile, and the ground and crowding counts of a window. The entry
-stays because it is why the detail went to a rendered picture rather than to
-the tool: the picture needed no new work and the tool needed seven readers, and
-that ordering was correct at the time it was chosen.
-
-**What the closure does not change.** The picture is still where a person reads
-the record, because a person reads an image and an agent does not. The two
-paths answer different readers, and the tool did not replace the picture.
-
-### FND-209 — The camera was not slow at the far zoom. The pan step was the wrong size for the view
-
-**Believed.** A watcher reported that camera navigation is "incredibly sluggish"
-at the far zoom, and the reading taken from that was a cost problem. A drawing
-at the smallest tile the camera allows costs about a third of a second on a
-development machine, which supported the reading.[^F209A]
-
-**True.** **Nothing was slow.** The project owner corrected it from watching the
-window move: the step is the same size however far out the view is zoomed. One
-press moved a fixed count of tiles, and a tile is a fixed number of pixels only
-at one zoom. At the zoom the viewer opens on, a press moved eighteen pixels. At
-the smallest tile the camera allows, the same press moved three. The camera was
-covering a fortieth of the distance for the same effort, and a watcher reads
-that as slowness.
-
-**Evidence.** The step was one and a half tiles, multiplied by the tile width in
-pixels. The tile width runs from two pixels to sixty-four, so the pixel distance
-of one press varied by a factor of thirty-two across the range the camera
-allows. The window polls the keyboard once for each drawn frame, so a held key
-crossed the window in about two seconds at the opening zoom and in about
-fourteen at the far zoom.
-
-**The cost figure is real and is not the cause.** The drawing cost about a
-third of a second at the far zoom on a development machine, and the ground of
-every visible tile was generated twice to produce it.[^F209B] That was a
-separate defect with its own item, and the item is complete.[^F209C] It made
-the frame rate low; it did not make the camera cover three pixels a press.
-
-**Follows.** **A pan covers a share of what the window shows.** The step is now
-a share of the window and not a count of tiles, so a press moves the same part
-of the picture at every zoom.
-
-**The share preserves rather than improves.** It is the share the old step
-covered at the zoom the viewer opens on: eighteen pixels in a window seven
-hundred and twenty pixels on its shorter side, which is one in forty. The one
-zoom nobody reported is unchanged and every other zoom now matches it. No part
-of the value was read off a render, and one test asserts the opening zoom still
-moves what it moved before.
-
-**The zoom did not have the matching defect, and now a test says so.** A zoom
-press multiplies the tile size by a factor. A press therefore changes the view
-by the same proportion wherever it is taken, which is the property the pan
-lacked. A zoom that added a count of tiles would produce the same complaint in
-the other direction, so a test asserts the ratio is one number across the range.
-
-**A measurement can be right and still answer the wrong question.** The cost of
-a drawing was measured carefully, on the correct binary, and it supported a
-diagnosis that was wrong. The person watching the window had the answer, and
-nobody asked them until after the measurement was taken. **Ask the reporter what
-they saw before measuring what you think they meant.**
-
-### FND-207 — The grid a watcher saw is the gap between the tiles, and the gap was neither whole nor bounded
-
-**Believed.** The window draws a black border around each tile, and the lattice
-that emerged at some zooms and not others was a defect of that border. The
-holding border was the suspect, because it is the only border the drawing
-names.
-
-**True.** The drawing draws no black line at all. It fills a square smaller
-than the tile and leaves the space around it, and that space shows the colour
-of the ground outside the world. What a watcher reads as a grid is the space
-the drawing does not fill. The holding border is a separate layer, in the
-colour of a faction, and it is not involved.
-
-The gap had two defects, and they answer two different halves of the report.
-
-**The lattice.** The drawing took one integer square width from the tile width
-and placed it at the rounded centre of each tile. A tile is a fractional number
-of pixels wide at nearly every zoom, because each zoom step multiplies the size
-by a fraction. The rounded centres therefore advanced by a whole pixel more
-under some tiles than under others, while the square stayed one width, so the
-gap was one pixel under some tiles and two under others. The pattern repeats
-across the picture at the beat of the fraction, and the eye reads a beat as a
-lattice.
-
-**The far zoom.** The square was a fixed share of the tile width, and the share
-rounded down to a whole number of pixels. At the smallest tile the camera
-allows, the square was one pixel of two and the gap took three quarters of the
-cell in area. The picture at that zoom is mostly the colour outside the world,
-with the ground showing through as specks. That is the state in which the grid
-"emerges", and it emerges because the map disappears.
-
-**Evidence.** The gaps were counted rather than judged, across a hundred
-neighbouring tiles in one row, at ten tile widths on a development machine. At
-a whole width the gap was one value. At a width of four and a half pixels it
-was zero under half the tiles and one under the other half; at six and a half
-it was one under half and two under the other half. Rendering the same world at
-each width showed the banding at exactly the widths the count named, so the
-artefact is in a still picture and is not a motion artefact.
-
-**Follows.** **A separator must be a whole number of pixels, and it must be the
-same number under every tile.** The drawing now takes the far edge of a tile
-from the near edge of the tile beside it, read the same way, so the two agree by
-construction rather than by arithmetic that a reader must check.
-
-**Two snapped values that a reader expects to be equal are one fact in two
-places.** The first repair computed the right edge as the rounded centre plus
-half a width, and the next tile's left edge as its own rounded centre less half
-a width. Those are equal in exact arithmetic and are not always equal in
-floating point. A test over twelve widths found the disagreement at a width of
-three and three tenths, which no picture would have shown.
-
-**A separator that covers more of the cell than the tile is not a separator.**
-The drawing leaves the gap out below the width at which the gap takes half the
-cell. The bound comes from that identity and from nothing else. It is not read
-off a picture and it does not depend on the world, the seed or the window.[^F207A]
-
-**What the bound does not settle.** At a tile of four pixels the gap passes the
-bound and still takes forty-four parts in a hundred of the cell, and the picture
-at that width still reads as a grid. The bound is the one value in its family
-that a sentence forces. Any other share is a matter of taste, and the register
-holds the question rather than a number somebody liked.[^F207B]
-
-### FND-208 — The window stated a drawing cost of zero in every stored picture, and it was a mean over no measurement
-
-**Believed.** The cost card of the window reports what the drawing cost. Every
-stored picture of the window said `draw 0.0 ms`, and the drawing was assumed to
-be very cheap.
-
-**True.** **A drawing cannot measure itself.** The run records the cost of a
-frame after that frame has been drawn. The cost card is drawn inside the frame,
-so the mean it states covers the frames before it. A picture written by one
-call to the drawing has no frame before it, and the mean is then taken over
-nothing. The card printed the result of that division as `0.0 ms`, which reads
-as a measurement of a free drawing.
-
-The live window is not affected after its first frame, because by then frames
-have been recorded. Every picture anybody looked at was affected, because a
-picture is one frame. The one instrument the project had was saying zero in
-every image the project examined.
-
-**Evidence.** The drawing was timed outside itself, over five frames at each of
-ten tile widths, on a development machine and not on the target platform. At the
-smallest tile the camera allows, one drawing of the demonstration world cost
-about a third of a second. That is three frames a second, and it is the reason a
-watcher reports that the camera is sluggish when zoomed out. The figure the card
-would have shown had it been able to measure itself is four orders of magnitude
-away from zero.
-
-**Follows.** **A cost the run has not measured is absent, not zero.** The
-window now says so in words. The record already required this of a number the
-window cannot afford, and a number nobody has taken is the same case.[^F208A]
-
-**A row that reads as a measurement must carry the count it was taken over.**
-The count travels with the mean into the readout, so no caller can print a mean
-without knowing whether one exists.
-
-**The stored picture did not catch this.** The test that stores a picture of
-the panel supplies fixed costs, because a clock gives a new number on every
-run. That is correct, and it is why the fixture never reached the case where no
-measurement exists. The test that closes this drives the real drawing with a
-run that has recorded nothing.[^F200A]
-
-### FND-206 — The holding border already draws only on a boundary, and the busy picture was the fixture
-
-**Believed.** A dense picture of a world was hard to read because the holding
-border drew on every held tile. The repair was to draw the boundary of a
-holding instead: a tile whose neighbours all share its holder would draw
-nothing, and only a tile on the edge of a holding would draw a border. A
-register entry and a backlog item both stated it that way.[^F201B]
-
-**True.** The drawing already does that. The border test reads the six
-neighbours of a held tile and draws only when one of them has a different
-holder. A tile surrounded by its own faction draws no border and never did.
-The repair was already in the code, and the entry that proposed it described a
-defect that does not exist.
-
-**Evidence.** The world was counted rather than judged. Of the held tiles, 83
-in 100 sit on a boundary in the picture that looked bad, 89 in 100 in the
-picture that looks best, and 85 in 100 in a third. **The picture that reads
-best has the highest share.** That number therefore does not explain the
-difference and cannot be the mechanism.
-
-The number that does explain it is the share of the world that is held. It is
-74 in 100 in the picture that looked bad and 8 in 100 in the picture that reads
-best. A world where three quarters of the ground is claimed draws as a map of
-factions, because it is one.
-
-**Follows.** **The fixture made the defect.** The bad picture came from six
-hundred units on a world of thirty-six hundred tiles, which is one unit for
-every six. Nobody chose that density for a reason; it was carried from one
-command line to the next while reproducing a different problem. The
-demonstration seats thirty people for each faction in a world of a quarter of a
-million tiles, and the default picture command is a fortieth as dense.
-
-**A measurement before a repair would have cost one run.** The first repair for
-this was a border weight that fell with the tile size, and it was removed for
-keying on the wrong variable.[^F206B] The second repair was the boundary rule,
-and it was already implemented. Both were proposed from a rendered picture and
-neither was proposed from a count. The count took one throwaway example and it
-refuted both.
-
-**What is real.** The drawing borders a holding against unclaimed ground and
-against another faction alike, and its own comment says it marks "where one
-holding meets another". The code and the comment disagree, and the comment is
-the thing that is wrong.[^F206C]
-
-### FND-201 — The holding edge carries no information when holdings interleave at tile scale
-
-**Believed.** A dense picture of a world was hard to read, and the units were
-the cause. A unit draws as a disc over its tile, so a crowded world buries the
-ground under discs.
-
-**True.** The discs cover about one part in fifty of the painted picture. The
-saturation comes from the holding layer: a held tile takes a mix of the
-holder's colour, and a held tile whose neighbour has another holder takes a
-border in nearly the pure colour. When three factions interleave at tile scale,
-almost every held tile borders a differently held one, so almost every tile
-draws its border. The border is then not a border. It is a second fill.
-
-**Evidence.** The picture was measured rather than judged. At six hundred units
-on three thousand six hundred tiles, pixels of a pure faction colour were two
-in a hundred of the painted picture. Drawing the same world with the holding
-border suppressed made the ground legible at once, with the holdings still
-readable as fields of colour.
-
-**Follows.** **The border is keyed on the wrong variable, and so was the first
-repair.** A border of one pixel is a larger part of a small tile than of a
-large one, so scaling the border's weight with the tile size looks principled.
-It is not the cause. The demonstration window opens near the same tile size and
-does not have this problem, because its holdings are small clusters in a large
-world and its borders are rare and informative.
-
-**The cause is the density of the holdings, not the zoom.** A repair keyed on
-tile size would have improved one picture and left the mechanism untouched,
-which is the shape this register already holds twice.[^F201A] [^22] The first
-repair was written, rendered, judged better, and then removed for that reason.
-
-**The open question is what a border should mean when everything is a border.**
-Drawing the outer boundary of a contiguous holding rather than the boundary of
-every tile would carry information at any density. That is real work and it is
-a separate item.[^F201B]
-
-**Corrected. The drawing already draws the boundary and not every tile, and
-this entry was wrong about the mechanism.** The share of held tiles that sit on
-a boundary is highest in the picture that reads best, so it cannot be the
-cause. The share of the world that is held is the difference, and the picture
-that looked bad came from a fixture nobody chose on purpose. The correction
-holds the counts.[^F201C]
-
-### FND-200 — A predicate that accepts a prefix accepts every rename that keeps it
-
-**Believed.** A check that compares a name in one place against a name in
-another closes the gap between them. The window prints a command name and the
-build file defines the recipe, which is one fact in two places, so a test that
-looks for the name in the build file fails when the two drift apart.[^22]
-
-**True.** The test looked for a line that **starts with** the name. A recipe
-renamed from `inspect` to `inspect-the-panel` still starts with `inspect`, so
-the check passed and the window still told a person to run a command that no
-longer existed. The check closed nothing. It only appeared to.
-
-**Evidence.** The recipe was renamed and the suite stayed green. The predicate
-now asks for the name followed by an argument or by the colon that ends a
-recipe line, and the same rename then fails it. Nothing but the falsification
-would have found this: the test read correctly, it named the right two places,
-and it passed for the right reason on the unmodified tree.[^F200A]
-
-**Follows.** **A test that compares two names must compare whole names.** A
-prefix match, a substring match and a `starts_with` all accept a family of
-wrong answers, and the wrong answers are exactly the ones a rename produces. A
-rename that extends a name is the most common rename there is.
-
-The general form is wider than a name. **An assertion that accepts a range
-where the truth is a point is not an assertion.** It fails only for inputs
-nobody was going to write. The project already holds that a fixture must supply
-the extreme that would fail an assertion.[^23] This is the same defect on the
-other side: the assertion itself was too loose to receive the failing case the
-fixture would have supplied.
-
-**Where else this shape sits.** Any check that matches a name against a file:
-a citation path, a record number, a registry row, a recipe. A record number
-check that accepts a prefix passes `ADR-0007` for `ADR-00071`.
-
-**A second instance was found in the same session, in a filter rather than a
-match.** The record check skips a path that holds a directory part naming a
-worktree, so that one run does not read a checkout another run is changing.
-Every worker here runs inside such a directory, so the filter drops the tree it
-was asked to read.[^F194REF] The cause is recorded there; the shape is recorded
-here, because the two are the same shape and one row for one cause is
-enough.[^22]
-
-"Skip a sibling checkout" and "skip any path that passes through a worktree
-directory" are different predicates. The loose one swallowed the strict one, in
-the same way `starts_with` swallowed the whole-name match above. **A filter and
-a match fail alike when they accept a family where the truth is a member.** The
-direction differs and the defect does not: a loose match keeps what it should
-drop, and a loose filter drops what it should keep.
-
-### FND-197 — Accepting a record breaks every citation of it
-
-**Believed.** A record is accepted by a reviewer, and the acceptance is an edit
-to the registry row. The registry says the file moves between directories as
-the status changes, and that reads as a second mechanical step of the same
-size.
-
-**True.** A citation of a record names its path, and the path holds the
-directory. So a citation written while a record is a draft states the
-directory a draft lives in, and the acceptance makes every one of them name a
-path that does not resolve. The citation check reads source comments as well
-as documents and fails on such a path.[^F197A] The acceptance is therefore a
-whole-tree sweep, and it grows with how well the record is cited.
-
-**Evidence.** A review reached the point of accepting two records and could
-make neither status change. One of the two carries nineteen citations in
-source comments under one crate, and one carries a single citation.[^F193H]
-The sweep is invisible until the check runs, and it lands on the tree that a
-documents-only worker may not touch. This was found by counting the citations
-of both records. Nothing was run beyond the document checks.
-
-**Follows.** Three things.
-
-**A reviewer that may not edit source cannot accept a well-cited record.** The
-verdict and the status change have different blast radii, and only the verdict
-is the reviewer's work.
-
-**The cost falls hardest on the records that earned it.** A record nothing
-cites moves for free. A record that reaches nineteen call sites pays for
-each. That is the opposite of the incentive the project wants.
-
-**The choice is a judgement and it is in the register.** Whether a citation
-should name the directory at all, and what a stable path would look like, is
-an open row.[^F197C]
-
-
-
 ### FND-194 — The record check reports no source citation inside a worktree
 
 **Believed.** The record check gives one answer for one tree. A worker runs it
@@ -8623,6 +4655,212 @@ hides best.[^22]
 integration and a reader waits for it. The reason is that the script states one
 thing and does another, in the place a contributor looks to learn what the
 check asserts.
+
+### FND-197 — Accepting a record breaks every citation of it
+
+**Believed.** A record is accepted by a reviewer, and the acceptance is an edit
+to the registry row. The registry says the file moves between directories as
+the status changes, and that reads as a second mechanical step of the same
+size.
+
+**True.** A citation of a record names its path, and the path holds the
+directory. So a citation written while a record is a draft states the
+directory a draft lives in, and the acceptance makes every one of them name a
+path that does not resolve. The citation check reads source comments as well
+as documents and fails on such a path.[^F197A] The acceptance is therefore a
+whole-tree sweep, and it grows with how well the record is cited.
+
+**Evidence.** A review reached the point of accepting two records and could
+make neither status change. One of the two carries nineteen citations in
+source comments under one crate, and one carries a single citation.[^F193H]
+The sweep is invisible until the check runs, and it lands on the tree that a
+documents-only worker may not touch. This was found by counting the citations
+of both records. Nothing was run beyond the document checks.
+
+**Follows.** Three things.
+
+**A reviewer that may not edit source cannot accept a well-cited record.** The
+verdict and the status change have different blast radii, and only the verdict
+is the reviewer's work.
+
+**The cost falls hardest on the records that earned it.** A record nothing
+cites moves for free. A record that reaches nineteen call sites pays for
+each. That is the opposite of the incentive the project wants.
+
+**The choice is a judgement and it is in the register.** Whether a citation
+should name the directory at all, and what a stable path would look like, is
+an open row.[^F197C]
+
+
+
+### FND-198 — A second layout of one reading loses the corrections the first one earned
+
+**Believed.** The panel and the cards read one readout, so they cannot
+disagree about a number. The readout is the single statement of what the view
+knows, and two layouts of it are two arrangements of the same facts.
+
+**True.** They cannot disagree about a number. They can disagree about which
+numbers to draw, and that is where a correction lives. The panel sizes its
+faction legend by the faction count of the world, because the colour table is
+larger than most worlds need and a legend sized by the table names a colour
+that no faction uses. The cards were written fresh and sized the legend by the
+table. In a world of four factions the cards named six, and two of them stood
+for nobody.
+
+**Evidence.** The defect was visible in the first render of the reference layer
+and in no test, because no test existed yet. The panel had the same defect once
+and its own helper carries the repair. The repair did not travel, because the
+new layout called no part of the old one.[^F198A]
+
+**Follows.** **When you write a second view of one model, list what the first
+view decided and not only what it read.** The readout carried the faction count
+and the new layout did not ask for it. A shared reading is not a shared
+judgement.
+
+The general form is the redundant declaration shape, one level up.[^22] Two
+layouts are two declaration sites for the question "which rows does a reader
+need", and nothing fails when they answer it differently. The repair here was
+to give the readout an accessor for the faction count, so both layouts ask the
+engine rather than guessing from a table.
+
+### FND-199 — The inspection tool cannot carry what the window stopped showing
+
+**Believed.** The window can drop a section because an agent inspection tool
+holds the same numbers. The tool speaks a protocol, holds a world between
+calls, and reports what the engine knows, so it is the natural home for detail
+that a window cannot afford.
+
+**True.** It reports the tick, the extent, the seed, the faction count, the
+tile count, the state hash and the event count. It reads the event log, the
+tile changes and the gather events. It spawns, despawns, orders a gather and
+names the tile of one unit. It has no reader for the founding survey, the level
+1 summary of a region, the store or the rate or the ration of a site, the
+choice explanation of a unit, the stock or the holder of a tile, the census of
+the ground, or the crowding counts. Those are most of what the panel
+holds.[^F199A]
+
+**Evidence.** The tools were counted while designing the overlay. Moving the
+panel's detail to that tool would have been about six new readers of work, and
+it would have blocked the overlay behind them.
+
+**Follows.** **The detail went to a rendered picture instead, which needed no
+new work.** One example already drew the whole panel to an image file at any
+height, with no display. A build recipe now names it, so the answer to "where
+did the detail go" is a command a person can run.
+
+The order of the work changed because of this. The agent tool still cannot show
+a watcher what the panel shows, and that is a separate item rather than a
+condition of the overlay.[^F199B]
+
+**A command name was shown to a person before it existed.** The name came from
+a mockup in a design conversation and not from the build file. It exists now,
+and a test compares the name the window prints against the recipes the build
+file defines, so the two cannot drift apart in silence.
+
+**Closed in the same round it was opened.** Another worker took the seven gaps
+this entry names and closed every one of them. The server now carries the
+founding survey, the level 1 summary of a region, the store and the rate and
+the ration of a site, the choice explanation of a unit, the stock and the
+holder of a tile, and the ground and crowding counts of a window. The entry
+stays because it is why the detail went to a rendered picture rather than to
+the tool: the picture needed no new work and the tool needed seven readers, and
+that ordering was correct at the time it was chosen.
+
+**What the closure does not change.** The picture is still where a person reads
+the record, because a person reads an image and an agent does not. The two
+paths answer different readers, and the tool did not replace the picture.
+
+### FND-200 — A predicate that accepts a prefix accepts every rename that keeps it
+
+**Believed.** A check that compares a name in one place against a name in
+another closes the gap between them. The window prints a command name and the
+build file defines the recipe, which is one fact in two places, so a test that
+looks for the name in the build file fails when the two drift apart.[^22]
+
+**True.** The test looked for a line that **starts with** the name. A recipe
+renamed from `inspect` to `inspect-the-panel` still starts with `inspect`, so
+the check passed and the window still told a person to run a command that no
+longer existed. The check closed nothing. It only appeared to.
+
+**Evidence.** The recipe was renamed and the suite stayed green. The predicate
+now asks for the name followed by an argument or by the colon that ends a
+recipe line, and the same rename then fails it. Nothing but the falsification
+would have found this: the test read correctly, it named the right two places,
+and it passed for the right reason on the unmodified tree.[^F200A]
+
+**Follows.** **A test that compares two names must compare whole names.** A
+prefix match, a substring match and a `starts_with` all accept a family of
+wrong answers, and the wrong answers are exactly the ones a rename produces. A
+rename that extends a name is the most common rename there is.
+
+The general form is wider than a name. **An assertion that accepts a range
+where the truth is a point is not an assertion.** It fails only for inputs
+nobody was going to write. The project already holds that a fixture must supply
+the extreme that would fail an assertion.[^23] This is the same defect on the
+other side: the assertion itself was too loose to receive the failing case the
+fixture would have supplied.
+
+**Where else this shape sits.** Any check that matches a name against a file:
+a citation path, a record number, a registry row, a recipe. A record number
+check that accepts a prefix passes `ADR-0007` for `ADR-00071`.
+
+**A second instance was found in the same session, in a filter rather than a
+match.** The record check skips a path that holds a directory part naming a
+worktree, so that one run does not read a checkout another run is changing.
+Every worker here runs inside such a directory, so the filter drops the tree it
+was asked to read.[^F194REF] The cause is recorded there; the shape is recorded
+here, because the two are the same shape and one row for one cause is
+enough.[^22]
+
+"Skip a sibling checkout" and "skip any path that passes through a worktree
+directory" are different predicates. The loose one swallowed the strict one, in
+the same way `starts_with` swallowed the whole-name match above. **A filter and
+a match fail alike when they accept a family where the truth is a member.** The
+direction differs and the defect does not: a loose match keeps what it should
+drop, and a loose filter drops what it should keep.
+
+### FND-201 — The holding edge carries no information when holdings interleave at tile scale
+
+**Believed.** A dense picture of a world was hard to read, and the units were
+the cause. A unit draws as a disc over its tile, so a crowded world buries the
+ground under discs.
+
+**True.** The discs cover about one part in fifty of the painted picture. The
+saturation comes from the holding layer: a held tile takes a mix of the
+holder's colour, and a held tile whose neighbour has another holder takes a
+border in nearly the pure colour. When three factions interleave at tile scale,
+almost every held tile borders a differently held one, so almost every tile
+draws its border. The border is then not a border. It is a second fill.
+
+**Evidence.** The picture was measured rather than judged. At six hundred units
+on three thousand six hundred tiles, pixels of a pure faction colour were two
+in a hundred of the painted picture. Drawing the same world with the holding
+border suppressed made the ground legible at once, with the holdings still
+readable as fields of colour.
+
+**Follows.** **The border is keyed on the wrong variable, and so was the first
+repair.** A border of one pixel is a larger part of a small tile than of a
+large one, so scaling the border's weight with the tile size looks principled.
+It is not the cause. The demonstration window opens near the same tile size and
+does not have this problem, because its holdings are small clusters in a large
+world and its borders are rare and informative.
+
+**The cause is the density of the holdings, not the zoom.** A repair keyed on
+tile size would have improved one picture and left the mechanism untouched,
+which is the shape this register already holds twice.[^F201A] [^22] The first
+repair was written, rendered, judged better, and then removed for that reason.
+
+**The open question is what a border should mean when everything is a border.**
+Drawing the outer boundary of a contiguous holding rather than the boundary of
+every tile would carry information at any density. That is real work and it is
+a separate item.[^F201B]
+
+**Corrected. The drawing already draws the boundary and not every tile, and
+this entry was wrong about the mechanism.** The share of held tiles that sit on
+a boundary is highest in the picture that reads best, so it cannot be the
+cause. The share of the world that is held is the difference, and the picture
+that looked bad came from a fixture nobody chose on purpose. The correction
+holds the counts.[^F201C]
 
 ### FND-202 — A growth policy lived in a completed backlog item, where nothing read it
 
@@ -8728,6 +4966,203 @@ value would fail, not what world is nearby.
 test asserts that the open tiles are fewer than the tiles, and that the window
 holds more than one kind of ground. Those assertions fail if a change to the
 generator makes the world uniform again, so the hole cannot come back quietly.
+
+### FND-206 — The holding border already draws only on a boundary, and the busy picture was the fixture
+
+**Believed.** A dense picture of a world was hard to read because the holding
+border drew on every held tile. The repair was to draw the boundary of a
+holding instead: a tile whose neighbours all share its holder would draw
+nothing, and only a tile on the edge of a holding would draw a border. A
+register entry and a backlog item both stated it that way.[^F201B]
+
+**True.** The drawing already does that. The border test reads the six
+neighbours of a held tile and draws only when one of them has a different
+holder. A tile surrounded by its own faction draws no border and never did.
+The repair was already in the code, and the entry that proposed it described a
+defect that does not exist.
+
+**Evidence.** The world was counted rather than judged. Of the held tiles, 83
+in 100 sit on a boundary in the picture that looked bad, 89 in 100 in the
+picture that looks best, and 85 in 100 in a third. **The picture that reads
+best has the highest share.** That number therefore does not explain the
+difference and cannot be the mechanism.
+
+The number that does explain it is the share of the world that is held. It is
+74 in 100 in the picture that looked bad and 8 in 100 in the picture that reads
+best. A world where three quarters of the ground is claimed draws as a map of
+factions, because it is one.
+
+**Follows.** **The fixture made the defect.** The bad picture came from six
+hundred units on a world of thirty-six hundred tiles, which is one unit for
+every six. Nobody chose that density for a reason; it was carried from one
+command line to the next while reproducing a different problem. The
+demonstration seats thirty people for each faction in a world of a quarter of a
+million tiles, and the default picture command is a fortieth as dense.
+
+**A measurement before a repair would have cost one run.** The first repair for
+this was a border weight that fell with the tile size, and it was removed for
+keying on the wrong variable.[^F206B] The second repair was the boundary rule,
+and it was already implemented. Both were proposed from a rendered picture and
+neither was proposed from a count. The count took one throwaway example and it
+refuted both.
+
+**What is real.** The drawing borders a holding against unclaimed ground and
+against another faction alike, and its own comment says it marks "where one
+holding meets another". The code and the comment disagree, and the comment is
+the thing that is wrong.[^F206C]
+
+### FND-207 — The grid a watcher saw is the gap between the tiles, and the gap was neither whole nor bounded
+
+**Believed.** The window draws a black border around each tile, and the lattice
+that emerged at some zooms and not others was a defect of that border. The
+holding border was the suspect, because it is the only border the drawing
+names.
+
+**True.** The drawing draws no black line at all. It fills a square smaller
+than the tile and leaves the space around it, and that space shows the colour
+of the ground outside the world. What a watcher reads as a grid is the space
+the drawing does not fill. The holding border is a separate layer, in the
+colour of a faction, and it is not involved.
+
+The gap had two defects, and they answer two different halves of the report.
+
+**The lattice.** The drawing took one integer square width from the tile width
+and placed it at the rounded centre of each tile. A tile is a fractional number
+of pixels wide at nearly every zoom, because each zoom step multiplies the size
+by a fraction. The rounded centres therefore advanced by a whole pixel more
+under some tiles than under others, while the square stayed one width, so the
+gap was one pixel under some tiles and two under others. The pattern repeats
+across the picture at the beat of the fraction, and the eye reads a beat as a
+lattice.
+
+**The far zoom.** The square was a fixed share of the tile width, and the share
+rounded down to a whole number of pixels. At the smallest tile the camera
+allows, the square was one pixel of two and the gap took three quarters of the
+cell in area. The picture at that zoom is mostly the colour outside the world,
+with the ground showing through as specks. That is the state in which the grid
+"emerges", and it emerges because the map disappears.
+
+**Evidence.** The gaps were counted rather than judged, across a hundred
+neighbouring tiles in one row, at ten tile widths on a development machine. At
+a whole width the gap was one value. At a width of four and a half pixels it
+was zero under half the tiles and one under the other half; at six and a half
+it was one under half and two under the other half. Rendering the same world at
+each width showed the banding at exactly the widths the count named, so the
+artefact is in a still picture and is not a motion artefact.
+
+**Follows.** **A separator must be a whole number of pixels, and it must be the
+same number under every tile.** The drawing now takes the far edge of a tile
+from the near edge of the tile beside it, read the same way, so the two agree by
+construction rather than by arithmetic that a reader must check.
+
+**Two snapped values that a reader expects to be equal are one fact in two
+places.** The first repair computed the right edge as the rounded centre plus
+half a width, and the next tile's left edge as its own rounded centre less half
+a width. Those are equal in exact arithmetic and are not always equal in
+floating point. A test over twelve widths found the disagreement at a width of
+three and three tenths, which no picture would have shown.
+
+**A separator that covers more of the cell than the tile is not a separator.**
+The drawing leaves the gap out below the width at which the gap takes half the
+cell. The bound comes from that identity and from nothing else. It is not read
+off a picture and it does not depend on the world, the seed or the window.[^F207A]
+
+**What the bound does not settle.** At a tile of four pixels the gap passes the
+bound and still takes forty-four parts in a hundred of the cell, and the picture
+at that width still reads as a grid. The bound is the one value in its family
+that a sentence forces. Any other share is a matter of taste, and the register
+holds the question rather than a number somebody liked.[^F207B]
+
+### FND-208 — The window stated a drawing cost of zero in every stored picture, and it was a mean over no measurement
+
+**Believed.** The cost card of the window reports what the drawing cost. Every
+stored picture of the window said `draw 0.0 ms`, and the drawing was assumed to
+be very cheap.
+
+**True.** **A drawing cannot measure itself.** The run records the cost of a
+frame after that frame has been drawn. The cost card is drawn inside the frame,
+so the mean it states covers the frames before it. A picture written by one
+call to the drawing has no frame before it, and the mean is then taken over
+nothing. The card printed the result of that division as `0.0 ms`, which reads
+as a measurement of a free drawing.
+
+The live window is not affected after its first frame, because by then frames
+have been recorded. Every picture anybody looked at was affected, because a
+picture is one frame. The one instrument the project had was saying zero in
+every image the project examined.
+
+**Evidence.** The drawing was timed outside itself, over five frames at each of
+ten tile widths, on a development machine and not on the target platform. At the
+smallest tile the camera allows, one drawing of the demonstration world cost
+about a third of a second. That is three frames a second, and it is the reason a
+watcher reports that the camera is sluggish when zoomed out. The figure the card
+would have shown had it been able to measure itself is four orders of magnitude
+away from zero.
+
+**Follows.** **A cost the run has not measured is absent, not zero.** The
+window now says so in words. The record already required this of a number the
+window cannot afford, and a number nobody has taken is the same case.[^F208A]
+
+**A row that reads as a measurement must carry the count it was taken over.**
+The count travels with the mean into the readout, so no caller can print a mean
+without knowing whether one exists.
+
+**The stored picture did not catch this.** The test that stores a picture of
+the panel supplies fixed costs, because a clock gives a new number on every
+run. That is correct, and it is why the fixture never reached the case where no
+measurement exists. The test that closes this drives the real drawing with a
+run that has recorded nothing.[^F200A]
+
+### FND-209 — The camera was not slow at the far zoom. The pan step was the wrong size for the view
+
+**Believed.** A watcher reported that camera navigation is "incredibly sluggish"
+at the far zoom, and the reading taken from that was a cost problem. A drawing
+at the smallest tile the camera allows costs about a third of a second on a
+development machine, which supported the reading.[^F209A]
+
+**True.** **Nothing was slow.** The project owner corrected it from watching the
+window move: the step is the same size however far out the view is zoomed. One
+press moved a fixed count of tiles, and a tile is a fixed number of pixels only
+at one zoom. At the zoom the viewer opens on, a press moved eighteen pixels. At
+the smallest tile the camera allows, the same press moved three. The camera was
+covering a fortieth of the distance for the same effort, and a watcher reads
+that as slowness.
+
+**Evidence.** The step was one and a half tiles, multiplied by the tile width in
+pixels. The tile width runs from two pixels to sixty-four, so the pixel distance
+of one press varied by a factor of thirty-two across the range the camera
+allows. The window polls the keyboard once for each drawn frame, so a held key
+crossed the window in about two seconds at the opening zoom and in about
+fourteen at the far zoom.
+
+**The cost figure is real and is not the cause.** The drawing cost about a
+third of a second at the far zoom on a development machine, and the ground of
+every visible tile was generated twice to produce it.[^F209B] That was a
+separate defect with its own item, and the item is complete.[^F209C] It made
+the frame rate low; it did not make the camera cover three pixels a press.
+
+**Follows.** **A pan covers a share of what the window shows.** The step is now
+a share of the window and not a count of tiles, so a press moves the same part
+of the picture at every zoom.
+
+**The share preserves rather than improves.** It is the share the old step
+covered at the zoom the viewer opens on: eighteen pixels in a window seven
+hundred and twenty pixels on its shorter side, which is one in forty. The one
+zoom nobody reported is unchanged and every other zoom now matches it. No part
+of the value was read off a render, and one test asserts the opening zoom still
+moves what it moved before.
+
+**The zoom did not have the matching defect, and now a test says so.** A zoom
+press multiplies the tile size by a factor. A press therefore changes the view
+by the same proportion wherever it is taken, which is the property the pan
+lacked. A zoom that added a count of tiles would produce the same complaint in
+the other direction, so a test asserts the ratio is one number across the range.
+
+**A measurement can be right and still answer the wrong question.** The cost of
+a drawing was measured carefully, on the correct binary, and it supported a
+diagnosis that was wrong. The person watching the window had the answer, and
+nobody asked them until after the measurement was taken. **Ask the reporter what
+they saw before measuring what you think they meant.**
 
 ### FND-214 — A reserved row is a guess that a constraint exists, and half of them were wrong
 
@@ -8981,178 +5416,6 @@ a retired number fails a gate and a closed blocker does not, so this one cannot
 be forgotten. That is luck rather than design, and the register records which of
 the two it is.
 
-### FND-233 — Four cell fields with incompatible ranges go into one argmax, so a weight is a preference times an unwritten unit conversion
-
-**Believed.** A weight expresses how much a unit prefers an option. The default
-profile gives every option a weight of one, which was read as no preference.
-
-**True.** The score of an option is the drive times the weight times the field
-the option reads. With every weight at one, the score is the drive times the
-field. **The four fields do not share a range**, so the comparison is decided
-partly by which field carries the larger units.
-
-- The open share is a count over a count, bounded at one by construction.
-- The mean food is a stock over a tile count, and its ceiling is whatever a
-  tile can hold.
-- The units for each open tile is a count over a count, and its ceiling is the
-  capacity of a tile.
-- The mean height is a mean over the height range.
-
-**Evidence.** A short unit of the demonstration was seen to choose roam while
-standing on ground that carried food. Its need was 0.48, so roam took the met
-drive at 0.48 and forage took the unmet drive at 0.52. The open share of its
-cell was near one, giving roam a score near 0.48. The mean food of its cell was
-0.669, giving forage 0.348. **Nothing is broken. The unit preferred open ground
-to food, because a share of one outscores a mean stock of two thirds.**
-
-**The comparison works in this world by coincidence.** The food generator puts
-the mean stock near one, so a share and a stock happen to be comparable. Raise
-the ceiling of a tile and forage wins everywhere, whatever a unit needs,
-because the mean food climbs past one and a share cannot follow.
-
-**Follows.** **A weight is not a preference. It is a preference multiplied by a
-unit conversion, and nobody has written the conversion down.** A content author
-who sets a weight of two for forage cannot tell whether they doubled a
-preference or corrected half a scale error, and the two are not distinguishable
-from the value.
-
-**No fix is proposed.** Whether the fields are normalised, or a weight carries
-its scale explicitly, is a design decision and it needs a record. This entry
-records the fact.
-
-### FND-234 — The exit field does steer the crowd, and a prediction from one frame said it did not
-
-**Believed.** A pre-registered prediction, written before the run: hungry units
-would not stand on better ground than fed ones, most would choose roam over
-forage, and only a minority in food-rich cells would forage. The prediction
-came from one rendered frame in which one short unit chose roam, and from the
-scale defect that explains why it did.[^F234A]
-
-**True. The prediction is refuted on both counts.** Over eight hundred ticks of
-the demonstration, at three sampled ticks:
-
-- Hungry units stand on cells whose mean food is 1.041, 0.781 and 0.876.
-- Fed units stand on cells whose mean food is 0.243, 0.224 and 0.257.
-- The world mean over a spread sample of the same cells is near 0.61.
-
-**A hungry unit stands on three to four times the food that a fed unit stands
-on**, and well above the world mean, while a fed unit stands well below it. The
-share of hungry units choosing forage is 28 in 48, then 34 in 48, then 36 in
-48. **It rises with time rather than holding.**
-
-**Follows.** The field steers. A unit that needs food moves onto ground that
-carries it, and the population separates into two by where it stands.
-
-**What the measurement does not settle.** The hungry units belong to the two
-poorest sites and the fed units to the two richest, so a raw comparison between
-the two groups confounds steering with where their sites sit. The world mean is
-the baseline that survives that, and both groups sit far from it in opposite
-directions. The rising share of foragers is the second independent signal,
-because geography does not change with time and that share does.
-
-**The mean food under the hungry crowd falls and then recovers**, from 1.041 to
-0.781 and back to 0.876. That is consistent with a crowd that depletes where it
-stands and moves on while the ground behind it recovers, which is the negative
-feedback the work was built for. It is consistent, not proven.
-
-**The lesson is about the prediction, not the engine.** The frame that produced
-it was real and the unit in it was in the quarter that chose roam. **One frame
-generalised to a population is the same error as one render generalised to a
-world**, which this register already holds twice.[^F201C] The pre-registration
-is what makes this entry cheap: the prediction was written down before the run,
-so its refutation is a fact rather than a memory.
-
-### FND-231 — A unit draws from its home site wherever it stands, so nothing it does can make it hungry
-
-**Believed.** A unit that walks away from the site it belongs to gets hungry,
-so a demonstration in which units migrate would show hunger somewhere. The
-brief for the work that found this asked for a population fed near its site and
-hungry away from it, which assumes distance costs a unit something.
-
-**True.** **Feeding has no distance term anywhere.** The draw is keyed on the
-home site of a unit and on its faction, and on nothing else. A founding sets
-the home site of every person it seats, once. A unit seventy-three tiles from
-that site draws from its store exactly as one standing on the site does, and it
-keeps drawing for as long as the store pays.
-
-**Evidence.** The demonstration was run for twelve hundred ticks with four
-groups of thirty. Every unit was fed at every sampled tick, no unit was ever
-short or starved, the ration never failed, and not one tile of the world was
-ever gathered from. Over the same run the mean distance from a founding rose
-and the furthest unit reached seventy-three tiles. **The units migrated and
-stayed fed.**
-
-**Follows.** **A unit cannot be made hungry by going anywhere.** Hunger is a
-property of the site a unit belongs to and of the group that site carries, and
-a unit changes neither by moving.
-
-**The consequence reaches past the demonstration.** The forage option scores
-against the deficit of a unit. If no movement can produce a deficit, then no
-movement can drive the option, and the option cannot close a loop with
-movement. Two open items exist to make a step read the option a unit chose and
-to let the engine order a gather.[^F226A] [^F226B] Neither can produce a unit
-that grew hungry by travelling, because nothing does.
-
-**It also bears on a strategy that a unit would follow.** A record under
-consideration holds that a strategy is a field a unit follows. **"Return to my
-site" is the first strategy anybody will want, and today a unit has no reason
-to return**, because being away costs it nothing.
-
-**This is why the engine tests are built the opposite way from the
-demonstration.** The starvation fixture gives every second site a store that
-empties and no production, and says in its own comment that the demonstration
-world is chosen to look right and that every unit in it eats. That fixture
-reaches the hungry case by choosing the site, which is the only handle there
-is.[^F231C]
-
-**No fix is proposed here.** Whether feeding gains a distance term is a design
-decision and it needs a record, not a repair. This entry records the fact and
-what it forbids.
-
-### FND-232 — The demonstration fed every unit forever, so the food layer decided nothing a watcher could see
-
-**Believed.** The demonstration exercises the food loop. A watcher of the
-running window sees units that gather, ground that empties, and a choice that
-varies with what the ground carries.
-
-**True.** No unit of the demonstration was ever hungry, so the forage option
-scored zero on every unit on every frame whatever the ground held, and **not
-one tile of the world was ever gathered from.** The window showed a food layer
-that decided nothing. The panel stated it plainly and it was read as a healthy
-world: the nearest unit reported the food under it and a score of zero for the
-option that reads that food, because it was fed.
-
-**Evidence.** Twelve hundred ticks, four groups of thirty. Fed at every sampled
-tick, none short, none starved, no ration ever failed, and zero tiles of two
-hundred and eighty-one thousand six hundred showed any depletion. The site
-stores grew without interruption for the whole run.
-
-**Two candidate causes were eliminated by measurement before anything
-changed.** It is not the starting store: **at the first tick every store is
-zero and every unit is still fed**, so an empty store does not make a unit
-hungry, and the repair anyone would reach for first would have changed nothing.
-It is not the declared upkeep rate either, which is zero at every group size,
-because the founding never sets one. **A cohort does not draw the declared
-upkeep. It draws its own ration from the store.**
-
-**The relation that governs it is exact.** The founding sets the production
-rate of a site to a sixteenth of the food its survey reached, and the default
-need rule gives a person a ration of a sixteenth of a full need for each
-application. The two cancel. **A site feeds exactly as many people as the food
-its survey measured**, and that number is one the founding already prints.
-
-**Follows.** **A fixture that produces one condition everywhere measures
-itself.** The group size now falls inside the spread of what the founded sites
-reach, so some ground cannot carry its group and other ground can, and a
-watcher sees both conditions at once. The split follows the ground rather than
-the number.
-
-**A run that loses the split now says so.** The founding report states for each
-site whether its ground carries its group, and the run prints a note when every
-seated group came out the same way. The defect that this entry records is that
-nobody noticed for as long as the demonstration ran, and a silent fixture is
-what allowed that.
-
 ### FND-219 — The next-number line reflects merged state, so it cannot allocate across branches
 
 **Believed.** Each register carries an explicit next number, and a writer claims
@@ -9225,6 +5488,161 @@ so a document explaining why a number went cannot name it.[^F218F] A number is
 allocated by a line that cannot see uncommitted work. In each case the registry
 stores a piece of state somewhere that cannot be read atomically by everyone who
 needs it, and in each case nothing fails until two readers disagree.
+
+### FND-222 — A frame at the target scale costs eleven times its budget
+
+**Believed:** nothing. No measurement existed on the target platform, so the
+project had no figure for the cost of a frame at the target scale. The frame
+budget of 100 milliseconds is derived from the tick rate and the tile edge,
+and nobody had checked the engine against it.
+
+**True:** one frame at 16,777,216 tiles and 1,000,000 units costs a median of
+1,135 milliseconds on two Graviton3 hardware threads. That is 11.4 times the
+budget. One thread costs 1,861 milliseconds, so a frame holds 1.86
+core-seconds of work.
+
+**The cost is two straight lines.** A tile costs 78 ns for each frame on one
+thread and a unit costs 557 ns. The two constants predict the target scale row
+to one part in two hundred. The unit count is therefore the larger half of the
+frame at the target scale, and it holds 1,000,000 units against 16,777,216
+tiles.
+
+**Evidence:** the target platform register holds the run, the machine, the
+commit and every row.[^F222]
+
+**Follows:** the tile pass ran 1.81 times faster on two threads and the unit
+passes ran 1.35 times faster, so the half of the frame that is larger is also
+the half that scales worse.
+
+**The two constants in this entry are weaker than it says.** A pre-registered
+prediction later missed by 6.2 percent, and FND-240 holds it. Read them as an
+approximation good to about ten percent. The measured rows in this entry and
+in FND-224 do not move, because neither is computed from a constant. The measured world held no settlement, so every
+figure above is a lower bound.
+
+**This entry first said the budget needs at least 19 cores at perfect
+efficiency. A later run on 16 cores refuted the reasoning behind that
+sentence, and FND-224 holds the correction.** Perfect efficiency is not
+available: the unit passes reach a floor and stop.
+
+### FND-223 — A sentence about the missing measurement reached ninety documents
+
+**Believed:** no measurement exists on the target platform. About ninety
+documents in this tree state that sentence in their own words, in a product
+record, in an accepted decision record, in a review, in a completed backlog
+item, in two reference registers, in the project orientation and in a doc
+comment in the engine.
+
+**True:** the sentence was true when each document was written. It stopped
+being true on 3 September 2026, when a benchmark ran on a Graviton instance
+and measured four operations. The blocker narrowed on the same day and did not
+close, so the sentence is wrong in the general case and right about most
+individual figures.
+
+**Evidence:** the search that found the sites, and the register that holds the
+figures.[^F222] [^28]
+
+```
+grep -rniE "no (measurement|benchmark)|nobody has measured|not been measured" --include="*.md" --include="*.rs" .
+```
+
+**Follows:** the sweep was not made, and the reason is not neglect. An
+accepted record does not change except in status, so repairing one needs a
+record that supersedes it.[^F223C] A review and a completed backlog item are
+records of a moment and are correct as written. The three documents that guide
+work today were repaired: the project orientation, the target register and the
+local register. Everything else cites the blocker register, and that row is
+now the current statement.
+
+**This is the shape FND-042 names, at the largest scale the project has seen.**
+A blocker that narrows leaves a false sentence in every document that stated
+the blocker in its own words. Nothing fails, because a document is prose. The
+defence is not a sweep. The defence is that a document states the blocker by
+citation and never in its own words.
+
+
+### FND-224 — The frame budget is out of reach on any core count
+
+**Read FND-330 before quoting a figure from this entry.** The 500 millisecond
+frame and the 300 millisecond floor below are superseded. Later work made the
+frame 177.9 milliseconds at the target scale on 12 threads. The title of this
+entry still holds, because the budget is 100 milliseconds and the frame is
+above it.
+
+**Believed:** FND-222 divided 1.86 core-seconds by a budget of 100
+milliseconds and concluded that 19 cores would reach it. That reasoning
+assumed the work divides.
+
+**True:** it does not all divide. A run on 16 Graviton3 hardware threads gives
+a frame of 500 milliseconds at the target scale, which is 5.0 times the
+budget, at a speedup of 3.69 on 16 cores. **The unit passes reach a floor near
+300 milliseconds and gain nothing between 12 threads and 16.** The tile pass
+has no floor in the range measured and reached 6.13 on 16 threads.
+
+**A frame at the target scale therefore cannot fall below about 300
+milliseconds on this engine, whatever the core count.** The budget is 100
+milliseconds. No machine reaches it.
+
+**That floor is about twice as high as this entry says.** Every figure here
+was taken with the units packed into a band, and FND-245 shows a unit costs
+about twice as much at the density the project states. The conclusion holds
+under both patterns and the level does not.
+
+**Evidence:** the target platform register holds both runs, the machines, the
+commits and every row.[^F222] The unit half is the difference between a world
+of 1,000,000 units and a world of none, at 4,194,304 tiles, taken at five
+thread counts.
+
+**Follows:** buying a larger machine does not deliver the tick rate. Either a
+unit must cost less in a frame, or fewer units must do work in a frame. The
+project already holds the second shape as a design principle, because a
+set-valued command permits a cheaper algorithm than a per-entity loop. This is
+the first measurement that says the principle is load-bearing rather than
+tidy.
+
+**Two cautions.** The measured world held no settlement and no character, so
+the unit half is a lower bound and the floor may be higher. The step starts
+threads for each parallel stage rather than using a pool, so part of the floor
+may be that cost rather than the work.
+
+### FND-225 — The tiles hold the memory at the target scale, and the units do not
+
+**Read FND-246 before quoting a figure from this entry.** The 545 MB below is
+the figure at one thread. A machine needs about 960 MB.
+
+**Read FND-246 before quoting a figure from this entry.** The 545 MB below is
+the figure at one thread. A machine needs about 960 MB.
+
+**Believed:** memory at the target scale would be dominated by the entity
+tiers rather than by the tiles, on the reasoning that a tile is generated and
+only its change is stored. A derivation put the total at one to three
+gigabytes.
+
+**True:** a world of 16,777,216 tiles and 1,000,000 units holds **545 MB
+resident at one thread**, and 876 MB at 12. FND-246 holds the thread rows. The same world with no unit holds 456 MB, so the whole population
+of one million adds 89 MB. **A tile costs 27 bytes and a unit costs 89 bytes.**
+The tiles are five sixths of the total.
+
+**The generated-tile records are not contradicted.** Nothing stores a tile
+value or a tile stock. The 27 bytes are the columns the world does allocate
+for each tile, and one proposed item already names the holder column as one of
+them.[^F162D]
+
+**Building the world needs more than holding it.** The high water mark at the
+target scale is 872 MB against 545 MB resident, and the gap holds at every
+large extent. A machine sized to hold the world will fail to build it.
+
+**Evidence:** the target platform register.[^F222] Each point was measured by
+a process that built one world and exited, because a process that has already
+built a large world does not return the memory and would report the high mark
+of the run.
+
+**Follows:** the derived figure was high by a factor of two to six, and it was
+wrong about which half dominates. The measured world holds no settlement and
+no character, and the scale constants table names 5,000 settlements and 50,000
+living characters, with the character layer derived at about 85 MB. Adding
+those to 545 MB does not reach one gigabyte, so the shape of the answer is
+unlikely to change.
 
 ### FND-226 — The demonstration feeds every unit, so it never forages
 
@@ -9323,6 +5741,646 @@ the callers of the setter, not only for the readers of the column. A fixture
 that sets a value and then runs a frame is the shape that breaks, and it breaks
 quietly: the value is read back correctly and it is the wrong value.
 
+### FND-231 — A unit draws from its home site wherever it stands, so nothing it does can make it hungry
+
+**Believed.** A unit that walks away from the site it belongs to gets hungry,
+so a demonstration in which units migrate would show hunger somewhere. The
+brief for the work that found this asked for a population fed near its site and
+hungry away from it, which assumes distance costs a unit something.
+
+**True.** **Feeding has no distance term anywhere.** The draw is keyed on the
+home site of a unit and on its faction, and on nothing else. A founding sets
+the home site of every person it seats, once. A unit seventy-three tiles from
+that site draws from its store exactly as one standing on the site does, and it
+keeps drawing for as long as the store pays.
+
+**Evidence.** The demonstration was run for twelve hundred ticks with four
+groups of thirty. Every unit was fed at every sampled tick, no unit was ever
+short or starved, the ration never failed, and not one tile of the world was
+ever gathered from. Over the same run the mean distance from a founding rose
+and the furthest unit reached seventy-three tiles. **The units migrated and
+stayed fed.**
+
+**Follows.** **A unit cannot be made hungry by going anywhere.** Hunger is a
+property of the site a unit belongs to and of the group that site carries, and
+a unit changes neither by moving.
+
+**The consequence reaches past the demonstration.** The forage option scores
+against the deficit of a unit. If no movement can produce a deficit, then no
+movement can drive the option, and the option cannot close a loop with
+movement. Two open items exist to make a step read the option a unit chose and
+to let the engine order a gather.[^F226A] [^F226B] Neither can produce a unit
+that grew hungry by travelling, because nothing does.
+
+**It also bears on a strategy that a unit would follow.** A record under
+consideration holds that a strategy is a field a unit follows. **"Return to my
+site" is the first strategy anybody will want, and today a unit has no reason
+to return**, because being away costs it nothing.
+
+**This is why the engine tests are built the opposite way from the
+demonstration.** The starvation fixture gives every second site a store that
+empties and no production, and says in its own comment that the demonstration
+world is chosen to look right and that every unit in it eats. That fixture
+reaches the hungry case by choosing the site, which is the only handle there
+is.[^F231C]
+
+**No fix is proposed here.** Whether feeding gains a distance term is a design
+decision and it needs a record, not a repair. This entry records the fact and
+what it forbids.
+
+### FND-232 — The demonstration fed every unit forever, so the food layer decided nothing a watcher could see
+
+**Believed.** The demonstration exercises the food loop. A watcher of the
+running window sees units that gather, ground that empties, and a choice that
+varies with what the ground carries.
+
+**True.** No unit of the demonstration was ever hungry, so the forage option
+scored zero on every unit on every frame whatever the ground held, and **not
+one tile of the world was ever gathered from.** The window showed a food layer
+that decided nothing. The panel stated it plainly and it was read as a healthy
+world: the nearest unit reported the food under it and a score of zero for the
+option that reads that food, because it was fed.
+
+**Evidence.** Twelve hundred ticks, four groups of thirty. Fed at every sampled
+tick, none short, none starved, no ration ever failed, and zero tiles of two
+hundred and eighty-one thousand six hundred showed any depletion. The site
+stores grew without interruption for the whole run.
+
+**Two candidate causes were eliminated by measurement before anything
+changed.** It is not the starting store: **at the first tick every store is
+zero and every unit is still fed**, so an empty store does not make a unit
+hungry, and the repair anyone would reach for first would have changed nothing.
+It is not the declared upkeep rate either, which is zero at every group size,
+because the founding never sets one. **A cohort does not draw the declared
+upkeep. It draws its own ration from the store.**
+
+**The relation that governs it is exact.** The founding sets the production
+rate of a site to a sixteenth of the food its survey reached, and the default
+need rule gives a person a ration of a sixteenth of a full need for each
+application. The two cancel. **A site feeds exactly as many people as the food
+its survey measured**, and that number is one the founding already prints.
+
+**Follows.** **A fixture that produces one condition everywhere measures
+itself.** The group size now falls inside the spread of what the founded sites
+reach, so some ground cannot carry its group and other ground can, and a
+watcher sees both conditions at once. The split follows the ground rather than
+the number.
+
+**A run that loses the split now says so.** The founding report states for each
+site whether its ground carries its group, and the run prints a note when every
+seated group came out the same way. The defect that this entry records is that
+nobody noticed for as long as the demonstration ran, and a silent fixture is
+what allowed that.
+
+### FND-233 — Four cell fields with incompatible ranges go into one argmax, so a weight is a preference times an unwritten unit conversion
+
+**Believed.** A weight expresses how much a unit prefers an option. The default
+profile gives every option a weight of one, which was read as no preference.
+
+**True.** The score of an option is the drive times the weight times the field
+the option reads. With every weight at one, the score is the drive times the
+field. **The four fields do not share a range**, so the comparison is decided
+partly by which field carries the larger units.
+
+- The open share is a count over a count, bounded at one by construction.
+- The mean food is a stock over a tile count, and its ceiling is whatever a
+  tile can hold.
+- The units for each open tile is a count over a count, and its ceiling is the
+  capacity of a tile.
+- The mean height is a mean over the height range.
+
+**Evidence.** A short unit of the demonstration was seen to choose roam while
+standing on ground that carried food. Its need was 0.48, so roam took the met
+drive at 0.48 and forage took the unmet drive at 0.52. The open share of its
+cell was near one, giving roam a score near 0.48. The mean food of its cell was
+0.669, giving forage 0.348. **Nothing is broken. The unit preferred open ground
+to food, because a share of one outscores a mean stock of two thirds.**
+
+**The comparison works in this world by coincidence.** The food generator puts
+the mean stock near one, so a share and a stock happen to be comparable. Raise
+the ceiling of a tile and forage wins everywhere, whatever a unit needs,
+because the mean food climbs past one and a share cannot follow.
+
+**Follows.** **A weight is not a preference. It is a preference multiplied by a
+unit conversion, and nobody has written the conversion down.** A content author
+who sets a weight of two for forage cannot tell whether they doubled a
+preference or corrected half a scale error, and the two are not distinguishable
+from the value.
+
+**No fix is proposed.** Whether the fields are normalised, or a weight carries
+its scale explicitly, is a design decision and it needs a record. This entry
+records the fact.
+
+### FND-234 — The exit field does steer the crowd, and a prediction from one frame said it did not
+
+**Believed.** A pre-registered prediction, written before the run: hungry units
+would not stand on better ground than fed ones, most would choose roam over
+forage, and only a minority in food-rich cells would forage. The prediction
+came from one rendered frame in which one short unit chose roam, and from the
+scale defect that explains why it did.[^F234A]
+
+**True. The prediction is refuted on both counts.** Over eight hundred ticks of
+the demonstration, at three sampled ticks:
+
+- Hungry units stand on cells whose mean food is 1.041, 0.781 and 0.876.
+- Fed units stand on cells whose mean food is 0.243, 0.224 and 0.257.
+- The world mean over a spread sample of the same cells is near 0.61.
+
+**A hungry unit stands on three to four times the food that a fed unit stands
+on**, and well above the world mean, while a fed unit stands well below it. The
+share of hungry units choosing forage is 28 in 48, then 34 in 48, then 36 in
+48. **It rises with time rather than holding.**
+
+**Follows.** The field steers. A unit that needs food moves onto ground that
+carries it, and the population separates into two by where it stands.
+
+**What the measurement does not settle.** The hungry units belong to the two
+poorest sites and the fed units to the two richest, so a raw comparison between
+the two groups confounds steering with where their sites sit. The world mean is
+the baseline that survives that, and both groups sit far from it in opposite
+directions. The rising share of foragers is the second independent signal,
+because geography does not change with time and that share does.
+
+**The mean food under the hungry crowd falls and then recovers**, from 1.041 to
+0.781 and back to 0.876. That is consistent with a crowd that depletes where it
+stands and moves on while the ground behind it recovers, which is the negative
+feedback the work was built for. It is consistent, not proven.
+
+**The lesson is about the prediction, not the engine.** The frame that produced
+it was real and the unit in it was in the quarter that chose roam. **One frame
+generalised to a population is the same error as one render generalised to a
+world**, which this register already holds twice.[^F201C] The pre-registration
+is what makes this entry cheap: the prediction was written down before the run,
+so its refutation is a fact rather than a memory.
+
+### FND-235 — A stored watermark read nothing, because a sentinel already said it
+
+**Believed.** The record of descent needed a stored count of how many rows the
+Euler labels covered. A query about a row above that count would answer
+nothing rather than answering from a stale label.
+
+**True.** The count read nothing. The two label columns already mark an
+unlabelled row with an absent-value sentinel, which a birth writes and a
+relabel clears. The sentinel alone decides every answer. The stored count was
+a second declaration of the same fact, and the length of the Euler order was a
+third.
+
+**Evidence.** The watermark check was removed from the label reader and the
+whole suite stayed green: twelve tests, none of which could see the
+difference. The behaviour was covered. The declaration was redundant, and only
+removing it showed that.
+
+**Follows.** Two things.
+
+**A green suite after a removal is evidence about the removal, not about the
+test.** The suite proved the watermark unnecessary. It would equally have
+proved a necessary check unnecessary if no test reached the case, which is why
+the removal was paired with a test that does reach it: a character born after
+the relabel must answer nothing, and that test fails when the sentinel is
+wrong.
+
+**Count the declaration sites of a derived quantity before storing it.** The
+number of labelled rows is derivable from the Euler order length, and the
+label columns already answer per row. Neither needed a third site. The record
+now derives the count and stores nothing.[^235A]
+
+### FND-236 — The descent columns went to the record, not to the arena
+
+**Believed.** The backlog item said to add the descent columns to the
+character arena: the two parent edges, the house, and the two Euler
+labels.[^236A]
+
+**True.** Three of the five belong to the record of descent, and two were
+already there. Item 0067 had put the parent edges in a separate append-only
+record keyed on a descent identity rather than on a slot, and it gave the
+reason: the arena reuses a slot after a death, so a slot names a different
+character later.[^236B]
+
+The same reason governs the other three. A house on a slot column would be
+released when its holder died, so a dynasty would lose its founder and every
+dead member of its line. A Euler label on a slot column would be worse, since
+the father forest holds every character the world ever created and the labels
+must cover all of them. The character arena holds a reader for each, and the
+reader resolves the identity to a descent row.
+
+**Evidence.** A test removes a character and asserts that the record of
+descent still answers its house, and that a living descendant keeps the house
+of the dead ancestor.
+
+**Follows.** **A backlog item names the structure it expects, and the item may
+be wrong about it.** This one was written before the work that built the
+record, and it named the arena because that is where the columns sat when it
+was written. Read an item's structure name as its author's expectation and not
+as a constraint. A constraint lives in a record.[^16]
+
+This is the same shape as the misattribution that ADR-0021 now forbids: a
+sentence that names one home for a set of fields whose passes disagree about
+where they belong.[^236D]
+
+### FND-237 — The record check reads no source file when it runs in a worktree
+
+**Believed.** The record check reports a record that no other record and no
+source file cites. Running it from a worktree gives the same answer as running
+it from the main checkout.
+
+**True.** It reads no source file at all from a worktree. The check walks the
+tree for Rust and Python files and skips any path that holds a part named
+`.git`, `target` or `worktrees`. A worktree of this project lives under
+`.claude/worktrees/`, so every path below it holds that part and every source
+file is skipped.
+
+The effect is confined to the uncited note. The section check, the volatile
+figure check, the citation check and the registry check all read documents,
+and those are unaffected.
+
+**Evidence.** The file walk of the check was run against a worktree root with
+the same skip set. It returned zero Rust files. The same run reports the
+uncited note for twelve records, including one whose claim is cited from two
+source modules.
+
+**Follows.** **A filter that names a directory by its base name reaches every
+path that passes through it.** The skip set means "do not descend into a
+worktree from the main checkout". Inside a worktree it means "skip
+everything", because the root itself is inside one.
+
+**A check that reads nothing reports the same shape as a check that found
+nothing.** Zero files scanned and zero citations found produce the same note.
+Nothing distinguishes them, and the note reads as a finding about the record.
+A check that walks a tree should state how many files it read.[^37]
+
+The uncited note is a note and never a failure, so no gate went green that
+should have been red.[^237B] The cost is a false signal to whoever reads it.
+
+### FND-238 — The gate prints ten screens of red when it passes
+
+**Believed.** A reader can tell a passing gate run from a failing one by
+reading its output. Red means something is wrong.
+
+**True.** A fully green `just check` prints ten test binaries reporting
+`FAILED` and ten `error: test failed` lines. They come from the probe
+recipes, whose passing condition is a non-zero exit, so the recipe marks each
+one and the gate exits zero with all of them red.[^238A] The probes exist for
+a good reason: a determinism test with no proven failure mode is
+decoration.[^238B] The cost is not the probes. It is that the gate has spent
+its whole vocabulary of alarm on its success path.
+
+**Evidence.** A worker read the block as a determinism defect and
+investigated it: decoded the event bytes, found two tile events in reverse
+order, traced the emission site, and ran the suite in isolation and under
+load. The investigation ended only when the reversed order turned out to be
+*exactly* reverse, which is what the probe feature injects and not what a
+thread-order defect produces. The dispatcher reports reading past the same
+block four times in one day, and recognising it only from having hit it
+early.
+
+**Follows.** Three things.
+
+**A check whose success prints as failure has no alarm left for a real
+failure.** The reader who has learnt to skim ten `FAILED` lines will skim the
+eleventh. This is the same shape as a gate left broken because it cannot
+pass: both train everyone to ignore the pipeline.[^238C]
+
+**The probe output is convincing, not merely noisy.** A reader who does not
+skim it loses time instead, because the injected defect is a plausible one by
+construction. The probe reverses the combine order, and reversed order is
+exactly what a result ordered by thread completion would look like.
+
+**What distinguished the probe from a real defect was the exactness.** A
+result taken from thread completion order varies between runs. A result that
+is exactly reversed, every time, on an idle machine and a loaded one, is a
+deliberate switch. Record that as the test to apply next time, because it is
+cheaper than decoding the bytes.
+
+This finding proposes no fix. The shape is the finding.
+### FND-239 — All four merge defects were already checked. What was missing was the timing
+
+**Believed.** A dispatcher produced four defects by hand in one day and none
+was caught until the gate ran, so a check for them did not exist.
+
+**True.** Every one of the four was already checked. The register check fails
+both on a number that names two entries and on a next-number line that
+disagrees with its own entries, which is two of the four.[^32] The footnote
+check fails on a label a document defines twice, which is the third.[^239A]
+The citation check fails on a footnote naming a path that does not resolve,
+which is the fourth.[^148]
+
+The four were not undetected. They were detected minutes later, over the whole
+tree, after the commit existed.
+
+**Evidence.** Each rule was found by reading the three scripts before writing
+a new one, and each was confirmed by staging the defect and watching the
+existing check fail. The four checks cost 1.0, 3.7, 7.7 and 4.0 seconds on a
+development machine, which is why they run in the gate and not at the commit.
+
+**Follows.** Three things.
+
+**Before writing a check, ask whether the rule is already checked and only the
+timing is wrong.** A check written on the assumption of a gap would have
+restated three rules that already had a home. Two copies of a rule drift, and
+nothing fails when they disagree.[^22] The check that was written imports the
+other two and calls them.
+
+**A slow check and a missing check fail the same way from the outside.** Both
+let the defect reach the commit. Whoever watches four defects survive until
+the gate reasonably concludes that nothing is watching. The distinction
+matters because the remedies differ: one needs a rule, the other needs a place
+to run an existing one.
+
+**One rule was genuinely new, and it is the narrow one.** No existing check
+ties a move to the citations of the path it moved from. The citation check
+overlaps without covering it, because it reads footnote paths under `docs/`,
+so a moved crate file named in a comment passes it. Scoping the new rule to
+the paths the change moves is what makes it both new and cheap.
+
+**A fifth instance arrived while the work was in progress, and nobody arranged
+it.** Merging the trunk into the branch that carries this check left four rows
+of the records priority index listed twice: one side had rewritten the table
+and the auto-merge kept both. The priority check caught it.[^239B] That is the
+same shape as a register naming one number twice, in a file that is not a
+register, found by the same mechanism the finding describes. The count of
+these defects is not four and it is not five. **Do not write the count down.
+Write the shape: a merge that keeps both sides of a table that one side
+rewrote.**
+
+
+### FND-240 — A pre-registered prediction refuted the two-constant model
+
+**Believed:** the cost of a frame is the tile count times a constant plus the
+unit count times a second constant. The register said the two constants
+predict the target scale row to one part in two hundred, and called that the
+strongest evidence in the run.
+
+**True:** the agreement was one point. A prediction written into the register
+and committed **before** the run that tested it named 396.6 milliseconds for
+16,777,216 tiles and 500,000 units at 12 threads, with a hit defined as five
+percent. The measurement is 371.9 milliseconds, which is 6.2 percent low and
+outside the band.
+
+**The cost of a unit is not one constant.** At 16,777,216 tiles it is 248 ns
+at 500,000 units and 270 ns at 1,000,000, so it rises with the population. The
+constant the prediction used came from a world of 4,194,304 tiles, where it is
+298 ns, so it depends on the extent as well.
+
+**Evidence:** the register holds the prediction, the band, the result and both
+commits.[^F222] The commit that states the prediction holds no result, and the
+commit after it holds the result, so the order of the two is the evidence.
+
+**Follows:** the two constants are an approximation good to about ten percent,
+and the register now says so. **The headline result does not move**, because
+it never rested on the model: the frame at the target scale, the tile pass and
+the unit passes are each measured rows, and the floor in the unit passes is a
+difference between measured rows.
+
+**The method is the finding as much as the result is.** A consistency check
+computed after the data is in hand cannot fail, and this one would have stood
+in the register as strong evidence. It cost ten cents and one commit ordering
+to learn that it was worth about a tenth of what it claimed.
+
+### FND-241 — The unit cost of a frame is not one stage, and most of it cannot be measured from outside
+
+**Believed:** the unit passes are 298 milliseconds at 12 threads, and finding
+which stage holds them would give the project one optimisation target.
+
+**True:** no single stage holds them. At the target scale, of 274 milliseconds
+of unit cost in a 521 millisecond frame, the choice scoring is 71
+milliseconds, one bridge rebuild is 26, the economy is 6, and **170
+milliseconds is a residual that the public interface cannot divide.** The
+largest part is the part nobody can name.
+
+**The residual holds** the movement intents, admission, the holder spread, the
+death scan, the part of the level 1 rebuild that reads the units, and the walk
+over every live unit inside the choice pass that the interval does not remove.
+
+**Evidence:** the register holds the rows.[^F222] Each part was priced by
+running a whole frame with a switch off and taking the difference, because the
+engine holds no instrumentation and the benchmark added none. Three switches
+exist on the public interface: the economy schedule, the choice interval, and
+the bridge rebuild, which is public and was priced directly.
+
+**A correction inside this finding.** The step calls the bridge refresh four
+times in a frame. The step held three refreshes when this was measured, and a
+first reading of that put the bridge at three rebuilds and 79 milliseconds. The
+refresh compares a revision counter and returns when the bridge is still
+accurate, so the measured frame pays one rebuild and the other refreshes are
+constant checks. The figure is 26 milliseconds, not 79.
+
+**Follows:** a stage that cannot be measured from the public interface is a
+stage nobody can prove they improved, and that may be why none of this has
+been optimised. Something must make the stages separable before the largest
+part of the unit cost can be worked on. Backlog item 0229 already asks for a
+stage measurement and names the constraint that a clock must not enter the
+engine.
+
+### FND-242 — A list that could not go stale had gone stale
+
+**Believed:** the budgets register carried a table of the records that still
+hold a derived cost figure in their bodies, naming ADR-0003, ADR-0005 and
+ADR-0006. The register said the record check carries the list, and that the
+check fails when an entry matches nothing, so the list cannot go stale.
+
+**True:** all three records hold no figure of any kind. The work that cleared
+them did not clear the table, so the table named three records as carrying
+figures they do not carry.
+
+**The safeguard was not what the register said it was.** The check carries a
+baseline of tolerated figures, and it is the baseline that fails when an entry
+matches nothing. The baseline is empty. Nothing reads the table in the
+register, so the table is prose like any other and always was.
+
+**Evidence:**
+
+```
+grep -oE "[0-9]+(\.[0-9]+)? ?(percent|ms|ns|byte)" docs/adrs/*/adr-000[356]*.md
+grep -cv "^#|^$" scripts/adr-volatile-baseline.txt
+```
+
+The first command finds nothing in any of the three records. The second
+reports that the baseline holds no entry.
+
+**Follows:** the table now says that no record holds a figure, and it names
+this finding. **A claim that a list is checked is worth nothing unless the
+reader can see what checks it.** This one named the check in a footnote, and
+the footnote pointed at a file that holds a different list for a different
+purpose. That is close enough to be convincing and far enough to be false.
+
+**This is defect shape 1 with the roles reversed.** The usual shape is one
+value in two places with nothing failing when they disagree. Here the second
+place was a safeguard that did not cover the first, and the register asserted
+that it did.
+
+### FND-245 — The placement of the units doubles the cost of a frame
+
+**Believed:** the benchmark measured the engine at the target scale. The
+fixture placed the units by walking the world from the first tile and filling
+each tile that admits one.
+
+**True:** that pattern packs 1,000,000 units into a band across the top of the
+map at one unit for each tile, and leaves the rest of the world empty. It is
+about seventeen times denser than the target scale describes, because one
+million units over 16,777,216 tiles is one unit for each seventeen tiles.
+
+**A unit costs about twice as much at the density the project states.** The
+same frame, in one process on one machine from one build, under two placement
+patterns:
+
+| Threads | Unit cost packed, ms | Unit cost scattered, ms | Ratio |
+|---|---|---|---|
+| 1 | 578.5 | 1,363.4 | 2.36 |
+| 2 | 422.5 | 962.2 | 2.28 |
+| 4 | 329.5 | 746.5 | 2.27 |
+| 12 | 278.5 | 587.5 | 2.11 |
+
+**Evidence:** the register holds both patterns at every thread count.[^F222]
+
+**Follows:** every packed unit figure in the register is a lower bound. A frame
+at the target scale costs 835 milliseconds at 12 threads at the stated
+density, which is 8.4 times the budget, against 526 and 5.3 times packed.
+
+**The shape survives and the level does not.** The unit passes scale to 2.08
+on 12 threads packed and 2.32 scattered, so the conclusion in FND-224 that the
+budget is out of reach holds under both. The floor is about twice as high as
+that entry says.
+
+**The memory does not move**, at one part in four thousand between the two
+patterns.
+
+**This is the shape the testing rule names, found in a benchmark rather than
+in a test.** The rule says to ask what distribution the work needs rather than
+to copy a convenient world, and to put the defect back and watch the test stay
+green. Nobody asked it of this benchmark, and the fixture was chosen because
+it was easy to write.
+
+### FND-246 — A memory figure without a thread count is not usable
+
+**Believed:** a world at the target scale holds 545 MB. FND-225 states it and
+the register stated it without naming a thread count.
+
+**True:** 545 MB is the figure at one thread. The same world holds 572 MB at
+two threads and 876 MB at 12. The step gives each thread its own output slot,
+so the resident size grows with the thread count by about 30 MB for each
+thread.
+
+**The peak moves much less**, from 872 MB at one thread to 957 MB at 12,
+because the peak is set by the build and the build runs at one thread whatever
+the caller asks for.
+
+**Evidence:** the register holds the three rows.[^F222] Each was measured by a
+process that built one world and exited.
+
+**Follows:** a machine needs about 960 MB free to build and step a world at
+the target scale, not 545 MB. The conclusion of FND-225 does not change: the
+tiles still hold the memory and the units still do not, and both figures move
+together with the thread count.
+
+### FND-247 — A comparison that isolated one variable had two, and it was discarded
+
+**Believed:** the first placement comparison answered whether the fixture
+biased every unit figure. It ran the same frame under a packed and a scattered
+population and reported that the scattered one cost 86 percent more.
+
+**True:** it placed 762,599 units under the scattered pattern against
+1,000,000 under the packed one. The two rows differed in their population as
+well as in their placement, so a comparison built to isolate one variable had
+two, and neither row explained the other. **The result was discarded rather
+than reported with a caveat.**
+
+The cause was in the fixture and not in the engine. The scattered pattern
+walks the world at a stride and searched one stride for a tile that admits a
+unit. A stride at the target scale is sixteen tiles, and a run of sixteen
+tiles of water ends that unit's search while every later unit keeps its own
+target, so the shortfall accumulates. The cursor now never goes backwards and
+never stops early, so water costs a longer walk rather than a lost unit.
+
+**Evidence:** the discarded run reported 762,599 in its unit column, which is
+where the defect showed. The repaired run reports 1,000,000 under both
+patterns, and the corrected result is a 60 percent difference rather than 86.
+
+**Follows:** a caveat is not a substitute for a second run when the second run
+costs three cents and four minutes. The discarded numbers were in the right
+direction and would have supported the same conclusion, which is exactly why
+reporting them would have been wrong: **a result that happens to point the
+right way is not evidence, and publishing it teaches the reader that the
+apparatus was sound when it was not.**
+
+**The unit column is what caught it**, and it was in the output only because
+the benchmark reports what it placed rather than what it was asked for. A
+fixture that reports its request rather than its result cannot show this
+class of defect at all.
+
+### FND-248 — A guard that fires correctly is not evidence that the thing it guarded against was acceptable
+
+**Believed:** the teardown trap makes a launch safe to attempt, because a run
+that goes wrong terminates itself.
+
+**True:** the trap works, and it is not a licence. One command chained a source
+edit and an instance launch. The edit failed its assertion and wrote nothing.
+The launch went ahead against a benchmark mode that did not exist, so the
+instance built the tree, ran a sweep nobody asked for, and billed for it.
+
+The trap did its job. An interrupt terminated the instance, deleted the key
+pair and the security group, and the region was verified empty afterwards.
+**That is the good news and it is not the finding.**
+
+**Evidence:** the launch and its teardown are in the run log, and the commit
+that repaired the sequencing describes it.
+
+**Follows:** **an edit and a launch do not belong in one command.** The launch
+must depend on the edit having succeeded, and a shell that runs the next
+command after a failed one gives no such dependency. Separate them, or make
+the launch conditional on the edit's exit status.
+
+**The general shape.** A guard exists because the guarded action can go wrong.
+Once the guard is trusted, the action gets attempted more casually, and the
+guard is then load-bearing for cases it was never designed to cover. The trap
+was written for a build that fails and a connection that drops. It was not
+written for a launch that should never have happened, and it happened to
+cover that too. **Next time it may not.**
+
+### FND-249 — Three kinds of work, three kinds of scaling, measured on one machine
+
+**Believed:** the exit field derivation would either scale like the tile pass
+or floor like the unit passes, and which one it did would say whether the
+lattice claim survives its first instance.
+
+**True:** it does neither, and the reason was structural and readable before
+the run. The derivation takes no thread count, and its own documentation says
+the pass runs on the calling thread. A prediction saying so was written into
+the register and committed before the run, with a hit defined as a speedup
+inside 0.9 to 1.1 and a cost under 10 milliseconds.
+
+**All three predictions hold.** The derivation costs 2.15 milliseconds at 1,
+2 and 12 threads, flat to three figures, which is 132 ns for each of 16,384
+cells. The level 1 rebuild beside it reaches 11.59 times on 12 threads, which
+is 0.97 of the machine and the best scaling measured anywhere in this project.
+
+**The result that matters is the comparison, not any one row.** Three kinds of
+work, on one machine at one extent:
+
+| Work follows | Speedup on 12 threads |
+|---|---|
+| The cells | 1.00, and it does not need threads |
+| The tiles | 11.59 |
+| The population | 2.08 packed, 2.32 scattered |
+
+**Evidence:** the register holds the prediction, the rows and both
+commits.[^F222] The derivation was measured directly rather than by a
+difference, because the field, its constructor and the level it reads are all
+public. The engine gained no instrumentation. The units were scattered,
+because a packed population would flatter a per-cell claim in the direction
+the record wants to hear.
+
+**Follows:** work that follows the lattice is small enough not to need
+threads, and work that follows the tiles takes them almost perfectly. **Work
+that follows the population barely takes them at all**, and that is the half
+of the frame the project cannot currently reduce. The lattice claim is
+supported by its first instance.
+
+**One caution against reading this as a general law.** The exit field is flat
+because it is small, not because per-cell work cannot be large. A per-cell
+pass over 16,384 cells that did much more for each cell would want threads and
+would not have them, because the derivation takes no thread count and nothing
+would notice.
+
 ### FND-250 — A behavioural strategy is one constraint, not three
 
 **Believed.** A behavioural strategy decomposes into three parts that each need
@@ -9368,263 +6426,6 @@ has been chosen at all.
 because each part sounds like it needs a record and the reviewer's instinct is
 to write three. The evidence that separates them is in the source and in the
 registry, not in the framing.
-
-### FND-270 — Slot order and identity order agree in an ordinary fixture, so a test cannot tell them apart
-
-**Believed.** A test that asserts which unit took the first position proves
-that the assignment follows the identity of the unit rather than the order the
-units were read in. The two are different rules, so a test that names one of
-them distinguishes them.
-
-**True only when the fixture separates the two orders, and an ordinary fixture
-does not.** A unit spawned earlier holds both a lower slot and a lower
-identity, because an identity is a slot index with a generation above it and a
-fresh arena hands out slots in ascending order. In such a fixture the two rules
-give exactly the same answer.
-
-**The evidence.** The assignment pass sorts its applicants by a key vector
-whose last field is the whole identity. The first version of the test spawned
-four units in order and asserted that the positions went to them in identity
-order. **The sort was then replaced with the identity permutation, so the pass
-seated in the order it read the units, and all eight tests passed.** The test
-that existed to name the order could not see the difference.
-
-**The repair is in the fixture and not in the assertion.** A slot that is freed
-and filled again carries a higher generation, so the unit in the lowest slot
-holds the highest identity. The fixture now spawns two units, despawns the
-first, and spawns a third into the freed slot. Read order then names the third
-unit first and identity order names the second, and the same mutation fails the
-test.
-
-**Follows.** Three things.
-
-**This is the fixture shape the register already holds, in a new place.**
-FND-051 and FND-048 in this register record a fixture that modelled the typical
-case and so never supplied the extreme. This one is narrower and worth naming on its own: **any test
-about entity order needs a fixture in which a slot has been reused**, because
-generation is the only thing that separates slot order from identity order.
-
-**A test about an order must be mutated, not read.** Nothing in the test looked
-wrong. It named the right rule, asserted the right sequence, and was green for
-the right-looking reason. Only putting the defect back showed that it was
-measuring the fixture.[^23]
-
-**The other three mutations were caught.** Removing the pass from the step
-failed seven of eight tests, storing a bare slot index instead of an identity
-failed the reuse test, and seating an already seated unit failed two. The suite
-was sound apart from this one case, which is why the case is worth recording
-rather than the suite.
-
-
-### FND-269 — Three completed subsystems produce nothing at all in the demonstration world
-
-**Believed.** The demonstration shows less than the engine holds because the
-drawing has not caught up. The repair for a feature a watcher cannot see is
-therefore drawing work, in the way that items 0216 and 0240 were fixture
-work.[^F269A]
-
-**True for some subsystems and false for three.** Positions, characters and
-improvements do not merely go undrawn in the demonstration. **They never
-happen.** A front end that drew them today would draw an empty set, and the
-test that proved the drawing correct would be measuring the fixture.[^23]
-
-**The measurement.** The world the demonstration builds, founded for four
-factions with a group each, stepped on four threads. The counts are read from
-the public readers of the engine at the tick named.
-
-| Quantity | Tick 50 | Tick 200 |
-|---|---|---|
-| Units alive | 192 | 192 |
-| Settlements | 4 | 4 |
-| Position seats that exist | 16 | 16 |
-| Position seats a unit holds | 0 | 0 |
-| Characters | 0 | 0 |
-| Upgrade sites | 0 | 0 |
-| Units the shortage ended | 0 | 0 |
-| Units carrying a load | 0 | 45 |
-| Units whose chosen option is forage | 0 | 44 |
-| Tiles held, summed over the factions | 7,866 | 46,992 |
-
-**Each zero has a cause, and every cause is an open item.** Nothing seats a
-unit in a position, which is what item 0063 does. Nothing promotes a unit into
-the character tier, which is what item 0088 does. No option in the option set
-orders a build, which is what item 0180 does. The subsystems are complete and
-correct; what is absent is the caller that makes one instance of each occur.
-
-**Every one of those three items sits in `Later`.** They sit there for reasons
-that are each defensible on their own, and the priority index states them. The
-consequence that no row states is the one the project owner names most often:
-the demonstration cannot show a feature that never occurs, so the work that
-makes the demonstration show its features is ordered below the work that makes
-it faster.
-
-**Follows.** Three things.
-
-**Ask whether a feature occurs before asking whether it is drawn.** An audit
-that reads the drawing finds the features the drawing omits. It cannot find a
-feature the world never produces, because both look identical from the front
-end: an empty set.
-
-**A zero is the cheapest evidence this project has, and nothing prints one.**
-Every figure above came from a throwaway probe that no test holds and no
-command runs. The demonstration prints whether a founded ground carries its
-group, and that line exists because a silent fixture cost the project a
-round.[^F269A] It prints nothing about a subsystem that produced no instance.
-Item 0278 asks for that.
-
-**The three items are not equivalent in cost.** Item 0063 writes into a
-structure that exists and holds sixteen empty seats already. Item 0088 has no
-stated blocker. Item 0180 adds an option to the pass that item 0238 is
-rewriting, and the index says it should read that pass afterwards. Moving the
-first two is cheap; moving the third against a stated sequencing reason is not.
-
-[^F269A]: Findings register, FND-232, in this document.
-
-
-### FND-263 — The needs of one cell spread widest while a store empties, and they polarise afterwards
-
-**Believed.** Two things, and both were reasonable. The first is that a need is
-a fixed-point quantity, so two units in one cell almost never share one and a
-key on the exact need reduces nothing.[^F263A] The second is that no fixture in
-this project produces the distribution, because it needs settlements, home sites
-and a running economy and the benchmark world holds none of the three.[^F263B]
-
-**True, with a correction to the first and a replacement for the second.** A
-fixture now exists and the distribution is measured.[^F263C]
-
-**The measurement.** A world of 65,536 tiles, 64 level 1 cells, 64 settlements,
-about 4,000 units with a home each, and the economy running on every tick. The
-median cell holds about 75 units, which is the density the project states for
-the target scale. Two placements bound the answer: **mixed** gives neighbouring
-units different homes, **clustered** gives a run of neighbouring units one home.
-The figures are the median cell. The collapse is the units of that cell divided
-by the distinct keys in it.
-
-| Frame | Distinct exact needs | Buckets at the matched width | Buckets four times finer |
-|---|---|---|---|
-| 4 | 14 | 5 | 14 |
-| 8 | 26 | 9 | 26 |
-| 16 | 41 | 17 | 41 |
-| 32 | 24 | 11 | 22 |
-| 64 | 12 | 4 | 9 |
-
-The clustered placement holds 7 to 9 distinct exact needs at every frame.
-
-**The first belief is false as stated, and its conclusion holds for another
-reason.** An exact key does not give one distinct value for each unit. It gives
-14 to 41 out of about 75, because a cohort is one site and one faction, and every
-unit of one cohort draws one ration and holds one need exactly. **The distinct
-keys of a cell are bounded by the cohorts standing in it**, and that is a
-structural fact rather than a figure of this fixture.
-
-**The bound belongs to the content, and that is what decides the question.** A
-world that gave every unit a site of its own would put one key on every unit, and
-nothing in the engine refuses such a world. **A bound a content author can remove
-cannot carry a claim that the population must not raise the work.** The bucket
-gives a bound the engine holds, so the conclusion that the key must be a bucket
-survives. What does not survive is the reason given for it.
-
-**The measured collapse says the same thing in the other direction.** At the
-moment the needs are most spread, the exact key collapses the median cell 1.8
-times. A pass that does half the per-unit work is not a pass whose cost follows
-the lattice. So the exact key fails the claim on the measurement as well as on
-the argument, and it fails it in a world whose cohorts are already sharing.
-
-**The spread is transient and the steady state is polarised.** The decay takes a
-fixed amount and the gain is a share of a store. A cohort whose share is below
-the decay falls to the floor and stays. One whose share is above it rises to the
-ceiling and stays. The values between the two are what a store produces while it
-empties, so the spread rises to a peak and then falls as each site settles on one
-side. **The peak is the case that decides the width**, and it is the case a run
-of a few frames misses.
-
-**Follows.** **The width is matched to the rate at which a need moves, and the
-measurement is why.** The default need rule takes a fixed amount off a unit on
-every tick. A bucket of that amount means a unit crosses one bucket in one tick.
-A finer bucket separates two needs that the rule cannot separate inside a tick,
-and the table above shows what that costs: four times finer than the matched
-width gives 41 distinct keys against 17 at the peak, and the collapse falls from
-4.4 to 1.8. **The finer bucket buys nothing and it is not free.**
-
-**The decay is a parameter of the need rule, so the two are coupled.** A caller
-who changes the decay and leaves the width alone has unmatched them. That
-coupling is why the width is a parameter of the world and not a constant of a
-module. An open decision closed against this measurement.[^F263D]
-
-**The width changes where the population ends up, and the fixture showed it by
-accident.** The measurement was taken twice, once at each of two default widths,
-because the fixture reads the width the world holds. The median cell held 71
-units at the finer width and 67 at the matched one, at the same frame of the same
-seed. A unit takes its option from its bucket and its step from its option, so a
-different width moves a different population. **No golden file sees any of
-this**, and a separate finding records why.[^F263F]
-
-**This is not a cost figure and no blocker governs it.** The simulation is
-deterministic integer arithmetic, so every number above is the same on every
-machine. The register that holds measured cost figures is for the target
-platform, and this belongs in neither that register nor the derived one.[^F263E]
-
-**What this does not measure.** Whether the matched width dithers a unit's
-behaviour, and what the real placement of homes in a played world looks like.
-The two placements bound the answer and neither predicts it.
-
-### FND-262 — The choice quantised the need, and no golden scenario reaches the case it changes
-
-**Believed.** Deciding the choice for each cell and each bucket of need changes
-behaviour, so the golden state hash moves and the move has to be stated rather
-than discovered. The item that asked for the work said exactly that, and the
-record that decides it says so in its own text.[^F262A] [^F262B]
-
-**True.** The change moves no golden hash. All eight scenarios match their
-stored files, at the recording thread count, with the quantisation in place.
-
-**Evidence, and it is direct.** The bucketing was removed from the pass, so that
-the pass scored the exact need again, and the golden test was run against the
-unchanged files. It passed. **No golden scenario reaches a need where the bucket
-changes the answer.** The removal is the check, because a scenario that reached
-the case would fail with the quantisation and pass without it.
-
-The case exists and it is easy to reach. A purpose-built fixture searches the
-need range against the summary its own cell holds, finds a need whose bucket
-answers differently, and drives the engine to that need by naming the decay. The
-unit then takes the answer of the bucket. The search asserts that it found a
-divergent need before it asserts anything else, so a fixture that stopped
-reaching the case would fail rather than pass quietly.[^23]
-
-**Part of the reason is visible and part is not.** The default need rule takes a
-sixteenth of the need range off a unit on every tick, and the bucket is a
-sixty-fourth of that range, so a decay lands on a bucket bound exactly. A unit
-that is never partly fed therefore holds a need that the quantisation does not
-move. **Whether every unit of every golden scenario is in that condition is not
-verified**, because the store divides among a cohort and a share need not be a
-multiple of the bucket width. The removal experiment above proves the outcome
-without proving the mechanism.
-
-**Follows.** **A behavioural change can be real, checked and invisible to the
-whole gate at once.** The golden files are the project's answer to "did the
-simulation change", and here they answer no to a change that a record was
-written for. A reviewer reading a green gate would conclude the change is inert.
-It is not inert. It is unreached.
-
-**A green golden file is evidence about the scenarios, not about the engine.**
-This is the same shape the register already holds twice, where a fixture modelled
-the typical case and supplied no extreme.[^F262D] The new part is that the
-fixture here is the golden corpus itself, which the project treats as the
-authority on whether behaviour moved.
-
-**The width of the bucket can be varied over most of its range and no golden file
-moves.** The width was set to four different values spanning a factor of eight,
-and every scenario matched its stored file each time. So the gate is blind not
-only to the quantisation but to the parameter that decides how much the
-quantisation does. **That parameter is the mechanism of the decision**, and a
-review of the governing record said so before any of this was measured. A
-register holds the value and the measurement it was chosen against.[^F263D]
-
-**The remedy is not a new golden scenario.** A scenario built to sit on a bucket
-boundary would pin the boundary rather than the behaviour, and the record says
-that a test which wants the option set states a need in the middle of a
-bucket.[^F262E] The test that reaches the case belongs beside the decision, and
-it is written there.
 
 ### FND-251 — There are no unit types, and one weight profile serves every unit alive
 
@@ -9720,6 +6521,171 @@ and the ends are what a thread count cannot help.
 before reading what it contends on. Contention is the failure that a rule
 already prevents, so it is the least likely one to be present in a project that
 has the rule.
+
+### FND-255 — The collapse measurement measured the cell count, because every unit holds the same need
+
+**Believed:** counting the distinct pairs of level 1 cell and need against the
+live unit count would say how far a choice pass collapses if it decided for
+each cell rather than for each unit.
+
+**True:** the count returned a pair count exactly equal to the cell count, at
+every bucket width including the exact need, under both placement patterns.
+**The need column holds one value for all 1,000,000 units.** It is 65536,
+which is one in the fixed point scale, and it is the value a unit spawns with.
+
+The measured world holds no settlement, so no unit has a home to draw from and
+consumption never moves a need. The measurement therefore reports the units
+for each cell and nothing about the need.
+
+**What it does establish.** The geometry gives 14,970 occupied cells of 16,384
+for 1,000,000 units at the density the project states, so **66.8 is a ceiling
+on the collapse factor** and no need distribution can beat it. The packed
+figure of 740.2 is a property of a fixture that puts the whole population into
+8 percent of the cells.
+
+**What decides the real answer.** A cell holds 64 units at the median under
+the scattered pattern. The distinct pairs in a cell are the smaller of the
+units in it and the need values they take, so the collapse in the median cell
+is about 64 divided by the number of need buckets. At 4 buckets it is 16, at
+16 buckets it is 4, and at 64 buckets it is 1. **The need is a Q16.16 quantity
+and takes about four thousand million values, so unbucketed the collapse is 1
+and the rule buys nothing.** The bucket width is the mechanism, not a detail.
+
+**Evidence:** the register holds every row, both placements and all six bucket
+widths.[^F222] The counts come through the public crate interface, and the
+engine gained no instrumentation: the live units, the tile of a unit, the need
+of a unit and the block layout are all public. The pairs pack into one word
+and the count is a sort and a scan, so no hash iteration order reaches the
+result.
+
+**Follows:** the record must not carry a collapse figure from this run. The
+number it needs is how many need values coexist in one cell in a world that
+consumes, and no fixture in this project produces one, because that needs
+settlements, home sites and a running economy. **A ceiling of 66.8 and an
+unmeasured floor of 1 is what this run supports.**
+
+**This is the third fixture defect this benchmark has produced in one
+session.** The first packed the population into a band, the second placed 76
+percent of the units it was asked for, and this one measured a column that
+never changes. Each was found by looking at a number that was too clean.
+
+### FND-256 — The fixture of a benchmark is its least reviewed code and its most load-bearing
+
+**Believed:** the benchmark measured the engine. Its figures were reviewed, its
+method was stated, and its rows carried the machine, the commit and the date.
+
+**True:** three of its figures described the fixture rather than the engine,
+and all three were found in one session. None was found by reading the
+benchmark. Each was found by distrusting a number that looked too clean.
+
+| The defect | What it made false | How it showed |
+|---|---|---|
+| The population filled the first open tiles, packing 1,000,000 units into a band at one unit for each tile | Every unit figure, by about a factor of two | A reviewer asked what density the pattern gave |
+| The scattered pattern gave up at water and placed 762,599 units of 1,000,000 | A comparison built to isolate the placement | The unit column in the output |
+| The need column held one value for every unit, because no unit had a home to draw from | The whole collapse measurement | A pair count exactly equal to a cell count |
+
+**The transferable claim.** A benchmark's fixture is the least reviewed code
+in a project and the most load-bearing for every figure the benchmark
+produces. The measurement code gets read, because a figure is what people
+argue about. The world the measurement runs on gets written once, early, by
+whoever wanted a number, and then every later figure inherits it.
+
+**Evidence:** the register holds all three, with the corrected figures beside
+the ones they replaced.[^F222] FND-245 holds the placement, FND-247 holds the
+discarded comparison, and FND-255 holds the constant need column.
+
+**Follows:** the register now names the fixture beside every table, and its
+format rule demands the fixture as well as the machine. **A figure whose
+fixture is not named is not reproducible**, and that is a stronger statement
+than the one this project already makes about the machine.
+
+**Three tests, in the order they cost.** Ask what distribution the measurement
+needs, before writing the world. Make the fixture report what it produced
+rather than what it was asked for, because that is what caught the second
+defect. Distrust a number that is too round, too flat or exactly equal to
+another number, because that is what caught the first and the third.
+
+**The testing rule already said the first of those**, and it says it about
+tests rather than about benchmarks.[^23] Nobody applied it here, because a
+benchmark is not a test and the rule did not say the word. The rule is right
+and its scope was too narrow.
+
+### FND-257 — A check that searches for a moved path must first ask whether the path is a name
+
+**Believed:** the moved-path rule of the merge-defect check was ready for a
+merge. It reads the paths the change moved away from, searches the tree for
+each one, and reports every place that still names an old path. The rule is
+sound and the check passed every fixture and every real change until now.
+
+**True:** the rule searched for a path called `0` and reported 14571 failures,
+all of them false. The search is a fixed-string search. A path of one
+character is a substring of ordinary text, so the search matched every version
+field of a lock file. The check blocked a merge that held no moved-path defect
+at all.
+
+**The evidence is the run.** The merge of the benchmark branch deleted three
+files whose names are `0`, `40` and `600`. They are image dumps that a render
+script wrote to a numeric file name and that a commit then captured. The gate
+reported 14571 failures and named the lock file on every line.
+
+**What follows.** A search for a name needs two conditions that a fixed-string
+search does not carry. The name must be distinctive enough that a match means
+a reference, and the match must stand on its own rather than sit inside a
+longer name. The check now asks both.
+
+**The two conditions do different work, and the measurement says which does
+which.** The first repair asked both at once, and the tidier reading was that
+the second condition carried it. That reading is wrong. Over the tree at the
+merge, a fixed-string search for `0` matches 14588 lines. The
+stands-on-its-own condition alone leaves 2066 of them, because prose holds
+sentences such as "level 0 holds individual tiles". It annihilates the lock
+file only because a lock file holds no prose. **The distinctive-name condition
+is the one that carries this defect, and anyone who simplifies it away
+reopens it.**
+
+**The first form of the distinctive-name condition was too wide.** It searched
+for a path only when the path held a directory separator or a file extension.
+That rejects the bare number and it also rejects `justfile`, which 16 lines of
+this project name and which no prose holds by accident. A move of it reported
+nothing and the gate passed. The condition now asks the narrower question:
+can ordinary prose hold this token? A bare number can, a word cannot, so the
+check skips a path whose last segment is all digits and searches every other
+path. A bare number one directory down is the same defect and is skipped for
+the same reason.
+
+**A skipped path is reported, not dropped.** A moved file the check does not
+search for is still a moved file, and the check prints a note for it. The note
+says why the search did not run, so a reader can search by hand. A residual
+gap remains for a name that is neither a number nor distinctive, such as a
+one-letter file at the root. It is stated rather than closed, because no such
+file exists and an escape written before a real instance is a capability
+nobody invokes.[^37]
+
+**A match now survives a full stop that ends a sentence.** A full stop
+continues a name in `docs/a.md.bak` and closes one in "the detail is in
+docs/a.md." The two are told apart by the character after the stop. Prose that
+names a path outside a code span breaks the documentation rule, and it is
+therefore the prose most likely to be stale.
+
+**The rule now has a probe, and it did not before.** Each condition above was
+put back as a defect, one at a time, and the probe was run against it. The
+condition that shipped first fails exactly the case built for `justfile`. A
+probe is the thing that would have found this hole without anyone reasoning
+about it, and its absence is why two repairs were needed rather than one.
+
+**The shape.** This is the inert-capability shape inverted. The rule was not
+inert; it ran, and it ran on the first input that was outside the distribution
+its fixtures held. A fixture built from citation-shaped paths supplies no
+one-character name, so the assertion never received the input that would fail
+it.[^84] The defect lived at an extreme of the distribution, and the
+fixture modelled the typical case.
+
+**The cost of finding it was one gate, and then one review.** The check is
+nine hours old, this was its first live merge, and its first repair carried a
+second instance of the same shape.[^F257B] Both instances are one shape: a
+rule was narrowed against the input in front of it, and nothing measured what
+the narrowing cost on the inputs that were not.
+
 
 ### FND-258 — Every document check passes with a false sentence in a record, and that was tested
 
@@ -9827,6 +6793,503 @@ starts from the register's number cannot reach it.
 missed.** The first pass here reported clean against its own search. That report
 was true about the search and false about the tree, and nothing in the result
 distinguished the two.
+
+### FND-261 — A count of what one layer asked for cannot see a generation below it
+
+**Believed.** The drawing generated the ground of every visible tile twice,
+and one of the two answers was a value it already held.[^F209C] A count of the
+grounds the drawing asks for would say whether the repair worked.
+
+**True.** The count says half of it. The counter stands in the drawing, so it
+counts the calls that the drawing makes into the core. It cannot see a
+generation that a reader below the drawing runs, and the second generation was
+exactly that: a stock reader that started from the address and generated the
+ground again to answer.
+
+A contributor can therefore put the defect back and no test fails. The drawing
+would call the reader that starts from the address alone, the picture would
+not change, and the count of grounds the drawing asked for would still equal
+the count of painted tiles.
+
+**Evidence.** Two defects were put back, one at a time, against the tests that
+claim the rule. A second generation written into the drawing was caught,
+because both calls increment the counter. A second generation written into the
+reader below was caught only by a test in the core crate, which gives the
+reader a ground the address does not carry and asserts that the answer follows
+the argument. No test in the drawing saw it.
+
+A third defect was put back and caught nothing. A test named "the count
+follows the window and not the world" was written first as a sweep over the
+zoom steps. The drawing was then made to walk every column of every visible
+row. The count still equalled the count of painted tiles, and the count still
+fell at each step in, because the rows were still held to the window. **The
+test measured less than its name claimed.** The test that replaced it draws one
+window at one tile size over two worlds of different sizes and requires the
+same count, which is the shape an existing test of the holder count already
+uses.[^F261B]
+
+**Follows.** **Put the defect back at each layer, not at the layer you were
+thinking about.** A count is evidence about the layer that holds the counter,
+and about no layer below it.
+
+**Name a test for what it proves, not for the property you want.** The test
+above was correct in every assertion it made and wrong in its name, and a
+reader would have taken the name as the guarantee.
+
+**A count of the generations that one frame runs does not exist, and an item
+holds it.**[^F261C] Until it does, the claim that the ground is generated once
+rests on two tests in two crates and on reading the one call site.
+
+### FND-262 — The choice quantised the need, and no golden scenario reaches the case it changes
+
+**Believed.** Deciding the choice for each cell and each bucket of need changes
+behaviour, so the golden state hash moves and the move has to be stated rather
+than discovered. The item that asked for the work said exactly that, and the
+record that decides it says so in its own text.[^F262A] [^F262B]
+
+**True.** The change moves no golden hash. All eight scenarios match their
+stored files, at the recording thread count, with the quantisation in place.
+
+**Evidence, and it is direct.** The bucketing was removed from the pass, so that
+the pass scored the exact need again, and the golden test was run against the
+unchanged files. It passed. **No golden scenario reaches a need where the bucket
+changes the answer.** The removal is the check, because a scenario that reached
+the case would fail with the quantisation and pass without it.
+
+The case exists and it is easy to reach. A purpose-built fixture searches the
+need range against the summary its own cell holds, finds a need whose bucket
+answers differently, and drives the engine to that need by naming the decay. The
+unit then takes the answer of the bucket. The search asserts that it found a
+divergent need before it asserts anything else, so a fixture that stopped
+reaching the case would fail rather than pass quietly.[^23]
+
+**Part of the reason is visible and part is not.** The default need rule takes a
+sixteenth of the need range off a unit on every tick, and the bucket is a
+sixty-fourth of that range, so a decay lands on a bucket bound exactly. A unit
+that is never partly fed therefore holds a need that the quantisation does not
+move. **Whether every unit of every golden scenario is in that condition is not
+verified**, because the store divides among a cohort and a share need not be a
+multiple of the bucket width. The removal experiment above proves the outcome
+without proving the mechanism.
+
+**Follows.** **A behavioural change can be real, checked and invisible to the
+whole gate at once.** The golden files are the project's answer to "did the
+simulation change", and here they answer no to a change that a record was
+written for. A reviewer reading a green gate would conclude the change is inert.
+It is not inert. It is unreached.
+
+**A green golden file is evidence about the scenarios, not about the engine.**
+This is the same shape the register already holds twice, where a fixture modelled
+the typical case and supplied no extreme.[^F262D] The new part is that the
+fixture here is the golden corpus itself, which the project treats as the
+authority on whether behaviour moved.
+
+**The width of the bucket can be varied over most of its range and no golden file
+moves.** The width was set to four different values spanning a factor of eight,
+and every scenario matched its stored file each time. So the gate is blind not
+only to the quantisation but to the parameter that decides how much the
+quantisation does. **That parameter is the mechanism of the decision**, and a
+review of the governing record said so before any of this was measured. A
+register holds the value and the measurement it was chosen against.[^F263D]
+
+**The remedy is not a new golden scenario.** A scenario built to sit on a bucket
+boundary would pin the boundary rather than the behaviour, and the record says
+that a test which wants the option set states a need in the middle of a
+bucket.[^F262E] The test that reaches the case belongs beside the decision, and
+it is written there.
+
+### FND-263 — The needs of one cell spread widest while a store empties, and they polarise afterwards
+
+**Believed.** Two things, and both were reasonable. The first is that a need is
+a fixed-point quantity, so two units in one cell almost never share one and a
+key on the exact need reduces nothing.[^F263A] The second is that no fixture in
+this project produces the distribution, because it needs settlements, home sites
+and a running economy and the benchmark world holds none of the three.[^F263B]
+
+**True, with a correction to the first and a replacement for the second.** A
+fixture now exists and the distribution is measured.[^F263C]
+
+**The measurement.** A world of 65,536 tiles, 64 level 1 cells, 64 settlements,
+about 4,000 units with a home each, and the economy running on every tick. The
+median cell holds about 75 units, which is the density the project states for
+the target scale. Two placements bound the answer: **mixed** gives neighbouring
+units different homes, **clustered** gives a run of neighbouring units one home.
+The figures are the median cell. The collapse is the units of that cell divided
+by the distinct keys in it.
+
+| Frame | Distinct exact needs | Buckets at the matched width | Buckets four times finer |
+|---|---|---|---|
+| 4 | 14 | 5 | 14 |
+| 8 | 26 | 9 | 26 |
+| 16 | 41 | 17 | 41 |
+| 32 | 24 | 11 | 22 |
+| 64 | 12 | 4 | 9 |
+
+The clustered placement holds 7 to 9 distinct exact needs at every frame.
+
+**The first belief is false as stated, and its conclusion holds for another
+reason.** An exact key does not give one distinct value for each unit. It gives
+14 to 41 out of about 75, because a cohort is one site and one faction, and every
+unit of one cohort draws one ration and holds one need exactly. **The distinct
+keys of a cell are bounded by the cohorts standing in it**, and that is a
+structural fact rather than a figure of this fixture.
+
+**The bound belongs to the content, and that is what decides the question.** A
+world that gave every unit a site of its own would put one key on every unit, and
+nothing in the engine refuses such a world. **A bound a content author can remove
+cannot carry a claim that the population must not raise the work.** The bucket
+gives a bound the engine holds, so the conclusion that the key must be a bucket
+survives. What does not survive is the reason given for it.
+
+**The measured collapse says the same thing in the other direction.** At the
+moment the needs are most spread, the exact key collapses the median cell 1.8
+times. A pass that does half the per-unit work is not a pass whose cost follows
+the lattice. So the exact key fails the claim on the measurement as well as on
+the argument, and it fails it in a world whose cohorts are already sharing.
+
+**The spread is transient and the steady state is polarised.** The decay takes a
+fixed amount and the gain is a share of a store. A cohort whose share is below
+the decay falls to the floor and stays. One whose share is above it rises to the
+ceiling and stays. The values between the two are what a store produces while it
+empties, so the spread rises to a peak and then falls as each site settles on one
+side. **The peak is the case that decides the width**, and it is the case a run
+of a few frames misses.
+
+**Follows.** **The width is matched to the rate at which a need moves, and the
+measurement is why.** The default need rule takes a fixed amount off a unit on
+every tick. A bucket of that amount means a unit crosses one bucket in one tick.
+A finer bucket separates two needs that the rule cannot separate inside a tick,
+and the table above shows what that costs: four times finer than the matched
+width gives 41 distinct keys against 17 at the peak, and the collapse falls from
+4.4 to 1.8. **The finer bucket buys nothing and it is not free.**
+
+**The decay is a parameter of the need rule, so the two are coupled.** A caller
+who changes the decay and leaves the width alone has unmatched them. That
+coupling is why the width is a parameter of the world and not a constant of a
+module. An open decision closed against this measurement.[^F263D]
+
+**The width changes where the population ends up, and the fixture showed it by
+accident.** The measurement was taken twice, once at each of two default widths,
+because the fixture reads the width the world holds. The median cell held 71
+units at the finer width and 67 at the matched one, at the same frame of the same
+seed. A unit takes its option from its bucket and its step from its option, so a
+different width moves a different population. **No golden file sees any of
+this**, and a separate finding records why.[^F263F]
+
+**This is not a cost figure and no blocker governs it.** The simulation is
+deterministic integer arithmetic, so every number above is the same on every
+machine. The register that holds measured cost figures is for the target
+platform, and this belongs in neither that register nor the derived one.[^F263E]
+
+**What this does not measure.** Whether the matched width dithers a unit's
+behaviour, and what the real placement of homes in a played world looks like.
+The two placements bound the answer and neither predicts it.
+
+### FND-269 — Three completed subsystems produce nothing at all in the demonstration world
+
+**Believed.** The demonstration shows less than the engine holds because the
+drawing has not caught up. The repair for a feature a watcher cannot see is
+therefore drawing work, in the way that items 0216 and 0240 were fixture
+work.[^F269A]
+
+**True for some subsystems and false for three.** Positions, characters and
+improvements do not merely go undrawn in the demonstration. **They never
+happen.** A front end that drew them today would draw an empty set, and the
+test that proved the drawing correct would be measuring the fixture.[^23]
+
+**The measurement.** The world the demonstration builds, founded for four
+factions with a group each, stepped on four threads. The counts are read from
+the public readers of the engine at the tick named.
+
+| Quantity | Tick 50 | Tick 200 |
+|---|---|---|
+| Units alive | 192 | 192 |
+| Settlements | 4 | 4 |
+| Position seats that exist | 16 | 16 |
+| Position seats a unit holds | 0 | 0 |
+| Characters | 0 | 0 |
+| Upgrade sites | 0 | 0 |
+| Units the shortage ended | 0 | 0 |
+| Units carrying a load | 0 | 45 |
+| Units whose chosen option is forage | 0 | 44 |
+| Tiles held, summed over the factions | 7,866 | 46,992 |
+
+**Each zero has a cause, and every cause is an open item.** Nothing seats a
+unit in a position, which is what item 0063 does. Nothing promotes a unit into
+the character tier, which is what item 0088 does. No option in the option set
+orders a build, which is what item 0180 does. The subsystems are complete and
+correct; what is absent is the caller that makes one instance of each occur.
+
+**Every one of those three items sits in `Later`.** They sit there for reasons
+that are each defensible on their own, and the priority index states them. The
+consequence that no row states is the one the project owner names most often:
+the demonstration cannot show a feature that never occurs, so the work that
+makes the demonstration show its features is ordered below the work that makes
+it faster.
+
+**Follows.** Three things.
+
+**Ask whether a feature occurs before asking whether it is drawn.** An audit
+that reads the drawing finds the features the drawing omits. It cannot find a
+feature the world never produces, because both look identical from the front
+end: an empty set.
+
+**A zero is the cheapest evidence this project has, and nothing prints one.**
+Every figure above came from a throwaway probe that no test holds and no
+command runs. The demonstration prints whether a founded ground carries its
+group, and that line exists because a silent fixture cost the project a
+round.[^F269A] It prints nothing about a subsystem that produced no instance.
+Item 0278 asks for that.
+
+**The three items are not equivalent in cost.** Item 0063 writes into a
+structure that exists and holds sixteen empty seats already. Item 0088 has no
+stated blocker. Item 0180 adds an option to the pass that item 0238 is
+rewriting, and the index says it should read that pass afterwards. Moving the
+first two is cheap; moving the third against a stated sequencing reason is not.
+
+[^F269A]: Findings register, FND-232, in this document.
+
+
+### FND-270 — Slot order and identity order agree in an ordinary fixture, so a test cannot tell them apart
+
+**Believed.** A test that asserts which unit took the first position proves
+that the assignment follows the identity of the unit rather than the order the
+units were read in. The two are different rules, so a test that names one of
+them distinguishes them.
+
+**True only when the fixture separates the two orders, and an ordinary fixture
+does not.** A unit spawned earlier holds both a lower slot and a lower
+identity, because an identity is a slot index with a generation above it and a
+fresh arena hands out slots in ascending order. In such a fixture the two rules
+give exactly the same answer.
+
+**The evidence.** The assignment pass sorts its applicants by a key vector
+whose last field is the whole identity. The first version of the test spawned
+four units in order and asserted that the positions went to them in identity
+order. **The sort was then replaced with the identity permutation, so the pass
+seated in the order it read the units, and all eight tests passed.** The test
+that existed to name the order could not see the difference.
+
+**The repair is in the fixture and not in the assertion.** A slot that is freed
+and filled again carries a higher generation, so the unit in the lowest slot
+holds the highest identity. The fixture now spawns two units, despawns the
+first, and spawns a third into the freed slot. Read order then names the third
+unit first and identity order names the second, and the same mutation fails the
+test.
+
+**Follows.** Three things.
+
+**This is the fixture shape the register already holds, in a new place.**
+FND-051 and FND-048 in this register record a fixture that modelled the typical
+case and so never supplied the extreme. This one is narrower and worth naming on its own: **any test
+about entity order needs a fixture in which a slot has been reused**, because
+generation is the only thing that separates slot order from identity order.
+
+**A test about an order must be mutated, not read.** Nothing in the test looked
+wrong. It named the right rule, asserted the right sequence, and was green for
+the right-looking reason. Only putting the defect back showed that it was
+measuring the fixture.[^23]
+
+**The other three mutations were caught.** Removing the pass from the step
+failed seven of eight tests, storing a bare slot index instead of an identity
+failed the reuse test, and seating an already seated unit failed two. The suite
+was sound apart from this one case, which is why the case is worth recording
+rather than the suite.
+
+
+### FND-273 — The packed against scattered ratio measures the density, not the arena order
+
+**Believed.** The unit arena holds units in spawn order, nothing reorders it,
+and that is why a unit costs 2.11 times as much scattered as packed at 12
+threads. The backlog item took the ratio as the size of the prize for
+reordering the arena by cell.[^F273A] [^F273B]
+
+**True.** The ratio measures the placement of the units over the world. Both
+fixtures spawn in ascending tile order, so the arena is in cell order in both
+rows. One puts the units on consecutive tiles and the other puts them one in
+every seventeen. **A reorder of the arena cannot recover any part of that
+ratio, because the row that pays it already has the order the reorder would
+produce.**
+
+**Evidence.** A third fixture puts the units on the same tiles as the
+scattered row and spawns them in a permuted order, so the population is fixed
+and the arena order is the only thing that moves. The mean slot distance
+between two units next to each other in cell order is 108 in the ascending row
+and 83,269 in the permuted one, which is the decorrelation the item
+describes.[^F273C] The unit cost rises by 1.45 at one thread and 1.34 at four,
+not by 2.11. Both rows come from one process on one machine. The machine is a
+development x86-64 machine that other work shared, so the figures bound the
+shape of the effect and are not evidence about the target platform.[^28]
+
+**Follows.** Two things.
+
+**A benchmark that moves two variables together cannot price either.** The
+placement rows change the density and the arena order in one step, and the
+arena order happens not to move at all. The row that separates them is the one
+the decision needed.
+
+**The prize is real and it is smaller than the item claimed.** A drifted arena
+costs 1.24 to 1.45 on the unit half rather than 2.11, and only the part of
+that which survives the walk order is what a physical reorder would
+buy.[^F274A]
+
+### FND-274 — The unit pass is bound by the tile side, so the walk order costs more than the arena order
+
+**Believed.** A pass over the units of one cell is slow because the unit
+columns of those units sit far apart, and the fix is to move the units in the
+arena.[^F273A]
+
+**True.** The movement pass walks the live units and reads five things for
+each one. Four of them are on the tile side of the world: the exit of its
+cell, the address of its tile, the ground of its target, and the address of
+that target. One is on the unit side. **The tile side is the larger footprint
+by an order of magnitude, and the order that makes it ascending is the order
+of the walk, not the order of the arena.**
+
+Walking the arena in slot order reads the tile side at random once the arena
+has drifted. Walking in cell order reads it in ascending tile order whatever
+the arena holds. The bridge already sorts every live unit on the tile key once
+for each frame, at the barrier, so that order costs the frame nothing
+more.[^F274B]
+
+**Evidence, and what it does not cover.** The movement pass now walks the
+bridge order. The golden state hash did not move, at any scenario, and the
+whole suite stayed green.[^F274C]
+
+**The claim that no result reads the walk order was checked by perturbation
+and not by assertion.** The walk was reversed, and the golden hash still
+matched the stored file. Admission sorts what it receives on a total key of
+the target tile and the whole identity, so the same set in another order gives
+the same answer.[^F274D]
+
+**The size of the gain was not measured.** Four runs of the before and the
+after build, at four threads, gave ratios of the drifted unit cost to the
+packed one between 1.06 and 2.26, in both directions, with the two builds
+swapping places between runs. The development machine ran between eleven and
+fifty-seven runnable threads on sixteen cores while the runs took their
+samples, and the load moved by a factor of four inside one run. **The spread
+of the apparatus is larger than the effect it was measuring, so no figure here
+states what the change bought.** The measurement that would state it belongs
+on the target platform.[^28]
+
+**What the change rests on instead is structural and checked.** The pass reads
+four tile-side values for each unit. Walking in cell order makes those reads
+ascending in the tile index, and walking a drifted arena in slot order makes
+them random. That the penalty for a drifted arena exists at all is measured,
+in two independent runs of the before build: 1.24 and 1.34 at four threads,
+and 1.45 at one.
+
+**Follows.** Two things.
+
+**Ask what a pass reads before deciding where to move what it reads.** The
+item proposed moving the units. The larger of the two footprints was on the
+other side, and the order that fixes it was already built and thrown away
+every frame.
+
+**A change can be right and still unmeasured, and the report must say which.**
+The residual that only a physical reorder removes is now separable from the
+part the walk order removes, and both belong on a target-platform run before
+anyone spends a refactor on them.[^F274A]
+### FND-277 — The residual was one pass nobody had named, and it was 61 percent of the frame
+
+**Believed.** The 170 milliseconds the stage split could not divide held
+several passes in roughly comparable parts. The register named six of them:
+the movement intents, admission, the holder spread, the death scan, the part
+of the level 1 rebuild that reads the units, and the walk over live units
+inside the choice pass.[^FND277A]
+
+**True.** It is one pass, and inside that pass it is one function. With every
+stage of a frame named and timed, the holding spread is 514.3 milliseconds of
+a 836 millisecond frame, which is 61.5 percent of the whole frame. The three
+largest stages together are 85.3 percent. The death scan is 0.04
+milliseconds, admission is 29.3, and the movement intents are 4.7.
+
+**Inside the spread, the candidate list is 49.1 percent of the whole frame**,
+and it runs on the calling thread. It walks every held tile and every live
+unit, pushes an index for each, then sorts several million indices and removes
+the duplicates. The half of the pass that decides takes a thread count and
+costs 71.1 milliseconds. The half that chooses what to decide about takes none
+and costs five and a half times as much.
+
+**Evidence.** Two runs on a Graviton3 instance at 16,777,216 tiles, 1,000,000
+units scattered, 12 threads. The first named every stage, and the second
+divided the largest one. Every stage is a row and the register holds
+them.[^FND277A] The sum of the stages is 835,957,085 nanoseconds against
+835,978,143 for the same frames timed from outside, so the part that is still
+unattributed is 0.0025 percent.
+
+The two runs measured the frame at 836.0 and 816.1 milliseconds under the same
+setting, so they differ by 2.4 percent. Read a share here as a proportion and
+not as an amount.
+
+**Follows.** Four things.
+
+**A split by subtraction finds only what has a switch.** The old method priced
+a pass by running a frame without it, and the holding spread has no switch, so
+the largest thing in the frame was invisible to the method that existed to
+find it. The residual was not a mixture. It was one pass that the instrument
+could not point at.
+
+**The next optimisation is not the one the backlog names.** Four items propose
+a change to the layout or the allocation, and the priority index put them
+above the item that made the frame measurable. The measurement moved the
+order: one pass is worth more than the four items together.
+
+**Prices go stale, and one in the register was stale by a factor of 125.** The
+same split measured the choice at 71.4 milliseconds and called it 26 percent
+of the cost of a unit. The choice now costs 0.571 milliseconds, because item
+0238 made the pass decide once for each pair of cell and need. Nothing failed
+when that figure went stale, and nothing would have.
+
+**One measurement is enough to name a pass and not enough to name the part of
+it that costs.** The first run said the spread was 61 percent. It took a
+second run, with three spans inside the spread, to say that one serial
+function is 49 percent of the frame. A stage is the unit that a reader can
+act on, and this one needed two.
+
+**This row is history, and the code no longer matches its present tense.**
+Backlog item 0291 replaced the list and the sort with a bit plane over the
+tiles, and gave the pass a thread count. The pass costs 16.7 milliseconds
+instead of 400.9, and a frame costs 463.4 milliseconds instead of
+825.4.[^FND277A] Two findings hold what that work corrected, and one of them
+shows that the figure this row rests on was read from the wrong
+world.[^F277B] [^F277C]
+
+### FND-278 — Huge pages are worth 3.9 percent, and they cost five times the memory the estimate gave
+
+**Believed.** Huge pages might explain part of the unattributed cost, and the
+memory they waste at the end of an allocation would be under one part in two
+hundred.[^FND278A]
+
+**True.** Both halves are answered, and the second was wrong. A frame at the
+target scale costs 3.9 percent less with the kernel giving 2 MB pages, and the
+resident set grows by 2.65 percent rather than by 0.5.
+
+**Evidence.** One run on a Graviton3 instance, one commit, one binary, three
+processes, one for each kernel setting. The register holds every row.[^FND277A]
+The frame fell from 835,978,143 nanoseconds under the default setting to
+803,042,781 under `always`. Of the resident set, 719,323,136 bytes sat on huge
+pages under `always` and none did under either other setting, so the setting
+demonstrably reached the process. The resident set grew by 27,889,664 bytes.
+
+**Follows.** Three things.
+
+**The prediction named the shape and the shape held.** The item said a
+translation cost would appear spread across every pass that touches a large
+array, and invisible to a split that measures stages. Three stages account for
+the whole 32.9 milliseconds and every other stage moved by less than half a
+millisecond. The three are the passes that write scattered over a large array.
+
+**A time row without an occupancy row is a claim rather than a
+measurement.** Two of the three settings gave this engine identical pages,
+because the engine calls no advice. Only the huge page column separates "the
+setting did nothing" from "huge pages do nothing", and they are different
+answers.
+
+**Two conditions that should be identical differed by 0.64 percent**, so that
+is the noise floor of this apparatus at one run for each condition. A result
+this size is worth quoting to one figure and not to two.
+
 
 ### FND-281 — The tile-indexed exit direction costs an order of magnitude more than it saves, and the smaller item beats it on the read as well
 
@@ -10005,6 +7468,105 @@ argued.** The rule that two mechanisms exist because one is not enough rested
 on judgement. It now rests on an observation: the first mechanism can be
 switched off by a typing mistake in a configuration file, and the tool that
 reads that file will not say so.
+
+### FND-285 — The held ground of the demonstration world is 140 times smaller than the held ground of the benchmark world
+
+**Believed:** the holding covers a few tens of thousands of tiles. The register
+holds the figure. The demonstration world, founded for four factions with a
+group each, holds 7,866 tiles at tick 50 and 46,992 at tick 200.[^F285A] That
+figure was read as the size of a holding, and work on the candidate pass was
+planned from it: at 46,992 held tiles the pass would sort about 1.3 million
+indices, of which one million come from the units.
+
+**True:** the benchmark world holds 6,615,358 tiles after nine frames. That is
+39 percent of the world and 141 times the demonstration figure. The raw
+candidate list reaches 14,884,176 entries, of which 13.9 million come from the
+held tiles and one million from the units. **The units are 6.7 percent of the
+list, not 77 percent.**
+
+**The measurement.** A probe inside the candidate pass, printing the held
+count and the list length for each frame. Machine: the development machine,
+not the target platform, because the two counts are properties of the
+simulation and not of the processor. 16,777,216 tiles, 1,000,000 units
+scattered, 12 threads, ten frames.
+
+| Frame | Tiles held | Raw candidate entries | Distinct candidates |
+|---|---|---|---|
+| 1 | 0 | 1,000,000 | 998,551 |
+| 2 | 998,551 | 7,984,285 | 2,616,812 |
+| 5 | 3,218,758 | 12,724,736 | 4,355,868 |
+| 10 | 6,615,358 | 14,884,176 | 4,821,144 |
+
+**The cause is the population, and it is a fixture difference and not a
+defect.** The demonstration places 192 units on 16,777,216 tiles. The
+benchmark places 1,000,000 scattered. A unit takes the ground it stands on
+when nobody holds it, so the held ground grows with the units and then spreads
+from every seed at once. The two worlds are the same rule at two densities.
+
+**Follows.** Three things.
+
+**Do not carry a count from the demonstration world into a statement about the
+target scale.** The demonstration is built to look right, and the testing rule
+already says that a fixture chosen to look right supplies no extreme.[^84]
+The two worlds differ by four orders of magnitude in the population, and every
+derived quantity differs with it.
+
+**A figure in the register names the world it was measured in.** The row above
+does. The reading of it did not, and the reading is what reached a plan.
+
+**The unit walk was the wrong thing to remove.** The plan that came from the
+small figure proposed dropping the walk over the live units, because it looked
+like three quarters of the work. It is 6.7 percent. The sort was 68 percent
+and the walk over the held tiles was 31 percent, and both follow the held
+ground rather than the population.
+
+### FND-286 — A pass that allocates on every frame cost twelve milliseconds that no stage measures, and the mapping count is not the cause
+
+**Believed:** the cost of a buffer that a parallel stage allocates for each
+thread falls inside the stage that allocates it. The stage table would
+therefore see it.
+
+**True:** twelve milliseconds of it fall outside every stage. The candidate
+pass began allocating a bit plane of 2,097,152 bytes for each of twelve
+threads on every frame. The residual of the frame, which is the part no span
+measures, went from 22,202 nanoseconds to 12,196,680. Nothing else changed
+between the two runs.
+
+**Then the project believed the mapping count was the cause**, because giving
+back a mapping a thread has written reaches every core. **That is refuted.**
+Twelve mappings became one array of twelve chunks, which is one allocation
+instead of twelve, and the residual measured 11,739,029 nanoseconds. The two
+figures are the same to within the spread of this apparatus.
+
+**The measurement.** Machine C, `c7g.4xlarge`, Graviton3, 16,777,216 tiles,
+1,000,000 units scattered, 12 threads, nine frames, `stage-cost` feature.
+Three runs at one base commit, differing only in the tree.[^F286A]
+
+| The pass allocates | Residual, ns | Share of the frame |
+|---|---|---|
+| Nothing. It sorts a list | 22,202 | 0.0027 percent |
+| One plane for each thread | 12,196,680 | 2.74 percent |
+| One array of twelve chunks | 11,739,029 | 2.53 percent |
+
+**The cause is not identified, and this row says so rather than guessing
+again.** What is established is that the residual follows the allocation and
+not the number of mappings.
+
+**Follows.** Two things.
+
+**The plane should be held across frames rather than allocated in each one.**
+That is the change the evidence points at, and it is not made. It asks a
+design question the pass does not answer today: the holding is copied by a
+derive, and a buffer it holds would be copied with it, so the buffer needs a
+statement about what a copy of a holding means.
+
+**A saving of 384 milliseconds bought a cost of 12.** The trade is good and the
+cost is recorded so that it is not found again as a mystery.
+
+**This row's conclusion is wrong, and a later row corrects it.** The residual
+did not follow the allocation. The pass still allocates and the residual is back
+under half a millisecond.[^F277C]
+
 
 ### FND-288 — Miri cannot drive the engine at the fixture sizes the suite uses, because every world reserves the unit columns at the target population
 
@@ -10230,89 +7792,53 @@ sparse form cost more in the passes that read the field than in the one that
 wrote it, and no stage is named after reading a tile value. The stage table is
 a map of where time goes and not a map of what causes it.
 
-### FND-298 — A benchmark that measures its own process reports the history of the run, and this project has read it twice
+### FND-293 — No golden scenario reached a promotion, and the files still moved
 
-**Believed.** A process that has built a world and stepped it can report what
-that world costs, by reading its own resident size.
+**Believed.** A golden file that moves when a subsystem lands is evidence that
+the golden set covers the subsystem. The state hash is exact and
+order-sensitive, so a file that moved saw the change.
 
-**True.** It reports the high mark of everything the process has done. An
-allocator does not return memory to the kernel when a vector is dropped, so a
-transient buffer that existed for one frame is still in the figure. **The
-number is the history of the run and not the cost of the world.**
+**True that it moved, and false that it covered anything.** All eight golden
+files moved when the promotion work landed. **None of the eight promoted
+anybody.** The files moved because three new unit columns and two new schedules
+enter the state hash, which happens whatever the pass does. A change to the
+promotion rule itself would have moved nothing.
 
-**Evidence, and this is the second instance.** A recent change to the tile
-value field was reported as saving 225,906,688 bytes, from the `resident_bytes`
-line of a stage-cost run. The dedicated instrument, which starts one process
-for each point, gave a different answer for the same pair of trees: the
-resident size fell by 34,074,624 bytes and the peak by 196,821,088. The
-direction was right and the size was not. The benchmark already carried the
-right instrument, and its own comment says why it exists.[^F298A]
+**The evidence.** The gathering scenario is the only one that gathers, and
+gathering is what the promotion reads. A temporary assertion that it produced a
+character failed. A second probe printed the reason: the best unit in that
+scenario gathers 5 over the frames it runs, against a default threshold of 24.
+Every other scenario gathers nothing at all, so no unit in the golden set has
+ever had a deed to its name.
 
-The first instance is the resident memory entry, where a figure taken at one
-thread was quoted for a machine that needs a larger one.[^F298B]
-
-**Follows.** Three things.
-
-**Prefer the instrument that was built for the question.** The stage-cost run
-reports a resident size because it is cheap to print, not because it answers a
-memory question. A line that a run happens to emit is not a measurement of
-anything in particular.
-
-**A memory figure needs one process for each point.** That is the rule the
-benchmark already follows where it means to measure memory, and the rule was
-available to be read.
-
-**This is now a shape rather than an incident.** Two figures in this project
-have been wrong because a process measured its own past. Treat any resident
-size taken after other work in the same process as an upper bound and nothing
-more.
-### FND-299 — The spread read the ground of every candidate tile, and the ground can only refuse
-
-**Believed.** The ground governs a claim, so the rule that decides a tile reads
-the ground first. The ground says how much support the tile asks for, and open
-water asks for more than any claim can raise, so a pass that reads it first
-refuses the impossible cases before it does any work.
-
-**True.** The ground can only refuse. It never turns a losing challenger into a
-winning one, so a tile whose best challenger does not beat the holder keeps its
-holder whatever the ground says. Reading it first therefore paid for the answer
-on every candidate and used it on few. **The ground of a tile is generated from
-the seed rather than stored, so the read is a draw and not a load.**[^F299A]
-
-**The measurement.** An ablation that replaced the ground read with a constant.
-Development machine, 4,194,304 tiles, 250,000 units scattered, 12 threads, nine
-frames, the minimum of three runs because the machine was loaded.
-
-| The pass reads | ns for each frame |
-|---|---|
-| Everything | 311,285,062 |
-| No ground | 87,708,130 |
-| No units | 54,872,312 |
-| No supporter sort | 294,343,620 |
-
-**The ground read was 72 percent of the pass and the unit read was 82 percent,
-and the two sum to more than the whole.** They overlap: removing one lets the
-other's memory latency overlap with the arithmetic. Read each figure as an
-upper bound on what removing that one thing buys, not as a share of a partition.
-
-**The supporter sort is 5 percent**, and a plan that started from the source
-would have gone there first, because a sort inside a per-tile loop looks worse
-than a field read.
+**The repair was in the scenario, not in the engine.** The gathering scenario
+already states its own recovery periods, on the stated ground that a period is
+a parameter of the kind and the engine holds no test value. The threshold is
+the same kind of parameter, so the scenario now states it too, at a value this
+world reaches. Two mutations confirm the file now guards the behaviour: ranking
+the candidates by identity instead of by deeds moves the file, and promoting
+nobody trips the assertion.
 
 **Follows.** Three things.
 
-**Order the tests in a decision by what they can do, not by what they are
-about.** A test that can only refuse belongs after the tests that can decide.
-The ground is the subject of the rule, and that is why it was first.
+**A golden file that moved is not evidence that a golden file covers.** A
+change that widens the hashed state moves every file, and it looks exactly like
+a change that altered behaviour. The question to ask is not whether the file
+moved but whether the scenario reaches the pass, and the answer to that is an
+assertion in the fixture rather than a diff.
 
-**A generated field is a computation wearing the clothes of a read.** The
-project chose to generate the ground rather than store it, and the call site
-looks like an array index.[^F299A] Nothing at the call site says that it costs a
-draw, and the pass that read it 4.8 million times each frame did not know.
+**Assert the case in the scenario, in the same place the parameters are set.**
+The gathering scenario already carried two such assertions, for a stored take
+and for a recovery, each written after a fixture covered half a rule while
+looking complete. This is the third of the same kind, and the pattern is worth
+following rather than rediscovering.
 
-**Ablate before you plan.** The pass had four parts and the plan named the wrong
-one. Removing one part and measuring took three builds and found a 72 percent
-term that no reading of the source had suggested.
+**The same gap is open for the positions and nothing has closed it.** Item 0279
+records that no golden scenario reaches the position pass. The promotion case
+was found and repaired in the same round; the position case still stands, and
+the two together say that a new pass should be assumed uncovered until a
+scenario asserts otherwise.
+
 
 ### FND-294 — Both repairs after a holding change cost the holding, not the change
 
@@ -10444,52 +7970,196 @@ reason.
 **Check the time on the artefact you are about to measure.** One `ls` would have
 caught it two hours earlier.
 
-### FND-304 — Admission searched two count tables once for each segment, and it visits them in the order they are stored
+### FND-298 — A benchmark that measures its own process reports the history of the run, and this project has read it twice
 
-**Believed.** The passes that grant an intent read two small tables of counts,
-one for arrivals and one for departures. A lookup in a small table is cheap, so
-reading them once for each target tile costs little.
+**Believed.** A process that has built a world and stepped it can report what
+that world costs, by reading its own resident size.
 
-**True.** The tables are not small. At the target scale they reach one entry for
-almost every target tile, and a lookup is a binary search over them. The grant
-passes were 60 percent of the whole admission stage, and they run on the calling
-thread.
+**True.** It reports the high mark of everything the process has done. An
+allocator does not return memory to the kernel when a vector is dropped, so a
+transient buffer that existed for one frame is still in the figure. **The
+number is the history of the run and not the cost of the world.**
 
-**The order the pass already has removes the search.** The segments are in
-ascending tile order because the admission sort put them there, both tables are
-in ascending tile order because the merge that fills them requires it, and
-neither table changes while the pass walks the segments. One forward reader for
-each table therefore replaces every search, and the walk costs the segments plus
-the entries.
+**Evidence, and this is the second instance.** A recent change to the tile
+value field was reported as saving 225,906,688 bytes, from the `resident_bytes`
+line of a stage-cost run. The dedicated instrument, which starts one process
+for each point, gave a different answer for the same pair of trees: the
+resident size fell by 34,074,624 bytes and the peak by 196,821,088. The
+direction was right and the size was not. The benchmark already carried the
+right instrument, and its own comment says why it exists.[^F298A]
 
-**The measurement.** A probe inside the stage. Development machine, 16,777,216
-tiles, 1,000,000 units scattered, 12 threads. The last frame of ten, with
-314,158 intents and 291,047 segments:
+The first instance is the resident memory entry, where a figure taken at one
+thread was quoted for a machine that needs a larger one.[^F298B]
 
-| Part | ns | Share | Runs on |
+**Follows.** Three things.
+
+**Prefer the instrument that was built for the question.** The stage-cost run
+reports a resident size because it is cheap to print, not because it answers a
+memory question. A line that a run happens to emit is not a measurement of
+anything in particular.
+
+**A memory figure needs one process for each point.** That is the rule the
+benchmark already follows where it means to measure memory, and the rule was
+available to be read.
+
+**This is now a shape rather than an incident.** Two figures in this project
+have been wrong because a process measured its own past. Treat any resident
+size taken after other work in the same process as an upper bound and nothing
+more.
+### FND-299 — The spread read the ground of every candidate tile, and the ground can only refuse
+
+**Believed.** The ground governs a claim, so the rule that decides a tile reads
+the ground first. The ground says how much support the tile asks for, and open
+water asks for more than any claim can raise, so a pass that reads it first
+refuses the impossible cases before it does any work.
+
+**True.** The ground can only refuse. It never turns a losing challenger into a
+winning one, so a tile whose best challenger does not beat the holder keeps its
+holder whatever the ground says. Reading it first therefore paid for the answer
+on every candidate and used it on few. **The ground of a tile is generated from
+the seed rather than stored, so the read is a draw and not a load.**[^F299A]
+
+**The measurement.** An ablation that replaced the ground read with a constant.
+Development machine, 4,194,304 tiles, 250,000 units scattered, 12 threads, nine
+frames, the minimum of three runs because the machine was loaded.
+
+| The pass reads | ns for each frame |
+|---|---|
+| Everything | 311,285,062 |
+| No ground | 87,708,130 |
+| No units | 54,872,312 |
+| No supporter sort | 294,343,620 |
+
+**The ground read was 72 percent of the pass and the unit read was 82 percent,
+and the two sum to more than the whole.** They overlap: removing one lets the
+other's memory latency overlap with the arithmetic. Read each figure as an
+upper bound on what removing that one thing buys, not as a share of a partition.
+
+**The supporter sort is 5 percent**, and a plan that started from the source
+would have gone there first, because a sort inside a per-tile loop looks worse
+than a field read.
+
+**Follows.** Three things.
+
+**Order the tests in a decision by what they can do, not by what they are
+about.** A test that can only refuse belongs after the tests that can decide.
+The ground is the subject of the rule, and that is why it was first.
+
+**A generated field is a computation wearing the clothes of a read.** The
+project chose to generate the ground rather than store it, and the call site
+looks like an array index.[^F299A] Nothing at the call site says that it costs a
+draw, and the pass that read it 4.8 million times each frame did not know.
+
+**Ablate before you plan.** The pass had four parts and the plan named the wrong
+one. Removing one part and measuring took three builds and found a 72 percent
+term that no reading of the source had suggested.
+
+### FND-300 — The influence solve gets slower as the thread count rises, on a small world
+
+**Believed.** A stage that takes a thread count runs faster with more threads.
+The stage register declares `influence_solve` as taking one, and the target
+scale measurement agrees: it is 12.68 milliseconds and 5.25 percent of a 241
+millisecond frame at 16.7 million tiles and twelve threads.
+
+**True at the target extent, and the reverse on a small world.** On the
+demonstration world the solve costs more with every thread added. Measured on
+an x86-64 development machine, 256 by 256 tiles, 256 units, four factions, the
+mean of 120 frames after 30 warm-up frames:
+
+| Threads | The frame | `influence_solve` | Its share |
 |---|---|---|---|
-| Sort the intents by target tile | 208,785,397 | 20.1 percent | one thread |
-| Follow the permutation | 13,198,816 | 1.3 percent | one thread |
-| Build the segment table | 59,892,786 | 5.8 percent | one thread |
-| Read the capacity and the occupancy | 132,558,620 | 12.8 percent | every thread |
-| Grant the intents | 623,729,193 | 60.1 percent | one thread |
+| 1 | 36.314 ms | 9.343 ms | 25.7 percent |
+| 2 | 30.229 ms | 11.465 ms | 37.9 percent |
+| 4 | 35.786 ms | 19.749 ms | 55.2 percent |
+| 8 | 55.716 ms | 37.313 ms | 67.0 percent |
+| 12 | 81.471 ms | 55.482 ms | 68.1 percent |
 
-**Eighty-seven percent of the stage runs on one thread**, and the stage declares
-that it takes a thread count. The declaration is not wrong, because the one
-parallel part is real, but the column cannot say that seven eighths of a stage
-ignores the number.
+The solve is 5.9 times slower at twelve threads than at one, and the frame is
+2.7 times slower at twelve than at two. **The solve also costs more in absolute
+terms on the small world than on the target one**, 55.5 milliseconds against
+12.7, on a world with 256 times fewer tiles.
 
-**Follows.** Two things.
+**How to take the measurement again.** An example prices every stage on a
+world of a given extent, group and thread count, and prints the state hash
+beside the split so a sweep is also a determinism check.[^F300B]
 
-**A table that grows with the tiles is not a small table, whatever it is named
-for.** These hold arrivals and departures, which sound like a handful of events,
-and they reach almost every target tile at the target density.
+**The cause is the shape of the parallel section, not the arithmetic in it.**
+One relaxation pass opens a thread scope for each faction, and a solve runs a
+fixed count of passes, so a frame opens the pass count multiplied by the
+faction count of them. At the target extent each spawned thread relaxes
+thousands of cells and the spawn is paid back. On the demonstration world each
+one gets a handful of cells and the spawn is the whole cost.
 
-**This is the third place tonight where a search was removed by the order the
-caller already had.** The other two are the spread deciding a tile and the same
-stage reading how many units stand on a target.[^F304A] The shape is worth
-looking for: a bounded search whose caller walks in the order the searched
-structure is stored in.
+**The guard that exists cannot catch it, by design.** The code holds a thread
+back only when the cell count is at or below the thread count, and it says why:
+the rule reads the two numbers the caller already supplied and holds no
+constant of its own. A world of this extent has far more cells than twelve, so
+the guard never fires and every scope spawns.
+
+**The solve does not cross over at any extent measured.** A second sweep took
+three extents at one thread and at twelve. The frame crosses over between
+65,536 and 262,144 tiles, where other stages start to carry the win. The solve
+itself is still 7.6 times slower with twelve threads than with one at 1,048,576
+tiles, so the extent at which threads pay this stage is above a million cells
+of world.
+
+**The determinism holds.** The state hash is identical at one thread and at
+twelve, at every extent measured, so this is a cost defect and not a
+correctness one.
+
+**The absolute figures are noisy and the direction is not.** The machine ran
+other builds throughout, and one point measured 81 ms in one sweep and 192 ms
+in another. Every point in both sweeps has the same sign.
+
+
+**The scope count is most of the cost and it is not the cause of the
+inversion.** A change that opens one thread scope for each pass instead of one
+for each faction in each pass was built and measured, and it was not taken. It
+removes twenty-four of the thirty-two scopes a frame opens. Measured on an
+x86-64 development machine, 256 by 256 tiles, four factions, the mean of 120
+frames after 30 warm-up frames:
+
+| Threads | Solve, one scope for each faction | Solve, one scope for each pass |
+|---|---|---|
+| 1 | 8.761 ms | 2.732 ms |
+| 4 | 47.167 ms | 6.055 ms |
+| 12 | 179.561 ms | 15.447 ms |
+
+**The spawn is about three quarters of the solve at every thread count, and
+the solve is still 5.7 times slower at twelve threads than at one after it is
+gone.** Removing the scopes does not move the sign. It follows that the spawn
+is a large fixed cost and that threading this stage loses on this world for a
+second reason as well.
+
+**The change was not taken, and the reason is a record and not a measurement.**
+The version measured above gives each faction a scratch plane of its own, so
+the write half of the solve grows with the faction count. An accepted record
+decides against exactly that and names its own reopening condition.[^F300C]
+The figures stay here as evidence about the cause. They are not a proposal.
+
+**The determinism holds across the change.** The state hash reads
+`9d81e94936b9f445` at one, four and twelve threads, before and after, on the
+same world and the same commit.
+
+**Follows.** Three things.
+
+**A stage declared as taking a thread count can still lose by taking one.** The
+stage apparatus states that a measured speedup far from one on a stage declared
+`false` means the declaration is wrong. It checks one direction. A negative
+speedup on a stage declared `true` is the same class of error and nothing looks
+for it.
+
+**A measurement taken only at the target extent cannot see this shape.** Every
+frame figure in this project was taken at the target extent, where the defect
+is invisible. The small end is a different regime and it had never been
+measured.
+
+**The demonstration is slow for this reason and for no other.** Both front ends
+ask for the smaller of the machine's parallelism and twelve. Asking for fewer
+would make the demonstration between two and three times faster today with no
+engine change, and that is the reason not to change the requested frame rate.
+The repair belongs in the solver, so that no caller has to know. An item holds
+it.[^F300A]
 
 ### FND-301 — The bridge rebuild is 16.4 percent of a frame, and the record that gives it one thread says it has not earned one
 
@@ -10602,6 +8272,165 @@ The remaining hypothesis inherited the confidence of the one that was tested.
 **A residual is a difference of two large numbers, and it moves when either
 does.** Twelve milliseconds against a 463 millisecond frame and 0.31
 milliseconds against a 188 millisecond frame are not the same measurement twice.
+### FND-304 — Admission searched two count tables once for each segment, and it visits them in the order they are stored
+
+**Believed.** The passes that grant an intent read two small tables of counts,
+one for arrivals and one for departures. A lookup in a small table is cheap, so
+reading them once for each target tile costs little.
+
+**True.** The tables are not small. At the target scale they reach one entry for
+almost every target tile, and a lookup is a binary search over them. The grant
+passes were 60 percent of the whole admission stage, and they run on the calling
+thread.
+
+**The order the pass already has removes the search.** The segments are in
+ascending tile order because the admission sort put them there, both tables are
+in ascending tile order because the merge that fills them requires it, and
+neither table changes while the pass walks the segments. One forward reader for
+each table therefore replaces every search, and the walk costs the segments plus
+the entries.
+
+**The measurement.** A probe inside the stage. Development machine, 16,777,216
+tiles, 1,000,000 units scattered, 12 threads. The last frame of ten, with
+314,158 intents and 291,047 segments:
+
+| Part | ns | Share | Runs on |
+|---|---|---|---|
+| Sort the intents by target tile | 208,785,397 | 20.1 percent | one thread |
+| Follow the permutation | 13,198,816 | 1.3 percent | one thread |
+| Build the segment table | 59,892,786 | 5.8 percent | one thread |
+| Read the capacity and the occupancy | 132,558,620 | 12.8 percent | every thread |
+| Grant the intents | 623,729,193 | 60.1 percent | one thread |
+
+**Eighty-seven percent of the stage runs on one thread**, and the stage declares
+that it takes a thread count. The declaration is not wrong, because the one
+parallel part is real, but the column cannot say that seven eighths of a stage
+ignores the number.
+
+**Follows.** Two things.
+
+**A table that grows with the tiles is not a small table, whatever it is named
+for.** These hold arrivals and departures, which sound like a handful of events,
+and they reach almost every target tile at the target density.
+
+**This is the third place tonight where a search was removed by the order the
+caller already had.** The other two are the spread deciding a tile and the same
+stage reading how many units stand on a target.[^F304A] The shape is worth
+looking for: a bounded search whose caller walks in the order the searched
+structure is stored in.
+
+### FND-305 — The stage apparatus flags a stage that gains from threads it does not take, and not one that loses by taking them
+
+**Believed.** The stage table finds a wrong `takes_threads` declaration. The
+benchmark states the rule in its own documentation: a stage declared `false`
+that improves with the thread count means the declaration is wrong. The table
+prints the declaration beside the measurement in every row so that a reader can
+compare them.
+
+**True in one direction only.** The rule names one case and there are two. A
+stage declared `false` that improves is caught. A stage declared `true` that
+gets worse is the same class of error, it costs more, and nothing looks for it.
+The declaration and the measurement disagree in both cases.
+
+**Evidence.** The influence solve is declared as taking a thread count. On a
+256 by 256 world it is 5.9 times slower at twelve threads than at one, and it
+is still 7.6 times slower at twelve threads on a world of 1,048,576 tiles. The
+register holds the sweeps.[^F305A]
+
+**The instrument was built the same night, to find this class of error, and it
+stayed silent.** The table printed the declaration and the cost of the stage in
+adjacent columns, at one thread and at twelve, and reported no note. A reader
+who ran it saw the rows and read nothing wrong in them, because the
+documentation told them which direction to look.
+
+**Follows.** Three things.
+
+**A rule that names one direction of a symmetric test teaches the reader to
+look one way.** The cost of the omission is not that the check missed
+something. It is that a person holding the output missed it too.
+
+**The declaration is a value with two declaration sites and no check.** The
+source states `takes_threads` and the measurement states what threading did.
+Nothing fails when the two disagree, which is the first recurring defect
+shape.[^13]
+
+**The repair is a rule, not a constant.** A speedup far from one in either
+direction is the signal. A stage that declares it threads and measures slower
+threaded fails the same comparison as one that declares it does not and
+measures faster.
+
+### FND-306 — A check that prints its failure while the commit lands looks exactly like a check that never ran
+
+**The symptom is the finding.** A commit landed on the trunk holding conflict
+markers. The marker check had run in the same command, and its failure text had
+scrolled past on the way. That is what a working check looks like when
+something discards its answer, and it is also what a check looks like when it
+does not run. Nothing in the output distinguishes the two.
+
+**Believed, twice, and wrong both times.** The first explanation was that the
+check reports a failure and exits zero. The second was that the check skips a
+worktree's own files when it runs from inside that worktree, because a worktree
+path is in its skip list. Two readers reached for "the check is broken" before
+"my shell discarded its answer", because the symptom points that way.
+
+**Both are false, and the check is sound.** A probe put a real marker in a file
+inside a worktree and ran the check from inside that worktree. It named the
+file, named all three lines, and exited 1. The skip list holds the path of a
+worktree nested inside the tree being scanned, not the tree itself, because the
+root is derived from the location of the script. The skip is also gated on the
+scan being the root.
+
+**The cause is the shell that called it.** The check ran on the left of a pipe,
+inside a chain that continues on success. A pipeline exits with the status of
+its last command, so the status belonged to the command reading the output and
+not to the check. The chain continued and the commit landed.
+
+The failure text is written to the error stream, so it printed past the reader
+and was visible the whole time. It was read as noise from the merge that ran in
+the same chain.
+
+**How to take the measurement again.** An example prices every stage on a
+world of a given extent, group and thread count, and prints the state hash
+beside the split so a sweep is also a determinism check.[^F300B]
+**Evidence.** The same check, on the same file, two ways:
+
+```
+python3 scripts/check_conflict_markers.py | tail -2 && echo REACHED
+  ... 3 failures
+  REACHED
+python3 scripts/check_conflict_markers.py > /dev/null && echo REACHED
+  ... 3 failures
+  (nothing)
+```
+
+**The defect appeared inside the attempt to verify it.** The second reader ran
+the probe piped through a reader of its output, saw exit zero, and concluded
+the check was blind. Unpiped, the same tree gives exit 1. So a status was
+masked by a pipeline during the checking of a claim about a status masked by a
+pipeline.
+
+**Follows.** Four things.
+
+**Read the symptom as ambiguous, not as evidence.** Failure text with a
+successful outcome has three possible causes: the check did not run, the check
+ran and cannot see, or the check ran and something threw away its verdict. The
+output is identical in all three. Anyone who names one of them without a probe
+is guessing, and two readers guessed wrong in one night.
+
+**Never put a gate on the left of a pipe.** Redirect its output if the output
+is long. A gate exists to stop the next command, and a pipe takes that away
+without saying so.
+
+**A failure that prints and does not stop looks exactly like a check that does
+not run.** That is why the first two explanations both blamed the check. The
+symptom carries no information about which of the three causes produced it, so
+the next person to see it will guess as well unless they probe.
+
+**Probe the check before you blame it.** Both wrong explanations were reasoned
+from reading the source. The right one took one command and a temporary file.
+Putting the defect back is the rule for a test, and it is the rule for a check
+that is under suspicion.[^13]
+
 ### FND-307 — The holding apply spent more on rereading blocks than on the list everyone was looking at
 
 **Believed.** The holding apply is expensive because it rebuilds the held tile
@@ -10697,6 +8526,82 @@ tested the refusal.[^F313B]
 still 40 megabytes and it still drives the largest stage in the engine. The
 answer here is neither the dense array nor leaving it alone, and naming the
 ceiling is what makes that visible.
+### FND-309 — Four instruments in one night reported a figure about something other than what they measured, and not one of them said so
+
+**One of the four instances below is not recorded anywhere yet.** The first is
+FND-297, which the trunk holds and which this entry now cites.[^F314X] The
+fourth was reported and is being written by the worker who found it, so it is
+cited by description and owes a number. The citation check refuses a number the
+register does not hold, which is how the debt was noticed rather than shipped.
+
+**Believed.** An instrument that finishes and prints a number has measured the
+thing it was pointed at. A run that fails is visible, so a run that reports is
+a run that worked.
+
+**True.** Four instruments broke that in one night. Each returned a figure a
+reader could not tell from a valid one. In every case the invalid run was
+cheaper, cleaner or steadier than the valid one, so the wrong answer was the
+one a tired reader wants.
+
+| The instrument | What the figure described | What caught it |
+|---|---|---|
+| The local benchmark | A binary built two hours earlier | A probe printed nothing when it should have printed a line for each frame |
+| The gate timing harness | A gate that stopped early, priced as a gate that ran | Nothing. It was read out of the code before it cost a run |
+| The gate timing harness | A tree that changed under the run, because three branches merged into it | A person read the log |
+| The stage cost measurement | The code layout, not the change | Four stages the change never touched moved, and moved reproducibly |
+
+**Each was caught by a control outside the instrument, and three of those
+controls existed by accident.** The probe of the first was written for another
+purpose.[^309A] The moved stages of the fourth were nobody's control. The third
+was caught by a person reading a log at the right moment. Only the second was
+found on purpose, and it was found by reading rather than by running.
+
+**The second and third are the same instrument, and the interval between them
+is the point.** The stopped-gate hazard was read out of the code and repaired
+before it cost anything. The repaired instrument then met the tree-move hazard
+on its first live run. An apparatus meets its own failure modes sooner than
+anyone expects, and the repair paid for itself the same night.
+
+**The fourth instance carries the sharpest form of the rule.** This project
+builds with link-time optimisation and one code generation unit, so a change to
+any file relays the whole binary. One fixed tree measured twice gave 36.46 and
+29.07 milliseconds for one stage, a span of 25 percent, and one of those runs
+sat below both runs of the tree it was compared against. The same stage on the
+base tree repeats to 0.7 percent. Four stages the change never touched moved,
+and the compute-bound stages least sensitive to layout barely moved. So a
+single binary against a single binary cannot separate the change from the code
+layout, and every performance figure taken that night carries an unquantified
+layout term of up to about 8 percent.[^309B]
+
+**The discriminator is worth more than the figure.** A pair of runs is evidence
+only when the things that should not have moved did not. That test is what
+turned a plausible story about a slow memory host into a refuted one, and the
+worker refuted its own explanation rather than letting it stand.
+
+**Follows.** Three things.
+
+**An instrument must carry its own control, and the control must fail loudly.**
+Two were added to the gate timing harness. It now names every command line that
+failed and says in those words that the run is not a measurement, so a gate
+that stopped cannot read as a gate that is cheap. It also reads the commit
+before and after the run and reports when the two differ, so a table cannot
+describe a tree that never existed.[^309C]
+
+**State the discriminator beside the figure.** A figure with no stated way of
+being wrong is not a measurement, and the reader cannot supply one later. Every
+row above was saved by a discriminator, and three of those were luck.
+
+**A discipline is not a control.** The answer to a merge landing mid-run is not
+a rule that nobody merges during a run. That rule lives in one person's head at
+the end of a long night with four things moving, and this register exists
+because facts kept in heads do not survive. The answer is that the instrument
+reads the commit and says when it moved.
+
+**This is the same shape the testing rule states for a fixture, one level
+up.**[^309D] A fixture that supplies no extreme measures itself. An instrument
+with no control measures itself. In both the test passes, the number arrives,
+and nothing says which question was answered.
+
 ### FND-310 — The sort's guard was tested only on pairs that tie nothing, so the property it protects had no test
 
 **Believed.** The key vector sort refuses a repeated identifier, and two tests
@@ -11143,6 +9048,648 @@ site is not a summary field. Whatever answers this either adds a field that
 says where a unit belongs, or admits that a unit's own site is a fact no cell
 carries. The backlog holds the question.[^F317D]
 
+### FND-318 — The per-unit accumulator does not remove the cliff, and the draw that replaced it created food
+
+**Believed.** A whole-group model has a cliff: a place is fine a little above
+its demand and starves entirely a little below it. The per-unit deficit
+accumulator removes the cliff, because a shortage then degrades before it
+kills. An accepted record says this three times.[^F318A]
+
+**True.** The accumulator delays the cliff and does not spread it. Every unit
+of a cohort gains the same share, decays at the same rate and founds with the
+same need, so every unit holds the same accumulator value for ever and crosses
+the death bound on one tick.
+
+**Evidence.** The demonstration world, 256 by 256 at four factions and 64
+people each, driven 4000 ticks with the deficit of every unit read on every
+tick. **One distinct deficit value for each faction, on every tick of the
+run.** Two of the four factions lost all 64 units on a single tick each, at
+tick 820 and tick 3450. The other two never lost one.
+
+**The equilibrium is what makes it certain.** The decay saturates at zero, so a
+unit's need settles at exactly the ration it is granted, and nothing moves that
+number afterwards. Measured per application: the four sites granted 32,000,
+29,440, 37,760 and a full ration against a threshold of 32,768. The two below
+the threshold accrued deficit at a constant rate and died. The two above it
+never accrued any.
+
+**The population is the variable that would fix it and it never changed.**
+Supply is fixed and demand scales with the headcount, so the second faction's
+supply covered 46 of its 64 units. Losing 18 would have left 46 fed to full,
+for ever. The engine removed 64.
+
+**The first replacement created food.** A keyed draw for each unit, on each
+application, gives each unit an independent chance of eating. The number that
+eats is then binomial and not the count the store paid for. Measured on a
+fixture whose share covered exactly one ration: **two units ate on one
+application and none on another.** The conservation check did not fail, because
+a need is not a conserved quantity and the commodity had correctly left the
+store. The units simply received more ration than the store handed over.
+
+**What works is a rotation.** Each unit holds its place inside its own cohort,
+which the rebuild already walks and counts. A cohort draws one offset for the
+frame, and a unit eats when its ordinal advanced by that offset falls below the
+served count. A rotation is a bijection, so exactly as many units eat as the
+share covered.[^F318B]
+
+**After the change**, the same 4000-tick run loses units a few at a time and
+settles. The four factions end at 53, 46, 62 and 64 of 64. **The second lands
+on exactly the 46 its supply carries**, with a deficit of zero and a store that
+now grows.
+
+**Follows.** Three things.
+
+**A record can state a property that its own decisions do not deliver.** ADR-0063
+D1 is correct about what a per-unit need buys. The claim that it removes the
+cliff is a claim about a distribution, and nothing in the record produces one.
+Every input to a need was shared, so the outputs were shared too. **Look for the
+thing that differs between two units before believing that two units differ.**
+
+**A draw is not a shuffle, and the difference is conservation.** An independent
+draw for each member gives the right answer on average and the wrong answer on
+any one application. Where a count has been paid for, the selection has to be a
+bijection. This was caught by a test that asserted the served count against the
+count the share covered, and by nothing else: the conservation check passed
+throughout, because the quantity it conserves is not the one that was wrong.
+
+**An invariant that passes is not a proof that the right invariant exists.** The
+store conservation check and the carry conservation check both held while a
+cohort was eating rations the store never gave. The account they balance is the
+commodity, and the ration a unit receives is not that account.
+
+### FND-319 — The package says its verb interface is not written, and a verb ran
+
+**Believed.** The Python package states in its own top-level docstring that it
+is a stub, that it re-exports the compiled module, and that the selector
+interface, the verb interface and the view scope are not written yet.
+
+**True.** The selector interface is not written. The other two are. The
+compiled module carries set-valued verbs and columnar reads, and the worked
+example in the project orientation calls both.[^F319A]
+
+**Evidence.** The example in the orientation document was run unchanged
+against the installed package. It built a world, spawned a set of units, gave
+one gather order, stepped the world at four threads, checked the invariants,
+and read a state hash, two column dictionaries and a gather count. It printed
+a tick and a gather count and raised nothing.
+
+```
+grep -n "are not written yet" python/cachette/__init__.py
+grep -n "fn spawn_soldiers\|fn order_gather\|fn event_log_columns" crates/cachette-py/src/lib.rs
+```
+
+**Follows.** The one sentence the package writes about itself is wrong about
+two of the three things it names, and nothing fails, because a docstring is
+prose. This is the shape the recurring defect rule names last: a document that
+no longer describes the code.[^F319B] It is also the need that product record
+0021 states, and that record cites the same shape as the cost it must
+carry.[^F319C]
+
+**The repair is not made here.** The sentence and the documentation of this
+package are one statement, and correcting the sentence alone would create a
+second place that states what the package holds. The worker who chooses how
+this package is documented owns both.
+
+
+### FND-320 — The type stub claims a check that regenerates it, and no generator and no check exist
+
+**Believed.** The type stub for the compiled extension module is a generated
+artefact. Its own docstring says that the contributing guide requires the
+continuous integration system to check the stubs, that the build regenerates
+them, and that the job fails when the result differs from the file.[^F320A]
+
+**True.** No stub generator exists anywhere in the tree. No workflow job
+regenerates the stub, and no job compares it against anything. The stub is
+hand-written. The contributing guide never states the requirement that the
+docstring attributes to it. Its only use of the word "stub" describes the Rust
+crates as unimplemented.[^F320B]
+
+**The claim is wrong twice.** It names a guide that says something else, and it
+names a mechanism that does not exist. A contributor who changes a binding and
+reads that docstring concludes that a job will catch a stale stub. Nothing will.
+
+**A second half makes the first half expensive.** The stub carries a docstring
+for each typed dictionary and for each exception class. It carries none for any
+method of `World` and none for any method of `Camera`. The Rust bindings crate
+carries that prose, and PyO3 puts it on the compiled objects. So the stub and
+the compiled module are two declaration sites for the public interface, they
+already disagree about the prose, and nothing fails.[^F320C]
+
+**Evidence.**
+
+```
+grep -rniE "stub|pyi|pyo3-stub-gen" justfile scripts/ .github/ crates/cachette-py/Cargo.toml
+grep -niE "stub|\.pyi" CONTRIBUTING.md
+```
+
+The first command finds two matches, and neither generates or compares a stub.
+The second finds one match, and it describes the Rust crates.
+
+A documentation build measured the second half. A site built from the compiled
+module produced a page of 105,348 bytes that held the method prose. The same
+site built with module inspection turned off fell back to the stub, produced
+29,038 bytes, and held no method prose at all.[^F320D]
+
+**Follows.** Repair the stub docstring, or make the claim true with a
+generator. The research report on the documentation toolchain treats the
+Rust doc comment as the single source of the prose for exactly this
+reason.[^F320D] A generator would also remove the second declaration site for
+every signature, which is the shape the recurring defect rule names.[^F320E]
+
+### FND-321 — The stub already carries prose the Rust source owns, and the copy that drifted dropped the paragraph that warns against a copy
+
+**Believed.** The register records that the type stub and the compiled module
+are two declaration sites for the public interface, and that they already
+disagree about the prose.[^F321A] The disagreement it names is an absence: the
+stub carries no docstring for any method of `World` and none for any method of
+`Camera`.
+
+**True, and the sharper half is what the stub does carry.** Nine exception
+classes carry a docstring in the stub. All nine are the same words as the string
+that the Rust macro gives the same exception, character for character.[^F320C]
+The `World` class docstring is a one line copy of the Rust doc comment, and it
+agrees. The `Camera` class docstring is an abridged copy of the Rust doc comment,
+and it does not agree: it keeps the first and the last paragraph and drops two.
+
+**One of the dropped paragraphs is the one that names this defect.** The Rust
+doc comment says that a pan share and a zoom step written on both sides of the
+boundary would be one value in two places, with nothing failing when the copies
+disagreed. The stub is that second place, and the sentence did not survive the
+copy into it.
+
+**Evidence.**
+
+```
+grep -n "create_exception" crates/cachette-py/src/lib.rs
+sed -n '1303,1320p' crates/cachette-py/src/lib.rs
+sed -n '280,336p' python/cachette/_core.pyi
+```
+
+**Follows.** The count of copies is eleven, not zero, and nine of them agree
+today. **An agreeing copy is the worse case**, because it reads as a maintained
+file and gives a contributor no reason to look for the other site. The record on
+the provenance of the documentation prose forbids a docstring on a stub member
+that the compiled module provides, and it names this as a defect it does not
+fix.[^F321C] A backlog item holds the removal and the check.[^F321D]
+### FND-322 — The document a newcomer reads first sells a pyramid level that nothing writes
+
+**Believed.** The orientation document of this repository states that the engine
+organises the world into three levels of detail, and it describes the third:
+region-scale summaries that combine blocks of level 1 cells. It lists the
+spatial pyramid among the key capabilities of the engine, and it says that three
+levels of detail provide instant answers for continental aggregate
+queries.[^F322A]
+
+**True.** Level 2 does not exist. The pyramid holds one derived level. The
+project instruction file says so in bold, and it warns that a reader who takes
+the three-level paragraph for the code plans against a level that nothing
+writes.[^F322B] The Rust source agrees in its own words: the pyramid names the
+whole-world summary as what level 2 **would** hold, in the conditional.[^F322C]
+
+**Evidence.**
+
+```
+grep -n "Level 2" README.md
+grep -rn "level 2" crates/ --include="*.rs"
+```
+
+**Follows.** The two orientation documents disagree, and one of them is the only
+document a person outside this project reads. This is the shape a backlog item
+already holds for a different sentence in the same pair of files, and the finding
+behind it records the same cost.[^F322D] The documentation plan inherits the
+claim, because the reader the plan serves arrives through this document, and the
+worked example the plan turns into a tutorial sits on the same page as the false
+paragraph.[^F322E] Repair the paragraph, or delete it and let the generated
+reference report what the pyramid holds.
+
+### FND-323 — The orientation document sells the agent server as a product capability, and the package does not install it
+
+**Believed.** The orientation document lists native support for artificial
+intelligence agents among the key capabilities of the engine. It says an
+integrated Model Context Protocol server connects external agents directly to
+the engine, it names the capability again under a third audience, and it gives
+the command that starts the server.[^F322A]
+
+**True, in the sense that the server exists, and false in the sense a reader
+takes.** The server is a tool for a contributor to this repository. Its own
+docstring says so, and it says that the reference implementation of the protocol
+is a development dependency and not a runtime dependency of the
+package.[^F323A] The project manifest agrees: the protocol library sits in the
+development dependency group, with a comment that states the reason. The runtime
+dependency list holds one entry, and it is not that library.[^F323B]
+
+**A reader who follows the document gets an import error.** Install the package
+from an index, run the command the document gives, and nothing starts, because
+the package never installed the library the server imports.
+
+**The product records draw the line the other way round.** The record that holds
+the game developer states three times that the tool server is not part of that
+need: it serves an agent that works on this repository, and another record holds
+that audience.[^F323C] [^F323D]
+
+**Evidence.**
+
+```
+grep -n "cachette.agent\|Model Context Protocol" README.md
+grep -n "mcp>=" pyproject.toml
+grep -n "dependencies" pyproject.toml
+```
+
+**Follows.** The product record requires the documentation to separate the
+surface a program may depend on from the surface that exists for this
+repository, and to state what the package cannot do yet, so that a reader who
+wants a missing thing does not conclude that they failed to find it.[^F323C]
+This finding is one instance of that gap and the explanation quadrant of the
+documentation plan holds the page that states the line.[^F322E]
+
+[^F322A]: Project orientation, the key capabilities and the architectural foundation. `README.md`
+[^F322B]: Project instructions, the levels of detail. `CLAUDE.md`
+[^F322C]: The pyramid of the core crate. `crates/cachette-core/src/pyramid.rs`
+[^F322D]: Findings register, FND-259, in this document.
+[^F322E]: Backlog item 0308, the documentation plan. `docs/backlog/refined/0308-the-documentation-plan.md`
+[^F323A]: The agent-facing protocol server of the control plane. `python/cachette/agent/server.py`
+[^F323B]: The project manifest. `pyproject.toml`
+[^F323C]: Product requirement record 0021, what this does not do. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
+[^F323D]: Product requirement record 0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
+
+### FND-324 — The strict mode of the site builder does not see the fallback to the type stub
+
+**Believed.** A research report measured that a documentation build with module
+inspection turned off falls back to the type stub, loses the method prose, and
+reports no error.[^F324A] A reader of that report can conclude that the strict
+mode of the builder closes the hole, because a strict build ends on a warning.
+
+**True.** It does not. The documentation job now runs the builder in strict
+mode. With module inspection off, that build reported no issue, exited zero, and
+46 of the 57 member summaries that the import finds were not on any page. The
+site looked complete. Every signature was there and the prose was gone.
+
+**Evidence.** The probe recipe breaks the job in the two ways the record names
+and requires it to fail each time.[^F324B] The first case takes the compiled
+module out of the environment. The second case builds the broken configuration
+that turns inspection off.[^F324C]
+
+```
+just docs-probe
+```
+
+**Follows.** No setting of the builder is the guard. The guard must compare the
+built site against the module that the import creates, and the documentation job
+runs that comparison after the site build.[^F324D] The expected text is derived
+from the module on every run, so the check holds no copy of any docstring.
+
+### FND-325 — Every public member of the compiled module already carries prose
+
+**Believed.** The record on the provenance of the documentation prose says that
+a member with no Rust doc comment publishes with no prose and that nothing
+fails.[^F325A] The priority index says the reference publishes empty prose until
+the doc comments exist.[^F325B] Both read as though members with no prose exist
+in numbers.
+
+**True.** None does. The import of the compiled module finds 57 public members
+and every one of them carries a docstring. The count covers the module level
+names and the members that each class declares itself.
+
+**One thing the count does not cover is the constructor, and it has no prose.**
+The binding library does not copy the doc comment of a constructor onto the
+Python object, so the module carries the standard interpreter sentence there and
+nothing else. The reference therefore says what a class is and never says how to
+build one. The prose for that belongs in the doc comment of the class.
+
+**Evidence.**
+
+```
+uv run python scripts/check_reference.py --import-only
+```
+
+**Follows.** The item that repairs the doc comments keeps its second half and
+loses its first.[^F325C] The gap is the audience of the prose and not the
+absence of it: a doc comment written for a contributor to the core under-serves
+the Python developer that the product record names, and no check can see
+that.[^F325A] [^F319C] The check that the documentation job runs reports every
+member with no prose, without failing, so the first half stays covered if a new
+member arrives with none.
+
+### FND-326 — The panel cut one line kind of eight, and the other seven stayed inside it by luck
+
+**Believed.** The panel cuts a value that does not fit, so that text can never
+be written over the panel edge.[^F326A]
+
+**True.** One line kind cut its value. The title, the note, the heading, the
+legend row, the ground row and the founding row all wrote from the left margin
+with no right bound. The length of the text was the only thing holding them
+inside the rectangle.
+
+**Evidence.** One note of 32 characters had 30 glyphs of room, and the stored
+layout picture shows its ink two glyphs into the padding. The longest note that
+fits is 30 characters, and every note in the panel was under that bound by
+accident. No author had anything to tell them what the bound was, because the
+bound follows from the panel width and the glyph size and neither was written
+down where a writer would look.
+
+**Follows.** The cut now lives in one writer that takes a right edge, and every
+line kind of both the head-up display and the deck writes through it. An author
+cannot reach the map, whatever the text says. The bound is derived from the
+width and the glyph table, so nobody counts characters and nobody counts them
+wrongly.
+
+**A cut is still a defect.** A cut line states something other than what it was
+given, in silence. The check that reports one now covers every line kind, and
+one note was rewritten rather than left to be cut.
+
+### FND-327 — The demonstration drew and stepped at one rate, and a record said so as if it were a property of the viewer
+
+**Believed.** The viewer runs after the step, on the stepping thread, so the
+drawing rate and the tick rate are one number.[^F218B] The Python
+demonstration says the same in its own docstring.
+
+**True.** The first half is a property of the viewer and it still holds. Every
+draw follows the steps of that frame, on one thread. The second half described
+the loop that existed when the record was written. It is not a property of the
+viewer, because the caller owns the loop and decides how many steps a frame
+runs.[^F327B]
+
+**Evidence.** The demonstration now steps the engine as many times each frame
+as a clock says, and it draws once. A paused world runs no step and still
+draws, so the camera moves and the panel reads while the tick stands still.
+
+**Follows.** A watcher can stop the world, run it at four speeds, and ask for
+exactly one tick. That last one matters because the engine keeps its logs for
+one tick, so a promotion or a rationing was readable for one thirtieth of a
+second and no longer.
+
+**The record is not edited here.** ADR-0067 is accepted, and the sentence sits
+in prose that describes the viewer correctly. A worker who supersedes it should
+say that the caller owns the number of steps in a frame.
+
+### FND-328 — Nothing in the engine could say how many units a faction had left
+
+**Believed.** The panel reports the units of each faction, so a watcher sees
+how the factions stand.
+
+**True.** Every unit count the panel stated was a count of the window. The
+drawing pass counts what it painted, by colour, over the tiles the camera
+reached. No value anywhere in the engine held the population of a faction in
+the world, and nothing could compute one without reading every live unit.
+
+**Evidence.** A search of the world interface found `holding_of`, which gives
+the tiles a faction holds, and no counterpart for its people. The soldier arena
+held one total live count and no split by faction.
+
+**Follows.** A faction whose last unit starves vanishes from the picture with no
+number falling to zero anywhere. That is the one thing a watcher most wants to
+see, and the demonstration could not show it.
+
+**A count is not the fix; a maintained count is.** Counting the units of a
+faction reads every live unit, and at the target scale that is one million reads
+for one row of one panel, every frame, which the panel record forbids.[^F328A]
+The arena now maintains the count at the two sites that change a slot's live
+byte. That is one fact in two places, so the arena check recounts and compares,
+and it fails when the copies disagree.[^13]
+
+### FND-329 — A backlog item decays fastest at the sentence that tells a reader not to take it
+
+**Believed.** A backlog item in `proposed/` is an idea and costs nothing while
+it waits. The guide says an item there may be one sentence, so a stale item is
+a small loss and the priority index carries the judgement that matters.[^F329A]
+
+**True.** An item decays like any other document, and the sentence that decays
+first is the one a reader acts on. An audit of the 89 items in `proposed/` on
+3 September 2026 found the same shape in nine of them, and in three cases the
+stale sentence was the reason nobody had taken the item.
+
+**The worst case is a deferral whose reason is gone.** Item 0039 carried a
+section headed "Do not build this yet". Its reason was that a unit has no plan
+and draws a fresh direction on each frame, so a refused unit does not repeat the
+choice that failed. A unit now takes its direction from the exit of its cell for
+the option it chose, and every input to that holds from one frame to the
+next.[^F329B] The demonstration world was driven for 400 ticks: a unit held its
+tile against a target the ground admits 61 times, and one unit was refused on
+five consecutive frames. **The item said the condition could not arise, and the
+engine produced it 61 times in one run.**
+
+**Two other deferrals had the same shape.** Item 0272 says no measurement exists
+on the target platform. One does, and it names the pass this item is about: the
+choice costs 0.571 milliseconds of a frame of about 836.[^F329C] Item 0270 asks
+for a vector rewrite of that pass and quotes 71.4 milliseconds for it from the
+same register, which marks the figure stale in its own words on another
+page.[^F329C] **One register said both things at once, and two items read the
+half that suited them.**
+
+**A closed premise also makes an item invisible.** Item 0206 states in its own
+first section that another worker closed every gap it names, and asks whoever
+merges the two to close it. It stayed open. The priority index carried a row
+saying "Do not take it", so the index was paying to point at an item that should
+not have existed.
+
+**Four items carried a count that the tree had moved past.** Item 0278 said the
+demonstration world holds no character and that no unit holds a ranked position.
+Driven again, the same world seats 16 of 32 ranked positions and holds 26
+characters at tick 200. Item 0145 said the faction coercion is written at six
+places; there are five in the module and more outside it. Item 0222 said the
+error hierarchy holds seven leaves; it holds eight. Item 0072 said one test
+calls the panel fit check; two do.
+
+**Evidence.** The audit read every item in `proposed/`, then measured the three
+claims above by driving the engine rather than by reading it. The probe built
+the demonstration world, founded a run for every faction, stepped 400 frames and
+printed the counts. The commit body holds the command and the output.
+
+**Follows.** Four things.
+
+**A count in a backlog item rots exactly as a count in a decision record
+does.** The scope rule bans a count from a record and sends it to the commit
+message.[^53] The backlog has no such rule, and it does not need the same
+one, because a count is often the whole argument for an item. It needs the
+weaker rule: **a count in an item is dated evidence, not a current fact, and a
+reader who plans against it derives it again first.**
+
+**A "do not take this yet" section is the highest-value line in the backlog and
+nothing rechecks it.** It stops work. Its reason is a claim about the code, and
+the code moves. **State the reason as a condition that can be tested, not as a
+description of how things are**, so a later reader can run something and find
+out.
+
+**An item that says it is superseded is not closed by saying so.** Item 0206
+said it for a day and the index repeated it. The close is the work.
+
+### FND-330 — A stale frame figure sat in a blocker row and in a register, and nothing failed
+
+**Believed.** A frame at the target scale costs 500 milliseconds on the target
+platform. The blocker row about derived cost figures said so in its own words,
+and two sections of the target platform register concluded from it that a frame
+cannot fall below about 300 milliseconds on any core count.[^F222] [^28]
+
+**True.** The frame is 177.9 milliseconds at the target scale, on 12 threads,
+on a world whose units are scattered. Two later runs of a changed tree gave 167
+to 169 milliseconds. The register holds every row with its machine, its commit
+and its fixture.[^F222]
+
+**The two figures do not measure one thing, and that is part of the finding.**
+The 500 millisecond figure came from the first run, on 16 threads, on a world
+whose units were packed. A packed unit costs about half a scattered one, so the
+later figure is better than the difference between the two numbers shows. **A
+figure without its fixture is not comparable to another figure**, and this
+register already states that rule for its own rows.[^F222]
+
+**Evidence.** The stage tables in the target platform register, taken on 3
+September 2026 on `c7g.4xlarge` instances. The 500 millisecond figure entered
+the blocker row on the same date, from the first two runs of that day.
+
+**What follows. The register moved eleven times in one day and the prose did
+not move with it.** Every stage table carries a line that supersedes the tables
+above it. No such line reaches a document outside the register. The blocker row
+held the figure as its own sentence rather than as a citation, so no check could
+see it go stale, and a priority row carried an 836 millisecond frame as the
+denominator of a share for the same reason.
+
+**This strengthens the case for two open items and does not change either.**
+One item adds a check that fails when a document states a register in its own
+words.[^F258C] This is a fourth instance of that shape, and the first where the
+stale copy sits in a register row rather than in a report. The other item makes
+a check compare the two project orientation files.[^F259CHECK] It is the same shape
+at a smaller radius, and this instance says the family of phrases the first
+check reads must include a frame figure, not only the state of measurement.
+
+**A blocker row is not a place for a figure.** The scope rule states this for a
+decision record, and the reason is the same here: a row that quotes a number
+must be edited when the number moves, and nothing fails when nobody edits
+it.[^12] The row now cites the register and states no frame figure.
+
+## E. Layout and platform corrections
+
+### FND-331 — Three exception classes the package exports and documents, and nothing raises
+
+**Believed.** The compiled module declares nine exception classes and exports
+every one of them.[^F320C] The package re-exports all nine, and a test asserts
+that each one is a subclass of the root class.[^F331B] Each carried a docstring
+that reads as a statement of when the engine raises it. A reader takes the list
+for the set of failures the engine reports.
+
+**True: six of the nine are raised, and three are not.** No call site in this
+repository raises `SelectorError`, `DeterminismError` or `EnginePanic`. Each of
+the three appears twice in the tree: once where the macro declares it, and once
+where the module registers it. Nothing else names any of them, in the core
+crate, in the bindings crate, in the package or in the tests.
+
+**The panic class is the sharper case, because a panic does happen and does not
+produce it.** The bindings crate installs no panic hook. The binding library
+catches a panic at the boundary and raises its own `pyo3_runtime.PanicException`,
+which is not a subclass of the root class. A caller that catches the root class
+in order to survive a panic does not survive one.
+
+**Evidence.**
+
+```
+grep -rn "SelectorError\|DeterminismError\|EnginePanic" crates python tests scripts
+```
+
+The search returns the declaration, the registration, the package re-export and
+the membership test. It returns no raise site.
+
+**Follows.** This is the shape the project already names: a capability that
+nothing invokes, declared and documented as if it were fact.[^F331C] The product
+record requires a reader to learn which error a
+call raises, and to learn what the package cannot do yet rather than conclude
+that they failed to find it.[^F331E] The three docstrings now say plainly that
+nothing raises them. Either something raises each class, or the class goes. Do
+not delete one while its docstring is the only place that says it is inert.
+
+### FND-332 — A refused faction names the project ceiling, and the engine applied the faction count of the world
+
+**Believed.** The refusal that a verb returns for a faction it will not accept
+reads `the faction 3 is at or above the ceiling 63`. A caller reads the number
+in the message as the bound that was applied.
+
+**True: the world applies its own faction count, and the message names a
+different number.** The world checks the faction against the faction count that
+its constructor took, and it raises the arena's own ceiling error to report
+that.[^F332A] The arena formats that error with the project-wide ceiling, which
+is a constant of the storage.[^F332B] The two bounds are unrelated, and the
+message names the one that was not applied.
+
+**Evidence.** A world built with a faction count of one refuses the faction
+three, and says that three is at or above 63.
+
+```
+uv run python -c "import cachette; cachette.World(8, 8, faction_count=1).spawn_soldiers([(2, 2)], 3)"
+```
+
+The same shape reaches the settlement verbs, which raise the same error from the
+settlement arena.
+
+**Follows.** The message misdirects the reader that the product record serves,
+because that reader learns which error a call raises from the message and from
+the reference alone.[^F331E] A caller who reads it raises the faction count of
+the world and meets the same refusal. This work documents the behaviour and
+does not repair the message, because the repair changes the text a verb returns
+and that is engine work rather than documentation work.
+
+[^F324A]: Research report 19, the documentation toolchain, section 4.2. `docs/research/reports/19-documentation-toolchain.md`
+[^F324B]: The documentation probe. `scripts/docs-probe.sh`
+[^F324C]: The broken site configuration. `tests/fixtures/docs-inspection-off/mkdocs.yml`
+[^F324D]: The reference check. `scripts/check_reference.py`
+[^F325A]: ADR-0107, the Python reference is generated from the compiled module, the consequences. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
+[^F325B]: Backlog priority index, the row for item 0310. `docs/backlog/PRIORITY.md`
+[^F325C]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/complete/0310-write-the-rust-doc-comments-for-the-python-reader.md`
+[^F331B]: The public interface test of the package. `tests/test_public_api.py`
+[^F331C]: Recurring Defect Shapes, shape 3, inert code that nothing invokes. `.claude/rules/recurring-defects.md`
+[^F331E]: Product requirement record 0021, what the person cannot do today. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
+[^F332A]: The world of the core crate, the soldier spawn. `crates/cachette-core/src/world.rs`
+[^F332B]: The soldier arena of the core crate. `crates/cachette-core/src/soldier.rs`
+
+### FND-333 — Nine error classes named a module that was not the module they belong to, and the reference dropped every one
+
+**Believed.** The reference publishes each public member that the import of the
+compiled module finds. The nine error classes are public, they are named in the
+export list of the module, and each one carries prose, so the reference carries
+all nine.
+
+**True.** It carried none of them. Every error class reported the bare name
+`_core` as its module, and every other member reported the dotted path
+`cachette._core`. The documentation builder reads the module of a member and
+skips one that names a different module, because such a member is an import
+from somewhere else rather than a member of the module it documents. The nine
+classes left the page. The page rendered fifteen members and looked complete.
+
+**The macro writes the module name, and the binding library writes the dotted
+path.** The declaration of an error takes a module name as its first argument,
+and it puts that argument into the class. A class that the binding library
+builds takes the dotted path instead. So one module described itself in two
+ways, and the two disagreed.
+
+**Evidence.** The import reports the module of each member.
+
+```
+uv run python -c "import cachette._core as m; print(m.World.__module__, m.CachetteError.__module__)"
+```
+
+The built site names each member it rendered.
+
+```
+grep -o 'id="cachette._core\.[A-Za-z_]*"' target/site/reference/index.html | sort -u | wc -l
+```
+
+That count was fifteen before the repair and twenty-four after it. The
+documentation job now reports that every one of the fifty-nine summaries
+reached the site.
+
+**Follows.** This is one fact held in two places, with nothing that fails when
+the copies disagree.[^F320E] The module registration now sets the dotted path on
+each error class before it adds it, so one statement of the path reaches every
+member.
+
+**A check that derived its expectation is what found this.** The check asks the
+imported module which members carry prose, and it compares that set against the
+built site.[^F324D] A written list of the members to document would have omitted
+the nine classes as well, and it would have agreed with the site for ever.
+
+
+[^F334A]: Findings register, FND-317, in this document.
+[^F334B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D6. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+[^F335A]: Findings register, FND-316, in this document.
+[^F317E]: Findings register, FND-334, in this document.
+
 ### FND-334 — A delivered total above zero does not prove that anything steers a unit home
 
 **Believed.** The delivery of a carried load never runs, and the total the
@@ -11230,74 +9777,1098 @@ reason the promotion threshold and the recovery periods already are: a default
 chosen for a world that runs for a long time reaches nothing in a scenario
 that runs for a few frames.
 
-### FND-318 — The per-unit accumulator does not remove the cliff, and the draw that replaced it created food
+### FND-336 — The site address drives the page for an unknown address, and without it that page pointed at the root of the domain
 
-**Believed.** A whole-group model has a cliff: a place is fine a little above
-its demand and starves entirely a little below it. The per-unit deficit
-accumulator removes the cliff, because a shortage then degrades before it
-kills. An accepted record says this three times.[^F318A]
+**Believed.** The site address of the configuration drives the canonical link
+of each page and the sitemap. A build that states no address loses those two
+things and nothing else. The item that built the site left the address unset
+under a blocker, and it stated that only the publishing step depends on
+it.[^F336A]
 
-**True.** The accumulator delays the cliff and does not spread it. Every unit
-of a cohort gains the same share, decays at the same rate and founds with the
-same need, so every unit holds the same accumulator value for ever and crosses
-the death bound on one tick.
+**True.** The builder also writes the address into the page it generates for an
+address the host does not hold. That page cannot use a relative link, because
+the host serves it for any address. The builder therefore writes an absolute
+path into every link and every asset of it, and it derives that path from the
+site address. With no address, it wrote the root of the domain.
 
-**Evidence.** The demonstration world, 256 by 256 at four factions and 64
-people each, driven 4000 ticks with the deficit of every unit read on every
-tick. **One distinct deficit value for each faction, on every tick of the
-run.** Two of the four factions lost all 64 units on a single tick each, at
-tick 820 and tick 3450. The other two never lost one.
+**This site does not answer at the root.** The repository does not carry the
+name of its owner, so the site is a project site and it answers on a path below
+the host name of the owner. A page that points at the root points outside the
+site, and the host answers with its own page rather than with the one this
+build made.
 
-**The equilibrium is what makes it certain.** The decay saturates at zero, so a
-unit's need settles at exactly the ration it is granted, and nothing moves that
-number afterwards. Measured per application: the four sites granted 32,000,
-29,440, 37,760 and a full ration against a threshold of 32,768. The two below
-the threshold accrued deficit at a constant rate and died. The two above it
-never accrued any.
+**Evidence.** Two builds of one tree, with the address set and with it removed.
+The two pages for an unknown address hold different links.
 
-**The population is the variable that would fix it and it never changed.**
-Supply is fixed and demand scales with the headcount, so the second faction's
-supply covered 46 of its 64 units. Losing 18 would have left 46 fed to full,
-for ever. The engine removed 64.
+```
+grep -o '\(href\|src\)="/[^"]*"' target/site/404.html | sort -u
+```
 
-**The first replacement created food.** A keyed draw for each unit, on each
-application, gives each unit an independent chance of eating. The number that
-eats is then binomial and not the count the store paid for. Measured on a
-fixture whose share covered exactly one ration: **two units ate on one
-application and none on another.** The conservation check did not fail, because
-a need is not a conserved quantity and the commodity had correctly left the
-store. The units simply received more ration than the store handed over.
+With the address set, each link starts with the repository name. With the
+address removed, each link starts at the root. Every other page of both builds
+holds relative links only, and the two builds are identical in every other
+respect. The site build reported no issue in either case, and the reference
+check passed in both.
 
-**What works is a rotation.** Each unit holds its place inside its own cohort,
-which the rebuild already walks and counts. A cohort draws one offset for the
-frame, and a unit eats when its ordinal advanced by that offset falls below the
-served count. A rotation is a bijection, so exactly as many units eat as the
-share covered.[^F318B]
+**Follows.** A site that states no address is not a site that loses two
+features. It is a site with one broken page, and no check sees it. State the
+address in the configuration as soon as the host is known.
 
-**After the change**, the same 4000-tick run loses units a few at a time and
-settles. The four factions end at 53, 46, 62 and 64 of 64. **The second lands
-on exactly the 46 its supply carries**, with a deficit of zero and a store that
-now grows.
+### FND-337 — A blocker row asked for a fact and for an action, and only the fact was information
+
+**Believed.** The blocker on the documentation site closed when the project
+owner named the address of the site and confirmed that the hosting was turned
+on. The row said so in its own closing condition.[^F337A]
+
+**True.** The two halves are not the same kind of thing. The address is
+information the project did not have, and the register holds exactly that. The
+hosting source setting is an action that one person takes in the settings of
+the host. No contributor can take it, and no contributor can read it from the
+tree either, but a register of blockers is not where an action waits.
+
+**The register states the distinction itself.** It says that a blocker needs
+information the project does not have, and it compares the decisions register,
+which holds choices that need judgement.[^F337A] An action belongs in the
+backlog, where the priority index states when it is taken.[^F282D]
+
+**Evidence.** The owner answered the first half on 3 September 2026 and the
+second half stayed open, because he takes it in a browser rather than in this
+repository. The row would have stayed open with every fact in the tree.
+
+**Follows.** Write a closing condition that names a fact. When a row needs an
+action as well, open the backlog item for the action in the same change, and
+let the row close on the fact. A row that waits for an action reads as missing
+information, and it stops work that has everything it needs.
+
+[^F336A]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/complete/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
+[^F337A]: Blockers register, BLK-035 and the opening statement. `docs/BLOCKERS.md`
+[^F350A]: ADR-0107, the Python reference is generated from the compiled module, decisions D1, D2 and D4. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
+[^F350B]: Fresh reader review of the published reference, sections B and G, 3 September 2026. `~/cachette-reader-rounds/round-1-reference.md`
+[^F350C]: Interface review of the published reference, section 0, 3 September 2026. `~/cachette-reader-rounds/round-1-interface.md`
+[^F350D]: The site configuration, the member filter. `mkdocs.yml`
+[^F351A]: The `WorldSettings` dataclass and its docstring. `python/cachette/agent/session.py`
+[^F351B]: Interface review, section 2e. `~/cachette-reader-rounds/round-1-interface.md`
+[^F352A]: Interface review, section 6a. `~/cachette-reader-rounds/round-1-interface.md`
+[^F352B]: Research report 20, what the Python interface should be, section 3.1. `docs/research/reports/20-the-python-interface.md`
+
+### FND-340 — The reference cited an error that a call it never published raises, and a fresh reader could not write the third line of a program
+
+**Believed.** The constructor gap is a gap in the audience of the prose. Every
+public member of the compiled module carries a docstring, so the reference says
+what each call does. The one member with no prose is the constructor, and a
+register recorded that as a note rather than as a failure.[^F340A]
+
+**True.** The gap makes the page self-contradictory and it stops a reader at
+the third line. A developer who was given the address of the published
+reference and nothing else read it six times and could not build a `World`. The
+page carries an error class whose own prose says "The `World` constructor
+raises this class", and it names "the world settings", a term that appears
+nowhere else on the page. So the error documentation asserts a call, and names
+an argument, that the class documentation omits.
+
+**A graded review scored the first action at 1 of 5 and trust at 3 of 5**, and
+it named the constructor as the repair for both. The reader's next move was to
+clone the repository and read the Rust source, which is the move the reference
+exists to prevent.[^F340B]
+
+**Evidence.** The import shows that the binding library replaces the doc
+comment of a constructor with the standard interpreter sentence.
+
+uv run python -c "import cachette._core as m; print(m.World.__init__.__doc__)"
+
+**Follows.** The prose of a constructor lives in the doc comment of its class,
+and the class doc comment states each parameter, its default and its bound. The
+`World` class and the `Camera` class now hold theirs. A doc comment on the
+constructor function itself says where the prose lives and holds none, so the
+two sites cannot part.
+
+**A member that carries prose is not a member that a reader can use.** The
+check that guards the documentation build counts members with a docstring, and
+it counted 59 of 59 while the page could not be acted on.[^F340C] The count
+measures presence. It cannot measure sufficiency, and no check can.
+
+### FND-341 — The name a reader would install belongs to an unrelated project
+
+**Believed.** Nothing in the tree says how a reader installs the package. The
+distribution name is `cachette`, and the reference gave no install line at all,
+so a reader supplies the obvious one.
+
+**True.** The obvious one installs somebody else's software. The public Python
+package index answers on the name `cachette` with a cache extension for
+frameworks that serve web requests, at a version this project has never
+published. A reader who runs the obvious install command gets that package, and
+the import then fails with a message that names no cause.
+
+**Evidence.** Taken on 3 September 2026.
+
+curl -s https://pypi.org/pypi/cachette/json | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['info']['name'], d['info']['version'], d['info']['home_page'])"
+
+It printed a name, a version and a repository address that belong to another
+author.
+
+**Follows.** The reference now says that no public index carries this engine,
+and it gives the four commands that build it from a checkout. A blocker holds
+the question of which name this project publishes under, because the project
+owner owns that choice and no reader of the tree can answer it.[^F341A]
+
+**This is a claim that decays, and it is written where a test cannot reach
+it.** The prose states what was true on one day about a service outside this
+repository. Treat it as a reason to close the blocker rather than as a fact the
+project maintains.
+
+### FND-342 — The check that a gather order documents cannot fire on half the numbers a caller confuses
+
+**Believed.** The gather verb checks its kind argument. The reference said it
+raises the typed refusal "when the number names no kind", and the error class
+says the same. A reader concluded that a wrong kind is refused.
+
+**True.** The check tests membership of one scale, and two scales share their
+low numbers. The resource kinds are food, wood and stone, numbered 0, 1 and 2.
+The ground kinds are water, plain, forest, hill and mountain, numbered 0 to 4.
+The verb converts its argument to a resource kind and refuses 3 and above. A
+caller who reads a ground kind from a tile report and passes it to the gather
+verb passes 0, 1 or 2, is not refused, and orders the whole set to gather the
+resource of that number.
+
+**The wrong answer then repeats exactly.** The engine is deterministic, so the
+mistake gives one answer at every thread count and on every run. The two
+determinism tests compare a run against a run, so neither can see it. The
+testing rule states this shape, and this is the shape reaching the public
+interface.[^43]
+
+**Evidence.** The verb checks the kind before it resolves the set, so an empty
+set reads the check alone.
+
+uv run pytest tests/test_documented_values.py -k ground_kind
+
+The test asserts that 0, 1 and 2 pass and that 3 and 4 are refused.
+
+**Follows.** The prose now states the true guard rather than the guard a reader
+would want. The reference says that the two scales overlap, that a member which
+takes a resource kind accepts an overlapping ground kind, and that nothing
+reports it. The errors section says the refusal covers three and above.
+
+**The interface question is recorded and not answered here.** Making the two
+scales distinct types at the boundary changes the interface, and a decision
+register row holds the options and the recommendation.[^F342B] The library
+already made this decision the other way for an entity, which crosses as one
+opaque identity that Python cannot build, so the interface is inconsistent with
+itself rather than merely underspecified.
+
+### FND-350 — The constructor's prose is written in Rust and reaches no Python object
+
+**Believed.** The prose of a member the compiled module provides lives in the
+Rust doc comment, and the reference is generated by importing the module, so a
+member that carries a doc comment publishes its prose.[^F350A]
+
+**True.** That holds for a method, for a property and for a class. It does not
+hold for the constructor. The binding library does not copy the doc comment of
+the constructor onto the class, onto `__init__` or onto `__new__`. The prose is
+written, it is good, and no Python reader can reach it.
+
+**Evidence.** The constructor of `World` carries a doc comment of twenty-six
+lines. It explains the extent, the seed, the faction count, the fact that a new
+world holds no unit, and the reservation of unit storage. Measured against the
+installed module on 3 September 2026: `World.__doc__` is the single line
+`A simulated world.`; `World.__init__.__doc__` is the CPython default
+`Initialize self.  See help(type(self)) for accurate signature.`; and
+`World.__new__.__doc__` is the CPython default `Create and return a new
+object.  See help(type) for accurate signature.` The signature itself does
+reach Python: `World.__text_signature__` reports every argument and every
+default, and `inspect.signature` reads it.
+
+Two fresh readers graded the published page cold. Both led with the same
+complaint: no constructor is documented, so a reader cannot write line three of
+a program.[^F350B] [^F350C] One graded the first action 1 of 5. The site
+configuration also filters out every member whose name begins with two
+underscores, which removes `__init__` even when it carries prose, so two
+mechanisms drop the same paragraph.[^F350D]
+
+**Follows.** A member whose prose lives only in a constructor doc comment
+publishes nothing, and nothing fails. Put the constructor's prose in the class
+doc comment, which does reach `__doc__`. The guard that checks the built site
+against the module must also check that the class prose is more than one
+line.[^F350A]
+
+This is the second declaration site shape in a new place: the prose exists and
+the reader gets a different, shorter copy, with nothing that fails when the two
+disagree.[^13]
+
+### FND-351 — The engine does not report the seed or the faction count, and a second declaration site was already built to hold them
+
+**Believed.** The world is the unit of simulation, and it holds its own
+configuration. A caller that built a world can ask the world what built it.
+
+**True.** The world reports `width`, `height`, `tile_count`, `tick`,
+`event_count`, `gather_count`, `soldier_count` and `settlement_count`. It
+reports neither the seed nor the faction count, and the constructor takes both.
+
+**Evidence.** Measured against the installed module on 3 September 2026:
+`hasattr(world, "faction_count")` is `False`, and no property of that name and
+no property named `seed` appears in the bindings crate. The agent protocol
+server already carries the gap: it declares a frozen dataclass of the four
+construction values, and that dataclass says in its own docstring that the
+engine does not report the seed or the faction count back, so the store keeps
+them.[^F351A] A fresh reader found the same gap from the published page and
+recovered the faction count from the length of a returned array, which copies an
+array to learn a number the constructor took.[^F351B]
+
+**Follows.** This is the redundant declaration shape, in this repository,
+today.[^13] One value lives in the engine and in a Python dataclass, and
+nothing fails when the copies disagree. A researcher who must reproduce a run
+reads the seed from a Python object that the engine cannot check.
+
+Add `seed` and `faction_count` as properties of the world. A constructor
+argument that the object cannot report back forces every caller to keep it, and
+each of those is a copy.
+
+### FND-352 — The engine checks the range of a kind and cannot check its meaning, so it refuses two of the five wrong values
+
+**Believed.** Three integer scales share the name `kind`, and the reference page
+carries the hazard in prose. The page states the numbering in the conventions
+section and restates it at six members.
+
+**True.** The engine checks that the number names a resource kind, which is a
+range check over three values. Three of the five ground kinds fall inside that
+range, so the engine accepts them in full and the caller gets a legal, wrong
+order. Prose has been tried and the restatements do not make a call site
+readable.
+
+**Evidence.** Measured against the installed module on 3 September 2026, over
+64 soldiers. `World.order_gather(units, 4)` raised `VerbError` with the message
+`4 names no resource kind`, which is the mountain ground kind. `World
+.order_gather(units, 2)` was accepted in full, and the number 2 is stone in the
+resource numbering and forest in the ground numbering.
+
+The same shape is on the write side of the fixed-point scale, and there the
+engine cannot check at all. A target of `1` is legal and means one part in
+65536, and the caller who wrote it meant one.[^F352A]
+
+**Follows.** A range check cannot separate two numberings that overlap. A named
+type can, and it costs nothing at run time because an enumeration member of the
+integer kind is an integer. The enumeration must be generated from the compiled
+module rather than written in Python, or it becomes the second declaration site
+this register keeps recording.[^13]
+
+Research report 20 holds the design and the argument against the
+alternatives.[^F352B]
+
+### FND-360 — The core holds a general build verb, and no binding and no Python line calls it
+
+**Believed.** The control plane can found a settlement and nothing else that
+builds. A god game that wants to build things needs a build verb the engine does
+not have.
+
+**True.** The world type is public on four build methods: order a build for one
+unit and one kind, stop that order, report it, and remove a finished upgrade at
+an address. The store behind them is sparse and holds one entry for each tile
+that carries an upgrade.[^F360A] The bindings crate names none of the four, and
+neither does any Python file.
+
+**Evidence.** Measured on 3 September 2026 in this worktree. `grep -c
+"order_build\|destroy_upgrade\|stop_build" crates/cachette-py/src/lib.rs`
+reported 0. `grep -rn "order_build\|destroy_upgrade\|return_direction" python
+tests --include "*.py"` reported no line. `grep -n "    pub fn "
+crates/cachette-core/src/world.rs` reported all four on the world type.
+
+**Follows.** The build verb the downstream game wants is a binding, not an
+engine feature. This is the imported shape of a capability that nothing
+invokes: the mechanism is built, its own tests pass, and nothing reaches
+it.[^F331C] A gap in the boundary and a gap in the engine need different work,
+and the project should not price this one as the second.
+
+### FND-361 — Territory is one of the best-modelled things in the engine, and it reaches Python one tile at a time
+
+**Believed.** Territory ownership is an example of what a god game needs and
+this engine does not model.
+
+**True.** A tile carries one holder, and the holder is one faction or nobody.
+The world stores one faction mask for each block of tiles, so a query for one
+faction skips every block that does not name it. Each faction carries a running
+total of the ground it holds, maintained by the rule that changes a
+holder.[^F361A] The core answers the holder of an address, the mask near an
+address, the count for a faction, the blocks a faction holds and the tiles a
+faction holds.
+
+**Evidence.** Read on 3 September 2026 from the holding module of the core and
+from the public methods of the world type. The bindings expose two of it: one
+scalar entry in the report for one address, and one count in a region summary.
+
+**Follows.** The gap is the boundary and not the model. A need stated as "the
+engine must model territory" would produce work the engine has already done.
+The need is a read, and a product record states it.[^F361B]
+
+### FND-362 — The presence question is a relation between factions, so it does not follow the population
+
+**Believed.** Asking which units of one faction stand on ground another faction
+holds costs the population, and it waits on the selector.
+
+**True.** The gate form of the question does not. The world admits at most 63
+factions, and the reference table says the ceiling was chosen so that a relation
+is one plane and a presence set is one word.[^F362A] The answer for the whole
+world is therefore one set of factions for each faction. The engine already
+rebuilds the derived position of the population at every barrier, and that pass
+already visits every unit and its tile, so deriving the relation adds one read
+for each unit and allocates nothing. The combine is a union of sets, which has
+an identity, is associative and is commutative, so the fold gives one answer at
+any thread count.
+
+**Evidence.** Read on 3 September 2026. `grep -n "FACTION_CEILING"
+crates/cachette-core/src/types.rs` reported `pub const FACTION_CEILING: u16 =
+63`. The scale constants table states the reason for the ceiling in its own
+words.
+
+**Follows.** Separate the gate from the set. The gate is a fixed-size read that
+a large world cannot slow down, and it needs no selector. Naming which units are
+present is the wider question and it is the selector's. A design that folded the
+two together would hold the cheap answer behind the expensive one.
+
+### FND-363 — The return field is built, and the record that describes it reads as a proposal
+
+**Believed.** A record describes a reach field that would give ordered movement
+without a per-unit search, and building it is future work.
+
+**True.** The core answers a return direction for a faction and an address, and
+it answers an exit direction for an address and an option. Both are
+implemented. What is missing is not the field. It is that the seed set is fixed
+at every live site of the faction, so the control plane cannot name a
+destination.[^F363A]
+
+**Evidence.** Read on 3 September 2026. `grep -n "    pub fn "
+crates/cachette-core/src/world.rs` reported `return_direction` and
+`exit_direction` on the world type. No line of the bindings crate and no Python
+file names either.
+
+**Follows.** "Move units somewhere" is a settable seed set and not a new
+mechanism. Reading the record's status as the state of the code costs the
+project a large estimate for a small change. A draft record that the code
+already implements should say so, and this one does not.
+
+### FND-370 — The presence relation cannot ride on the bridge rebuild, because that rebuild runs before the holding spreads
+
+**Believed.** Deriving the presence relation rides on the pass that already
+visits every unit and the tile it stands on. A research report named that pass
+as the rebuild of the unit-to-tile bridge, which runs at the frame
+barrier.[^F370A]
+
+**True.** The bridge rebuild is the wrong place, for two reasons that the
+report did not weigh. The barrier runs before the holding spreads, so a fold
+there reads the holders of the previous tick. The barrier also runs before the
+starvation reap, so a fold there names a unit that the same frame ends, and
+every read for the rest of that frame is then refused as stale. The fold is its
+own stage at the end of the step, after the last structural change and after
+the spread.[^F370B]
+
+**Evidence.** Read on 3 September 2026 from the step of the world type. The
+barrier stage sits above the holding spread stage, and the reap sits below both.
+The record now states the placement and why.[^F370B]
+
+**Follows.** "It rides on a pass that already runs" is an argument about the
+cost term and not about the position. The cost term survives: the fold reads
+three unit columns and one tile column once, and allocates one row array for
+each thread. Nothing here was measured, and one blocker governs every cost
+figure in this project.[^28]
+
+### FND-371 — A derived relation moves no golden state hash, and that is the check that it is derived
+
+**Believed.** Nothing. The project had no relation between factions, so nobody
+had asked what one does to the state hash.
+
+**True.** The golden state hash did not move when the presence relation was
+added. That is the expected result and it is also the evidence: the relation
+reaches no state, so it reaches no hash. A relation that had moved the hash
+would have been stored rather than derived, against the record.[^F371A]
+
+**Evidence.** `cargo test --package cachette-core --test golden_state_hash` was
+green before and after the change, with no regeneration of the golden file.
+
+**Follows.** For any future derived structure, an unmoved golden hash is a
+cheap check that the structure is derived. A moved hash is a question to answer
+before the work is done, not a file to regenerate.
+
+### FND-372 — One visiting unit takes the tile it visits, so a naive presence fixture measures the spread rule
+
+**Believed.** A test of the presence relation places a unit of one faction on a
+tile another faction holds, steps, and reads the answer.
+
+**True.** That fixture does not produce the case. A unit raises seven for a
+claim on the tile it stands on, and the holder of a tile raises one for each
+neighbour that holds with it. A lone visitor therefore beats a holder that
+draws only on its six neighbours, and the tile changes hands in the same step,
+before the fold runs. The relation then correctly reports nothing, and the test
+fails for a reason that has nothing to do with the relation.[^F372A]
+
+**Evidence.** Found while writing the presence tests on 3 September 2026. The
+fixture now places three units of the holder on the visited tile beside the
+guest, and it asserts the holder of the tile under the guest before it reads
+the relation.
+
+**Follows.** A test about a read over the holding must fix the holding first,
+or it measures the spread rule. State the assertion about the fixture, not only
+the assertion about the answer.
+
+### FND-373 — A fixture whose guest sits in the last chunk cannot catch a combine that is not order-free
+
+**Believed.** A test that runs one scenario at three thread counts and compares
+the answers catches a combine that depends on the partition.
+
+**True.** It does not, when the interesting unit sits in the last chunk of the
+arena at every thread count. The presence test spawned the guest last, so the
+guest had the highest arena slot. A combine that took the last slot and dropped
+every other one gave the right answer at one thread and at twelve, and the
+comparison passed.
+
+**Evidence.** Found by putting the defect back on 3 September 2026. The join of
+the presence fold was changed from a union to an assignment, and the
+thread-count test stayed green. The fixture now spawns a further batch of units
+after the guest, so the guest sits in a middle chunk, and the same defect then
+fails the test.
+
+**Follows.** A thread-count comparison is only as good as where the fixture
+puts the value under test. Ask which chunk holds it, and put something after
+it. This is the fixture rule applied to a parallel join.[^23]
+### FND-380 — A unit builds on ground of any faction, and the rule that says otherwise reaches no code
+
+**Believed.** The project orientation states that a unit builds only on ground
+that its own faction holds. It states it as an answered question, beside the
+one owner question about building that stays open.[^F380A]
+
+**True.** Nothing checks the holder. The pass that collects the build intents
+of a step reads the build order of each live unit and the tile it stands on,
+and it reads no holder and no faction. The verb that gives the order reads
+none either. A unit of one faction therefore builds on ground that another
+faction holds, and it finishes.
+
+**Evidence.** Measured on 3 September 2026, through the installed package, in
+a world of 64 by 64 tiles at the seed 7. A founding run gave both factions
+ground. After 20 steps faction 1 held 662 open tiles. One soldier of faction 0
+was spawned on one of them, at the address (16, 9), and given the order to
+build a road. After 12 steps the tile reported the road finished, and it
+reported faction 1 as its holder.
+
+`grep -n "fn build_intents" -A 25 crates/cachette-core/src/world.rs` shows the
+whole input of the pass: the live set, the build order, and the tile.
+
+**Follows.** The rule is a simulation rule, so the core owns it and no binding
+may add it. A binding that checked the holder would be a second declaration
+site of a rule the step does not hold, and the step would go on building
+whenever anything else gave an order.[^13] A backlog item holds the work,
+and the decisions register holds where the rule belongs.[^F380C] [^F380D]
+
+The doc comment of the verb states what the engine does rather than what the
+project intends, because a record of an intent as a fact is the shape the scope
+rule names.[^10]
+
+### FND-381 — A finished terrace changed nothing that the control plane could read
+
+**Believed.** The upgrade store is the mark a unit leaves on a tile, and a
+watcher reads the mark from the tile.
+
+**True.** Before this change no read of the boundary reported an upgrade. The
+report of one tile carried the ground, the stock, the value, the holder and the
+capacity, and the capacity is the only entry an upgrade touched. A road raises
+the capacity, so a finished road was visible as a larger number with no stated
+cause. A terrace raises the gather bonus and touches no entry of that report,
+so a finished terrace was invisible in every read of the ground. A caller could
+infer it only from the resource log, by watching units take more than before.
+
+**Evidence.** Read on 3 September 2026. The capacity of a kind and the gather
+bonus of a kind are two tables in the upgrade module, and the terrace row of
+the capacity table is empty. The report of one tile in the bindings crate set
+ten keys before this change, and none of them named an upgrade.
+
+**Follows.** A build that a watcher cannot see is a build nobody can repair.
+The report of one tile now carries the kind, the work done and whether the work
+is finished. Binding a write verb is not finished when the write lands: the
+work is finished when a caller can read the result back.
+### FND-390 — A fight resolved at the level 1 cell smears, and a fight resolved at the tile does not
+
+**Believed.** Nobody knew. Two factions had never been run into contact in this
+engine, and a blocker held the gap.[^F390A]
+
+**True.** The band that holds the middle 90 percent of the casualties is 1 tile
+wide at the tile, in every arrangement measured. It runs from 1 to 30 tiles wide
+at the level 1 cell, against a block edge of 32 tiles. The furthest casualty of a
+cell resolution stood 36 tiles from the nearest enemy, which is further than the
+block edge because the block diagonal is longer than its side. Between 67 and 72
+percent of the casualties of a cell resolution stood on a tile that held no
+enemy at all.
+
+**Evidence.** A harness runs four arrangements of two armies in a world of
+128 by 96 tiles, resolves 24 frames at each granularity, and reports the
+band.[^F390B] It ran on an x86-64 development machine. The figures are a shape
+and not a cost, so the target platform would report the same numbers.
+
+**The casualty rule is a model and the geometry is the engine.** The engine
+holds no contest, so the harness supplies a provisional rule that removes up to
+one unit for each side of each contested resolution unit in each frame. The
+world, the terrain, the unit arena, the faction column, the unit-to-tile bridge
+and the block layout are the engine.
+
+**Follows.** Resolve a fight at the tile. The cell keeps the job the sketch gave
+it, which is deciding where an army goes.[^F390C] The measurement closes the
+blocker and settles the decision row that waited on it.[^F390D]
+
+### FND-391 — A thin fixture reports no smear, and it would have closed the blocker with the wrong answer
+
+**Believed.** One arrangement of two armies is enough to measure the band.
+
+**True.** It is not. The same rule, over the same world, reports a cell band of
+1 tile for two armies two tiles deep, and 30 tiles for one army that fills a
+level 1 cell against an enemy at one corner of it. An arrangement with nothing
+behind the front has nothing to smear, so it cannot show the defect that the
+blocker asked about.
+
+**Evidence.** The harness runs a two-tile arrangement beside three deeper
+ones.[^F390B] The two-tile arrangement reports a band of 1 tile and no casualty
+away from an enemy, at the granularity that every other arrangement smears at.
+
+**Follows.** This is a local instance of the shape the testing rule names: a
+fixture that models the typical case supplies no extreme.[^23] A measurement
+that decides between two designs states which arrangement it measured, and it
+measures the arrangement that would fail.
+
+### FND-392 — Ordinary ground holds eight units, so a full tile refuses the enemy that would fight it
+
+**Believed.** A design sketch resolves a fight for each tile as a table over
+unit types, without a stated bound on the table.
+
+**True.** The capacity of ordinary ground is 8 units, and the admission rule
+reads that capacity and not the faction. So a contest at one tile reads at most
+8 units in total across every faction and every type. A tile that already holds
+8 units of one faction offers no room, so no enemy can stand on it, and a rule
+that needs the two factions on one tile never fires against a packed army.
+
+**Evidence.** Read on 3 September 2026. `grep -n "ORDINARY_CAPACITY"
+crates/cachette-core/src/terrain.rs` reported `const ORDINARY_CAPACITY: u32 =
+8`, and the passability of a kind is that capacity above zero. A search of the
+admission pass for the word `faction` returned nothing.
+
+**Follows.** A per-tile table is small, which is the good half. The other half
+is a game rule that nobody has stated: whether a contest reads the tile alone,
+or the tile and its neighbours. A decision row holds it.[^F392A]
+
+### FND-393 — The threshold after the sum fails the acceptance test at eleven bowmen
+
+**Believed.** The order of the threshold and the sum matters. The research
+judged the sketch sound and stated the reasoning rather than a number.[^F393A]
+
+**True.** With an effect of 10 for each bowman and a threshold of 100 on the
+tank, the threshold applied before the sum gives zero at every count, including
+one million. The same numbers with the threshold applied after the sum give
+zero at four bowmen and a positive result at eleven. So the acceptance test
+survives one order and fails the other, and it fails at a count a player reaches
+in an ordinary game.
+
+**Evidence.** Two folds over integers, in a model.[^F390B] **This is a model
+and not the engine.** A unit carries no type and no strength, so the engine
+cannot express either side of the test.
+
+**Follows.** The order is the whole mechanism, and a record must state it as an
+order rather than as a threshold. The cliff that the order buys is stated with a
+number in the same harness: a crowd of 1000 whose effect is 99 against a
+threshold of 100 does nothing, and the same crowd at 101 does everything.
+### FND-400 — A contest was said to need a count structure sized by three counts, and the tile form needs none
+
+**Believed.** A contest needs a count for each faction and each type, at
+whatever granularity the fight uses. That structure is the largest new thing
+the design asks for, and its size is the product of three counts, so it must be
+sized on purpose.[^F400A]
+
+**True.** The tile form needs no such structure at all. The resolution builds
+the counts for one tile, from the units standing on that tile, and it discards
+them before it reads the next tile. The list holds one entry for each pair of a
+faction and a type that the tile carries, so its length follows the occupancy of
+the tile and never the faction count or the type count. One buffer for each
+thread serves the whole world.
+
+**Evidence.** Built on 3 September 2026. The resolution walks the derived unit
+structure block by block, and the counts of a tile live in one reused vector
+per thread. The world gained no field for them. The claim the report made is
+correct for a resolution at the level 1 cell, which would have to hold the
+counts of every cell at once, and the project chose the tile.[^F400B]
+
+**Follows.** A design that resolves at the tile is cheaper in storage than the
+report estimated, and not only in the width of the killing. Read a storage
+estimate against the granularity it assumed, because the two options here differ
+by a whole structure rather than by a constant.
+
+### FND-401 — The death plane was documented as safe under any parallel marking, and it is safe only under a slot partition
+
+**Believed.** The plane is dense, so a marking pass writes into disjoint words
+and the plane is identical at any thread count. The doc comment of the plane
+states that as a property of the plane.[^F401A]
+
+**True.** It is a property of the pass that was written first, and not of the
+plane. That pass partitions the unit slots, so each thread owns whole words. A
+pass that partitions something else does not own whole words: the resolution of
+a meeting partitions the tiles, and two tiles held by two threads can hold units
+whose slots share one word.
+
+**Evidence.** Built on 3 September 2026. The resolution gives each thread its
+own plane and joins them by a bitwise union, which is commutative and
+associative. A shared plane would have needed an atomic write, and an atomic
+write would have been correct here by luck rather than by the argument the doc
+comment gives.
+
+**Follows.** A doc comment that states a safety property must name the pass that
+supplies it. A second caller reads the property, believes it holds for its own
+partition, and writes a data race that a single-threaded test cannot see. The
+plane now documents both cases and offers the union.
+
+### FND-402 — A fight was designed to fire when two factions share a tile, and admission makes that state unreachable
+
+**Believed.** Two factions meet when they stand on one tile, so a contest fires
+on co-occupation. The design brief for the contest said so, and the research
+report that shaped it describes a fight over the units of one place.[^F400A]
+
+**True.** Admission enforces the capacity of a target tile by reading the
+capacity of the ground and the number of units standing there. **It never reads
+the faction.** A tile that an army has filled therefore refuses every unit,
+including every enemy, so two factions cannot come to share a tile by walking.
+A rule that fired only on co-occupation would never fire against an army that
+packed itself to capacity, which is exactly the state a fight is about.
+
+**Evidence.** Read on 3 September 2026. The admission pass fills a segment
+table with the capacity of each target and the number of units the derived
+structure reports standing on it, and it grants an intent only while the second
+is below the first. No line of it reads the faction column. A parallel
+measurement of the front line found the same fact from the other direction, and
+the merge of the two branches must fold that row and this one into one.
+
+**Follows.** Contact is adjacency. A unit reaches every unit of another faction
+on its own tile and on the six tiles beside it, so nobody has to enter
+anything.[^F402B] The alternative was a rule that lets an enemy enter a full
+tile, and it was rejected: it supersedes an accepted record and it makes the
+capacity mean nothing at the one moment it exists for.[^F274D]
+
+**A design that fires on a state can be correct and still never fire.** Ask
+what produces the state, not only what the state is. The brief, the research
+report and the first implementation all passed their own tests, because a spawn
+may over-fill a tile and every fixture spawned.
+### FND-410 — A control-plane order reached the movement pass behind the intent filter, so a unit that had chosen nothing could not be ordered anywhere
+
+**Believed.** An order from the control plane is another input to the step that
+moves a unit, so the movement pass can read it wherever it reads the other
+inputs. The pass opens by reading the intent of a unit and returning early when
+the unit holds none, and that early return looked like a filter on units that
+have nothing to do.[^F180A]
+
+**True.** It is a filter on units that have not chosen yet, which is a
+different set. The choice pass writes an intent only on the frame that the cell
+of a unit chooses, so a unit spawned between two choices holds none.[^F252D] An
+order read after that filter therefore reached no newly spawned unit at all, and
+reached every other unit only on the frames after its cell had chosen.
+
+**A caller cannot see the difference from outside.** The order is accepted, the
+call returns, and the unit stands still. Nothing fails, and the caller has no
+read that would say why.
+
+**Evidence.** A world with the choice schedule set to a long period. One unit
+was spawned, and the test asserted that it held no intent. It was then sent to a
+destination four cells away and the step was driven for 32 frames. With the
+order read after the intent filter, it held its starting tile for all 32. With
+the order read before the filter, it left on an early frame. The test is the
+record of it, and the commit body holds the command.[^F411C]
+
+**Follows.** Two things.
+
+**An order is not a preference, and it does not enter the pass where a
+preference enters.** A unit chooses an option by scoring, and an order from the
+control plane joins no score. It replaces the field that steers the step, and it
+replaces nothing else. The record states that.[^F410D]
+
+**A filter that looks like it drops idle units may drop unstarted ones.** The
+two sets differ only in the frames after a spawn and before a choice, and no
+fixture that spawns and then steps many frames reaches the difference. A test
+that wants the case must hold the choice off.[^23]
+### FND-411 — A unit ordered to a place stopped at a shoreline and never arrived, and it was not frozen
+
+**Believed.** A unit that the control plane sends to a place walks there. The
+field holds a direction for every cell between the unit and the destination,
+and the fall-back to a keyed draw stops the unit freezing, so the unit arrives
+in about as many frames as there are tiles between the two.[^F411A]
+
+**True.** It arrives only when the ground on the way is open. A field at the
+pitch of a block says which way a block should go, and it cannot say how one
+unit gets around the water in front of it. A record already states that
+consequence, and this is the first case that shows what it costs an ordered
+unit.[^F411B]
+
+**The unit is not frozen, and it does not arrive.** The two are different
+failures, and the fall-back answers only the first. The unit takes a step every
+frame, it wanders inside the cell it is stuck in, and it never crosses the
+barrier. A caller who watched it would see movement and no progress.
+
+**Evidence.** The demonstration extent at the shared seed. A unit was placed at
+one address and sent to the first open tile of the world, which lies about
+eighty tiles west. It walked west for about twenty tiles and then held a
+three-tile neighbourhood for the remaining four thousand frames. The direction
+of its cell pointed west for all of them, and the tile west of it is water. The
+diagnostic run is in the commit history of this branch, and the test that the
+work kept is the fixture rule that came out of it.[^F411C]
 
 **Follows.** Three things.
 
-**A record can state a property that its own decisions do not deliver.** ADR-0063
-D1 is correct about what a per-unit need buys. The claim that it removes the
-cliff is a claim about a distribution, and nothing in the record produces one.
-Every input to a need was shared, so the outputs were shared too. **Look for the
-thing that differs between two units before believing that two units differ.**
+**A test must not assert that a sent set arrives, unless the fixture proves the
+ground is open.** The fixture of this work walks the field from each candidate
+start and rejects a start whose walk meets ground that refuses it. Without that
+rule the test asserts a promise the engine does not make, and it fails on a seed
+rather than on a defect.
 
-**A draw is not a shuffle, and the difference is conservation.** An independent
-draw for each member gives the right answer on average and the wrong answer on
-any one application. Where a count has been paid for, the selection has to be a
-bijection. This was caught by a test that asserted the served count against the
-count the share covered, and by nothing else: the conservation check passed
-throughout, because the quantity it conserves is not the one that was wrong.
+**The verb is honest and the promise is narrower than it reads.** A caller sends
+a set toward a place. The engine does not promise that the set arrives, and the
+Python prose says what it does promise.
 
-**An invariant that passes is not a proof that the right invariant exists.** The
-store conservation check and the carry conservation check both held while a
-cohort was eating rations the store never gave. The account they balance is the
-commodity, and the ration a unit receives is not that account.
+**Routing around a barrier is a different claim and it needs a different
+field.** The reach that this work spreads is over cells, and the barrier is a
+tile. A backlog row holds the gap.[^F411D]
+
+### FND-420 — The gatherable resource catalogue cannot grow at run time
+
+**Believed.** A caller can build a world with any number of resource kinds,
+and the engine reads the number the caller gave.
+
+**True.** The number of gatherable kinds is a constant that the compiler
+fixes, and the code uses it as an array length. What one site wants is a row
+of that length, and the table that maps work onto a commodity is a row of that
+length as well.[^F420A] The kind numbering also reaches the state hash, the
+gather event and a sort key, so a renumbering invalidates every golden
+file.[^F420B]
+
+**Evidence.** A search of the tree for the constant finds it as the length of
+two arrays in the position module and of four more in the resource module and
+the world. The resource module states in its own prose that the numbering is
+stable, and it names the three readers that make it so.[^F420B]
+
+**Follows.** A luxury is a second tier and not a fourth kind. A luxury is a
+presence, so the engine holds a set of bits for each tile rather than a column
+of amounts. The set is one word, so its width bounds the catalogue and no
+array length changes. The control plane names the luxuries when it seeds the
+world, and the gatherable catalogue stays fixed.[^F420C]
+
+
+### FND-421 — A constructor that makes an invalid value unrepresentable makes its own invariant check unfalsifiable
+
+**Believed.** An invariant check earns its place when the project can show
+that it fails on a defect.
+
+**True.** The luxury field has one constructor. That constructor sorts the
+placements, coalesces the repeats and refuses a bad argument, so no caller can
+build an unsorted field, a repeated tile or an empty entry. The part of the
+invariant check that tests those three things cannot fail, and no test can
+trip it.
+
+**Evidence.** A sweep put ten defects back, one at a time, and ran the tests
+after each one. Nine defects failed at least two tests. The tenth turned the
+field invariant check off, and every test stayed green.[^F421A]
+
+**Follows.** Keep the check, and do not count it as covered. Say in the report
+which guards a test reaches and which it does not.
+
+**The falsifiable check is the one between two copies of one fact.** The world
+compares level 1 of the variety against the field it was derived from. A
+defect that dropped one entry from the derivation failed nine tests, and the
+world invariant check was one of them. A check on a value that no caller can
+build is a guard for a future writer. A check between two copies is a test.
+
+
+### FND-430 — Every resource kind credits one commodity, so a store cannot say what a contract delivered
+
+**Believed.** A settlement store holds a quantity for each commodity, and the
+three resource kinds a unit carries reach three separate totals.
+
+**True.** The store holds one commodity, and the table that maps a resource
+kind to a commodity names commodity zero three times. A unit that delivers
+wood and a unit that delivers stone raise one number. The store therefore
+answers how much arrived and never what arrived.
+
+**Evidence.** Read on 3 September 2026. `grep -n "COMMODITY_COUNT: usize"
+crates/cachette-core/src/site.rs` reported `pub const COMMODITY_COUNT: usize =
+1`. `grep -n "WORK_COMMODITY" crates/cachette-core/src/position.rs` reported
+`[CommodityId(0), CommodityId(0), CommodityId(0)]`.
+
+**Follows.** A trade contract states the resource kind exactly, in its own row
+and in its own event, because the store cannot state it. A caller that wants to
+know what a contract moved reads the contract row and never the store. A second
+commodity would change the mapping table and no code outside it, so this is a
+present fact rather than a permanent one.
+
+### FND-431 — The delivery pass carries no stage span, so a pass that moves a quantity is invisible to the cost table
+
+**Believed.** Every pass the step runs opens a stage, so the frame cost table
+accounts for the whole frame.
+
+**True.** The pass that moves a carried load into a store opens no stage. The
+step calls it between two stages and its cost falls into neither. The stage
+list is a declaration, and a pass that declares nothing is absent from every
+cost report the project takes.
+
+**Evidence.** Read on 3 September 2026. `grep -n "self.deliver(threads)"
+crates/cachette-core/src/world.rs` reported one call site, and the lines around
+it hold no `stage::open`. Every other pass in the step is wrapped in one.
+
+**Follows.** The contract settlement pass follows the same precedent, so two
+passes that move a quantity are now outside the table. A backlog item holds the
+repair, and it must add both at once rather than one.[^F431A]
+
+### FND-432 — Presence for one ordered pair needs no derived relation
+
+**Believed.** Answering whether a unit of one faction stands on ground another
+faction holds waits on a derived presence relation, because the answer for the
+whole world is a fold over every unit at the barrier.
+
+**True.** The whole-world answer does. **One ordered pair does not.** The
+soldier arena holds a faction column and a tile column, and the holding holds a
+holder column over the tiles. A walk over the live units that stops at the
+first match answers one pair exactly, from primary state alone, with nothing
+stored and nothing derived.
+
+**Evidence.** Read on 3 September 2026. The trade verbs answer the gate this
+way and their tests pass. `grep -n "pub fn holders"
+crates/cachette-core/src/holding.rs` reported the holder column, and `grep -n
+"pub fn faction_column" crates/cachette-core/src/soldier.rs` reported the
+faction column.
+
+**Follows.** A capability that needs the gate ships before the relation lands,
+and it holds no second copy of the answer, so the relation replaces the walk
+with a one-bit read and changes no behaviour. Read a missing derived structure
+as a cost question and not as a capability question.
+
+### FND-433 — The arena revision means more than a structural change, and the presence relation depends on that
+
+**Believed.** The revision of the unit arena counts structural changes. The
+doc comment says a spawn, a despawn and a move each raise it by one, and it
+explains that an order and an intent do not, because the derived unit
+structure maps a tile to the units on it and neither of those moves a unit.
+
+**True.** The revision is what every structure derived from the arena checks
+its own freshness against, and the derived unit structure is not the only one.
+The presence relation is folded from the faction column, and it refuses a read
+when the revision has moved on. A write to the faction column that left the
+revision alone would give that relation a stale answer that passed its own
+freshness check.
+
+**Evidence.** Read on 3 September 2026 while adding conversion. `grep -n
+"built\|revision" crates/cachette-core/src/presence.rs` showed the relation
+recording the revision it folded at, and refusing a read when the value moved.
+The conversion pass writes the faction column and moves no unit, so it fits the
+class the doc comment says does not raise the revision.
+
+**Follows.** A faction change raises the revision. The derived unit structure
+does not read the faction column, so it rebuilds for nothing on a frame that
+converted somebody. That is the conservative side of one counter, and a second
+counter would be one fact in two places with nothing that fails on
+disagreement.[^22] Read the revision as "a derived structure must look
+again", not as "a unit was created, removed or moved".
+
+### FND-434 — A doc comment that enumerates the write sites of a maintained count goes stale the moment a third one arrives
+
+**Believed.** The per-faction live count of the unit arena has exactly two
+write sites. Its doc comment says the arena maintains it where a slot becomes
+live and where a slot stops being live, and it names those two moments as the
+reason a caller never counts a population.
+
+**True.** Conversion is a third site. It is neither a birth nor a death, and it
+moves a unit from one count to another. The sentence became false the moment
+that site existed, and nothing in the build failed, because the sentence is
+prose.
+
+**Evidence.** Added on 3 September 2026. The arena check recounts the live
+column against the maintained count and compares, so the omission of the
+update would have failed loudly. The sentence that describes where the update
+happens would not have.
+
+**Follows.** The check is what protects the count. The doc comment is what
+protects the reader, and it decays on a different schedule. Do not enumerate
+the write sites of a maintained value in prose. State the invariant instead,
+and name the check that fails when it breaks.[^46]
+### FND-443 — A test that watches a dead identity refuse does not cover the column that carries the identity
+
+**Believed.** A log column that carries a unit identity is covered by a test
+that hands each entry back to the engine and asserts that the engine refuses
+it. The column holds dead identities, the engine refuses a dead identity, so a
+column that stopped carrying identities would go red.
+
+**True.** It stays green. The engine refuses a slot index for the same reason
+it refuses a dead identity: neither is an identity it gave out. A column that
+emitted the slot index of each fallen unit therefore passed the refusal test
+without a change. Only a test that compares the column against the identities
+the caller was given sees the difference.
+
+**Evidence.** The binding that exposes the fallen log was measured against its
+own tests. The unit column was changed to emit the low bits of each identity,
+which is the slot index. The test that asserts that every identity in the
+column refuses stayed green. The test that compares the set of fallen
+identities against the set the spawn verb returned went red, and it named both
+sets.[^F443A]
+
+**Follows.** Two things.
+
+**A refusal is evidence about the engine, not about the column.** A test that
+asserts a refusal covers the resolution rule. It says nothing about which
+number the column carried, because two different wrong numbers refuse alike.
+This is the shape of the finding that measured defence in depth, one layer
+further out.[^F443B]
+
+**A column of identities needs a round trip against a value the caller
+holds.** The caller of the spawn verb holds the identities the engine gave it.
+Comparing the column against that set is the only assertion here that fails
+when the column carries something else.
+
+
+### FND-450 — A field over the level 1 cell lattice was believed to smear whatever it carried
+
+**Believed.** A quantity carried at level 1 granularity smears, because a cell
+covers a block of tiles and the block is large. A measurement of a fight at
+that granularity found the smear and the record refuses the granularity by
+name.[^F450A] [^F450B]
+
+**True.** The smear is a property of the thing carried, not of the lattice. A
+fight is an event between two units standing on one tile, so a cell is coarser
+than the thing being resolved and the answer spreads over a thousand tiles that
+were not in the fight. A weather field varies slowly over distance, so a cell
+samples it. Two units in one cell genuinely stand in the same weather.
+
+**Evidence.** The engine already carries a field at this pitch and nobody calls
+it smeared. The influence field is a plane over the same lattice, and a unit
+reads the cell it stands in.[^F450C] The difference between the two cases is
+whether the carried thing varies inside a block.
+
+**Follows.** Ask what varies inside a block before choosing a granularity. Do
+not read the combat answer as a rule about level 1. The weather record states
+the argument rather than citing the combat record for it.[^F450D]
+
+### FND-451 — A relaxation kernel taken from the influence solve would have lost water that nothing accounted for
+
+**Believed.** The weather spread could reuse the influence relaxation. Both are
+fields over the level 1 cell lattice, both read the six neighbours, and reusing
+the kernel would avoid a second machine for one shape.
+
+**True.** The influence kernel is not conservative. Its weights sum to less
+than the range, and the difference is what a cell loses on every pass, so an
+unforced field falls to nothing.[^F451A] That is correct for a reach. For a
+quantity it means water disappears and no reader can say where it went, and the
+product record asks that what leaves one place arrive at another exactly, with
+no loss to rounding and no gain.[^F451B]
+
+**Evidence.** The weather field now runs a transfer kernel instead. A cell
+hands each neighbour a truncated integer share and the receiver adds the same
+integer, so the pass conserves exactly. The world invariant check reads a
+running account and fails when the totals disagree, and the account balances at
+every frame of a forty-eight frame run.
+
+**Follows.** A field is not one thing. A reach and a quantity need different
+kernels, and the shared part is the lattice and the neighbour walk. Ask whether
+the carried thing has to balance before reusing a solver.
+
+### FND-452 — Conservation and decay looked like a contradiction, and the resource account already held the answer
+
+**Believed.** A weather condition cannot both conserve exactly and end on its
+own. A storm that conserves stays for ever, and a storm that decays loses
+quantity that nothing accounts for.
+
+**True.** The two hold together when the thing that leaves is counted. Water
+leaves the air onto the ground, and it leaves the ground into a running total.
+The sum of the air, the ground and that total is invariant, and a storm still
+ends.
+
+**Evidence.** The project had already solved this shape for a resource. A unit
+that dies takes its load out of the world, and the world records where the load
+went rather than letting it disappear.[^F452A] The weather account is the same
+pattern with a different name.
+
+**Follows.** When a rule seems to force a choice between conservation and
+change, add the account rather than dropping the conservation. Look for a
+running total that already exists for the same shape.
+
+### FND-453 — A world of one level 1 cell made a gate test pass for the wrong reason
+
+**Believed.** A twenty-four by twenty-four world is a good small fixture for a
+verb that gates on the ground of a level 1 cell. It is cheap to step and it
+holds no open water, which is what the effect test needed.
+
+**True.** The block edge is thirty-two tiles, so a world that narrow is one
+level 1 cell. Every address in it names the same cell, so a gate that refuses a
+place outside the faction's ground can never refuse anything, and a test of the
+refusal passes only because the second faction holds nothing at all.
+
+**Evidence.** The test that names one held place and one unheld place in the
+same call did not refuse. It succeeded, because both places named one cell. The
+fixture moved to a sixty-four by sixty-four world, which holds four cells and
+still holds no open water, and the test then refused as it should.
+
+**Follows.** A fixture for a rule that works at level 1 must be wider than the
+block edge, or it measures nothing. State the property in the fixture and
+assert it, so that a change to the block edge fails the fixture rather than the
+assertion.
+
+### FND-454 — A test matched the singular form of a message, and a change that made the plural true read as no event at all
+
+**Believed.** The demonstration prints one line when a unit is promoted, and a
+test that searches the output for that line proves a promotion happened before
+the picture was drawn.
+
+**True.** The line reads one way for one promotion and another way for more
+than one. The test searched for the singular form only. A change that made
+three units promote in one frame therefore produced a promotion and read as no
+promotion at all.
+
+**Evidence.** Adding weather changed what units gather, which changed what they
+earn, which moved the first promotion from one unit at a later tick to three
+units at an earlier one. The output held the line and the test failed. The test
+now matches the part of the message that both forms share.
+
+**Follows.** Do not assert on a rendered sentence that varies with a count. If
+a test must read printed output, match the invariant part of the message, or
+read the number the message was built from.
+
+### FND-460 — The shortfall log could not hold an entry, because nothing outside a Rust test ever set an upkeep rate
+
+**Believed.** The engine records a shortfall when a site cannot pay its upkeep.
+The world holds the log, the log holds a plain data event, and the rate pass
+fills it on every scheduled step.
+
+**True.** The rate pass filled it on no step of any run a caller could make. An
+upkeep rate starts at zero for every site, and a site that spends nothing can
+never fall short. The founding sets a production rate from the food the survey
+read, and it sets no upkeep rate at all.[^F460A]
+
+**Evidence.** A whole-tree search for the writer found the core method, two
+Rust test files, and nothing else. No pass writes it. No binding exposed it.
+The commit body holds the search command.
+
+**Follows.** Two things.
+
+**A log is not reachable until its writer is reachable.** This work bound the
+shortfall log and the upkeep rate together, because binding the reader alone
+would have shipped a call that answers with an empty log for ever. That is the
+inert capability shape with an extra step in it: the reader is invoked, and the
+thing it reads is not.[^37]
+
+**The same question applies to every other log.** Ask what writes it, and ask
+whether a caller can reach that writer. The four other logs this work bound each
+have a writer that a step reaches on its own.
+
+### FND-461 — A small world feeds itself, so a log fixture built from one measures the fixture
+
+**Believed.** A world with soldiers, sites and the default need rule goes short
+by itself. Step it far enough and units ration, go hungry and starve.
+
+**True.** It depends on the extent and on the faction count. A world of two
+factions on 32 tiles a side fed itself for the whole of a run. Every unit held a
+full need, no site rationed, nobody starved, and nobody was promoted.
+
+**Evidence.** A probe stepped that world 400 times and recorded no entry in the
+rationed log, the starved log or the promotion log. The same probe on 64 tiles a
+side with four factions recorded entries in all three: the first rationing on
+step 10, the first promotion on step 40, and the first starvation on step 120.
+The commit body holds both runs.
+
+**Follows.** A test for a log of scarcity states the extent and the faction
+count as the thing that makes the case, and says so where a reader will look.
+The fixture rule already says not to model the typical case, and this is that
+rule reaching a subsystem it had not reached.[^84]
 
 ### FND-470 — A whole tier of the engine reached no caller, and it is the largest capability in this engine that nothing invokes
 
@@ -11418,6 +10989,142 @@ it.[^F473A] The doc comment of the write says plainly that nothing in the
 engine reads the column, rather than implying a mechanism that does not
 exist.[^10]
 
+### FND-480 — The recovery rules govern every tick and stand outside the state hash
+
+**Believed.** Every value that a later frame reads enters the state hash, so
+two worlds that must diverge cannot hash the same.[^F160A]
+
+**True.** The rules that say how fast a depleted deposit returns do not enter
+it. The world folds the depletion ledger into the hash, and that fold writes
+the entries of the ledger and not the rule set beside them. A caller may
+replace the whole rule set at any time. Two worlds that hold the same tiles,
+the same takes and different recovery periods therefore hash the same, and
+they diverge on the next tick that ages an entry.
+
+**Evidence.** Read on 3 September 2026. The fold of the depletion ledger
+writes the entry count and then the key, the taken amount and the anchor tick
+of each entry.[^F480B] It never reads its own rule field. The whole-world fold
+calls it once and writes nothing else about depletion.[^F480C] The recovery
+pass reads the rule field on every tick.[^F480D]
+
+**Follows.** The golden state test can pass over a change that a caller made
+to the recovery rules, until the difference has already reached a stored take.
+The hash then reports the effect and never the cause, one or more ticks late.
+The repair is one line in the fold, and it moves every golden file because it
+changes the hash chain, so a backlog item holds it on its own.[^F480E]
+
+**This is a defect the boundary work found and did not repair.** The work that
+found it was a binding, and a binding must not move a golden file. The finding
+is the handover.
+
+
+### FND-481 — Three of the thirteen unbound economy names already cross to Python inside a report
+
+**Believed.** Thirteen names govern the economy of the engine, and no binding
+and no Python line reaches any of them.
+
+**True.** Ten of the thirteen reach no caller. The other three already cross,
+inside a report that a binding already builds. The production rate and the
+upkeep rate of a site cross as two entries of the economy report of that site.
+The stock a tile started with crosses as one entry of the tile report.[^F320C]
+
+**Evidence.** Read on 3 September 2026. `grep -rn "\bproduction_rate\b\|\bupkeep_rate\b\|\boriginal_stock\b" crates/cachette-py/src python tests scripts`
+reported three lines, all of them inside the bindings crate: two in the site
+economy report and one in the tile report. The same search over the other ten
+names reported nothing.
+
+**Follows.** A second binding for any of the three would be a second
+declaration site for one value, which is the defect shape this project keeps
+meeting.[^22] The work that bound the ten write knobs published no reader
+for the three, and pointed the doc comment of each write at the report that
+already answers it. A caller therefore has one place to read a rate and one
+place to write it.
+
+### FND-482 — Three trade records existed twice under two sets of numbers, and both sets were marked as drafts under review
+
+**Believed.** The registry held one record for each of the three trade claims:
+a negotiation is engine state, a terminal refusal closes a pair until a named
+tick, and a contract moves a quantity only when a unit carries it. Numbers
+0126 to 0128 held them.
+
+**True.** Numbers 0129 to 0131 held the same three files, byte for byte apart
+from the number in the title and in the footnotes that cite each other. A
+commit that restored the three records after a number collision wrote them
+under a second set of numbers, thirty-nine minutes after the first set was
+committed.[^F482A] Both sets carried the status `Draft`, both sets sat in the
+priority index as records waiting for review, and the Python binding cited the
+second set in three doc comments.
+
+**Evidence.** A diff of each pair shows one changed line in the title and one
+or two changed footnote lines, and nothing else. The whole-tree search below
+found every citation of the second set. It found four footnotes in the
+duplicate files themselves, three doc comments in one source file, and the
+three registry rows.
+
+```
+grep -rn "ADR-0129\|adr-0129\|ADR-0130\|adr-0130\|ADR-0131\|adr-0131" --exclude-dir=target --exclude-dir=.claude .
+```
+
+**Follows.** Three things.
+
+The second set is marked `Superseded` by the first, and the registry row names
+the twin. The files stay, because the registry keeps the file of a replaced
+record, and each carries a paragraph that names its twin.[^F482B] Every
+citation of the second set now points at the first.
+
+A restore after a collision is a sweep, and it needs the whole-tree search that
+every sweep needs. The restoring commit searched for the claims and not for the
+numbers, so it did not see that the claims already had numbers.
+
+The record check reports a number used twice only when two files share one
+number. Two numbers that share one claim pass it. A check that compared record
+titles across files would have failed here, and none exists.
+
+### FND-483 — A zero in the seat census was read as empty positions, and it means that no position exists
+
+**Believed.** The demonstration world at tick 200 held 32 ranked positions with
+16 of them filled, and a zero `seats_filled` at the end of a game meant that
+positions stood open with no holder. Item 0278 states the first figure, and it
+is now stale.[^F483A]
+
+**True.** Every position that exists has a holder at every measured tick. This
+holds in a run with the controller on, and in a run where every faction is
+externally controlled. The census row `seats_filled` counts the positions that
+exist and have a holder, summed over the sites.[^F483B] A zero in it means that
+no position exists.
+
+A site opens positions in proportion to what it lacks. The share function
+subtracts the store from the target for each kind of work, and it opens nothing
+when no kind is short.[^F483C] Every site starts with the default preference,
+which is 65536 raw, or 1.0 in Q16.16, for every kind.[^F483D] Stores climb to
+hundreds, so a site that lacks nothing opens nothing. All three kinds of work
+map to commodity 0, so one surplus closes every kind at once.[^F483E]
+
+**Evidence.** A read-only probe on 5 September 2026, on one development machine
+(ty001-ubuntu), with seed 81985529216486895, extent 256, four factions, and
+four threads. The probe script lived outside the tree and is not kept. With the
+controller on, the seat count over ticks 0 to 2000 read 0, 16, 16, 8, 8, 0, 0,
+0, 0. With every faction external, it read 0, 24, 24, 16, 16, 8, 8, 8, 0. At
+every sample the count of positions equalled the count of holders. Two of the
+four sites held no position by tick 200 at this seed. This is one
+development-machine run, and it says nothing about the target platform.
+
+**Follows.** Three things.
+
+The census cannot tell "no position opened" from "a position opened and stands
+empty". A `seats_open` row beside `seats_filled` would, and the census is a
+reader, so the row is a reader change.
+
+The seeding layer sets no store target, so the default of 1.0 governs a site of
+64 people. Whether a site keeps its positions open once its store passes the
+target is a behaviour decision. It belongs to the record that governs the
+position pass, and not to a reader.[^F483F] Backlog item 0483 holds the work.
+
+The figure in item 0278 is stale, which is defect shape 2: a document names a
+measured figure, and nothing fails when the tree moves past it.[^F483G] The item
+is not edited here, because its argument does not depend on the figure.
+
+
 ### FND-484 — A relation step for a storm sits in the rules, and no pass reads it
 
 **Believed.** ADR-0146 D3 names a storm on the ground of another faction as a
@@ -11493,253 +11200,951 @@ serves the product record that asks a developer to set what a settlement holds
 and to read the value back.[^F485G]
 
 
-### FND-589 — The economy was believed to deadlock on hunger, and the population never walks to the food
+### FND-486 — Every founded unit carries the worker row, whose attack is zero, so a meeting kills nobody
 
-**Believed.** A unit must be fed to deliver a load and hungry to fill one, so a
-world whose store starts empty can never begin: the units stay hungry, they
-never deliver, and the store stays empty. The dispatcher stated this as the
-likely cause of an economy that moves almost nothing.
+**Believed.** A faction that the seeding founds holds units that can fight. A
+campaign raises a cohort out of those units, and a war between two factions
+costs each side units. A fallen log that stays empty over a run therefore means
+that the two sides never met.
 
-**True.** There is no deadlock. Measured in the demonstration world, 256 by 256,
-four factions, seed 0x0123456789abcdef, 300 ticks, two threads, on
-ty001-ubuntu (x86-64): the mean need holds between 23808 and 37012 of a full
-65536, and 151 of 166 units are fed at tick 300. The store cycles, because the
-production fills it and the ration draws it in the same tick. Hunger never pins
-to zero, so the term that drives the delivery row is not what blocks it.
+**True.** The seeding gives every founded unit the worker row, and the worker
+row holds an attack of zero.[^F486A] A world builds with the default table, and
+a spawned unit takes the default type, which is row zero of it.[^F486B] The
+seeding founds one group for each faction, and it spawns every person of the
+group through that one call.[^F486C]
 
-**What blocks it is that the population never travels.** The units occupy 22 to
-26 distinct tiles at a mean distance of 2 from their home site. They strip that
-ground in about ninety ticks and then stand on it. Every live unit holds a
-gather order every tick and the grant is zero, because no unit stands on
-remaining stock of the kind it ordered. The world still holds 53611 food on
-11631 tiles against 83 ever taken.
+The contest pass tests each ordered pair of types before it adds anything. The
+attack of the attacker must exceed the armour of the defender.[^F486D] The
+record states that a pair which fails the test contributes exactly zero,
+however many attackers stand on the tile.[^F486E] The worker row holds an
+attack of zero and an armour of zero, so a worker never penetrates a worker.
 
-**The cause has a shape this project has met before.** The exit field of an
-option answers at the level 1 pitch, and the stock of a tile is a level 0
-property. A unit standing on barren ground inside the cell that holds the most
-food is told that its cell is the right cell, and nothing tells it to step two
-tiles sideways. A field that answers at one pitch about a fact that lives at
-another is the same defect as a flow field that ran out inside its destination
-cell.[^F589A]
+Two paths give a unit another type. The type verb sets a set of units. The
+campaign raise sets its cohort to the soldier row, whose attack is one, so a
+raised cohort does kill a worker.[^F486F] Nothing else in a seeded run changes
+a type.
 
-**What follows.** The option rows are not at fault and must not be changed to
-compensate. The movement and steering of a unit toward stock is the subject.
+**Evidence.** Read on 5 September 2026, at commit 4f5ed11. The default type
+constant names the worker row. The worker row holds zero in the attack column
+and zero in the armour column. The penetration test compares the two columns
+with a strict inequality. The soldier arena writes the default type on every
+spawn, and the founding calls that spawn for each person of the group.
 
-### FND-590 — The gather order of a unit is written in two places, and the comment that forbids it is in one of them
+A readability review of a 1500-tick run of the demonstration reports the same
+fact from the other end. The run produced no fight, and the reviewer had to
+define a type before a fight could be pictured.[^F486G] This work read the code
+and did not run the demonstration.
 
-**Believed.** A laden unit stops gathering, and that rule lives in the option
-row rather than in a second place that could disagree with it. The delivery row
-says so in its own doc comment.
+The harnesses that count the fallen define their own rows first. The
+thread-count harness writes two fighter rows over the default table before it
+spawns anything.[^F486H] That is a second reading of the same fact.
 
-**True.** The choice pass clears the gather order when a unit takes a row that
-names no resource kind, and the faction controller then sets the order for every
-unit of the faction at the last stage of the same step. Measured over the run
-above: the units holding a gather order equal the live unit count at every tick,
-while the intent to forage is only 18 to 118. So the rule holds in a world with
-no controller and fails in every world that has one.
+**Follows.** Four things.
 
-**What follows.** This is the recurring shape of one value with two declaration
-sites and no check that fails when they disagree. The comment states the rule
-the code does not keep, which is worse than no comment.[^F590A]
+**The unit clause of the domination reader cannot fire through combat in the
+demonstration world.** That clause ends a game when every rival holds no
+unit.[^F486I] A contest is the path that empties a faction, and a contest
+between workers kills nobody. The seat clause is unaffected, because it reads
+the holder of a seat tile.
 
-### FND-591 — A field over stock must state a fact about the ground, not about the order a unit holds now
+**A fallen log that reads zero reports the seeding and not the contest.** The
+subsystem census holds no row for the fallen, so a reader must open the log to
+see the zero at all.[^F486J] A census row beside the others would make it
+visible. That is the shape FND-483 records for the seat count, where a zero
+meant that no position existed rather than that no position was filled.[^F486K]
 
-**Believed.** A field that steers a unit to stock is keyed on the resource
-kind, so the seed set takes the kind from the gather order of each unit. A
-block seeds only the kind that the units standing in it were told to gather,
-which is the cheapest set that answers the question.
+**A fixture built from the demonstration world measures the fixture.** The
+testing rule names this shape. A fixture that models the typical case supplies
+no extreme, so the assertion never receives the input that would fail
+it.[^F486L] A combat test seeded the way the demonstration is seeded passes
+whatever the contest pass does.
 
-**True.** That set is stale before any unit reads it. The engine derives the
-field at the barrier of one step, and two passes write the gather order after
-that barrier. The controller of a faction writes the order of every unit of
-that faction at the last stage of the step.[^F591A] A unit therefore reads the
-field on the plane of an order that the field was not seeded for, finds no
-entry, and takes the coarse answer it took before the field existed.
+**A table of four filled rows is one row until something assigns the rest.**
+The record states that zero in a column means cannot.[^F486M] The seeding
+reaches one of the four rows, so three of them describe a unit that the
+demonstration never holds. Backlog item 0491 holds the work.[^F486N]
 
-**Evidence.** The first build keyed the seed set that way. Measured in the
-demonstration world, 256 by 256, four factions, seed 0x0123456789abcdef, 300
-ticks, two threads, on ty001-ubuntu (x86-64): the food ever taken rose from 83
-to 136 of 53694, which is the rise that the frames between two order writes
-give. A build that seeds every kind in each occupied block reached 160 in the
-same run, and the field then answers on every plane a unit can read.
+### FND-487 — Eleven test fixtures took ground by standing units on it, and each one encoded the rule rather than the need
 
-**What follows.** A derived field that a later pass can invalidate is a stale
-read that nothing fails on.[^F591B] Seed such a field from the state that no
-later pass writes. Here that state is the ground: a block seeds every resource
-kind it holds, and the order of a unit only selects which plane the unit reads.
-The field then holds no fact that any pass of the step can contradict.
+**Believed.** A fixture that wanted a faction to hold ground put units on that
+ground and ran a few frames. Each fixture said in its own prose that this is
+how a faction takes ground.
 
-**The cheap set is still the block set.** The seeds follow the blocks that hold
-a unit, and a block that holds none seeds nothing, so the derivation follows
-the population and never the tile count.[^F591C]
+**True.** That was the spread rule, and one record superseded it.[^F487A] A
+faction now holds the ground its cities reach, and a unit gives its faction no
+claim on the tile it stands on. Every one of those fixtures then held nothing,
+and eleven Rust test files and four Python test files went red at once. None
+of them was about the spread. Each wanted one thing: a tile whose holder is a
+named faction.
 
-### FND-597 — The relaxation reach of an approach field follows what the frame needs, not the block edge
+**Evidence.** The rewrite of the holding pass turned the whole suite red in one
+commit, and each repair was one founding call.
 
-**Believed.** An approach field relaxes over twice the block edge, so its reach
-covers a whole block by a straight route and admits a detour of the same
-length. That count is a property of the instrument.
+    cargo test -p cachette-core --no-fail-fast
 
-**True.** It is a property of the question. A destination plane must lead a
-sent unit from anywhere in a block to one named tile, so its reach must cover
-the block. A field over stock must not: a block holds many stocked tiles, the
-engine derives the field again at every frame, and a unit takes one step in a
-frame. A reach beyond the step the unit takes now is derived again before the
-unit walks it.
+**Follows.** A fixture states the need and not the mechanism where it can. The
+cheapest form here is one call that founds a city and one step, and a helper
+that a file states once. A fixture that walks the rule is a second declaration
+of the rule, and it fails the day the rule changes, which is the day it says
+least about the test it serves.
 
-**Evidence.** Measured in the demonstration world named in the finding above.
-At the block reach the food ever taken reached 131, and one step cost 25.5
-milliseconds more than a step with no field at all. At a reach of two the food
-ever taken reached 160, which is more, and the step cost 6.6 milliseconds more
-than a step with no field. **Part of that 6.6 is not the field.** A population
-that walks moves more units and gathers more often, so the step does more of
-its own work, and the two runs are not the same simulation. A unit whose stock
-lies further reads no offset and takes the direction of its level 1 cell, which
-is the answer every unit read before the field existed.
+**This is the second declaration shape, in test data.**[^F487B] The rule lived
+in the engine and in the fixtures. Nothing failed when they disagreed, because
+they only disagreed once the rule moved.
 
-**A second measurement came out of the same work.** The derivation asked the
-terrain for the ground of one block once for each plane of that block. The
-terrain is generated and never stored, so each question costs a noise
-evaluation.[^F299A] The ground of a block depends on the block and on the
-water crossing of the plane, and never on the plane itself. A walk in block
-order that holds the ground while the block repeats cut the whole demonstration
-step from 34.9 to 30.0 milliseconds, before the new field was added at all.
+**The viewer crate held the same shape, and it was found later.** Four suites
+of the viewer took ground by standing a band of soldiers on it. The lib tests
+of the panels failed 12, the upgrade and weather suite failed 8, the holder
+suite failed 9, and the card suite failed 1. Every one of the 30 was repaired
+by a founding call, and no assertion was weakened.
 
-**What follows.** State the reach a field needs beside the field, not beside
-the instrument. The two figures above are derived on a development machine and
-not on the target platform, and the blocker that says which cost figures are
-measured stays open.[^28]
+    cargo test -p cachette-view --no-fail-fast
 
-### FND-598 — Two tests held that a store fills from production alone, and a unit that reaches food makes both false
+**A city changes what else the picture draws, and two fixtures had to say
+more.** A city marks its tile, a unit covers most of its tile at a close zoom,
+and the picture draws the edge of a holding. The old band held ground four
+rings wider than the units, so the tile a fixture picked was plain by accident.
+Under the new rule the ground is a disc around the city, and the same pick
+lands on the edge or under a unit. Two fixtures now state what the tile must
+be: held, with six held neighbours, no city and no unit.
 
-**Believed.** A site store fills from the production rate of the site and from
-nothing else. A conservation test over the store therefore names four terms:
-what production put in, what upkeep spent, what the cohorts drew, and what a
-birth cost. A starvation test therefore holds that a group whose site has no
-production rate loses every person.
+**Two of the repaired tests cannot fail under the defect they name, and the
+fixture is not the reason.** Both compare a held world with a second world
+drawn by the same code, or read the value under test back through the function
+that produces it. A defect in the layer moves both readings together. The
+holding rule did not cause this and the repair did not remove it. Testing rule
+2a names the shape.[^F487C]
 
-**True.** A fifth thing fills a store, and it always could. A unit that gathers
-from the ground and walks home moves its load into the store of its home site.
-Neither test was wrong when it was written, because no unit ever reached ground
-that carried the kind it was ordered to gather.[^F593A] Both went false on the
-frame that one did.
+**The same shape returned one rule later, at the build order.** A faction now
+lays a road only on a tile its own plan zones.[^F487D] Four viewer tests
+ordered a build and never zoned a project, so the engine refused the order.
+Three of them assert on the mark a build site draws. The fourth reads the
+upgrade overlay, and it took its site from what the controller happened to
+build rather than from a build the fixture asked for. Each repair zones the
+project the order needs, and no assertion was weakened.
 
-**Evidence.** Both tests pass on the parent commit and fail on the commit that
-lets a gatherer reach stock. The conservation test misses by three whole loads,
-which is what the delivery ledger reports for the same run. The starvation test
-finds 30 of 120 seated people alive where it asserted none.
+    cargo test -p cachette-view --no-fail-fast
 
-**What follows.** A test that lists the terms of a balance states a count, and
-a count decays.[^F483G] Read a listed balance as a claim about what the engine
-can do, not as arithmetic. When a capability that was inert starts working, the
-tests that passed because it was inert are the ones to look at first.[^F498G]
+**A fixture that waits for the engine to supply its input measures the
+engine.** The overlay test above is the clear case. It ran the world and read
+whatever site appeared, so a rule change that stopped the controller building
+emptied the fixture. The repair spawns a builder, zones the project and orders
+the road, so the test states the input it needs.[^F487C]
 
-**The starvation test now claims the negation of the test it defends**, and no
-more. The test above it asserts that every seated person lives. This one takes
-the rate away and asserts that they do not. A survivor count would be the same
-decaying figure again.
+### FND-488 — A carrier that holds a home walks home rather than where it was sent
 
-### FND-672 — A wave of engine work landed with the Python suite unrun, and none of the thirteen failures was a regression
+**Believed.** A unit that a caller sends to a tile walks toward that tile. The
+send verb says that every unit the call names reads one entry of the plane and
+steps, and the movement pass says that the destination plane wins over the
+option the unit scored for itself.[^F488A] [^F488B] The controller therefore
+gave each carrier a home at the site of its own faction, so that the carrier
+still ate, and sent it to the site of the other party.
 
-**Believed.** Thirteen Python tests that drive the engine were failing on
-`main`. The economy figures and the trade figures moved together, and a wave of
-weather work had landed on 6 and 7 September, so the pattern read as a
-regression from the weather: weather moves tile water, and a site's production
-rate reads the ground.
+**True.** The destination plane wins over the option row, and the return field
+is not an option row. A unit that holds a home site and a load at the carry
+mark is laden, and a laden unit climbs the return field toward its own
+site.[^F488C] A carrier under the default mark therefore gathers on the way,
+crosses the mark, turns round, empties its load into the store of its own
+faction, and starts again. It never arrives.
 
-**True.** No failure of the thirteen was an engine regression. Eleven stated
-behaviour that a deliberate change had replaced. One restated a list that the
-engine declares. One used an instrument that cannot measure what it asserts;
-whether it once could was not established, because the weather module has
-changed by 1847 lines since that test landed and no older tree was built.
-Five changes, one stale list and one bad instrument account for all thirteen:
+**Evidence.** The end-to-end test of item 0482 ran 600 ticks with a bound
+contract in flight and no quantity moved on it. A print of every carrier on
+every fiftieth tick showed each one within a few tiles of the site of its own
+faction, with a load, and sent. Raising the carry mark above what a carrier
+picks up on the way made the same fixture deliver.
 
-    six  economy tests    the production pipeline scales the stored rate,
-                          and the upkeep gained a holding term
-    two  trade tests      the same holding term, taken on the tick the
-                          measured step crosses
-    one  land trade test  BLK-036 resolved and the refusal it asserted was
-                          removed on purpose
-    one  agent test       every caller-facing verb now leaves the world
-                          readable, so the refusal it asserted is repaired
-    one  controller test  the census table grew and the list in the test
-                          did not
-    one  weather test     the lattice gained a margin that the totals hold
-                          and the arrays crop away
-    one  wind test        the centre of a cropped array measured what left
-                          the world
+**Follows.** The carrier rule holds only while the carry mark stays above what
+a carrier gathers on the way. The code says so where it assigns the carriers,
+and the test fixture says so where it raises the mark. **A world whose mark is
+low sends its carriers home instead**, and nothing fails when it does. The
+alternative, a carrier with no home, is worse: the consumption pass serves a
+ration to the residents of a site, so a unit with no home eats nothing.
 
-**Evidence.** Each failure was traced to the commit that changed the
-behaviour, and each change carries its own reasoning in its commit message or
-in a record. The economy and trade group is 17227805 and 60c33a2a, the land
-group is 62fefa40, the readable-world group is the repair that FND-648
-records, and the weather group is 4fc66047.[^F672A] **None of the five
-commits the reading named is the cause of any failure.** Weather is involved
-in one of the thirteen, and through the margin rather than through the water
-it moves.
+### FND-489 — A unit sent to a tile arrives in the cell of that tile, and walks the last tiles by itself
 
-**The record predicted the work and nobody did it.** The draft record for the
-derived rate states in its own consequences that every test which sets a
-production rate, steps and asserts a store quantity now reads a different
-number, and that this is fallout of switching on a sink rather than a defect of
-the sink.[^F672B] The fallout was named and left.
+**Believed.** A contract moves a quantity when a unit of the debtor stands on
+the site of the other party.[^F489A] The controller sends a carrier at that
+site, so the carrier arrives and pays.
 
-**What follows.** A record that names its own fallout has not carried it out. A
-change that lands with a suite unrun leaves the next reader unable to tell a
-regression from an intended change, and the reading of the pattern was wrong in
-this case. Put the fallout in the item, and run the suite the changed behaviour
-is stated in.
+**True.** A destination field holds one direction for each level 1 cell, not
+one for each tile.[^F488B] The send verb takes the cell of each seed tile and
+seeds the plane at the cell. A unit outside that cell climbs toward it. A unit
+inside it reads the seed cell, finds no direction, and walks where its own
+choice takes it. The last tiles of the journey are therefore a walk of the
+unit's own, and the exact tile of the site is one tile of a whole block.
 
-## References
+**Evidence.** The end-to-end test seats the two sites in one level 1 cell, and
+a quantity then moves inside a bounded tick count. With the two sites in two
+distant cells the carriers reached the right part of the world and no quantity
+moved on the contract. The unit that paid was not always a carrier the
+controller assigned, because any unit of the debtor that stands on the site of
+the other party with a load pays the contract.
 
-[^F443A]: Review of backlog item 0390, section 5. `docs/reviews/0390-the-fallen-log.md`
-[^F443B]: Findings register, FND-148. `docs/FINDINGS.md`
+**Follows.** The end-to-end test of item 0482 proves that the chain from the
+board to the delivery is not inert. **It does not prove that the unit that paid
+was one of the carriers the controller assigned**, and the delivery pass names
+no unit in its log, so no reader can tell. A later pass that wants a carrier to
+arrive at a tile needs a field that resolves below the cell, or a verb that
+sends a unit at a site rather than at a tile. That is engine work and it is not
+in this item.
 
-[^F470A]: PRD-0015, a unit has parents and children. `docs/product/accepted/prd-0015-a-unit-has-parents-and-children.md`
-[^F470B]: PRD-0016, somebody is in charge. `docs/product/accepted/prd-0016-somebody-is-in-charge.md`
-[^F589A]: Findings register, FND-576, the release of a sent unit that arrives, in this document.
-[^F590A]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
-[^F591A]: Findings register, FND-590, in this document.
-[^F593A]: Findings register, FND-589, in this document.
-[^F591B]: Findings register, FND-029, in this document.
-[^F591C]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
-[^F470D]: Findings register, FND-360, in this document.
-[^F471A]: Backlog item 0461, tell a caller which arena an identity belongs to. `docs/backlog/proposed/0461-tell-a-caller-which-arena-an-identity-belongs-to.md`
-[^F471B]: Decisions register, DEC-265. `docs/DECISIONS.md`
-[^F472A]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
-[^F472C]: Decisions register, DEC-266. `docs/DECISIONS.md`
-[^F473A]: Blockers register, BLK-150. `docs/BLOCKERS.md`
-[^F485A]: Research report 24, demonstration readability, resources and weather, section 7. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
-[^F485B]: The site economy reader of the bindings. `crates/cachette-py/src/lib.rs`
-[^F485C]: The type stub of the compiled module, the founding verbs and the site columns. `python/cachette/_core.pyi`
-[^F485D]: The type stub of the compiled module, the founding report of the seeding verb. `python/cachette/_core.pyi`
-[^F485E]: The demonstration application, the seeding call. `python/cachette/demo/app.py`
-[^F485F]: Backlog item 0490, let the control plane read the store of a seeded settlement. `docs/backlog/proposed/0490-let-the-control-plane-read-the-store-of-a-seeded-settlement.md`
-[^F485G]: PRD-0047, a game states its own economy. `docs/product/shaped/prd-0047-a-game-states-its-own-economy.md`
-[^F484J]: ADR-0146, a faction relation is one signed integer per ordered pair and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
-[^F484H]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
-[^F484C]: The relation module, the storm step of the relation rules. `crates/cachette-core/src/relation.rs`
-[^F484D]: Balance register, the step when a storm falls on the ground of the other. `docs/reference/balance.md`
-[^F484E]: Blockers register, BLK-130. `docs/BLOCKERS.md`
-[^F484F]: Recurring Defect Shapes, shape 3, inert code that nothing invokes. `.agents/rules/recurring-defects.md`
-[^F484G]: Research report 24, demonstration readability, resources and weather, section 2.1. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
-[^F411A]: ADR-0125, the control plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
-[^F411B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, the consequences. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
-[^F411C]: The sent set test of the core. `crates/cachette-core/tests/a_sent_set_walks_to_its_destination.rs`
-[^F411D]: Backlog item 0401, decide how a sent unit gets around a barrier the field cannot see. `docs/backlog/proposed/0401-decide-how-a-sent-unit-gets-around-a-barrier.md`
-[^F410D]: ADR-0125, the control plane names the seed set of a destination field, decision D2. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
-[^F431A]: Backlog item 0421, put the two quantity passes into the stage table. `docs/backlog/proposed/0421-put-the-two-quantity-passes-into-the-stage-table.md`
+### FND-490 — A faction that founds with two people fills no ranked position, and the world still ends
 
-[^F326A]: The head-up display, the row drawing. `crates/cachette-view/src/hud.rs`
-[^F218B]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
-[^F327B]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
-[^F328A]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
-[^F315B]: The refused step test. `crates/cachette-core/tests/a_refused_step_does_not_freeze.rs`
-[^F318A]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D1 and the alternatives rejected. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
-[^F318B]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decision D2. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
-[^F317A]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/complete/0187-give-a-carried-load-somewhere-to-go.md`
-[^F317C]: Testing rules, section 5. `.claude/rules/testing.md`
-[^F317D]: Backlog item 0305, give a laden unit a reason to go home. `docs/backlog/complete/0305-give-a-laden-unit-a-reason-to-go-home.md`
-[^F316A]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/proposed/0279-let-a-golden-scenario-reach-the-position-pass.md`
+**Believed.** The founding group is a balance value with no structure behind
+it. The register marks it unset and holds a provisional number, so a change to
+that number moves shares and nothing else.[^F490A]
+
+**True.** The number gates a mechanism. The project owner set the founding
+group to 2 on 5 September 2026. A faction of two people has almost no
+gatherers, so no site ever reaches the store a ranked position asks for, and
+`seats_filled` is zero in every game. Three Python log tests also went red,
+because the shortage they test needs a crowded world and each read the default
+instead of asking for a group.
+
+**Evidence.** The balance harness ran the same seed at both values.
+
+    just balance --seeds 2
+
+At a founding group of 64 the harness reported `units=256 settlements=4
+seats_filled=16` and a win at tick 69. At a founding group of 2 it reported
+`units=8 settlements=4 seats_filled=0` and a win at tick 449. Both games ended
+before the tick limit, and every faction seated a settlement in both. Statement
+4 of the harness gained `seats_filled` in its list of counts that are zero in
+every game.
+
+**Follows.** The world does not stall, so nothing needs tuning. Two derivations
+in the balance register cited the old number and now state nothing true: the
+base reach of 4 was chosen as the disc that nearly holds 64 people, and the
+campaign cohort of 4 was chosen as half a founding group. Both rows now record
+that the derivation lapsed.[^F490A]
+
+**A balance value that gates a mechanism is not only a share.** A register row
+that reads as a share hides this, and only a harness run finds it. Run the
+harness at both values before and after a change to a founding number, and
+report what the mechanism did, not only what the share did.
+
+### FND-491 — Two reads a road plan needs have no reader, and a draft record said the engine already had them
+
+**Believed.** ADR-0152 D2 states that the road solver reads the sites a faction
+holds, the deposits it knows and which of its sites are unconnected. It then
+said that each of the three is a bounded aggregate that the engine already
+exposes or derives at the barrier.[^F491A]
+
+**True.** One of the three has readers. Two have none.
+
+The sites of a faction are readable. `SettlementArena` gives `iter`,
+`faction`, `tile` and `address`, and `World::seat` gives the seat of a faction
+at `crates/cachette-core/src/world.rs:9611`.
+
+**Nothing says which sites are unconnected.** No pass derives connectivity, and
+nothing indexes the roads. `World::finished_upgrade` answers for one tile at
+`crates/cachette-core/src/world.rs:5238`, and `World::upgrade_sites` returns
+the sparse entries at `crates/cachette-core/src/world.rs:5219`. Neither joins
+two places.
+
+**Nothing names the deposits of a faction.** A tile stock is generated from the
+seed, and only what was taken is stored.[^F182B] `World::original_stock` and
+`World::tile_stock` answer for one tile at `crates/cachette-core/src/world.rs:1221`
+and `crates/cachette-core/src/world.rs:1246`. No aggregate collects them.
+
+**Evidence.** The whole public surface of the world was listed and read.
+
+    grep -n "pub fn " crates/cachette-core/src/world.rs
+
+**Follows.** The record now states the read as a constraint. It says that each
+of the three must reach the solver as a bounded read, that the record does not
+claim a reader exists, and that the work which implements it states in the open
+what the solver does without one.[^F491A]
+
+**A record that says a reader exists is a capability claim, and the scope rule
+forbids it.**[^F491C] A record states what the code does or the constraint the
+code must satisfy. A reviewer who reads "the engine already exposes" plans work
+that has no ground under it, and nothing fails until an implementer opens the
+file.
+
+### FND-492 — A test that reads the work done cannot tell a stopped build from a raised one
+
+**Believed.** A test that watches a build reads the work done on the tile. A
+build that stopped shows the work it had, and a build that ran on shows more.
+
+**True.** The work done returns to zero when the level rises, and it then
+counts up again.[^F492A] A build that ran on for the work of one whole level
+shows the same small number that a stopped build shows. The first form of the
+test that proves the build pass refuses a row the ground no longer fits
+therefore passed with the defect put back, and it measured nothing.
+
+**Evidence.** Written on 5 September 2026, during item 0486. The test ordered a
+road, stepped once, and asserted that the work done stayed at one after eight
+more steps. It passed with the resolution removed from the build pass. A probe
+printed the work done as one at level one, because the level had risen at the
+eighth step and the ninth step had added one.
+
+**Follows.** Assert on the level, and on the work done beside it. A quantity
+that resets is not a monotone reading, and a test that treats it as one
+measures the fixture.[^F492B] The rule that a fixture must reach the case is
+about the data; this is the same failure in the assertion.
+
+### FND-493 — One faction climbs one destination plane, so a verb cannot send each unit to its own place
+
+**Believed.** ADR-0152 D5 states that the order sends each unit to the project
+nearest to it by hex distance.[^F493A] The statement reads as a promise of
+per-unit routing: this unit walks to that project.
+
+**True.** The engine moves a unit by a destination field, and a field is one
+plane. The plane of a faction is its faction number, and the campaign and the
+carriers already share it. The send verb takes a set of units, a set of seeds
+and one plane, and every unit on that plane climbs toward the nearest seed of
+the whole set. A per-unit destination would need a plane for each unit. **The
+code is right and the record was wrong.** The order decides the category a
+unit builds and the seed set the faction climbs. The field decides which seed
+a walking unit reaches.
+
+**Evidence.** The send verb is `World::send_units_to` at
+`crates/cachette-core/src/world.rs:1410`, and it writes one seed list for one
+plane. The assignment is `World::project_for` at
+`crates/cachette-core/src/world.rs:5631`, and the controller collects its
+answers into one seed list at `World::controller_take_projects`,
+`crates/cachette-core/src/world.rs:10527`. The campaign raise takes the same
+plane, and the carrier assignment takes it again. Three records state the form
+the engine has: the direction comes from a per-cell field and never from a
+per-unit search, the reach counts cells to the nearest seed, and the caller
+names the plane while the engine allocates none.[^F493B] [^F363A] [^F493D]
+
+**Follows.** ADR-0159 states the assignment, and it changes ADR-0152 D5.[^F493E]
+It says that the order names one category for each unit and one seed set for
+the faction, that the field distributes the units, and that no named unit is
+promised a named project. The reasoning is the design principle: a set-valued
+command buys a cheaper algorithm, and a promise of per-unit routing would
+forbid it.[^ORIENT2]
+
+**The retcon window was closed, so the project superseded rather than amended.**
+The window admits an in-place amendment only when nothing depends on the claim
+being changed. Source files cite ADR-0152 D5, backlog item 0488 was refined
+against it, and the registry row of ADR-0156 depends on ADR-0152. The registry
+also says to assume the window closed when in doubt.[^8] ADR-0152 keeps its
+text and its status, in the form ADR-0146 and ADR-0153 already use for a change
+to one decision of another record.
+
+**The rule is still testable, and it is tested where it decides.** The
+assignment is one reader, `World::project_for`, and the controller calls it.
+The test drives that reader rather than the walk, because the walk is the
+field's answer and not the rule's.
+
+### FND-494 — The wealth path has an arithmetic ceiling, and domination cannot fire in a seeded run at any bar
+
+**Believed.** The wealth path and the wonder path fired too early, and raising
+the two bars would let domination and territory end most games. The stock
+target row said the demonstration store climbs to hundreds by the tick limit,
+so the bar of 4096 whole units sat above any stock a run reached.[^F494A]
+
+**True.** Three things.
+
+**The stock target derivation was wrong by a factor of about eighty.** The
+store climbs to thousands, not to hundreds, and it climbs by 4.4 to 7.0 whole
+units on each tick. The wealth path therefore ended every game of the default
+seed set.
+
+**The wealth path has a hard ceiling that bounds the bar.** A faction founds
+one settlement, the commodity count is one, and a store is a `Fix32`. The
+stock total of a faction therefore clamps at 32767 whole units, and a target
+above that never fires. The bar can rise by at most a factor of eight, and no
+larger raise exists.
+
+**Domination cannot fire in a seeded run, and no bar changes that.** Two
+independent things stop it. The seat clause asks for a faction that holds the
+seat of a rival, and no faction fills a seat at all.[^F494B] The unit clause
+asks for a faction whose rivals hold no unit, and every founded unit carries
+the worker row, whose attack is zero, so a meeting kills nobody.[^F494C] A
+soldier reaches the field only through a campaign, a campaign is drawn only
+between factions at war, and no war is declared. The founding group is two
+people and the campaign cohort is four, so a raise could not take its cohort
+even if a war began.[^F494A]
+
+**Evidence.** Two runs of the balance harness on one development machine
+(ty001-ubuntu, x86-64), on 5 September 2026, over the 8 default seeds, extent
+256, four factions.
+
+    just balance
+
+Before, at a stock target of 4096 whole units, a wonder work of 240 and a tick
+limit of 2000: wealth or wonder won 8 of 8, at ticks 437, 470, 590, 841, 940,
+1110, 1340 and 950. No game ended on territory, on domination or on renown. No
+wonder finished. The run cost 30 seconds.
+
+After, at a stock target of 28672 whole units, a wonder work of 2400 and a tick
+limit of 5000: territory won 5 of 8 and wealth or wonder won 3 of 8, at ticks
+2960, 3180 and 3980. Domination and renown won none. No wonder finished. The
+run cost 2 minutes 46 seconds.
+
+A third run at a tick limit of 20000 and a stock target of 24576 whole units
+recorded wealth or wonder at 8 of 8, at ticks between 2520 and 7290. The
+project owner then set the horizon to 5000 ticks, so the second run above is
+the one that governs. The 20000-tick run cost 2 minutes 14 seconds.
+
+A probe stepped three seeds to 20000 ticks and read the standing of each
+faction. The stock total reached 32767 whole units by tick 8000 in every one,
+and stayed there. The wonder work done stalled between 18 and 61 units before
+tick 500 and never moved again.
+
+**These are development-machine runs.** They are no evidence about the target
+platform, which is AWS Graviton. Every cost figure in this project is derived
+rather than measured on the target, and the blocker that says so is
+open.[^28] The shares themselves stay unset while the rules of the
+downstream game are unwritten.[^F494F]
+
+**Follows.** Three things.
+
+**Do not raise a bar to reach a share that the mechanism cannot produce.**
+Domination is not a balance problem. It is blocked by a unit table and by a
+relation that never moves, and only code closes it.
+
+**Ask what bounds a value before choosing its multiple.** The stock target has
+an arithmetic ceiling that no register row stated. A row that holds a target
+should hold the ceiling of the quantity it compares.
+
+**A derivation is a claim, and it decays like any other.** The stock target row
+carried a wrong claim about the store from the pass that wrote it, and no check
+could see it. Only a harness run found it.
+
+### FND-495 — A bound test that fills the stored block measures the block and not the bound
+
+**Believed.** A test that pushes one entry past the bound of a queue proves
+that the bound refuses it.
+
+**True.** The queue of a site is a block of a fixed width, and the bound a
+world enforces sits at or below that width. A test that filled the block was
+refused by the block, whatever the bound said. The first form of the test that
+proves the queue bound therefore passed with the bound check removed.[^F495A]
+
+**Evidence.** Written on 5 September 2026, during item 0497. The test pushed
+`QUEUE_BOUND` entries and asserted that the next push was refused. The bound
+check was replaced with a branch that never fires, and the test stayed green,
+because the search for a free position in the block found none. The test now
+sets a bound of two against a stored width of four, and it went red under the
+same defect. A second test covers the width.
+
+**Follows.** **When one limit sits inside another, the fixture must sit
+between them.** A test at the outer limit cannot see the inner one. Ask which
+limit the assertion means, and build the fixture so that only that limit can
+fire.[^F492B] This is the shape of the fixture rule at the assertion rather
+than at the data: the input was extreme, and it was extreme in the wrong
+direction.
+
+### FND-496 — The road chain finished nothing in a run, because the plan bound where a unit builds and not what it builds
+
+**Believed.** The road chain works. Backlog item 0488 was moved to `complete/`
+with the outcome "Built", and the plan tests pass. The solver zones, the
+controller orders, the pass builds, and the census counts the project
+finished.[^F496A]
+
+**True.** The chain never closed once in a run of the demonstration world. The
+solver zoned, the controller ordered, and every order was refused. No road
+stood, and the plan register filled to its bound and stayed there.
+
+The cause is one clause the build rule did not hold. The rule read the plan
+only for a row that asks for no held ground, and it read it to ask whether the
+tile was zoned for that same category.[^F487D] It never asked whether the tile
+was zoned for **another** category. The demonstration controller draws a
+category for a whole faction and orders every unit to build it where it stands,
+and that draw applies at a lower draw index than the project order.[^F496C] A
+unit therefore planted one category on a tile its own plan zoned for another. A
+tile carries one upgrade, so the row resolution then refused the project's own
+category for ever, and no order could raise it.[^F496D]
+
+**Evidence.** The run was
+`uv run python -m cachette.demo --run-to-end --extent 96 --factions 3
+--tick-limit 800`, on the x86-64 development machine and not on the target
+platform.[^F496E]
+
+**One seed measures one world, so the reading is a spread.** Eight seeds were
+written down before any of them ran, and each was run for 800 ticks with the
+clause and without it. The count of seeds that finished at least one project
+went from one to seven. The count that also stood a road went from one to four
+at 600 ticks.
+
+| Seed | Finished without the clause | Finished with it |
+|---|---|---|
+| `0xf37fd6bdd8b64a3a` | 0 | 3 |
+| `0xea335e28791d60da` | 1 | 13 |
+| `0x58d024d97012dd6a` | 0 | 2 |
+| `0x0000000000000001` | 0 | 0 |
+| `0x0123456789abcdef` | 0 | 3 |
+| `0xdeadbeefcafef00d` | 0 | 2 |
+| `0x00000000000002a1` | 0 | 1 |
+| `0xffffffffffffffff` | 0 | 2 |
+
+The plan figures barely move. At `0xf37fd6bdd8b64a3a` the run zoned 120 and
+dropped 4680 without the clause, and it zoned 123 and dropped 4677 with it. The
+zoning count of 120 is three factions at the plan bound of forty. Each plan
+fills once and then never changes, because nothing finishes and nothing is
+cleared, so every later write is a drop.
+
+Instrumentation of the controller stage over sixty ticks named the refusal.
+Every project build order gave `TileHoldsAnother`, with a standing category the
+older draw had planted and the project's own category asked for. Not one order
+was ever applied.
+
+**Four census rows do not count what their names claim.**
+`projects_dropped` and `projects_refused` are not disjoint: a write past the
+bound raises both. `projects_refused` also holds every build refusal of the
+world, not only a refusal of a plan write, so two names read as one subsystem
+and are three things.
+
+`controller_commands` and `controller_refused` are counts of the last tick
+alone. The controller empties its log at the start of every tick, and it plans
+no command once the game end is written, so a run that ended reads zero in both
+rows while `plan_passes` reads 4800.[^F496J] Every other row beside them counts
+the whole run. Two time bases sit in one table and nothing marks which is
+which.
+
+**The production queue registered no census row at all.** The world holds four
+readers for it, and the Python boundary hands them out through a call of its
+own. The one census table holds none of them, so the demonstration census lists
+no queue row and a watcher cannot see what the queues produced or refused. The
+table is meant to be the only list, and a second declaration site now answers
+where the table is silent.[^F483A]
+
+**No test could have caught it.** The end-to-end test of the item calls
+`world.set_controller_evaluations(0)` and says in its own comment that it
+removes the competing draw "so that it measures the project order alone". Every
+other test of the chain drives the build verb by hand. The item's "done when"
+list asked for a test of each part and for no test of the whole, so the wave
+shipped a chain whose links each passed and whose whole never ran.[^F496F]
+
+**Follows.** Four things.
+
+**The plan binds every category, not only the reaching one.** The build rule
+now refuses an order that names one category on a tile the builder's own
+faction zones for another, whatever the row asks for. One typed refusal names
+the plan rather than the tile. The verb and the build intent pass call the one
+function that states the rule.[^F487D]
+
+**A chain needs a test that runs the chain, and over more than one seed.** The
+new test seeds the demonstration world at eight seeds, calls no verb of its
+own, removes no draw, runs each for a bounded number of ticks, and asserts that
+a stated number of them finished a project and stood a road. It reads four of
+eight with the clause and one of eight without it.[^F496G]
+
+**A fixture that removes the competing draw measures the fixture.** The
+register already held this shape twice, and this is the third instance. Turning
+a subsystem off to isolate another one hides exactly the defect that the two
+subsystems have together.[^F492B]
+
+**The plan still fills to its bound and drops thousands, and one seed of eight
+still finishes nothing.** The fix closes the loop; it does not make the loop
+reliable. Nothing releases a unit from a project send, so the seed set the
+faction climbs is written once and never re-aimed. Both stay open.[^F496I]
+
+**A fixture that named the return field read units the destination field
+steers.** The move pass reads the destination plane of a unit first, and it
+takes the option row only when the unit is free.[^F496L] The test that names
+the return field never checked whether the unit was free. It found six laden
+units in the world it was written against, and it passed because those six
+walked a destination direction that agreed with the return direction or stayed
+put.
+
+The clause of this finding makes a faction build the roads its plan zoned, so
+far more of its units carry a load. The same test then found 117 laden units,
+every one of them on the plane of its own faction, and the agreement broke.
+**The clause was right and the fixture was wrong.** The fixture now frees the
+units it measures through the stop verb, drops any that the step sends again,
+and asserts that it read some. It reads 113 of 117.
+
+The repair was proved twice. The assertion goes red when the expected
+neighbour is turned by one, so the fixture reaches the case. The test is green
+with the clause and green without it, so it no longer measures the clause.
+
+### FND-497 — The window settings were applied in an order the window library refuses, and no test could see it
+
+**Believed.** The demonstration applies its video settings to an open window,
+and the settings name what the window could not do rather than failing in
+silence.[^F497A] The order of the three calls did not matter, because each one
+sets an independent property.
+
+**True.** The order decides whether the window takes the call at all. The
+window library refuses a size while the window is fullscreen, and it refuses by
+raising.[^F497B] The settings sent the size first, so the key that left
+fullscreen set the size while the window was still fullscreen. The library
+raised, and the raise passed through the key handler and stopped the change.
+The refusal list never saw it, because the code guarded only against a method
+the window does not have.
+
+**True, second part.** The surface took its size from the setting, and a
+fullscreen window is the size of the screen. The picture therefore stayed the
+size of the windowed surface inside a full screen. The window picture was built
+once from the first surface and held a fixed pitch, so a surface of a new size
+handed it a buffer of the wrong length.
+
+**Evidence.** The project owner reported both faults from a run. The library
+raises from the base window class, before any platform code runs, whenever the
+fullscreen state is on.[^F497B] An existing test drove the settings against a
+fake window, and it asserted the wrong order as correct, because the fake took
+every call.[^F497C]
+
+**Follows.** Three things.
+
+**A fake that accepts every call tests the caller against a window that does
+not exist.** The fake must refuse what the real library refuses. The test that
+covers this now raises from the fake exactly where the library raises.
+
+**Name a refusal that arrives as a raise, not only one that arrives as a
+missing method.** A promise to name what could not be done must cover every way
+the other side says no.
+
+**The window path of the demonstration has no test that opens a window, because
+the gate has no display.** Everything the window path can be tested without a
+window is now tested: the order of the calls, the refusal, the size the surface
+follows, and the rebuild of the picture. What stays untested is the part that
+needs a real window: that the library moves the window to the screen size, that
+the size the window reports after a call is the size it drew at, and that the
+picture reaches the screen. Someone tests those on a machine with a display, or
+in the gate under a virtual display server, by opening the window, pressing the
+two keys and comparing the frame the window drew against the frame the file
+writer wrote for the same world and camera.[^F497D]
+
+### FND-498 — Two census rows read the last tick, so a busy run reported zero
+
+**Believed.** The subsystem census says what a run produced. Every row of the
+one table shares one time base, so a zero in any row means that the thing
+never happened.[^F483A]
+
+**True.** Two rows read the last tick and not the run. The controller empties
+its log and its refusal count at the top of every controller stage, and the
+command count filters that per-tick log.[^F498B] The trading rows beside them
+did the same, and so did the relation, war and campaign rows. A game end stops
+the controller, so both controller rows read zero at the end of every game,
+however busy the run was.[^F496J] A reader could not tell a run that never
+acted from a run that stopped acting.
+
+The build queue registered no row at all. The queue counted what it made and
+kept its three refusals apart, and the binding layer answered them through a
+second dictionary of its own.[^F498D] One question had two ways to ask it, and
+the one table said nothing about the newest subsystem.
+
+**Evidence.** Written on 5 September 2026, during item 0278. A run of nine
+ticks with a tick limit of three acted on the first two ticks and ended on the
+third. Under the old readers the command row fell from 7 to 5 and then to
+zero, and the new test names the row and the fall. A run that built one unit
+from a queue read one on the tick that built it and zero three ticks later.
+The balance harness recorded the artefact as a fact: it listed the two
+controller rows as zero in every game of an eight-seed set, and the register
+holds that reading.[^F498E]
+
+**Follows.** Four things.
+
+**Every judgement made from the census while these rows were wrong is
+suspect.** That includes the reading that roads were never built and the
+reading that the controller does nothing, and it includes every zero the
+balance harness reported for a row that counted an act.
+
+**A census of a run states the basis of each row.** Each row now says whether
+it counts what the world holds now, or what the run has made since it was
+built. A total never falls, so a zero in it means that the thing never
+happened.
+
+**A total is folded where the per-tick count is emptied.** The world adds each
+per-tick count to a run total at the one site that clears it. The per-tick
+counter stays the only place that counts the act, so nothing counts one act
+twice.[^F590A]
+
+**One table answers one question.** The queue rows are rows of the census, and
+the second dictionary is gone. Nothing outside its own tests called it, which
+is the shape of a capability nobody invokes.[^F498G]
+
+One row still says more than it reads. The storm row reports whether a storm
+stands now, and its name promises a count of storms. A pass that counts the
+storms themselves must replace it.
+
+### FND-510 — A record written ahead of the code states a false context once the code lands, and nothing fails
+
+**What the project believed.** ADR-0151 said that the upgrade kind was an
+enumeration in the core crate with two variants, that each variant carried its
+work and its effect as a match arm, and that the decisions register held the
+choice open. The decision record priority index agreed, and its row said in
+bold that the record ran ahead of the code.
+
+**What is true.** The code implements the record. The core crate holds an
+upgrade table, a row type, a category newtype and a default table with rows for
+the road, the terrace, the wonder, the store and the wall.[^F510A] DEC-143
+closed on 5 September 2026 and names the item that landed it.[^F510B] Both
+statements had been false since that item merged.
+
+**Why nothing caught it.** A record is prose. The record check reads structure,
+volatile material, citations and the registry, and none of those can see a
+context that describes a tree the project has left. The priority row is prose
+too, and it carried the same claim.
+
+**What follows.** A record that runs ahead of the code carries a context in the
+present tense, and that context expires when the work lands. Write the context
+of such a record in the past tense at review, as this review did, so the forces
+survive and the stale description does not. The registry and the priority index
+hold whether a record is implemented; the record itself should not.
+
+### FND-511 — A source file cited a decision number that exists and a rule that does not
+
+**What the project believed.** ADR-0158 said in its consequences that
+cancelling an entry was not decided, and that nothing removed an entry from the
+queue except finishing it.
+
+**What is true.** The engine holds a take-out order, the world routes it to the
+queue, and the Python boundary exposes it.[^F511A] Both the order variant and
+the binding cite ADR-0158 D3 for the rule that the work already charged is
+lost. D3 stated no such rule. It stated only that the store pays as the entry
+advances.
+
+**Why nothing caught it.** The record check verifies that a cited decision
+number names a decision the target record has.[^F192B] D3 existed, so the
+citation passed. The check cannot read whether the cited decision states the
+claim the citing file rests on.
+
+**What follows.** A citation of the form `ADR-NNNN Dn` is checked for
+existence and never for content. When you cite a decision from code, read that
+decision and confirm it states your claim. The repair here put the rule into
+D3, because the code and two call sites already believed it was there.
+
+### FND-512 — The volatile check reads a figure written in digits, and three records wrote theirs in words
+
+**What the project believed.** The record check fails a record that holds a
+version pin, a latency figure, a throughput figure or a percentage, so section
+4.1 of the scope rule is enforced.[^F512A]
+
+**What is true.** Every pattern the check carries matches digits. Three weather
+records argued from a measurement and wrote its results in words: a storm that
+reached about a third of the lattice in one tick, a storm that left nothing by
+the twentieth tick, and ground water that ran nearly fourfold from the driest
+cell to the wettest.[^F512B] The check passed all three.
+
+**Why it matters here rather than in general.** Each figure describes the
+behaviour that its own record sets out to change. The figures would have become
+false on the day the work landed, inside records that state the reason for
+doing the work.
+
+**What follows.** Section 4.1 is a human judgement wherever a figure is spelled
+out. Ask what a figure describes and whether the change the record proposes
+makes it false. The repair keeps the force and drops the number: the maximum
+never travels, it flattens in place, and the research report holds the
+figures.[^F512C]
+
+### FND-513 — A record said the order reads the idle units, and the code tests the plan first
+
+**What the project believed.** ADR-0159 D1 opened with the statement that the
+set is the idle units of the faction.
+
+**What is true.** The controller loop reads every unit of the faction. It tests
+whether the plan zones the tile the unit stands on before it tests whether the
+unit is idle, so a busy unit standing on a zoned tile takes a build order.[^F513A]
+Only the send is restricted to idle units, and the code comment beside the loop
+says so.
+
+**Why nothing caught it.** The rest of D1 was correct, and the wrong sentence
+was the summary rather than a rule. A reviewer who read the decision as a whole
+would find the two later sentences true and stop.
+
+**What follows.** Read a summary sentence at the head of a decision as a claim
+that must hold, not as an introduction to the claims below it. D1 now says that
+the order reads every unit and sends only the idle ones.
+### FND-520 — A search shaped around how a fact is consumed cannot see a declaration site that restates the fact as types
+
+**Believed.** Item 0153 asks that Python read an event without repeating its
+layout. A read-only audit reported the item done. It searched the Python
+package for the three ways a layout gets repeated, which are a buffer read, a
+structure unpack and a structured array type, and it found none of
+them.[^F590A] It concluded that no second declaration site remained.
+
+**True.** The negative result is correct and the conclusion does not follow.
+No Python module reads a byte of an event, and the runtime path was and is
+sound: the bindings return one array for each field under the field name, the
+fixed-point value crosses as a signed integer, and the identity crosses
+whole.[^F520B] Two declaration sites remained, and neither reads a byte.
+
+**The first is the type stub of the compiled module.** It held one typed
+dictionary for each event log, and each one listed the field names and the
+element widths in declaration order. That is the layout of the event, restated
+as types.[^F520C]
+
+**The second is the binding layer.** Each method that returns the columns of a
+log listed the fields of its event by hand, one line for each column. The copy
+is in Rust rather than in Python, which is why a search of the Python package
+could not reach it.[^F520D]
+
+**The general shape.** A search shaped around how a fact is consumed finds a
+consumer. It does not find a second declaration of the fact in a form that
+consumes nothing. A type annotation, a schema, a fixture and a stub are all
+declarations rather than reads. Search for the fact, not for the operation.
+
+**What follows.** Ask what the fact is, then search for every place it is
+stated, in every language of the tree. The recurring defect rule names one
+fact in more than one place as the through-line of the shapes it lists, and
+this finding is an instance of missing one of the places rather than of the
+shape itself.[^F520E]
+
+**The copies agreed.** No mismatch existed on the day the mechanism was
+written. This is prevention and not repair, and a reader who finds no defect
+in the history must not conclude that the mechanism was pointless.
+
+### FND-521 — The event column classes of the type stub now generate, and the rest of it does not
+
+**Believed.** The register records that nothing in the tree generates the type
+stub of the compiled module, and that no job compares it against the
+module.[^F321A] The stub says the same of itself.
+
+**True as far as it goes, and now narrower.** A class that holds the columns
+of an event carries a marked block of annotations. A script writes that block
+from the field declaration that the engine reports, and a test runs the same
+script in check mode.[^F521B] A field added to an event therefore fails a test
+until the block follows.
+
+**What stays exposed.** Every other declaration in the stub is hand-written.
+Every method signature of the world type and of the camera type, every typed
+dictionary that does not describe an event, and every alias are unchecked
+against the module. A signature there can disagree with the module and nothing
+fails. The earlier row stands for that part.[^F321A]
+
+**Evidence.** Adding a field to an event, and declaring it, leaves the stub
+short. The check prints the missing annotation and exits non-zero, and the
+test that runs it goes red.
+
+### FND-525 — A picture of the whole panel does not repeat, because the panel states the wall clock
+
+**Believed.** The demonstration writes one picture from one seed, and the
+engine gives one answer for one seed at any thread count. Two runs of one seed
+therefore give one picture, and a test may compare two picture files to prove
+that a change reached the frame.
+
+**True.** The whole panel states what the last step and the last frame cost,
+and those costs come from the wall clock.[^F525A] Two runs of one seed
+therefore give two different files, whatever else the runs did. A deck of named
+panels holds no cost row, and two runs of one seed give one file.
+
+**Evidence.** Two runs of one world, at one seed, one extent and one tick
+count, wrote two picture files that differ. The same two runs with a named
+deck wrote two identical files. The commit body holds the commands.
+
+**Follows.** Two things.
+
+**A test that compares two picture files must first assert that one
+configuration repeats.** Without that assertion the test passes on any pair of
+files, so it measures the wall clock rather than the change. Three tests of the
+deck were written that way, and each one stayed green when the wiring under it
+was removed. The repaired tests run the same configuration twice, assert the
+two files are equal, and only then assert that another configuration differs.
+
+**A picture is not simulated state.** The determinism rule binds the world and
+the event log, not the pixels the viewer paints. A cost row in a picture is
+correct and it is not a defect.
+
+### FND-526 — Three refined backlog items described work the tree already held
+
+**Believed.** The backlog held three refined items for the demonstration: one
+panel standard, a clock that separates the engine tick from the wall clock, and
+four panels that show the characters, the statistics, the events and a tile.
+An item in `refined/` states work that nobody has done.
+
+**True.** Every statement under `Done when` in the three items was already
+satisfied. The viewer holds one panel module that declares the geometry, the
+colours and the cut, and one list that registers every panel. The control plane
+holds the clock, the speed set, the pause and the single step. The four panels
+each exist as one file with its own tests.
+
+**Evidence.** The commit that gave the panel one standard, a deck and a clock
+is in the history, and later commits bound every panel to a key. The items
+stayed in `refined/` because nothing moves an item when the work lands under
+another item's number.
+
+**Follows.** Two things.
+
+**Read the tree before you start a refined item.** The item states a need at
+the moment it was written, and the tree is the current statement of what
+exists. Reading the item alone leads to a second implementation of a thing that
+already works, which is one fact in two places.[^F590A]
+
+**An item is not done until it moves.** A directory is a status, and a status
+that nobody sets is a register that decays.
+
+### FND-530 — The document checks were declared in two places, and the workflow ran six of the eight
+
+**Believed.** Continuous integration runs the document checks. The command
+runner holds a recipe that names them, and a workflow file holds a job that
+names them, so a check added to the recipe runs on every push.
+
+**True.** The two lists were written by hand and they drifted. The recipe named
+eight checks. The workflow named six. The footnote check and the conflict marker
+check ran on a developer machine and never in continuous integration. The
+workflow also named four probe cases against six in the recipe. Nothing failed,
+because neither list reads the other.
+
+**Evidence.** The work that added two more checks found the gap while wiring
+them in. The commit body holds the difference between the two lists.
+
+**Follows.** This is shape 1 of the recurring defect rule, in the file that
+exists to catch a defect.[^F530A] The fix is the one the rule states: derive,
+do not repeat. The workflow now runs the two recipes and names no check of its
+own, so the recipe is the one declaration site and a check added there runs in
+both places.
+
+**A list of checks is the easiest copy to overlook, because both copies work.**
+Each list ran and each passed. The gap was not a broken check. It was a check
+that never ran, and a passing job that looked like coverage.
+
+### FND-531 — The project orientation is one document under three names, and one of the three was a copy
+
+**Believed.** The orientation is two tracked files and a symlink, and a check
+must compare the two files after a normalisation.[^F322D] The item that holds
+the work states that design, and it states that neither file may be edited.
+
+**True.** Two of the three names were already symlinks to the third. The
+divergence lived in the one name that was still a regular file. A comparison
+between two hand-written files is the weaker instrument, because it lets the
+copies exist and then reports that they disagree. The rule prefers deriving one
+from the other, and this repository already mirrors its rules directory and its
+skills directory that way.[^F530A]
+
+**Evidence.** The orientation file for one harness was a regular file and
+carried an older numbering of its footnotes and an older repository layout
+table. It named neither the canonical rules directory nor the two symlinks
+beside it. The other two names read one file and could not disagree.
+
+**Follows.** The third name is now a symlink as well, so the orientation is one
+document and the copies cannot drift. The check stays, and it earns its place a
+different way: it fails when somebody replaces a symlink with a regular file
+that says something else. A checkout on a filesystem with no symlink must still
+work, so the check compares content and does not demand the link.
+
+**Read the shape before you build the instrument the item asks for.** The item
+asked for a comparison of two hand-written documents. The tree already held the
+better answer for two of the three names, and copying the item's design would
+have preserved the copy it set out to police.
+
+### FND-532 — A check that reads prose must choose a unit, and the sentence is too small
+
+**Believed.** A check for a stale restatement fails on a sentence that states a
+register's content and cites nothing. The sentence is the natural unit, because
+the documentation rule puts a footnote marker directly after the claim it
+supports.[^F532A]
+
+**True.** The sentence is too small a unit in this tree. A writer states a claim
+in one sentence and names the register in the next, which is ordinary prose and
+not a defect. A sentence-level test reported thirty-six failures over the tree.
+A paragraph-level test reported nineteen over the same tree, and every site it
+dropped named its register one sentence away.
+
+A whole table is too large in the other direction. A priority index is one table
+of many rows, and one cited row would excuse every other row. A row is therefore
+a unit of its own.
+
+**Evidence.** Both runs are in the commit body, against the same tree and the
+same phrase family.
+
+**Follows.** The unit is the paragraph, and a row of a table is a paragraph. Say
+in the script what the check cannot catch, rather than widen the check until it
+catches everything. A restatement that cites its register still passes, and it
+is still a second declaration site. The citation only gives a doubting reader
+one hop to the thing that decides it.
+
+**A check over prose buys a subset, and the honest move is to name the subset.**
+Failing every cited site would fail on about forty records that nobody may
+edit.[^F532B] A gate nobody can turn green is a gate everybody learns to skip,
+and the footnote check already carries that reasoning for its ordering test.
 
 ### FND-533 — The documentation plan is the backlog item, and a plan document would be a second declaration site
 
@@ -12135,826 +12540,95 @@ index against the set of open items and never against what an item says.
 [^F319B]: Recurring defect shapes, shape 5. `.claude/rules/recurring-defects.md`
 [^F319C]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
 
-### FND-320 — The type stub claims a check that regenerates it, and no generator and no check exist
-
-**Believed.** The type stub for the compiled extension module is a generated
-artefact. Its own docstring says that the contributing guide requires the
-continuous integration system to check the stubs, that the build regenerates
-them, and that the job fails when the result differs from the file.[^F320A]
-
-**True.** No stub generator exists anywhere in the tree. No workflow job
-regenerates the stub, and no job compares it against anything. The stub is
-hand-written. The contributing guide never states the requirement that the
-docstring attributes to it. Its only use of the word "stub" describes the Rust
-crates as unimplemented.[^F320B]
-
-**The claim is wrong twice.** It names a guide that says something else, and it
-names a mechanism that does not exist. A contributor who changes a binding and
-reads that docstring concludes that a job will catch a stale stub. Nothing will.
-
-**A second half makes the first half expensive.** The stub carries a docstring
-for each typed dictionary and for each exception class. It carries none for any
-method of `World` and none for any method of `Camera`. The Rust bindings crate
-carries that prose, and PyO3 puts it on the compiled objects. So the stub and
-the compiled module are two declaration sites for the public interface, they
-already disagree about the prose, and nothing fails.[^F320C]
-
-**Evidence.**
-
-```
-grep -rniE "stub|pyi|pyo3-stub-gen" justfile scripts/ .github/ crates/cachette-py/Cargo.toml
-grep -niE "stub|\.pyi" CONTRIBUTING.md
-```
-
-The first command finds two matches, and neither generates or compares a stub.
-The second finds one match, and it describes the Rust crates.
-
-A documentation build measured the second half. A site built from the compiled
-module produced a page of 105,348 bytes that held the method prose. The same
-site built with module inspection turned off fell back to the stub, produced
-29,038 bytes, and held no method prose at all.[^F320D]
-
-**Follows.** Repair the stub docstring, or make the claim true with a
-generator. The research report on the documentation toolchain treats the
-Rust doc comment as the single source of the prose for exactly this
-reason.[^F320D] A generator would also remove the second declaration site for
-every signature, which is the shape the recurring defect rule names.[^F320E]
-
-### FND-321 — The stub already carries prose the Rust source owns, and the copy that drifted dropped the paragraph that warns against a copy
-
-**Believed.** The register records that the type stub and the compiled module
-are two declaration sites for the public interface, and that they already
-disagree about the prose.[^F321A] The disagreement it names is an absence: the
-stub carries no docstring for any method of `World` and none for any method of
-`Camera`.
-
-**True, and the sharper half is what the stub does carry.** Nine exception
-classes carry a docstring in the stub. All nine are the same words as the string
-that the Rust macro gives the same exception, character for character.[^F320C]
-The `World` class docstring is a one line copy of the Rust doc comment, and it
-agrees. The `Camera` class docstring is an abridged copy of the Rust doc comment,
-and it does not agree: it keeps the first and the last paragraph and drops two.
-
-**One of the dropped paragraphs is the one that names this defect.** The Rust
-doc comment says that a pan share and a zoom step written on both sides of the
-boundary would be one value in two places, with nothing failing when the copies
-disagreed. The stub is that second place, and the sentence did not survive the
-copy into it.
-
-**Evidence.**
-
-```
-grep -n "create_exception" crates/cachette-py/src/lib.rs
-sed -n '1303,1320p' crates/cachette-py/src/lib.rs
-sed -n '280,336p' python/cachette/_core.pyi
-```
-
-**Follows.** The count of copies is eleven, not zero, and nine of them agree
-today. **An agreeing copy is the worse case**, because it reads as a maintained
-file and gives a contributor no reason to look for the other site. The record on
-the provenance of the documentation prose forbids a docstring on a stub member
-that the compiled module provides, and it names this as a defect it does not
-fix.[^F321C] A backlog item holds the removal and the check.[^F321D]
-### FND-329 — A backlog item decays fastest at the sentence that tells a reader not to take it
-
-**Believed.** A backlog item in `proposed/` is an idea and costs nothing while
-it waits. The guide says an item there may be one sentence, so a stale item is
-a small loss and the priority index carries the judgement that matters.[^F329A]
-
-**True.** An item decays like any other document, and the sentence that decays
-first is the one a reader acts on. An audit of the 89 items in `proposed/` on
-3 September 2026 found the same shape in nine of them, and in three cases the
-stale sentence was the reason nobody had taken the item.
-
-**The worst case is a deferral whose reason is gone.** Item 0039 carried a
-section headed "Do not build this yet". Its reason was that a unit has no plan
-and draws a fresh direction on each frame, so a refused unit does not repeat the
-choice that failed. A unit now takes its direction from the exit of its cell for
-the option it chose, and every input to that holds from one frame to the
-next.[^F329B] The demonstration world was driven for 400 ticks: a unit held its
-tile against a target the ground admits 61 times, and one unit was refused on
-five consecutive frames. **The item said the condition could not arise, and the
-engine produced it 61 times in one run.**
-
-**Two other deferrals had the same shape.** Item 0272 says no measurement exists
-on the target platform. One does, and it names the pass this item is about: the
-choice costs 0.571 milliseconds of a frame of about 836.[^F329C] Item 0270 asks
-for a vector rewrite of that pass and quotes 71.4 milliseconds for it from the
-same register, which marks the figure stale in its own words on another
-page.[^F329C] **One register said both things at once, and two items read the
-half that suited them.**
-
-**A closed premise also makes an item invisible.** Item 0206 states in its own
-first section that another worker closed every gap it names, and asks whoever
-merges the two to close it. It stayed open. The priority index carried a row
-saying "Do not take it", so the index was paying to point at an item that should
-not have existed.
-
-**Four items carried a count that the tree had moved past.** Item 0278 said the
-demonstration world holds no character and that no unit holds a ranked position.
-Driven again, the same world seats 16 of 32 ranked positions and holds 26
-characters at tick 200. Item 0145 said the faction coercion is written at six
-places; there are five in the module and more outside it. Item 0222 said the
-error hierarchy holds seven leaves; it holds eight. Item 0072 said one test
-calls the panel fit check; two do.
-
-**Evidence.** The audit read every item in `proposed/`, then measured the three
-claims above by driving the engine rather than by reading it. The probe built
-the demonstration world, founded a run for every faction, stepped 400 frames and
-printed the counts. The commit body holds the command and the output.
-
-**Follows.** Four things.
-
-**A count in a backlog item rots exactly as a count in a decision record
-does.** The scope rule bans a count from a record and sends it to the commit
-message.[^53] The backlog has no such rule, and it does not need the same
-one, because a count is often the whole argument for an item. It needs the
-weaker rule: **a count in an item is dated evidence, not a current fact, and a
-reader who plans against it derives it again first.**
-
-**A "do not take this yet" section is the highest-value line in the backlog and
-nothing rechecks it.** It stops work. Its reason is a claim about the code, and
-the code moves. **State the reason as a condition that can be tested, not as a
-description of how things are**, so a later reader can run something and find
-out.
-
-**An item that says it is superseded is not closed by saying so.** Item 0206
-said it for a day and the index repeated it. The close is the work.
-
-### FND-530 — The document checks were declared in two places, and the workflow ran six of the eight
-
-**Believed.** Continuous integration runs the document checks. The command
-runner holds a recipe that names them, and a workflow file holds a job that
-names them, so a check added to the recipe runs on every push.
-
-**True.** The two lists were written by hand and they drifted. The recipe named
-eight checks. The workflow named six. The footnote check and the conflict marker
-check ran on a developer machine and never in continuous integration. The
-workflow also named four probe cases against six in the recipe. Nothing failed,
-because neither list reads the other.
-
-**Evidence.** The work that added two more checks found the gap while wiring
-them in. The commit body holds the difference between the two lists.
-
-**Follows.** This is shape 1 of the recurring defect rule, in the file that
-exists to catch a defect.[^F530A] The fix is the one the rule states: derive,
-do not repeat. The workflow now runs the two recipes and names no check of its
-own, so the recipe is the one declaration site and a check added there runs in
-both places.
-
-**A list of checks is the easiest copy to overlook, because both copies work.**
-Each list ran and each passed. The gap was not a broken check. It was a check
-that never ran, and a passing job that looked like coverage.
-
-### FND-531 — The project orientation is one document under three names, and one of the three was a copy
-
-**Believed.** The orientation is two tracked files and a symlink, and a check
-must compare the two files after a normalisation.[^F322D] The item that holds
-the work states that design, and it states that neither file may be edited.
-
-**True.** Two of the three names were already symlinks to the third. The
-divergence lived in the one name that was still a regular file. A comparison
-between two hand-written files is the weaker instrument, because it lets the
-copies exist and then reports that they disagree. The rule prefers deriving one
-from the other, and this repository already mirrors its rules directory and its
-skills directory that way.[^F530A]
-
-**Evidence.** The orientation file for one harness was a regular file and
-carried an older numbering of its footnotes and an older repository layout
-table. It named neither the canonical rules directory nor the two symlinks
-beside it. The other two names read one file and could not disagree.
-
-**Follows.** The third name is now a symlink as well, so the orientation is one
-document and the copies cannot drift. The check stays, and it earns its place a
-different way: it fails when somebody replaces a symlink with a regular file
-that says something else. A checkout on a filesystem with no symlink must still
-work, so the check compares content and does not demand the link.
-
-**Read the shape before you build the instrument the item asks for.** The item
-asked for a comparison of two hand-written documents. The tree already held the
-better answer for two of the three names, and copying the item's design would
-have preserved the copy it set out to police.
-
-### FND-532 — A check that reads prose must choose a unit, and the sentence is too small
-
-**Believed.** A check for a stale restatement fails on a sentence that states a
-register's content and cites nothing. The sentence is the natural unit, because
-the documentation rule puts a footnote marker directly after the claim it
-supports.[^F532A]
-
-**True.** The sentence is too small a unit in this tree. A writer states a claim
-in one sentence and names the register in the next, which is ordinary prose and
-not a defect. A sentence-level test reported thirty-six failures over the tree.
-A paragraph-level test reported nineteen over the same tree, and every site it
-dropped named its register one sentence away.
-
-A whole table is too large in the other direction. A priority index is one table
-of many rows, and one cited row would excuse every other row. A row is therefore
-a unit of its own.
-
-**Evidence.** Both runs are in the commit body, against the same tree and the
-same phrase family.
-
-**Follows.** The unit is the paragraph, and a row of a table is a paragraph. Say
-in the script what the check cannot catch, rather than widen the check until it
-catches everything. A restatement that cites its register still passes, and it
-is still a second declaration site. The citation only gives a doubting reader
-one hop to the thing that decides it.
-
-**A check over prose buys a subset, and the honest move is to name the subset.**
-Failing every cited site would fail on about forty records that nobody may
-edit.[^F532B] A gate nobody can turn green is a gate everybody learns to skip,
-and the footnote check already carries that reasoning for its ordering test.
-
-### FND-322 — The document a newcomer reads first sells a pyramid level that nothing writes
-
-**Believed.** The orientation document of this repository states that the engine
-organises the world into three levels of detail, and it describes the third:
-region-scale summaries that combine blocks of level 1 cells. It lists the
-spatial pyramid among the key capabilities of the engine, and it says that three
-levels of detail provide instant answers for continental aggregate
-queries.[^F322A]
-
-**True.** Level 2 does not exist. The pyramid holds one derived level. The
-project instruction file says so in bold, and it warns that a reader who takes
-the three-level paragraph for the code plans against a level that nothing
-writes.[^F322B] The Rust source agrees in its own words: the pyramid names the
-whole-world summary as what level 2 **would** hold, in the conditional.[^F322C]
-
-**Evidence.**
-
-```
-grep -n "Level 2" README.md
-grep -rn "level 2" crates/ --include="*.rs"
-```
-
-**Follows.** The two orientation documents disagree, and one of them is the only
-document a person outside this project reads. This is the shape a backlog item
-already holds for a different sentence in the same pair of files, and the finding
-behind it records the same cost.[^F322D] The documentation plan inherits the
-claim, because the reader the plan serves arrives through this document, and the
-worked example the plan turns into a tutorial sits on the same page as the false
-paragraph.[^F322E] Repair the paragraph, or delete it and let the generated
-reference report what the pyramid holds.
-
-### FND-323 — The orientation document sells the agent server as a product capability, and the package does not install it
-
-**Believed.** The orientation document lists native support for artificial
-intelligence agents among the key capabilities of the engine. It says an
-integrated Model Context Protocol server connects external agents directly to
-the engine, it names the capability again under a third audience, and it gives
-the command that starts the server.[^F322A]
-
-**True, in the sense that the server exists, and false in the sense a reader
-takes.** The server is a tool for a contributor to this repository. Its own
-docstring says so, and it says that the reference implementation of the protocol
-is a development dependency and not a runtime dependency of the
-package.[^F323A] The project manifest agrees: the protocol library sits in the
-development dependency group, with a comment that states the reason. The runtime
-dependency list holds one entry, and it is not that library.[^F323B]
-
-**A reader who follows the document gets an import error.** Install the package
-from an index, run the command the document gives, and nothing starts, because
-the package never installed the library the server imports.
-
-**The product records draw the line the other way round.** The record that holds
-the game developer states three times that the tool server is not part of that
-need: it serves an agent that works on this repository, and another record holds
-that audience.[^F323C] [^F323D]
-
-**Evidence.**
-
-```
-grep -n "cachette.agent\|Model Context Protocol" README.md
-grep -n "mcp>=" pyproject.toml
-grep -n "dependencies" pyproject.toml
-```
-
-**Follows.** The product record requires the documentation to separate the
-surface a program may depend on from the surface that exists for this
-repository, and to state what the package cannot do yet, so that a reader who
-wants a missing thing does not conclude that they failed to find it.[^F323C]
-This finding is one instance of that gap and the explanation quadrant of the
-documentation plan holds the page that states the line.[^F322E]
-
-[^F322A]: Project orientation, the key capabilities and the architectural foundation. `README.md`
-[^F322B]: Project instructions, the levels of detail. `CLAUDE.md`
-[^F322C]: The pyramid of the core crate. `crates/cachette-core/src/pyramid.rs`
-[^F322D]: Findings register, FND-259, in this document.
-[^F322E]: Backlog item 0308, the documentation plan. `docs/backlog/refined/0308-the-documentation-plan.md`
-[^F323A]: The agent-facing protocol server of the control plane. `python/cachette/agent/server.py`
-[^F323B]: The project manifest. `pyproject.toml`
-[^F323C]: Product requirement record 0021, what this does not do. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
-[^F323D]: Product requirement record 0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
-
-### FND-324 — The strict mode of the site builder does not see the fallback to the type stub
-
-**Believed.** A research report measured that a documentation build with module
-inspection turned off falls back to the type stub, loses the method prose, and
-reports no error.[^F324A] A reader of that report can conclude that the strict
-mode of the builder closes the hole, because a strict build ends on a warning.
-
-**True.** It does not. The documentation job now runs the builder in strict
-mode. With module inspection off, that build reported no issue, exited zero, and
-46 of the 57 member summaries that the import finds were not on any page. The
-site looked complete. Every signature was there and the prose was gone.
-
-**Evidence.** The probe recipe breaks the job in the two ways the record names
-and requires it to fail each time.[^F324B] The first case takes the compiled
-module out of the environment. The second case builds the broken configuration
-that turns inspection off.[^F324C]
-
-```
-just docs-probe
-```
-
-**Follows.** No setting of the builder is the guard. The guard must compare the
-built site against the module that the import creates, and the documentation job
-runs that comparison after the site build.[^F324D] The expected text is derived
-from the module on every run, so the check holds no copy of any docstring.
-
-### FND-325 — Every public member of the compiled module already carries prose
-
-**Believed.** The record on the provenance of the documentation prose says that
-a member with no Rust doc comment publishes with no prose and that nothing
-fails.[^F325A] The priority index says the reference publishes empty prose until
-the doc comments exist.[^F325B] Both read as though members with no prose exist
-in numbers.
-
-**True.** None does. The import of the compiled module finds 57 public members
-and every one of them carries a docstring. The count covers the module level
-names and the members that each class declares itself.
-
-**One thing the count does not cover is the constructor, and it has no prose.**
-The binding library does not copy the doc comment of a constructor onto the
-Python object, so the module carries the standard interpreter sentence there and
-nothing else. The reference therefore says what a class is and never says how to
-build one. The prose for that belongs in the doc comment of the class.
-
-**Evidence.**
-
-```
-uv run python scripts/check_reference.py --import-only
-```
-
-**Follows.** The item that repairs the doc comments keeps its second half and
-loses its first.[^F325C] The gap is the audience of the prose and not the
-absence of it: a doc comment written for a contributor to the core under-serves
-the Python developer that the product record names, and no check can see
-that.[^F325A] [^F319C] The check that the documentation job runs reports every
-member with no prose, without failing, so the first half stays covered if a new
-member arrives with none.
-
-### FND-331 — Three exception classes the package exports and documents, and nothing raises
-
-**Believed.** The compiled module declares nine exception classes and exports
-every one of them.[^F320C] The package re-exports all nine, and a test asserts
-that each one is a subclass of the root class.[^F331B] Each carried a docstring
-that reads as a statement of when the engine raises it. A reader takes the list
-for the set of failures the engine reports.
-
-**True: six of the nine are raised, and three are not.** No call site in this
-repository raises `SelectorError`, `DeterminismError` or `EnginePanic`. Each of
-the three appears twice in the tree: once where the macro declares it, and once
-where the module registers it. Nothing else names any of them, in the core
-crate, in the bindings crate, in the package or in the tests.
-
-**The panic class is the sharper case, because a panic does happen and does not
-produce it.** The bindings crate installs no panic hook. The binding library
-catches a panic at the boundary and raises its own `pyo3_runtime.PanicException`,
-which is not a subclass of the root class. A caller that catches the root class
-in order to survive a panic does not survive one.
-
-**Evidence.**
-
-```
-grep -rn "SelectorError\|DeterminismError\|EnginePanic" crates python tests scripts
-```
-
-The search returns the declaration, the registration, the package re-export and
-the membership test. It returns no raise site.
-
-**Follows.** This is the shape the project already names: a capability that
-nothing invokes, declared and documented as if it were fact.[^F331C] The product
-record requires a reader to learn which error a
-call raises, and to learn what the package cannot do yet rather than conclude
-that they failed to find it.[^F331E] The three docstrings now say plainly that
-nothing raises them. Either something raises each class, or the class goes. Do
-not delete one while its docstring is the only place that says it is inert.
-
-### FND-332 — A refused faction names the project ceiling, and the engine applied the faction count of the world
-
-**Believed.** The refusal that a verb returns for a faction it will not accept
-reads `the faction 3 is at or above the ceiling 63`. A caller reads the number
-in the message as the bound that was applied.
-
-**True: the world applies its own faction count, and the message names a
-different number.** The world checks the faction against the faction count that
-its constructor took, and it raises the arena's own ceiling error to report
-that.[^F332A] The arena formats that error with the project-wide ceiling, which
-is a constant of the storage.[^F332B] The two bounds are unrelated, and the
-message names the one that was not applied.
-
-**Evidence.** A world built with a faction count of one refuses the faction
-three, and says that three is at or above 63.
-
-```
-uv run python -c "import cachette; cachette.World(8, 8, faction_count=1).spawn_soldiers([(2, 2)], 3)"
-```
-
-The same shape reaches the settlement verbs, which raise the same error from the
-settlement arena.
-
-**Follows.** The message misdirects the reader that the product record serves,
-because that reader learns which error a call raises from the message and from
-the reference alone.[^F331E] A caller who reads it raises the faction count of
-the world and meets the same refusal. This work documents the behaviour and
-does not repair the message, because the repair changes the text a verb returns
-and that is engine work rather than documentation work.
-
-[^F324A]: Research report 19, the documentation toolchain, section 4.2. `docs/research/reports/19-documentation-toolchain.md`
-[^F324B]: The documentation probe. `scripts/docs-probe.sh`
-[^F324C]: The broken site configuration. `tests/fixtures/docs-inspection-off/mkdocs.yml`
-[^F324D]: The reference check. `scripts/check_reference.py`
-[^F325A]: ADR-0107, the Python reference is generated from the compiled module, the consequences. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
-[^F325B]: Backlog priority index, the row for item 0310. `docs/backlog/PRIORITY.md`
-[^F325C]: Backlog item 0310, write the Rust doc comments for the Python reader. `docs/backlog/complete/0310-write-the-rust-doc-comments-for-the-python-reader.md`
-[^F331B]: The public interface test of the package. `tests/test_public_api.py`
-[^F331C]: Recurring Defect Shapes, shape 3, inert code that nothing invokes. `.claude/rules/recurring-defects.md`
-[^F331E]: Product requirement record 0021, what the person cannot do today. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
-[^F332A]: The world of the core crate, the soldier spawn. `crates/cachette-core/src/world.rs`
-[^F332B]: The soldier arena of the core crate. `crates/cachette-core/src/soldier.rs`
-
-### FND-333 — Nine error classes named a module that was not the module they belong to, and the reference dropped every one
-
-**Believed.** The reference publishes each public member that the import of the
-compiled module finds. The nine error classes are public, they are named in the
-export list of the module, and each one carries prose, so the reference carries
-all nine.
-
-**True.** It carried none of them. Every error class reported the bare name
-`_core` as its module, and every other member reported the dotted path
-`cachette._core`. The documentation builder reads the module of a member and
-skips one that names a different module, because such a member is an import
-from somewhere else rather than a member of the module it documents. The nine
-classes left the page. The page rendered fifteen members and looked complete.
-
-**The macro writes the module name, and the binding library writes the dotted
-path.** The declaration of an error takes a module name as its first argument,
-and it puts that argument into the class. A class that the binding library
-builds takes the dotted path instead. So one module described itself in two
-ways, and the two disagreed.
-
-**Evidence.** The import reports the module of each member.
-
-```
-uv run python -c "import cachette._core as m; print(m.World.__module__, m.CachetteError.__module__)"
-```
-
-The built site names each member it rendered.
-
-```
-grep -o 'id="cachette._core\.[A-Za-z_]*"' target/site/reference/index.html | sort -u | wc -l
-```
-
-That count was fifteen before the repair and twenty-four after it. The
-documentation job now reports that every one of the fifty-nine summaries
-reached the site.
-
-**Follows.** This is one fact held in two places, with nothing that fails when
-the copies disagree.[^F320E] The module registration now sets the dotted path on
-each error class before it adds it, so one statement of the path reaches every
-member.
-
-**A check that derived its expectation is what found this.** The check asks the
-imported module which members carry prose, and it compares that set against the
-built site.[^F324D] A written list of the members to document would have omitted
-the nine classes as well, and it would have agreed with the site for ever.
-
-
-[^F334A]: Findings register, FND-317, in this document.
-[^F334B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D6. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
-[^F335A]: Findings register, FND-316, in this document.
-[^F317E]: Findings register, FND-334, in this document.
-
-### FND-336 — The site address drives the page for an unknown address, and without it that page pointed at the root of the domain
-
-**Believed.** The site address of the configuration drives the canonical link
-of each page and the sitemap. A build that states no address loses those two
-things and nothing else. The item that built the site left the address unset
-under a blocker, and it stated that only the publishing step depends on
-it.[^F336A]
-
-**True.** The builder also writes the address into the page it generates for an
-address the host does not hold. That page cannot use a relative link, because
-the host serves it for any address. The builder therefore writes an absolute
-path into every link and every asset of it, and it derives that path from the
-site address. With no address, it wrote the root of the domain.
-
-**This site does not answer at the root.** The repository does not carry the
-name of its owner, so the site is a project site and it answers on a path below
-the host name of the owner. A page that points at the root points outside the
-site, and the host answers with its own page rather than with the one this
-build made.
-
-**Evidence.** Two builds of one tree, with the address set and with it removed.
-The two pages for an unknown address hold different links.
-
-```
-grep -o '\(href\|src\)="/[^"]*"' target/site/404.html | sort -u
-```
-
-With the address set, each link starts with the repository name. With the
-address removed, each link starts at the root. Every other page of both builds
-holds relative links only, and the two builds are identical in every other
-respect. The site build reported no issue in either case, and the reference
-check passed in both.
-
-**Follows.** A site that states no address is not a site that loses two
-features. It is a site with one broken page, and no check sees it. State the
-address in the configuration as soon as the host is known.
-
-### FND-337 — A blocker row asked for a fact and for an action, and only the fact was information
-
-**Believed.** The blocker on the documentation site closed when the project
-owner named the address of the site and confirmed that the hosting was turned
-on. The row said so in its own closing condition.[^F337A]
-
-**True.** The two halves are not the same kind of thing. The address is
-information the project did not have, and the register holds exactly that. The
-hosting source setting is an action that one person takes in the settings of
-the host. No contributor can take it, and no contributor can read it from the
-tree either, but a register of blockers is not where an action waits.
-
-**The register states the distinction itself.** It says that a blocker needs
-information the project does not have, and it compares the decisions register,
-which holds choices that need judgement.[^F337A] An action belongs in the
-backlog, where the priority index states when it is taken.[^F282D]
-
-**Evidence.** The owner answered the first half on 3 September 2026 and the
-second half stayed open, because he takes it in a browser rather than in this
-repository. The row would have stayed open with every fact in the tree.
-
-**Follows.** Write a closing condition that names a fact. When a row needs an
-action as well, open the backlog item for the action in the same change, and
-let the row close on the fact. A row that waits for an action reads as missing
-information, and it stops work that has everything it needs.
-
-[^F336A]: Backlog item 0309, publish the Python reference generated from the compiled module. `docs/backlog/complete/0309-publish-the-python-reference-generated-from-the-compiled-module.md`
-[^F337A]: Blockers register, BLK-035 and the opening statement. `docs/BLOCKERS.md`
-[^F350A]: ADR-0107, the Python reference is generated from the compiled module, decisions D1, D2 and D4. `docs/adrs/draft/adr-0107-the-python-reference-is-generated-from-the-compiled-module.md`
-[^F350B]: Fresh reader review of the published reference, sections B and G, 3 September 2026. `~/cachette-reader-rounds/round-1-reference.md`
-[^F350C]: Interface review of the published reference, section 0, 3 September 2026. `~/cachette-reader-rounds/round-1-interface.md`
-[^F350D]: The site configuration, the member filter. `mkdocs.yml`
-[^F351A]: The `WorldSettings` dataclass and its docstring. `python/cachette/agent/session.py`
-[^F351B]: Interface review, section 2e. `~/cachette-reader-rounds/round-1-interface.md`
-[^F352A]: Interface review, section 6a. `~/cachette-reader-rounds/round-1-interface.md`
-[^F352B]: Research report 20, what the Python interface should be, section 3.1. `docs/research/reports/20-the-python-interface.md`
-
-### FND-340 — The reference cited an error that a call it never published raises, and a fresh reader could not write the third line of a program
-
-**Believed.** The constructor gap is a gap in the audience of the prose. Every
-public member of the compiled module carries a docstring, so the reference says
-what each call does. The one member with no prose is the constructor, and a
-register recorded that as a note rather than as a failure.[^F340A]
-
-**True.** The gap makes the page self-contradictory and it stops a reader at
-the third line. A developer who was given the address of the published
-reference and nothing else read it six times and could not build a `World`. The
-page carries an error class whose own prose says "The `World` constructor
-raises this class", and it names "the world settings", a term that appears
-nowhere else on the page. So the error documentation asserts a call, and names
-an argument, that the class documentation omits.
-
-**A graded review scored the first action at 1 of 5 and trust at 3 of 5**, and
-it named the constructor as the repair for both. The reader's next move was to
-clone the repository and read the Rust source, which is the move the reference
-exists to prevent.[^F340B]
-
-**Evidence.** The import shows that the binding library replaces the doc
-comment of a constructor with the standard interpreter sentence.
-
-uv run python -c "import cachette._core as m; print(m.World.__init__.__doc__)"
-
-**Follows.** The prose of a constructor lives in the doc comment of its class,
-and the class doc comment states each parameter, its default and its bound. The
-`World` class and the `Camera` class now hold theirs. A doc comment on the
-constructor function itself says where the prose lives and holds none, so the
-two sites cannot part.
-
-**A member that carries prose is not a member that a reader can use.** The
-check that guards the documentation build counts members with a docstring, and
-it counted 59 of 59 while the page could not be acted on.[^F340C] The count
-measures presence. It cannot measure sufficiency, and no check can.
-
-### FND-341 — The name a reader would install belongs to an unrelated project
-
-**Believed.** Nothing in the tree says how a reader installs the package. The
-distribution name is `cachette`, and the reference gave no install line at all,
-so a reader supplies the obvious one.
-
-**True.** The obvious one installs somebody else's software. The public Python
-package index answers on the name `cachette` with a cache extension for
-frameworks that serve web requests, at a version this project has never
-published. A reader who runs the obvious install command gets that package, and
-the import then fails with a message that names no cause.
-
-**Evidence.** Taken on 3 September 2026.
-
-curl -s https://pypi.org/pypi/cachette/json | python3 -c "import json,sys; d=json.load(sys.stdin); print(d['info']['name'], d['info']['version'], d['info']['home_page'])"
-
-It printed a name, a version and a repository address that belong to another
-author.
-
-**Follows.** The reference now says that no public index carries this engine,
-and it gives the four commands that build it from a checkout. A blocker holds
-the question of which name this project publishes under, because the project
-owner owns that choice and no reader of the tree can answer it.[^F341A]
-
-**This is a claim that decays, and it is written where a test cannot reach
-it.** The prose states what was true on one day about a service outside this
-repository. Treat it as a reason to close the blocker rather than as a fact the
-project maintains.
-
-### FND-342 — The check that a gather order documents cannot fire on half the numbers a caller confuses
-
-**Believed.** The gather verb checks its kind argument. The reference said it
-raises the typed refusal "when the number names no kind", and the error class
-says the same. A reader concluded that a wrong kind is refused.
-
-**True.** The check tests membership of one scale, and two scales share their
-low numbers. The resource kinds are food, wood and stone, numbered 0, 1 and 2.
-The ground kinds are water, plain, forest, hill and mountain, numbered 0 to 4.
-The verb converts its argument to a resource kind and refuses 3 and above. A
-caller who reads a ground kind from a tile report and passes it to the gather
-verb passes 0, 1 or 2, is not refused, and orders the whole set to gather the
-resource of that number.
-
-**The wrong answer then repeats exactly.** The engine is deterministic, so the
-mistake gives one answer at every thread count and on every run. The two
-determinism tests compare a run against a run, so neither can see it. The
-testing rule states this shape, and this is the shape reaching the public
-interface.[^43]
-
-**Evidence.** The verb checks the kind before it resolves the set, so an empty
-set reads the check alone.
-
-uv run pytest tests/test_documented_values.py -k ground_kind
-
-The test asserts that 0, 1 and 2 pass and that 3 and 4 are refused.
-
-**Follows.** The prose now states the true guard rather than the guard a reader
-would want. The reference says that the two scales overlap, that a member which
-takes a resource kind accepts an overlapping ground kind, and that nothing
-reports it. The errors section says the refusal covers three and above.
-
-**The interface question is recorded and not answered here.** Making the two
-scales distinct types at the boundary changes the interface, and a decision
-register row holds the options and the recommendation.[^F342B] The library
-already made this decision the other way for an entity, which crosses as one
-opaque identity that Python cannot build, so the interface is inconsistent with
-itself rather than merely underspecified.
-
-### FND-487 — Eleven test fixtures took ground by standing units on it, and each one encoded the rule rather than the need
-
-**Believed.** A fixture that wanted a faction to hold ground put units on that
-ground and ran a few frames. Each fixture said in its own prose that this is
-how a faction takes ground.
-
-**True.** That was the spread rule, and one record superseded it.[^F487A] A
-faction now holds the ground its cities reach, and a unit gives its faction no
-claim on the tile it stands on. Every one of those fixtures then held nothing,
-and eleven Rust test files and four Python test files went red at once. None
-of them was about the spread. Each wanted one thing: a tile whose holder is a
-named faction.
-
-**Evidence.** The rewrite of the holding pass turned the whole suite red in one
-commit, and each repair was one founding call.
-
-    cargo test -p cachette-core --no-fail-fast
-
-**Follows.** A fixture states the need and not the mechanism where it can. The
-cheapest form here is one call that founds a city and one step, and a helper
-that a file states once. A fixture that walks the rule is a second declaration
-of the rule, and it fails the day the rule changes, which is the day it says
-least about the test it serves.
-
-**This is the second declaration shape, in test data.**[^F487B] The rule lived
-in the engine and in the fixtures. Nothing failed when they disagreed, because
-they only disagreed once the rule moved.
-
-**The viewer crate held the same shape, and it was found later.** Four suites
-of the viewer took ground by standing a band of soldiers on it. The lib tests
-of the panels failed 12, the upgrade and weather suite failed 8, the holder
-suite failed 9, and the card suite failed 1. Every one of the 30 was repaired
-by a founding call, and no assertion was weakened.
-
-    cargo test -p cachette-view --no-fail-fast
-
-**A city changes what else the picture draws, and two fixtures had to say
-more.** A city marks its tile, a unit covers most of its tile at a close zoom,
-and the picture draws the edge of a holding. The old band held ground four
-rings wider than the units, so the tile a fixture picked was plain by accident.
-Under the new rule the ground is a disc around the city, and the same pick
-lands on the edge or under a unit. Two fixtures now state what the tile must
-be: held, with six held neighbours, no city and no unit.
-
-**Two of the repaired tests cannot fail under the defect they name, and the
-fixture is not the reason.** Both compare a held world with a second world
-drawn by the same code, or read the value under test back through the function
-that produces it. A defect in the layer moves both readings together. The
-holding rule did not cause this and the repair did not remove it. Testing rule
-2a names the shape.[^F487C]
-
-**The same shape returned one rule later, at the build order.** A faction now
-lays a road only on a tile its own plan zones.[^F487D] Four viewer tests
-ordered a build and never zoned a project, so the engine refused the order.
-Three of them assert on the mark a build site draws. The fourth reads the
-upgrade overlay, and it took its site from what the controller happened to
-build rather than from a build the fixture asked for. Each repair zones the
-project the order needs, and no assertion was weakened.
-
-    cargo test -p cachette-view --no-fail-fast
-
-**A fixture that waits for the engine to supply its input measures the
-engine.** The overlay test above is the clear case. It ran the world and read
-whatever site appeared, so a rule change that stopped the controller building
-emptied the fixture. The repair spawns a builder, zones the project and orders
-the road, so the test states the input it needs.[^F487C]
-
-### FND-490 — A faction that founds with two people fills no ranked position, and the world still ends
-
-**Believed.** The founding group is a balance value with no structure behind
-it. The register marks it unset and holds a provisional number, so a change to
-that number moves shares and nothing else.[^F490A]
-
-**True.** The number gates a mechanism. The project owner set the founding
-group to 2 on 5 September 2026. A faction of two people has almost no
-gatherers, so no site ever reaches the store a ranked position asks for, and
-`seats_filled` is zero in every game. Three Python log tests also went red,
-because the shortage they test needs a crowded world and each read the default
-instead of asking for a group.
-
-**Evidence.** The balance harness ran the same seed at both values.
-
-    just balance --seeds 2
-
-At a founding group of 64 the harness reported `units=256 settlements=4
-seats_filled=16` and a win at tick 69. At a founding group of 2 it reported
-`units=8 settlements=4 seats_filled=0` and a win at tick 449. Both games ended
-before the tick limit, and every faction seated a settlement in both. Statement
-4 of the harness gained `seats_filled` in its list of counts that are zero in
-every game.
-
-**Follows.** The world does not stall, so nothing needs tuning. Two derivations
-in the balance register cited the old number and now state nothing true: the
-base reach of 4 was chosen as the disc that nearly holds 64 people, and the
-campaign cohort of 4 was chosen as half a founding group. Both rows now record
-that the derivation lapsed.[^F490A]
-
-**A balance value that gates a mechanism is not only a share.** A register row
-that reads as a share hides this, and only a harness run finds it. Run the
-harness at both values before and after a change to a founding number, and
-report what the mechanism did, not only what the share did.
-
-### FND-491 — Two reads a road plan needs have no reader, and a draft record said the engine already had them
-
-**Believed.** ADR-0152 D2 states that the road solver reads the sites a faction
-holds, the deposits it knows and which of its sites are unconnected. It then
-said that each of the three is a bounded aggregate that the engine already
-exposes or derives at the barrier.[^F491A]
-
-**True.** One of the three has readers. Two have none.
-
-The sites of a faction are readable. `SettlementArena` gives `iter`,
-`faction`, `tile` and `address`, and `World::seat` gives the seat of a faction
-at `crates/cachette-core/src/world.rs:9611`.
-
-**Nothing says which sites are unconnected.** No pass derives connectivity, and
-nothing indexes the roads. `World::finished_upgrade` answers for one tile at
-`crates/cachette-core/src/world.rs:5238`, and `World::upgrade_sites` returns
-the sparse entries at `crates/cachette-core/src/world.rs:5219`. Neither joins
-two places.
-
-**Nothing names the deposits of a faction.** A tile stock is generated from the
-seed, and only what was taken is stored.[^F182B] `World::original_stock` and
-`World::tile_stock` answer for one tile at `crates/cachette-core/src/world.rs:1221`
-and `crates/cachette-core/src/world.rs:1246`. No aggregate collects them.
-
-**Evidence.** The whole public surface of the world was listed and read.
-
-    grep -n "pub fn " crates/cachette-core/src/world.rs
-
-**Follows.** The record now states the read as a constraint. It says that each
-of the three must reach the solver as a bounded read, that the record does not
-claim a reader exists, and that the work which implements it states in the open
-what the solver does without one.[^F491A]
-
-**A record that says a reader exists is a capability claim, and the scope rule
-forbids it.**[^F491C] A record states what the code does or the constraint the
-code must satisfy. A reviewer who reads "the engine already exposes" plans work
-that has no ground under it, and nothing fails until an implementer opens the
-file.
+### FND-537 — Four choice parameters and three other stored values stood outside the state hash, and two tests said they should
+
+**Believed.** The recovery rules were the one value that the step read on every
+tick and that the whole-world hash did not cover.[^F537A] A weight profile was
+an input to the world rather than a fact the world held, so the intent column
+carried what it decided and the profile itself needed no coverage. A flag that
+said the world had taken a luxury seed stated nothing that the luxury field did
+not.
+
+**True.** Eight stored values stood outside the hash, and each one changes what
+the world does next. The recovery rules are one of them. The choice pass reads
+four more on every tick: the choice schedule, the need bucket width, the weight
+profile and the carry mark.[^F537B] A trade verb reads the land list bound. The
+luxury seed flag decides whether the next seed call is accepted or refused, and
+an empty seed leaves the field exactly as an unseeded world leaves it, so the
+field cannot tell the two worlds apart.
+
+**Two tests asserted the defect.** One asserted that a weight the world could
+not act on moved no byte of the hash. One asserted that an empty luxury seed
+left the hash alone. Both passed, and both stated the hole as a rule.[^F537C]
+
+**Evidence.** Read on 5 September 2026. An audit compared every field of the
+world against the fields the hash function writes. The choice pass takes the
+four parameters into local variables at the top of the pass and reads them for
+every cell.[^F537B] Each of the eight is now folded in, and each fold was
+proved by removing it again and watching a named test go red.[^F537D]
+
+**Follows.** Three things.
+
+**The outcome does not excuse the cause.** The argument that the intent column
+carries what a weight decided is the same argument that left the recovery rules
+out. A hash of the effect reports a changed parameter only after the difference
+has reached a stored value, which is one or more ticks after the change.
+
+**The audit is the unit of work, not the value.** The backlog item named one
+value. Seven more had the same shape, and a hash function that a person writes
+field by field will grow more of them. A record now states the rule and asks
+for a test for each covered value.[^F537E]
+
+**A test that states a hole is worse than no test.** Both tests read as
+deliberate. A reader who met either one would conclude that the project had
+considered the case and decided it. Neither had been considered against the
+finding that names the shape.
+### FND-538 — The world conservation statement held three terms, and growth is a fourth
+
+**Believed.** What the stores of the world hold is what they held, plus what
+production put in, less what upkeep spent, less what the cohorts drew. A test
+of the consumption pass states that equality and calls it "the world must
+balance to zero".[^F538A]
+
+**True.** The statement was complete only while nothing else took from a store.
+The growth stage takes food out of a store to make a person, and the rate
+ledger and the draw ledger hold neither term. The test failed at the first run
+after growth landed, by forty-five whole units of food, which is the number of
+births the fixture made.
+
+The production queue has the same shape and did not show it, because the
+fixture of that test queues nothing.
+
+**Evidence.** The command was `cargo test -p cachette-core --test consumption`
+on the x86-64 development machine, and not on the target platform. The
+assertion reported 10559488 against 13508608 in the raw Q16.16 scale, and the
+difference is 2949120, which is forty-five whole units.
+
+**What follows.** The world holds a growth ledger, and the test reads it as a
+fourth term. **A pass that takes from a store must state what it took**, or the
+next conservation statement fails and the failure names the wrong pass. A
+reviewer who adds a fourth sink should ask which ledger holds it before the
+pass lands.
+
+### FND-539 — One word named the slot ceiling of the settlement arena and was about to name the housing
+
+**Believed.** The settlement arena member named `capacity` could stand for the
+people a site houses. Two backlog items and one decision record each warned
+that it could not, and each warning was written separately.[^F539A] [^F539B]
+
+**True.** The member is the ceiling on the slot index of the arena, and it is a
+property of the identity layout rather than a number of people. A reader who
+took the wrong meaning would get a number near four billion where a housing was
+meant, and nothing would fail.
+
+**Evidence.** The member and its reader are in the settlement column set, and
+the constant behind them is the range of the slot index.
+
+**What follows.** The slot ceiling is named `slot_ceiling`, its two builders
+are named for it, and the housing column is named `housing`. The word
+`capacity` no longer appears in the settlement arena. **A warning repeated in
+three documents is evidence that the name should change, not that the next
+reader will read the warning.**
 
 ### FND-540 — A renumber repairs every citation in a file and cannot repair a commit message
 
@@ -13135,586 +12809,99 @@ public interface, and everyone would learn to ignore it.
 
 ## H. The trading controller
 
-### FND-488 — A carrier that holds a home walks home rather than where it was sent
+### FND-542 — Domination cannot fire in a seeded run, because a holder is a city distance and a campaign never reaches anything
+
+**Believed.** Domination was unreachable through a chain of five links, and the
+links were about people and types: no seat filled, every founded unit a worker
+with no attack, soldiers only from a campaign, a campaign only at war, and a
+cohort of four impossible from a founding group of two.[^F494C] Three of those
+links have since moved. A campaign types its cohort as soldiers, the queue
+builds typed units, and growth fills a site to sixteen people by tick five
+hundred. The premise was that domination would then become reachable.
+
+**True.** Domination fires in no seed, and the reason is not the people. It is
+the rule that decides who holds a tile. A tile belongs to the faction of the
+nearest city within reach, and the pass reads no unit position.[^F487A] The
+seat of a faction is the tile of its own founding, so its own city stands on it
+at distance zero. No rival city can be nearer. The seat clause of the
+domination reader therefore fires only when the rival city stops
+existing.[^F542C]
+
+**Nothing in a step destroys a settlement, and nothing in a step founds one.**
+The destroy verb has one caller inside the engine, and that caller is the
+rollback of a founding that failed. The controller has no found option in its
+choice set.[^F542D] The settlement count reads four at tick zero and four at
+the end of every seed of the set.
+
+**The unit clause cannot fire either.** It asks that every rival holds no unit.
+The growth stage makes a person at a site, the site never stops existing, and
+the population of every faction reads sixteen from tick five hundred to the end
+of the run.
+
+**Two more links sit below those, and each would stop the chain on its own.**
+
+**A campaign requires war, and war closes the ground the campaign must cross.**
+The controller raises a campaign only against a faction in the war band, and
+the admission pass refuses a guest whose holder is below the peace edge toward
+it.[^F542E] [^F542F] The two edges make the objective unreachable by
+construction: the ground of the objective refuses the cohort exactly when the
+cohort is raised.
+
+**A campaign that reaches nothing never closes, so a faction raises about one
+campaign for the whole run.** The close pass ends a campaign when the objective
+changes holder or when the cohort is empty, and neither happens. A faction with
+a live campaign is refused a new one.[^F542G] Over 32 seeds of 20000 ticks the
+campaigns raised run from 3 to 11 across four factions, and the campaigns won
+run from 0 to 0.
+
+**The cohort is one unit and not four.** The raise takes the idle units of the
+faction and truncates them to the cohort size, and it does not wait for four.
+The project order and the campaign take the same idle units, so almost every
+unit is already sent. The register row of a live campaign reads a cohort size
+of one at every faction that raised one.
+
+**Evidence.** Measured on 5 September 2026 on one development machine
+(ty001-ubuntu, x86-64), and not on the target platform. The command was
+`uv run python scripts/balance_sweep.py --seeds 32 --tick-limit 20000
+--sample 500 --workers 16 --json target/sweep-before.json`, at extent 256 with
+four factions.[^F542H] Every figure came through the public Python interface.
+The march of one cohort was watched for 4000 ticks: the unit came within five
+tiles of its objective once and then drifted back to thirty, and the holder of
+the objective never changed.
+
+**What follows.** No value in the balance register makes domination reachable.
+The chain is closed by three engine rules and not by a number. Backlog item
+0507 holds the work.[^F542I]
+
+### FND-543 — No stock target the engine permits puts the wealth path out of reach
+
+**Believed.** The project owner asked for a wealth bar high enough that
+domination and territory decide a game. A previous pass raised the stock target
+seven times, to seven eighths of the clamp, and recorded that the wealth path
+then ended three of eight games.[^F543A]
+
+**True.** At a horizon of 20000 ticks the wealth-or-wonder path ends 32 of 32
+seeds, and no other path ends any. The store of a faction rises steadily and
+does not level off. It reads a median of 22 percent of the target at tick 2000
+and crosses the target in 29 of the 32 seeds. The other three end earlier on
+the wonder clause.
+
+**The ceiling is close, and the whole distribution is under it.** A faction
+founds one settlement, the commodity count is one, and a store is a `Fix32`, so
+the stock total of a faction clamps just below 32768 whole units. The current
+target of 28672 is seven eighths of that clamp. The highest target the engine
+permits is therefore about one seventh above the current one, and the store
+reaches the clamp, so every legal target is crossed given enough ticks. **The
+register cannot make this path slow, and it cannot make it unreachable.**
+
+**Evidence.** The same 32-seed run as the finding above. The end ticks run from
+1059 to 16850, with quartiles at 4239, 8550 and 12510.
+
+**What follows.** The wealth clause needs an engine change and not a value.
+Three options exist: scale the target by the settlements a faction owns, widen
+the store type, or drop the stock clause from the reader. Backlog item 0506
+holds the work.[^F543B]
 
-**Believed.** A unit that a caller sends to a tile walks toward that tile. The
-send verb says that every unit the call names reads one entry of the plane and
-steps, and the movement pass says that the destination plane wins over the
-option the unit scored for itself.[^F488A] [^F488B] The controller therefore
-gave each carrier a home at the site of its own faction, so that the carrier
-still ate, and sent it to the site of the other party.
-
-**True.** The destination plane wins over the option row, and the return field
-is not an option row. A unit that holds a home site and a load at the carry
-mark is laden, and a laden unit climbs the return field toward its own
-site.[^F488C] A carrier under the default mark therefore gathers on the way,
-crosses the mark, turns round, empties its load into the store of its own
-faction, and starts again. It never arrives.
-
-**Evidence.** The end-to-end test of item 0482 ran 600 ticks with a bound
-contract in flight and no quantity moved on it. A print of every carrier on
-every fiftieth tick showed each one within a few tiles of the site of its own
-faction, with a load, and sent. Raising the carry mark above what a carrier
-picks up on the way made the same fixture deliver.
-
-**Follows.** The carrier rule holds only while the carry mark stays above what
-a carrier gathers on the way. The code says so where it assigns the carriers,
-and the test fixture says so where it raises the mark. **A world whose mark is
-low sends its carriers home instead**, and nothing fails when it does. The
-alternative, a carrier with no home, is worse: the consumption pass serves a
-ration to the residents of a site, so a unit with no home eats nothing.
-
-### FND-489 — A unit sent to a tile arrives in the cell of that tile, and walks the last tiles by itself
-
-**Believed.** A contract moves a quantity when a unit of the debtor stands on
-the site of the other party.[^F489A] The controller sends a carrier at that
-site, so the carrier arrives and pays.
-
-**True.** A destination field holds one direction for each level 1 cell, not
-one for each tile.[^F488B] The send verb takes the cell of each seed tile and
-seeds the plane at the cell. A unit outside that cell climbs toward it. A unit
-inside it reads the seed cell, finds no direction, and walks where its own
-choice takes it. The last tiles of the journey are therefore a walk of the
-unit's own, and the exact tile of the site is one tile of a whole block.
-
-**Evidence.** The end-to-end test seats the two sites in one level 1 cell, and
-a quantity then moves inside a bounded tick count. With the two sites in two
-distant cells the carriers reached the right part of the world and no quantity
-moved on the contract. The unit that paid was not always a carrier the
-controller assigned, because any unit of the debtor that stands on the site of
-the other party with a load pays the contract.
-
-**Follows.** The end-to-end test of item 0482 proves that the chain from the
-board to the delivery is not inert. **It does not prove that the unit that paid
-was one of the carriers the controller assigned**, and the delivery pass names
-no unit in its log, so no reader can tell. A later pass that wants a carrier to
-arrive at a tile needs a field that resolves below the cell, or a verb that
-sends a unit at a site rather than at a tile. That is engine work and it is not
-in this item.
-
-### FND-493 — One faction climbs one destination plane, so a verb cannot send each unit to its own place
-
-**Believed.** ADR-0152 D5 states that the order sends each unit to the project
-nearest to it by hex distance.[^F493A] The statement reads as a promise of
-per-unit routing: this unit walks to that project.
-
-**True.** The engine moves a unit by a destination field, and a field is one
-plane. The plane of a faction is its faction number, and the campaign and the
-carriers already share it. The send verb takes a set of units, a set of seeds
-and one plane, and every unit on that plane climbs toward the nearest seed of
-the whole set. A per-unit destination would need a plane for each unit. **The
-code is right and the record was wrong.** The order decides the category a
-unit builds and the seed set the faction climbs. The field decides which seed
-a walking unit reaches.
-
-**Evidence.** The send verb is `World::send_units_to` at
-`crates/cachette-core/src/world.rs:1410`, and it writes one seed list for one
-plane. The assignment is `World::project_for` at
-`crates/cachette-core/src/world.rs:5631`, and the controller collects its
-answers into one seed list at `World::controller_take_projects`,
-`crates/cachette-core/src/world.rs:10527`. The campaign raise takes the same
-plane, and the carrier assignment takes it again. Three records state the form
-the engine has: the direction comes from a per-cell field and never from a
-per-unit search, the reach counts cells to the nearest seed, and the caller
-names the plane while the engine allocates none.[^F493B] [^F363A] [^F493D]
-
-**Follows.** ADR-0159 states the assignment, and it changes ADR-0152 D5.[^F493E]
-It says that the order names one category for each unit and one seed set for
-the faction, that the field distributes the units, and that no named unit is
-promised a named project. The reasoning is the design principle: a set-valued
-command buys a cheaper algorithm, and a promise of per-unit routing would
-forbid it.[^ORIENT2]
-
-**The retcon window was closed, so the project superseded rather than amended.**
-The window admits an in-place amendment only when nothing depends on the claim
-being changed. Source files cite ADR-0152 D5, backlog item 0488 was refined
-against it, and the registry row of ADR-0156 depends on ADR-0152. The registry
-also says to assume the window closed when in doubt.[^8] ADR-0152 keeps its
-text and its status, in the form ADR-0146 and ADR-0153 already use for a change
-to one decision of another record.
-
-**The rule is still testable, and it is tested where it decides.** The
-assignment is one reader, `World::project_for`, and the controller calls it.
-The test drives that reader rather than the walk, because the walk is the
-field's answer and not the rule's.
-
-### FND-492 — A test that reads the work done cannot tell a stopped build from a raised one
-
-**Believed.** A test that watches a build reads the work done on the tile. A
-build that stopped shows the work it had, and a build that ran on shows more.
-
-**True.** The work done returns to zero when the level rises, and it then
-counts up again.[^F492A] A build that ran on for the work of one whole level
-shows the same small number that a stopped build shows. The first form of the
-test that proves the build pass refuses a row the ground no longer fits
-therefore passed with the defect put back, and it measured nothing.
-
-**Evidence.** Written on 5 September 2026, during item 0486. The test ordered a
-road, stepped once, and asserted that the work done stayed at one after eight
-more steps. It passed with the resolution removed from the build pass. A probe
-printed the work done as one at level one, because the level had risen at the
-eighth step and the ninth step had added one.
-
-**Follows.** Assert on the level, and on the work done beside it. A quantity
-that resets is not a monotone reading, and a test that treats it as one
-measures the fixture.[^F492B] The rule that a fixture must reach the case is
-about the data; this is the same failure in the assertion.
-
-### FND-494 — The wealth path has an arithmetic ceiling, and domination cannot fire in a seeded run at any bar
-
-**Believed.** The wealth path and the wonder path fired too early, and raising
-the two bars would let domination and territory end most games. The stock
-target row said the demonstration store climbs to hundreds by the tick limit,
-so the bar of 4096 whole units sat above any stock a run reached.[^F494A]
-
-**True.** Three things.
-
-**The stock target derivation was wrong by a factor of about eighty.** The
-store climbs to thousands, not to hundreds, and it climbs by 4.4 to 7.0 whole
-units on each tick. The wealth path therefore ended every game of the default
-seed set.
-
-**The wealth path has a hard ceiling that bounds the bar.** A faction founds
-one settlement, the commodity count is one, and a store is a `Fix32`. The
-stock total of a faction therefore clamps at 32767 whole units, and a target
-above that never fires. The bar can rise by at most a factor of eight, and no
-larger raise exists.
-
-**Domination cannot fire in a seeded run, and no bar changes that.** Two
-independent things stop it. The seat clause asks for a faction that holds the
-seat of a rival, and no faction fills a seat at all.[^F494B] The unit clause
-asks for a faction whose rivals hold no unit, and every founded unit carries
-the worker row, whose attack is zero, so a meeting kills nobody.[^F494C] A
-soldier reaches the field only through a campaign, a campaign is drawn only
-between factions at war, and no war is declared. The founding group is two
-people and the campaign cohort is four, so a raise could not take its cohort
-even if a war began.[^F494A]
-
-**Evidence.** Two runs of the balance harness on one development machine
-(ty001-ubuntu, x86-64), on 5 September 2026, over the 8 default seeds, extent
-256, four factions.
-
-    just balance
-
-Before, at a stock target of 4096 whole units, a wonder work of 240 and a tick
-limit of 2000: wealth or wonder won 8 of 8, at ticks 437, 470, 590, 841, 940,
-1110, 1340 and 950. No game ended on territory, on domination or on renown. No
-wonder finished. The run cost 30 seconds.
-
-After, at a stock target of 28672 whole units, a wonder work of 2400 and a tick
-limit of 5000: territory won 5 of 8 and wealth or wonder won 3 of 8, at ticks
-2960, 3180 and 3980. Domination and renown won none. No wonder finished. The
-run cost 2 minutes 46 seconds.
-
-A third run at a tick limit of 20000 and a stock target of 24576 whole units
-recorded wealth or wonder at 8 of 8, at ticks between 2520 and 7290. The
-project owner then set the horizon to 5000 ticks, so the second run above is
-the one that governs. The 20000-tick run cost 2 minutes 14 seconds.
-
-A probe stepped three seeds to 20000 ticks and read the standing of each
-faction. The stock total reached 32767 whole units by tick 8000 in every one,
-and stayed there. The wonder work done stalled between 18 and 61 units before
-tick 500 and never moved again.
-
-**These are development-machine runs.** They are no evidence about the target
-platform, which is AWS Graviton. Every cost figure in this project is derived
-rather than measured on the target, and the blocker that says so is
-open.[^28] The shares themselves stay unset while the rules of the
-downstream game are unwritten.[^F494F]
-
-**Follows.** Three things.
-
-**Do not raise a bar to reach a share that the mechanism cannot produce.**
-Domination is not a balance problem. It is blocked by a unit table and by a
-relation that never moves, and only code closes it.
-
-**Ask what bounds a value before choosing its multiple.** The stock target has
-an arithmetic ceiling that no register row stated. A row that holds a target
-should hold the ceiling of the quantity it compares.
-
-**A derivation is a claim, and it decays like any other.** The stock target row
-carried a wrong claim about the store from the pass that wrote it, and no check
-could see it. Only a harness run found it.
-
-### FND-495 — A bound test that fills the stored block measures the block and not the bound
-
-**Believed.** A test that pushes one entry past the bound of a queue proves
-that the bound refuses it.
-
-**True.** The queue of a site is a block of a fixed width, and the bound a
-world enforces sits at or below that width. A test that filled the block was
-refused by the block, whatever the bound said. The first form of the test that
-proves the queue bound therefore passed with the bound check removed.[^F495A]
-
-**Evidence.** Written on 5 September 2026, during item 0497. The test pushed
-`QUEUE_BOUND` entries and asserted that the next push was refused. The bound
-check was replaced with a branch that never fires, and the test stayed green,
-because the search for a free position in the block found none. The test now
-sets a bound of two against a stored width of four, and it went red under the
-same defect. A second test covers the width.
-
-**Follows.** **When one limit sits inside another, the fixture must sit
-between them.** A test at the outer limit cannot see the inner one. Ask which
-limit the assertion means, and build the fixture so that only that limit can
-fire.[^F492B] This is the shape of the fixture rule at the assertion rather
-than at the data: the input was extreme, and it was extreme in the wrong
-direction.
-
-### FND-538 — The world conservation statement held three terms, and growth is a fourth
-
-**Believed.** What the stores of the world hold is what they held, plus what
-production put in, less what upkeep spent, less what the cohorts drew. A test
-of the consumption pass states that equality and calls it "the world must
-balance to zero".[^F538A]
-
-**True.** The statement was complete only while nothing else took from a store.
-The growth stage takes food out of a store to make a person, and the rate
-ledger and the draw ledger hold neither term. The test failed at the first run
-after growth landed, by forty-five whole units of food, which is the number of
-births the fixture made.
-
-The production queue has the same shape and did not show it, because the
-fixture of that test queues nothing.
-
-**Evidence.** The command was `cargo test -p cachette-core --test consumption`
-on the x86-64 development machine, and not on the target platform. The
-assertion reported 10559488 against 13508608 in the raw Q16.16 scale, and the
-difference is 2949120, which is forty-five whole units.
-
-**What follows.** The world holds a growth ledger, and the test reads it as a
-fourth term. **A pass that takes from a store must state what it took**, or the
-next conservation statement fails and the failure names the wrong pass. A
-reviewer who adds a fourth sink should ask which ledger holds it before the
-pass lands.
-
-### FND-539 — One word named the slot ceiling of the settlement arena and was about to name the housing
-
-**Believed.** The settlement arena member named `capacity` could stand for the
-people a site houses. Two backlog items and one decision record each warned
-that it could not, and each warning was written separately.[^F539A] [^F539B]
-
-**True.** The member is the ceiling on the slot index of the arena, and it is a
-property of the identity layout rather than a number of people. A reader who
-took the wrong meaning would get a number near four billion where a housing was
-meant, and nothing would fail.
-
-**Evidence.** The member and its reader are in the settlement column set, and
-the constant behind them is the range of the slot index.
-
-**What follows.** The slot ceiling is named `slot_ceiling`, its two builders
-are named for it, and the housing column is named `housing`. The word
-`capacity` no longer appears in the settlement arena. **A warning repeated in
-three documents is evidence that the name should change, not that the next
-reader will read the warning.**
-
-### FND-496 — The road chain finished nothing in a run, because the plan bound where a unit builds and not what it builds
-
-**Believed.** The road chain works. Backlog item 0488 was moved to `complete/`
-with the outcome "Built", and the plan tests pass. The solver zones, the
-controller orders, the pass builds, and the census counts the project
-finished.[^F496A]
-
-**True.** The chain never closed once in a run of the demonstration world. The
-solver zoned, the controller ordered, and every order was refused. No road
-stood, and the plan register filled to its bound and stayed there.
-
-The cause is one clause the build rule did not hold. The rule read the plan
-only for a row that asks for no held ground, and it read it to ask whether the
-tile was zoned for that same category.[^F487D] It never asked whether the tile
-was zoned for **another** category. The demonstration controller draws a
-category for a whole faction and orders every unit to build it where it stands,
-and that draw applies at a lower draw index than the project order.[^F496C] A
-unit therefore planted one category on a tile its own plan zoned for another. A
-tile carries one upgrade, so the row resolution then refused the project's own
-category for ever, and no order could raise it.[^F496D]
-
-**Evidence.** The run was
-`uv run python -m cachette.demo --run-to-end --extent 96 --factions 3
---tick-limit 800`, on the x86-64 development machine and not on the target
-platform.[^F496E]
-
-**One seed measures one world, so the reading is a spread.** Eight seeds were
-written down before any of them ran, and each was run for 800 ticks with the
-clause and without it. The count of seeds that finished at least one project
-went from one to seven. The count that also stood a road went from one to four
-at 600 ticks.
-
-| Seed | Finished without the clause | Finished with it |
-|---|---|---|
-| `0xf37fd6bdd8b64a3a` | 0 | 3 |
-| `0xea335e28791d60da` | 1 | 13 |
-| `0x58d024d97012dd6a` | 0 | 2 |
-| `0x0000000000000001` | 0 | 0 |
-| `0x0123456789abcdef` | 0 | 3 |
-| `0xdeadbeefcafef00d` | 0 | 2 |
-| `0x00000000000002a1` | 0 | 1 |
-| `0xffffffffffffffff` | 0 | 2 |
-
-The plan figures barely move. At `0xf37fd6bdd8b64a3a` the run zoned 120 and
-dropped 4680 without the clause, and it zoned 123 and dropped 4677 with it. The
-zoning count of 120 is three factions at the plan bound of forty. Each plan
-fills once and then never changes, because nothing finishes and nothing is
-cleared, so every later write is a drop.
-
-Instrumentation of the controller stage over sixty ticks named the refusal.
-Every project build order gave `TileHoldsAnother`, with a standing category the
-older draw had planted and the project's own category asked for. Not one order
-was ever applied.
-
-**Four census rows do not count what their names claim.**
-`projects_dropped` and `projects_refused` are not disjoint: a write past the
-bound raises both. `projects_refused` also holds every build refusal of the
-world, not only a refusal of a plan write, so two names read as one subsystem
-and are three things.
-
-`controller_commands` and `controller_refused` are counts of the last tick
-alone. The controller empties its log at the start of every tick, and it plans
-no command once the game end is written, so a run that ended reads zero in both
-rows while `plan_passes` reads 4800.[^F496J] Every other row beside them counts
-the whole run. Two time bases sit in one table and nothing marks which is
-which.
-
-**The production queue registered no census row at all.** The world holds four
-readers for it, and the Python boundary hands them out through a call of its
-own. The one census table holds none of them, so the demonstration census lists
-no queue row and a watcher cannot see what the queues produced or refused. The
-table is meant to be the only list, and a second declaration site now answers
-where the table is silent.[^F483A]
-
-**No test could have caught it.** The end-to-end test of the item calls
-`world.set_controller_evaluations(0)` and says in its own comment that it
-removes the competing draw "so that it measures the project order alone". Every
-other test of the chain drives the build verb by hand. The item's "done when"
-list asked for a test of each part and for no test of the whole, so the wave
-shipped a chain whose links each passed and whose whole never ran.[^F496F]
-
-**Follows.** Four things.
-
-**The plan binds every category, not only the reaching one.** The build rule
-now refuses an order that names one category on a tile the builder's own
-faction zones for another, whatever the row asks for. One typed refusal names
-the plan rather than the tile. The verb and the build intent pass call the one
-function that states the rule.[^F487D]
-
-**A chain needs a test that runs the chain, and over more than one seed.** The
-new test seeds the demonstration world at eight seeds, calls no verb of its
-own, removes no draw, runs each for a bounded number of ticks, and asserts that
-a stated number of them finished a project and stood a road. It reads four of
-eight with the clause and one of eight without it.[^F496G]
-
-**A fixture that removes the competing draw measures the fixture.** The
-register already held this shape twice, and this is the third instance. Turning
-a subsystem off to isolate another one hides exactly the defect that the two
-subsystems have together.[^F492B]
-
-**The plan still fills to its bound and drops thousands, and one seed of eight
-still finishes nothing.** The fix closes the loop; it does not make the loop
-reliable. Nothing releases a unit from a project send, so the seed set the
-faction climbs is written once and never re-aimed. Both stay open.[^F496I]
-
-**A fixture that named the return field read units the destination field
-steers.** The move pass reads the destination plane of a unit first, and it
-takes the option row only when the unit is free.[^F496L] The test that names
-the return field never checked whether the unit was free. It found six laden
-units in the world it was written against, and it passed because those six
-walked a destination direction that agreed with the return direction or stayed
-put.
-
-The clause of this finding makes a faction build the roads its plan zoned, so
-far more of its units carry a load. The same test then found 117 laden units,
-every one of them on the plane of its own faction, and the agreement broke.
-**The clause was right and the fixture was wrong.** The fixture now frees the
-units it measures through the stop verb, drops any that the step sends again,
-and asserts that it read some. It reads 113 of 117.
-
-The repair was proved twice. The assertion goes red when the expected
-neighbour is turned by one, so the fixture reaches the case. The test is green
-with the clause and green without it, so it no longer measures the clause.
-
-### FND-498 — Two census rows read the last tick, so a busy run reported zero
-
-**Believed.** The subsystem census says what a run produced. Every row of the
-one table shares one time base, so a zero in any row means that the thing
-never happened.[^F483A]
-
-**True.** Two rows read the last tick and not the run. The controller empties
-its log and its refusal count at the top of every controller stage, and the
-command count filters that per-tick log.[^F498B] The trading rows beside them
-did the same, and so did the relation, war and campaign rows. A game end stops
-the controller, so both controller rows read zero at the end of every game,
-however busy the run was.[^F496J] A reader could not tell a run that never
-acted from a run that stopped acting.
-
-The build queue registered no row at all. The queue counted what it made and
-kept its three refusals apart, and the binding layer answered them through a
-second dictionary of its own.[^F498D] One question had two ways to ask it, and
-the one table said nothing about the newest subsystem.
-
-**Evidence.** Written on 5 September 2026, during item 0278. A run of nine
-ticks with a tick limit of three acted on the first two ticks and ended on the
-third. Under the old readers the command row fell from 7 to 5 and then to
-zero, and the new test names the row and the fall. A run that built one unit
-from a queue read one on the tick that built it and zero three ticks later.
-The balance harness recorded the artefact as a fact: it listed the two
-controller rows as zero in every game of an eight-seed set, and the register
-holds that reading.[^F498E]
-
-**Follows.** Four things.
-
-**Every judgement made from the census while these rows were wrong is
-suspect.** That includes the reading that roads were never built and the
-reading that the controller does nothing, and it includes every zero the
-balance harness reported for a row that counted an act.
-
-**A census of a run states the basis of each row.** Each row now says whether
-it counts what the world holds now, or what the run has made since it was
-built. A total never falls, so a zero in it means that the thing never
-happened.
-
-**A total is folded where the per-tick count is emptied.** The world adds each
-per-tick count to a run total at the one site that clears it. The per-tick
-counter stays the only place that counts the act, so nothing counts one act
-twice.[^F590A]
-
-**One table answers one question.** The queue rows are rows of the census, and
-the second dictionary is gone. Nothing outside its own tests called it, which
-is the shape of a capability nobody invokes.[^F498G]
-
-One row still says more than it reads. The storm row reports whether a storm
-stands now, and its name promises a count of storms. A pass that counts the
-storms themselves must replace it.
-
-### FND-510 — A record written ahead of the code states a false context once the code lands, and nothing fails
-
-**What the project believed.** ADR-0151 said that the upgrade kind was an
-enumeration in the core crate with two variants, that each variant carried its
-work and its effect as a match arm, and that the decisions register held the
-choice open. The decision record priority index agreed, and its row said in
-bold that the record ran ahead of the code.
-
-**What is true.** The code implements the record. The core crate holds an
-upgrade table, a row type, a category newtype and a default table with rows for
-the road, the terrace, the wonder, the store and the wall.[^F510A] DEC-143
-closed on 5 September 2026 and names the item that landed it.[^F510B] Both
-statements had been false since that item merged.
-
-**Why nothing caught it.** A record is prose. The record check reads structure,
-volatile material, citations and the registry, and none of those can see a
-context that describes a tree the project has left. The priority row is prose
-too, and it carried the same claim.
-
-**What follows.** A record that runs ahead of the code carries a context in the
-present tense, and that context expires when the work lands. Write the context
-of such a record in the past tense at review, as this review did, so the forces
-survive and the stale description does not. The registry and the priority index
-hold whether a record is implemented; the record itself should not.
-
-### FND-511 — A source file cited a decision number that exists and a rule that does not
-
-**What the project believed.** ADR-0158 said in its consequences that
-cancelling an entry was not decided, and that nothing removed an entry from the
-queue except finishing it.
-
-**What is true.** The engine holds a take-out order, the world routes it to the
-queue, and the Python boundary exposes it.[^F511A] Both the order variant and
-the binding cite ADR-0158 D3 for the rule that the work already charged is
-lost. D3 stated no such rule. It stated only that the store pays as the entry
-advances.
-
-**Why nothing caught it.** The record check verifies that a cited decision
-number names a decision the target record has.[^F192B] D3 existed, so the
-citation passed. The check cannot read whether the cited decision states the
-claim the citing file rests on.
-
-**What follows.** A citation of the form `ADR-NNNN Dn` is checked for
-existence and never for content. When you cite a decision from code, read that
-decision and confirm it states your claim. The repair here put the rule into
-D3, because the code and two call sites already believed it was there.
-
-### FND-512 — The volatile check reads a figure written in digits, and three records wrote theirs in words
-
-**What the project believed.** The record check fails a record that holds a
-version pin, a latency figure, a throughput figure or a percentage, so section
-4.1 of the scope rule is enforced.[^F512A]
-
-**What is true.** Every pattern the check carries matches digits. Three weather
-records argued from a measurement and wrote its results in words: a storm that
-reached about a third of the lattice in one tick, a storm that left nothing by
-the twentieth tick, and ground water that ran nearly fourfold from the driest
-cell to the wettest.[^F512B] The check passed all three.
-
-**Why it matters here rather than in general.** Each figure describes the
-behaviour that its own record sets out to change. The figures would have become
-false on the day the work landed, inside records that state the reason for
-doing the work.
-
-**What follows.** Section 4.1 is a human judgement wherever a figure is spelled
-out. Ask what a figure describes and whether the change the record proposes
-makes it false. The repair keeps the force and drops the number: the maximum
-never travels, it flattens in place, and the research report holds the
-figures.[^F512C]
-
-### FND-513 — A record said the order reads the idle units, and the code tests the plan first
-
-**What the project believed.** ADR-0159 D1 opened with the statement that the
-set is the idle units of the faction.
-
-**What is true.** The controller loop reads every unit of the faction. It tests
-whether the plan zones the tile the unit stands on before it tests whether the
-unit is idle, so a busy unit standing on a zoned tile takes a build order.[^F513A]
-Only the send is restricted to idle units, and the code comment beside the loop
-says so.
-
-**Why nothing caught it.** The rest of D1 was correct, and the wrong sentence
-was the summary rather than a rule. A reviewer who read the decision as a whole
-would find the two later sentences true and stop.
-
-**What follows.** Read a summary sentence at the head of a decision as a claim
-that must hold, not as an introduction to the claims below it. D1 now says that
-the order reads every unit and sends only the idle ones.
-### FND-537 — Four choice parameters and three other stored values stood outside the state hash, and two tests said they should
-
-**Believed.** The recovery rules were the one value that the step read on every
-tick and that the whole-world hash did not cover.[^F537A] A weight profile was
-an input to the world rather than a fact the world held, so the intent column
-carried what it decided and the profile itself needed no coverage. A flag that
-said the world had taken a luxury seed stated nothing that the luxury field did
-not.
-
-**True.** Eight stored values stood outside the hash, and each one changes what
-the world does next. The recovery rules are one of them. The choice pass reads
-four more on every tick: the choice schedule, the need bucket width, the weight
-profile and the carry mark.[^F537B] A trade verb reads the land list bound. The
-luxury seed flag decides whether the next seed call is accepted or refused, and
-an empty seed leaves the field exactly as an unseeded world leaves it, so the
-field cannot tell the two worlds apart.
-
-**Two tests asserted the defect.** One asserted that a weight the world could
-not act on moved no byte of the hash. One asserted that an empty luxury seed
-left the hash alone. Both passed, and both stated the hole as a rule.[^F537C]
-
-**Evidence.** Read on 5 September 2026. An audit compared every field of the
-world against the fields the hash function writes. The choice pass takes the
-four parameters into local variables at the top of the pass and reads them for
-every cell.[^F537B] Each of the eight is now folded in, and each fold was
-proved by removing it again and watching a named test go red.[^F537D]
-
-**Follows.** Three things.
-
-**The outcome does not excuse the cause.** The argument that the intent column
-carries what a weight decided is the same argument that left the recovery rules
-out. A hash of the effect reports a changed parameter only after the difference
-has reached a stored value, which is one or more ticks after the change.
-
-**The audit is the unit of work, not the value.** The backlog item named one
-value. Seven more had the same shape, and a hash function that a person writes
-field by field will grow more of them. A record now states the rule and asks
-for a test for each covered value.[^F537E]
-
-**A test that states a hole is worse than no test.** Both tests read as
-deliberate. A reader who met either one would conclude that the project had
-considered the case and decided it. Neither had been considered against the
-finding that names the shape.
 ### FND-544 — The world seeder was suspected of the empty run, and it seats every faction at every seed of the demonstration world
 
 **Believed.** The world seeder makes a run that has nothing in it. The Python
@@ -13851,99 +13038,6 @@ rule the founding needs when the group grows again, and the growth chain will
 grow it. A test cannot reach it at a group of two, so no test asserts that it
 refuses anything.
 
-### FND-542 — Domination cannot fire in a seeded run, because a holder is a city distance and a campaign never reaches anything
-
-**Believed.** Domination was unreachable through a chain of five links, and the
-links were about people and types: no seat filled, every founded unit a worker
-with no attack, soldiers only from a campaign, a campaign only at war, and a
-cohort of four impossible from a founding group of two.[^F494C] Three of those
-links have since moved. A campaign types its cohort as soldiers, the queue
-builds typed units, and growth fills a site to sixteen people by tick five
-hundred. The premise was that domination would then become reachable.
-
-**True.** Domination fires in no seed, and the reason is not the people. It is
-the rule that decides who holds a tile. A tile belongs to the faction of the
-nearest city within reach, and the pass reads no unit position.[^F487A] The
-seat of a faction is the tile of its own founding, so its own city stands on it
-at distance zero. No rival city can be nearer. The seat clause of the
-domination reader therefore fires only when the rival city stops
-existing.[^F542C]
-
-**Nothing in a step destroys a settlement, and nothing in a step founds one.**
-The destroy verb has one caller inside the engine, and that caller is the
-rollback of a founding that failed. The controller has no found option in its
-choice set.[^F542D] The settlement count reads four at tick zero and four at
-the end of every seed of the set.
-
-**The unit clause cannot fire either.** It asks that every rival holds no unit.
-The growth stage makes a person at a site, the site never stops existing, and
-the population of every faction reads sixteen from tick five hundred to the end
-of the run.
-
-**Two more links sit below those, and each would stop the chain on its own.**
-
-**A campaign requires war, and war closes the ground the campaign must cross.**
-The controller raises a campaign only against a faction in the war band, and
-the admission pass refuses a guest whose holder is below the peace edge toward
-it.[^F542E] [^F542F] The two edges make the objective unreachable by
-construction: the ground of the objective refuses the cohort exactly when the
-cohort is raised.
-
-**A campaign that reaches nothing never closes, so a faction raises about one
-campaign for the whole run.** The close pass ends a campaign when the objective
-changes holder or when the cohort is empty, and neither happens. A faction with
-a live campaign is refused a new one.[^F542G] Over 32 seeds of 20000 ticks the
-campaigns raised run from 3 to 11 across four factions, and the campaigns won
-run from 0 to 0.
-
-**The cohort is one unit and not four.** The raise takes the idle units of the
-faction and truncates them to the cohort size, and it does not wait for four.
-The project order and the campaign take the same idle units, so almost every
-unit is already sent. The register row of a live campaign reads a cohort size
-of one at every faction that raised one.
-
-**Evidence.** Measured on 5 September 2026 on one development machine
-(ty001-ubuntu, x86-64), and not on the target platform. The command was
-`uv run python scripts/balance_sweep.py --seeds 32 --tick-limit 20000
---sample 500 --workers 16 --json target/sweep-before.json`, at extent 256 with
-four factions.[^F542H] Every figure came through the public Python interface.
-The march of one cohort was watched for 4000 ticks: the unit came within five
-tiles of its objective once and then drifted back to thirty, and the holder of
-the objective never changed.
-
-**What follows.** No value in the balance register makes domination reachable.
-The chain is closed by three engine rules and not by a number. Backlog item
-0507 holds the work.[^F542I]
-
-### FND-543 — No stock target the engine permits puts the wealth path out of reach
-
-**Believed.** The project owner asked for a wealth bar high enough that
-domination and territory decide a game. A previous pass raised the stock target
-seven times, to seven eighths of the clamp, and recorded that the wealth path
-then ended three of eight games.[^F543A]
-
-**True.** At a horizon of 20000 ticks the wealth-or-wonder path ends 32 of 32
-seeds, and no other path ends any. The store of a faction rises steadily and
-does not level off. It reads a median of 22 percent of the target at tick 2000
-and crosses the target in 29 of the 32 seeds. The other three end earlier on
-the wonder clause.
-
-**The ceiling is close, and the whole distribution is under it.** A faction
-founds one settlement, the commodity count is one, and a store is a `Fix32`, so
-the stock total of a faction clamps just below 32768 whole units. The current
-target of 28672 is seven eighths of that clamp. The highest target the engine
-permits is therefore about one seventh above the current one, and the store
-reaches the clamp, so every legal target is crossed given enough ticks. **The
-register cannot make this path slow, and it cannot make it unreachable.**
-
-**Evidence.** The same 32-seed run as the finding above. The end ticks run from
-1059 to 16850, with quartiles at 4239, 8550 and 12510.
-
-**What follows.** The wealth clause needs an engine change and not a value.
-Three options exist: scale the target by the settlements a faction owns, widen
-the store type, or drop the stock clause from the reader. Backlog item 0506
-holds the work.[^F543B]
-
 ### FND-547 — Two derivations in the balance register describe a world that no longer runs
 
 **Believed.** The balance register records that the wonder work does not move.
@@ -13965,63 +13059,6 @@ before it.
 the same change. **A derivation that names a measured share goes stale the next
 time a subsystem is repaired, and nothing fails.** That is the shape the
 recurring-defect rule names, and this is one more local instance of it.[^F483G]
-
-### FND-550 — The ceiling that ends every game is in the store, not in the accumulator
-**Believed.** Three engine changes could put the wealth path out of reach:
-scale the bar by the settlements a faction owns, widen the store type, or drop
-the stock clause.[^F550A] The backlog item repeated them, and a fourth reading
-named a wider accumulator as the smallest change of the three.[^F543B]
-**True.** The reader already totals in a 64-bit accumulator, and it already
-sums every commodity of every live settlement.[^F548C] **A wider accumulator
-was never an available answer, because the accumulator was never the narrow
-part.** The narrow part is the store the accumulator reads. A store is a
-fixed-point value of a fixed width, so one settlement of one commodity
-saturates, and the sum of one settlement saturates with it.
-**Scaling the bar by the settlements a faction owns is worse than no change.**
-A bar that rises as a faction grows is a bar the faction never approaches, and
-it punishes the expansion a wealth win rewards.
-**What follows.** The answer is where the bar stands, and not what the reader
-totals. The bar now stands above the stock one settlement can hold, and a
-compiled assertion stops the build when it does not. A record holds the
-decision.[^F548D] **A wealth win now asks a faction for a second settlement,
-and nothing in the engine founds one, so the stock clause fires in no seeded
-run today.**[^F548E] The wonder clause carries the path.
-**The shape.** Two registers and one backlog item named a remedy that the code
-already had. Each writer read the finding above and not the reader. **Read the
-code for the part you mean to change, even when a register names it.**
-### FND-551 — The wealth bar was declared in three places, and two of them were copies
-**Believed.** The engine states the wealth bar once, and the balance register
-holds its derivation.[^F543A]
-**True.** Two scripts held their own copy of the bar as a whole number, and
-each used its copy to report the share of the bar a faction had reached.[^F542H]
-[^F549B] Nothing compared the copies against the engine. A change to the
-engine constant would have left both scripts reporting a share against a bar
-the engine no longer held, and every gate would have passed.
-**Evidence.** A whole-tree search for the value found three sites: the engine
-constant and the two scripts. The commit body holds the search command.
-**What follows.** The binding now exposes the bar, and each script reads it.
-One declaration site remains. This is one more local instance of the first
-recurring defect shape.[^F590A]
-### FND-552 — The offset space of a block is the square of the block edge, and a fixture over interior blocks alone hides that
-**Believed.** A block of the lattice holds as many tile offsets as it holds
-tiles. The first observation container therefore sized every scratch bitmap and
-every payload by the tile count of the block.
-**True.** The offset of a tile packs the row and the column of that tile
-against the block edge, so the offset space is the square of the block
-edge.[^F552A] A block that the world edge cuts holds fewer tiles than that, and
-the offsets of the tiles it does hold still reach the top of the space. Every
-tile of a cut block above the tile count was dropped in silence.
-**Evidence.** The defect reached no interior block, because an interior block
-holds exactly as many tiles as its offset space. A fixture over a world of one
-cut block reported that a faction which saw every tile saw 128 of 256. The
-fixture was built to reach the payload-free form at the top of the density
-range, and it found this instead.
-**What follows.** Size a container by the address space of its key, never by
-the population that the world happens to put in it. **A fixture over the
-typical case would never have failed**, because the typical block of a large
-world is not cut. This is one more local instance of the shape the testing rule
-names.[^F492B]
-
 
 ### FND-548 — The census repair left three rows that still said more than they read
 
@@ -14145,6 +13182,63 @@ that ignored the build rate would have frozen such a unit for the rest of the
 run, because no work would ever finish the site under it. The clause that
 excludes it is the only thing that bounds the hold, and a test goes red when it
 is removed.
+
+### FND-550 — The ceiling that ends every game is in the store, not in the accumulator
+**Believed.** Three engine changes could put the wealth path out of reach:
+scale the bar by the settlements a faction owns, widen the store type, or drop
+the stock clause.[^F550A] The backlog item repeated them, and a fourth reading
+named a wider accumulator as the smallest change of the three.[^F543B]
+**True.** The reader already totals in a 64-bit accumulator, and it already
+sums every commodity of every live settlement.[^F548C] **A wider accumulator
+was never an available answer, because the accumulator was never the narrow
+part.** The narrow part is the store the accumulator reads. A store is a
+fixed-point value of a fixed width, so one settlement of one commodity
+saturates, and the sum of one settlement saturates with it.
+**Scaling the bar by the settlements a faction owns is worse than no change.**
+A bar that rises as a faction grows is a bar the faction never approaches, and
+it punishes the expansion a wealth win rewards.
+**What follows.** The answer is where the bar stands, and not what the reader
+totals. The bar now stands above the stock one settlement can hold, and a
+compiled assertion stops the build when it does not. A record holds the
+decision.[^F548D] **A wealth win now asks a faction for a second settlement,
+and nothing in the engine founds one, so the stock clause fires in no seeded
+run today.**[^F548E] The wonder clause carries the path.
+**The shape.** Two registers and one backlog item named a remedy that the code
+already had. Each writer read the finding above and not the reader. **Read the
+code for the part you mean to change, even when a register names it.**
+### FND-551 — The wealth bar was declared in three places, and two of them were copies
+**Believed.** The engine states the wealth bar once, and the balance register
+holds its derivation.[^F543A]
+**True.** Two scripts held their own copy of the bar as a whole number, and
+each used its copy to report the share of the bar a faction had reached.[^F542H]
+[^F549B] Nothing compared the copies against the engine. A change to the
+engine constant would have left both scripts reporting a share against a bar
+the engine no longer held, and every gate would have passed.
+**Evidence.** A whole-tree search for the value found three sites: the engine
+constant and the two scripts. The commit body holds the search command.
+**What follows.** The binding now exposes the bar, and each script reads it.
+One declaration site remains. This is one more local instance of the first
+recurring defect shape.[^F590A]
+### FND-552 — The offset space of a block is the square of the block edge, and a fixture over interior blocks alone hides that
+**Believed.** A block of the lattice holds as many tile offsets as it holds
+tiles. The first observation container therefore sized every scratch bitmap and
+every payload by the tile count of the block.
+**True.** The offset of a tile packs the row and the column of that tile
+against the block edge, so the offset space is the square of the block
+edge.[^F552A] A block that the world edge cuts holds fewer tiles than that, and
+the offsets of the tiles it does hold still reach the top of the space. Every
+tile of a cut block above the tile count was dropped in silence.
+**Evidence.** The defect reached no interior block, because an interior block
+holds exactly as many tiles as its offset space. A fixture over a world of one
+cut block reported that a faction which saw every tile saw 128 of 256. The
+fixture was built to reach the payload-free form at the top of the density
+range, and it found this instead.
+**What follows.** Size a container by the address space of its key, never by
+the population that the world happens to put in it. **A fixture over the
+typical case would never have failed**, because the typical block of a large
+world is not cut. This is one more local instance of the shape the testing rule
+names.[^F492B]
+
 
 ### FND-553 — The seed sweep table of FND-545 does not reproduce at the tree that recorded it
 
@@ -14540,6 +13634,78 @@ decide which path is strong. It decides which path gets to fire.
 **Neither domination nor territory has ended a seeded game at any horizon.** The
 paths the project owner wants are still not the paths that decide a run.
 
+### FND-564 — The border of the weather lattice was believed to be starved, and it is retentive
+
+**Believed.** The weather lattice is exactly the size of the world, so air
+leaves through one edge and nothing arrives through the other. The cells beside
+an edge are therefore starved of water, and a margin of simulated cells around
+the world will raise the water they hold.
+
+**True.** A bare border holds **more** water in the air than a border with a
+margin, not less. The transport pass skips a direction that names no
+neighbour, and it skips both halves of that direction: the cell does not take
+from the outside, and it also does not give to the outside. So a border cell of
+a bare lattice cannot lose water off the map. It is retentive, and the retention
+is not physics. It is the shape of the loop.
+
+What a bare border lacks is upwind, not water. Nothing carries a mass onto it,
+so the water it holds is the water it lifted, and the field there does not move
+as the field inside moves.
+
+**Evidence.** A probe ran one terrain three times over one padded lattice at
+the per-tile pitch, and changed only the ground under the margin. An empty
+margin gave the lowest border water, a mirror margin gave more, and an ocean
+margin gave the most. A separate probe ran the same world at a range of margin
+widths and read the border water, which fell slightly as the margin widened.
+The commit body holds both tables and the commands that produced them.
+
+**What follows.** Do not measure a border repair by the water the border holds.
+The bare reading is inflated by an artefact, so the repaired field reads lower
+and looks worse. Measure the structure instead: whether every cell a reader can
+see has a full set of neighbours, and whether the field at the edge moves as the
+field inside moves.
+
+A test that asserted more border water after the margin was written and it
+failed. The test in the tree asserts the neighbour property, which is the thing
+the margin buys and which fails at margin zero.
+
+### FND-565 — An accepted record fixed the shape of an enumeration another record owns, and the enumeration never had that shape
+
+**Believed.** The action a learner takes factorises into a verb, a target and a
+magnitude, and the verb set is the set the built-in controller's choice
+enumeration holds. An accepted record states both as one decision.[^F565A]
+
+**True.** The enumeration has never had that shape. One of its choices names two
+things, several name nothing, and none of them carries a quantity. The register
+that would hold the bucket edges of a magnitude holds no row for one. The
+commit body of this change lists every choice and its arguments, because a list
+decays and a record must not hold one.[^F542D]
+
+**Evidence.** The choice enumeration of the controller module on the
+`integration` branch, read against the record. No file under `crates/` and no
+file under `python/` names the record, so no code contradicts it. A research
+report found the same disagreement and named a different number of choices than
+the enumeration holds.[^F565C]
+
+**What follows.** **A record may state a constraint on an artefact it does not
+own. It may not state a property of one as a fact.** The scope rule already says
+to write the constraint the code must satisfy and never what you hope the code
+will do, and this is the first local instance of that failure in this
+project.[^F491C] The constraint underneath the shape was sound: one integer, one
+bounded table, one schema. Only the fixed triple was a description, and the
+description was wrong from the day it was written.
+
+**The repair went to the record and not to the engine.** Every choice of the
+enumeration was added under a record of its own. Reshaping the enumeration to
+fit a boundary encoding would have let the encoding decide what the simulation
+offers a faction, which runs the authority backwards. A later record changes the
+one decision and keeps the rest.[^F565E]
+
+**A research report is fixed to a moment and still gets a count wrong.** The
+report that found this said three choices break the factorisation, then listed
+four, and neither number matches the enumeration. Read the artefact, and take
+the count from the artefact.
+
 ### FND-566 — A ruling about one trigger retired two paths, because one reader held both
 
 **Believed.** The wealth-or-wonder reader fired on a stock total at a target or
@@ -14594,43 +13760,6 @@ like a defect in the code.
 **A setter needs a reader for this reason, and not only for the caller.** A value
 a caller can set and cannot read back is a value that every test and every script
 must state again.
-### FND-565 — An accepted record fixed the shape of an enumeration another record owns, and the enumeration never had that shape
-
-**Believed.** The action a learner takes factorises into a verb, a target and a
-magnitude, and the verb set is the set the built-in controller's choice
-enumeration holds. An accepted record states both as one decision.[^F565A]
-
-**True.** The enumeration has never had that shape. One of its choices names two
-things, several name nothing, and none of them carries a quantity. The register
-that would hold the bucket edges of a magnitude holds no row for one. The
-commit body of this change lists every choice and its arguments, because a list
-decays and a record must not hold one.[^F542D]
-
-**Evidence.** The choice enumeration of the controller module on the
-`integration` branch, read against the record. No file under `crates/` and no
-file under `python/` names the record, so no code contradicts it. A research
-report found the same disagreement and named a different number of choices than
-the enumeration holds.[^F565C]
-
-**What follows.** **A record may state a constraint on an artefact it does not
-own. It may not state a property of one as a fact.** The scope rule already says
-to write the constraint the code must satisfy and never what you hope the code
-will do, and this is the first local instance of that failure in this
-project.[^F491C] The constraint underneath the shape was sound: one integer, one
-bounded table, one schema. Only the fixed triple was a description, and the
-description was wrong from the day it was written.
-
-**The repair went to the record and not to the engine.** Every choice of the
-enumeration was added under a record of its own. Reshaping the enumeration to
-fit a boundary encoding would have let the encoding decide what the simulation
-offers a faction, which runs the authority backwards. A later record changes the
-one decision and keeps the rest.[^F565E]
-
-**A research report is fixed to a moment and still gets a count wrong.** The
-report that found this said three choices break the factorisation, then listed
-four, and neither number matches the enumeration. Read the artefact, and take
-the count from the artefact.
-
 ### FND-568 — The quantity the wonder reader compares is not the quantity the standing reports
 
 **Believed.** The standing of a faction names every running value the win
@@ -14668,6 +13797,49 @@ nothing without its extent and its depth**, and the first reading of this row
 carried neither. That figure bounds the throughput of any training run and
 belongs in the sizing of the batch step.
 
+### FND-569 — The polar cloud failure was read as a margin defect, and it was a test that indexed a plane at a world address
+
+**Believed.** Two branches that were each correct alone met and broke the
+poles. One branch gave the weather lattice a margin of mirrored cells on all
+four sides. The other made the capacity of the air fall with the temperature.
+Together they left the polar land at a mean of 8 parts of a sky in 255, against
+a bar of 16. The reading was that the pole gained the power to export water at
+the moment its capacity collapsed, and that the mirror beyond the pole is a
+sink that never gives anything back. Forcing the margin to zero made the test
+pass, which was read as proof.
+
+**True.** The margin costs the poles almost nothing. The test walked the whole
+lattice, took the whole-lattice address of each cell as a world address, and
+read the cloud plane at that index. The margin sits between the two, so the
+walk was wrong by the margin width in both axes. It sampled cells beyond the
+north pole as polar land, and it lost most of the southern band, because a
+world address test rejects a row past the world. The margin-to-zero measurement
+did not test the field. It made the wrong walk correct again.
+
+**Evidence.** The latitude probe carried the same defect and was repaired
+first. Repaired, it read the polar bands at 36 parts of a sky over all cells
+and 25 over the inland cells with the margin present, and at 38 and 27 with the
+margin forced to zero. A reflecting edge at the north and the south moved
+neither figure. The acceptance test then passed with the walk repaired and no
+change to the field at all. The commit body holds the three probe tables and
+the commands.
+
+**Follows.** Three things.
+
+**A plane over a padded lattice has two address spaces, and nothing fails when
+a reader confuses them.** The lattice offers one map between them, and every
+reader must go through it. This is the redundant declaration shape: one
+position held in two coordinate systems with no check that they agree.[^38]
+
+**A repair that makes a test pass is not a diagnosis.** Setting the margin to
+zero changed the field and the test's own arithmetic at the same time. When one
+switch moves two things, it names neither.
+
+**Measure a claim about a band with an instrument that reads that band.** The
+probe and the test shared the defect, so the probe could not have caught it.
+Repair the instrument before you trust what it says about the subject.
+
+
 ### FND-570 — The reader of a faction's weight vector reported fewer weights than the vector holds
 
 **Believed.** The weight vector of a faction holds four weights, and the Python
@@ -14694,6 +13866,33 @@ reader returns, so the two cannot part again without a failure.
 
 This is the first local instance of a partial reader in this project. The
 nearest recorded shape is a value a caller can set and cannot read back.[^F569B]
+### FND-571 — A backlog item said that nothing in the engine held the sight rule, and three quarters of it was built
+
+**Believed.** Backlog item 0495 said that no column, no plane and no table held
+what a faction has observed, and that a search of the tree for the words of the
+subject returned one reserved bit, one doc comment and no storage. It listed
+four parts of the work and described all four as missing. The accepted record
+it implements says the same thing in its own context section.[^F568A] [^F568B]
+
+**True.** Three of the four parts were built before the item was taken. The
+observation module of the core crate holds the two layers, the four block
+forms, the rebuild and two of the three derived masks, and the step calls the
+rebuild on every ordinary tick with no flag and no gate.[^F568C] Only the
+readers were missing, and one of the three derived masks. The item was written
+before the module existed, and nothing moved it when the module landed.
+
+**Evidence.** A worker who took the item found the module and the pass. The
+audit of the learner surface had found the same thing a day earlier and stated
+it as its first claim.[^F568D] The priority index had been corrected and the
+item file had not, so the index and the item disagreed and nothing failed.
+
+**Follows.** An item in `proposed/` decays in the same way a summary decays. It
+states the state of the tree at the moment it was written, and nothing fails
+when the tree moves. **Read the code before you plan against a proposed item,
+and repair the item in the same change.** The priority index is the cheaper
+place to carry a state, because a check reads it and a worker reads it first.
+
+
 ### FND-572 — The demonstration world stopped producing a laden unit when a sent unit began to arrive
 
 **Believed.** The carrier tests of the demonstration world went red in a
@@ -14777,56 +13976,6 @@ founding housing of the world governs nothing in it.
 a need rule of no decay, and it says so, because a reader who found the rule
 there without the reason would take it for balance.
 
-### FND-576 — A record refused to release a sent unit for a reason its own later work removed
-
-**Believed.** The engine cannot decide that a sent unit has arrived, so the
-control plane must stop the order itself. A destination field steers by the
-reach of a level 1 cell, and a field at block pitch cannot answer one tile. The
-decision record stated this and stated the consequence: a unit that reaches its
-cell keeps the order and walks about inside the block.[^F411A]
-
-**True.** The premise stopped holding when the same record gained a second
-field. The approach field answers at the pitch of one tile, and its seed offset
-says that a unit stands on the tile the caller named.[^F574B] The engine can
-therefore decide arrival, and the record refused a release for a reason that no
-longer applied. Nothing released a sent unit, and a sent unit reads no option
-row, so it neither gathered nor delivered.[^F574C]
-
-The release now answers three states with one rule. A unit on a seed tile has
-arrived. A unit that reads no direction from either field holds a plane that
-leads nowhere, which covers an empty seed set, a seed that went away, and ground
-that cuts the unit off. Both are released. A unit that reads a direction the
-ground under it refuses stays sent and takes the keyed draw, because that
-refusal repeats and a unit that only stayed put would stay put for ever.
-
-**Evidence.** Measured on 6 September 2026 on one development machine
-(ty001-ubuntu, x86-64), in the demonstration world at 300 ticks, with a probe
-that drives the step. Before the release the heaviest load reached 14 against a
-carry mark of 32, no unit was laden, no unit held the delivery option, and 120
-units still held a destination. After the release the heaviest load reached 66,
-six units were laden, five held the delivery option, and 71 units still held a
-destination. The carrier target passed. The commit body holds the probe and the
-command.
-
-**What follows.** Three things.
-
-**A record states a constraint, and the reason for it decays separately.** The
-constraint was sound when it was written. The work that removed its reason sat
-in the same record and did not repair it, so the record went on refusing a
-release that had become cheap.
-
-**A rejected alternative decays too.** Two other records cite this decision for
-the claim that a unit inside the seeded cell reads no direction. A reader who
-takes that for the current engine plans against a field that a later commit
-replaced.
-
-**Removing a defect can expose a second one.** The approach field repaired the
-wandering, and the wandering was the only path that reached the delivery. A
-repair that makes a run worse is evidence that something downstream of it never
-ran.[^F574C]
-
-
-
 ### FND-574 — A housing bound of 1024 was read as the population ceiling, and the food is the ceiling
 
 **Believed.** A settlement holds as many people as its housing admits. Raising
@@ -14881,6 +14030,56 @@ and at every sample after.
 with nothing that fails when they disagree, which is the redundant declaration
 shape. A blocker holds the question of which one moves.
 
+### FND-576 — A record refused to release a sent unit for a reason its own later work removed
+
+**Believed.** The engine cannot decide that a sent unit has arrived, so the
+control plane must stop the order itself. A destination field steers by the
+reach of a level 1 cell, and a field at block pitch cannot answer one tile. The
+decision record stated this and stated the consequence: a unit that reaches its
+cell keeps the order and walks about inside the block.[^F411A]
+
+**True.** The premise stopped holding when the same record gained a second
+field. The approach field answers at the pitch of one tile, and its seed offset
+says that a unit stands on the tile the caller named.[^F574B] The engine can
+therefore decide arrival, and the record refused a release for a reason that no
+longer applied. Nothing released a sent unit, and a sent unit reads no option
+row, so it neither gathered nor delivered.[^F574C]
+
+The release now answers three states with one rule. A unit on a seed tile has
+arrived. A unit that reads no direction from either field holds a plane that
+leads nowhere, which covers an empty seed set, a seed that went away, and ground
+that cuts the unit off. Both are released. A unit that reads a direction the
+ground under it refuses stays sent and takes the keyed draw, because that
+refusal repeats and a unit that only stayed put would stay put for ever.
+
+**Evidence.** Measured on 6 September 2026 on one development machine
+(ty001-ubuntu, x86-64), in the demonstration world at 300 ticks, with a probe
+that drives the step. Before the release the heaviest load reached 14 against a
+carry mark of 32, no unit was laden, no unit held the delivery option, and 120
+units still held a destination. After the release the heaviest load reached 66,
+six units were laden, five held the delivery option, and 71 units still held a
+destination. The carrier target passed. The commit body holds the probe and the
+command.
+
+**What follows.** Three things.
+
+**A record states a constraint, and the reason for it decays separately.** The
+constraint was sound when it was written. The work that removed its reason sat
+in the same record and did not repair it, so the record went on refusing a
+release that had become cheap.
+
+**A rejected alternative decays too.** Two other records cite this decision for
+the claim that a unit inside the seeded cell reads no direction. A reader who
+takes that for the current engine plans against a field that a later commit
+replaced.
+
+**Removing a defect can expose a second one.** The approach field repaired the
+wandering, and the wandering was the only path that reached the delivery. A
+repair that makes a run worse is evidence that something downstream of it never
+ran.[^F574C]
+
+
+
 ### FND-577 — The mask made the whole-map read cheap, and the loop shape did not
 
 **Believed.** A point query is the wrong shape for a whole map, so the way to
@@ -14919,6 +14118,45 @@ caller pays the lower price and no caller holds a second copy of the rule.[^F487
 learner at the start of a run pays for the ground it has walked. A record says
 that fog storage grows with observed area, and the read now grows the same
 way.[^F572E]
+
+### FND-578 — The cloud over a polar interior came from a capacity floor of two drops, and not from water that reached it
+
+**Believed.** An earlier repair made the capacity of the air fall with the
+temperature, and an acceptance test then found cloud over the polar land of a
+landlocked world. The reading was that water now reaches a high latitude and
+stands there as cloud, and that the poles are no longer structurally
+cloudless.[^F570A]
+
+**True.** The cloud a watcher saw was a ratio with a floor of two drops under
+it. Cloud is the air of a cell against what the air of that cell can hold, and
+the earlier curve gave the coldest cell a capacity of two drops. One drop
+standing over a polar cell therefore painted half a sky. The published
+saturation curve gives the same cell about fifty drops, and the same water then
+covers a fiftieth of the sky.[^F570B]
+
+**Evidence.** The published curve was fitted at eight temperatures the report
+states, and it matches every one of them. On the landlocked fixture the polar
+land then held a mean of 4 parts of a sky in 255 against a bar of 16, and the
+air plane held nothing at all over the first band of rows. On a world whose
+polar rows hold open sea, the same code held 114 parts over all cells and 46
+over the inland cells. So the water supply decided the answer, and the curve
+did not. The commit body holds both probe tables and the commands.
+
+**Follows.** Three things.
+
+**A ratio with a small denominator is not a measurement of the numerator.** The
+test read a share and took it for a quantity. A share against a floor says
+almost nothing about how much water arrived.
+
+**A polar continental interior is a desert, and that is the published
+behaviour.** The air of a cold cell holds very little, so the poleward
+transport rains out most of what it carries. The driest place on the Earth is
+the interior of a polar continent.
+
+**A fixture must supply the input the assertion needs.** A test that asks
+whether a model destroys the water reaching a pole must give the pole water.
+The landlocked fixture supplied none, so it measured the fixture.[^F487C]
+
 
 ### FND-579 — The campaign takes no argument position, and the record's context reads as if it takes two
 
@@ -15026,6 +14264,103 @@ this is a local instance of it.[^F590A]
 It reads back correctly, it passes every test that does not reach the case, and
 when it does fail it accuses the engine.
 
+### FND-582 — The flat observation array carries one win threshold and not the other
+
+**Believed.** Item 0516 put the victory claim into the observation array of a
+faction, so the array now carries every quantity a win reader compares. A
+learner that reads the array can therefore tell how close each path is.[^F582A]
+
+**True.** The array carries the tick limit, which is the threshold of the
+territory path. It carries no renown target, which is the threshold of the
+renown path. The renown reader fires for the first faction whose best renown
+reaches that target, and a learner that reads the array alone cannot tell how
+far it is from it.[^F582B]
+
+**Evidence.** Read on 6 September 2026 from the schema of a world of extent 32
+with three factions. The field list holds the tick and the tick limit as two
+fields, and it holds the best renown with no matching target. The world states
+the target through a public accessor, so the value exists and the array omits
+it. The commit body holds the command.
+
+**What follows.** The omission is an asymmetry and not a rule. The reward of a
+faction reads the array, so it can weigh the best renown and it cannot weigh
+the distance to the target. A later item may add the field. Until then, a
+caller that wants the distance reads the target from the world, which is a
+public rule of the game and not a fact about a rival.
+
+### FND-583 — A faction that loses every unit is not eliminated, because it keeps its ground
+
+**Believed.** A faction that loses every unit and every person is eliminated.
+Its run is over, so a reward may pay a terminal value for the elimination and
+stop the episode there.
+
+**True.** Such a faction keeps its held tiles and its seat. The territory reader
+compares held tiles at the tick limit, so the faction may still win. A terminal
+that fired on the loss of the last unit would end an episode the faction could
+still win.
+
+**Evidence.** Measured on 6 September 2026 on one development machine
+(ty001-ubuntu, x86-64), over nine seeds at two and three factions, on a world of
+extent 24, to 800 ticks or to the game end. A faction that had been alive and
+then held no unit and no person appeared in 4907 sampled tick and faction pairs.
+In none of them did the same faction reach zero held tiles. On one seed the
+faction with no unit at all held 187 tiles against the winner's 179. No
+ever-alive faction reached zero on all four of held tiles, seats held, live
+units and population. The commit body holds the probe and the command.
+
+**What follows.** The reward of a faction states three terminal outcomes and no
+elimination. It reports one boolean beside them, which is true while the faction
+holds a unit or a person. A caller that wants to stop a run early reads it. A
+faction the seeding never seated reads the same boolean, because it holds the
+same nothing.
+
+### FND-584 — The heat scale ran cold because two terms were written down, and the repair was to derive both
+
+**Believed.** The four terms that drive the temperature of a cell were balanced
+so that they reach the bottom of the heat scale together and the top of it
+together. The sun term reserves a swing, and that swing is the sum of the two
+amplitudes its two parts carry.
+
+**True.** The sum of the two parts never reaches the sum of the two amplitudes.
+The belt of a latitude peaks at the equator, where the season contributes
+nothing. The season peaks at the middle latitudes, where the belt contributes
+nothing. So the highest sum the geometry holds is a little over half of the
+reserved swing, and the top of the scale was out of reach.
+
+**A second term was wrong beside it, and the first repair exposed it.** A whole
+sky took away about three times the published net effect of cloud. The equator
+is the wettest band of the world, so the cloud cooled the equator far more than
+the dry poles. The equator therefore stood colder than the subtropics, and the
+latitude order of the temperature was inverted at its warm end.
+
+**Evidence.** A probe grades the land of a world against the published Köppen
+thresholds. Before the repair no land graded tropical on either seed, and
+between 44 and 58 percent graded ice cap. After it the land grades tropical near
+the equator, desert in the subtropics, continental at the middle latitudes and
+tundra and ice at the poles. The commit body holds both grades, both seeds, the
+mean land temperature of each band, and the command that produced them.
+
+**The defect was put back twice.** A test asserts that the sun term reaches the
+reserved swing at each end, and it fails when the normaliser is written down
+rather than derived. A second test asserts that a whole sky is worth the
+published effect of cloud on the scale the sun states, and it fails when the
+cloud swing is written down.
+
+**Follows.** Three things.
+
+**A term normalised on each part is not normalised on the sum.** Two parts that
+each span a range do not span the sum of the two ranges, unless they peak
+together. Normalise against the reach of the sum, and measure that reach from
+the thing that produces it.
+
+**The heat base did not move.** A base carries the same degrees to a pole that
+it carries to the equator. Raising it was the obvious repair, and it would have
+flattened the latitude gradient rather than restoring the warm equator. The
+defect was the shape of one term and the size of another.
+
+**Five of the weather defects this project has found were a value written down
+where it should have been derived.** Both halves of this one are that shape
+again.
 ### FND-585 — Two tests asserted that a value stands still, and a rule neither test models moves it
 
 **Believed.** A test may read a rule by asserting that a state does not change
@@ -15166,6 +14501,308 @@ reader may not depend on held ground.
 
 **A put-back experiment answers a question a passing test cannot.** Both guards
 read as tested until the experiment ran.[^F492B]
+
+### FND-589 — The economy was believed to deadlock on hunger, and the population never walks to the food
+
+**Believed.** A unit must be fed to deliver a load and hungry to fill one, so a
+world whose store starts empty can never begin: the units stay hungry, they
+never deliver, and the store stays empty. The dispatcher stated this as the
+likely cause of an economy that moves almost nothing.
+
+**True.** There is no deadlock. Measured in the demonstration world, 256 by 256,
+four factions, seed 0x0123456789abcdef, 300 ticks, two threads, on
+ty001-ubuntu (x86-64): the mean need holds between 23808 and 37012 of a full
+65536, and 151 of 166 units are fed at tick 300. The store cycles, because the
+production fills it and the ration draws it in the same tick. Hunger never pins
+to zero, so the term that drives the delivery row is not what blocks it.
+
+**What blocks it is that the population never travels.** The units occupy 22 to
+26 distinct tiles at a mean distance of 2 from their home site. They strip that
+ground in about ninety ticks and then stand on it. Every live unit holds a
+gather order every tick and the grant is zero, because no unit stands on
+remaining stock of the kind it ordered. The world still holds 53611 food on
+11631 tiles against 83 ever taken.
+
+**The cause has a shape this project has met before.** The exit field of an
+option answers at the level 1 pitch, and the stock of a tile is a level 0
+property. A unit standing on barren ground inside the cell that holds the most
+food is told that its cell is the right cell, and nothing tells it to step two
+tiles sideways. A field that answers at one pitch about a fact that lives at
+another is the same defect as a flow field that ran out inside its destination
+cell.[^F589A]
+
+**What follows.** The option rows are not at fault and must not be changed to
+compensate. The movement and steering of a unit toward stock is the subject.
+
+### FND-590 — The gather order of a unit is written in two places, and the comment that forbids it is in one of them
+
+**Believed.** A laden unit stops gathering, and that rule lives in the option
+row rather than in a second place that could disagree with it. The delivery row
+says so in its own doc comment.
+
+**True.** The choice pass clears the gather order when a unit takes a row that
+names no resource kind, and the faction controller then sets the order for every
+unit of the faction at the last stage of the same step. Measured over the run
+above: the units holding a gather order equal the live unit count at every tick,
+while the intent to forage is only 18 to 118. So the rule holds in a world with
+no controller and fails in every world that has one.
+
+**What follows.** This is the recurring shape of one value with two declaration
+sites and no check that fails when they disagree. The comment states the rule
+the code does not keep, which is worse than no comment.[^F590A]
+
+### FND-591 — A field over stock must state a fact about the ground, not about the order a unit holds now
+
+**Believed.** A field that steers a unit to stock is keyed on the resource
+kind, so the seed set takes the kind from the gather order of each unit. A
+block seeds only the kind that the units standing in it were told to gather,
+which is the cheapest set that answers the question.
+
+**True.** That set is stale before any unit reads it. The engine derives the
+field at the barrier of one step, and two passes write the gather order after
+that barrier. The controller of a faction writes the order of every unit of
+that faction at the last stage of the step.[^F591A] A unit therefore reads the
+field on the plane of an order that the field was not seeded for, finds no
+entry, and takes the coarse answer it took before the field existed.
+
+**Evidence.** The first build keyed the seed set that way. Measured in the
+demonstration world, 256 by 256, four factions, seed 0x0123456789abcdef, 300
+ticks, two threads, on ty001-ubuntu (x86-64): the food ever taken rose from 83
+to 136 of 53694, which is the rise that the frames between two order writes
+give. A build that seeds every kind in each occupied block reached 160 in the
+same run, and the field then answers on every plane a unit can read.
+
+**What follows.** A derived field that a later pass can invalidate is a stale
+read that nothing fails on.[^F591B] Seed such a field from the state that no
+later pass writes. Here that state is the ground: a block seeds every resource
+kind it holds, and the order of a unit only selects which plane the unit reads.
+The field then holds no fact that any pass of the step can contradict.
+
+**The cheap set is still the block set.** The seeds follow the blocks that hold
+a unit, and a block that holds none seeds nothing, so the derivation follows
+the population and never the tile count.[^F591C]
+
+### FND-592 — The way between two settlements was believed to be planned, and the branch that planned it could never run
+
+**Believed.** The plan solver chose a way between the seat of a faction and
+another settlement of that faction. The solver held a loop over the
+settlements, the decision record names a way between one site and another, and
+a test asserted that a faction with two cities zoned a way between them.[^F545D]
+
+**True.** The branch was inert. The solver anchored one window on the seat, and
+it asked that window for the cost of reaching each other settlement. The window
+radius is a balance value and the founding rule keeps two settlements of one
+faction apart by a distance that is more than twice it. Every settlement
+therefore lay outside the window, the window answered no cost, and the branch
+skipped every candidate on every tick of every world.
+
+**The test could not see it.** The fixture founded its second city inside the
+window radius, and it asserted that the pair sat inside the radius. The founding
+verb never places a second city there, so the fixture modelled a world the
+engine does not build. The fixture measured the window, not the way.[^F496G]
+
+**Evidence.** A run of the demonstration world over four seeds reports the
+distance between each pair of settlements of one faction. The least distance in
+every run equals the founding distance, and no run holds a pair inside the
+window radius. A separate run counts the pairs that a standing road joins, and
+it counts none.
+
+**What follows.** A way between two settlements chains a fixed number of fixed
+windows, each aimed at the far end. A fixture for a way places its two
+settlements at least the founding distance apart, and the assertion that the
+pair sits inside the radius is the wrong assertion. Two values that must agree
+were declared in two files with nothing that fails when they disagree, which is
+the first recurring shape.[^F487B]
+
+### FND-593 — A way was believed to stand wherever a unit walks
+
+**Believed.** A way between two places follows the cheapest path over ground
+that admits a unit. The path search refuses a tile that admits nobody, and
+nothing else was thought to bar a way.
+
+**True.** A unit walks the mountain and a road does not fit the mountain. The
+ground fit of the joining category admits the plain, the forest and the hill,
+and the mountain admits a unit at the ordinary capacity. A way whose cheapest
+path crosses high ground therefore holds a tile that no unit can ever build.
+The plan holds that project, the build pass refuses it on every tick, and the
+two settlements at the ends stay apart while the plan reads as though it joined
+them.
+
+**Evidence.** A fixture founded two cities sixteen steps apart and ran nine
+hundred ticks. The road that touched the seat grew to about a hundred tiles and
+stopped eleven steps short of the far city, and the count did not move over a
+further two thousand one hundred ticks. The way crossed high ground, and the
+tiles on it were never built.
+
+**What follows.** The window a way reads admits only ground the joining
+category fits. The window a deposit and a yield read is unchanged, because
+those two ask where a unit may go and not where a road may stand. A pair of
+settlements that no such ground joins now yields no project, which is a plan
+that says nothing rather than a plan that lies.
+
+### FND-594 — The camera was believed to say where every renderer stands, and the sketch fits its own page instead
+
+**Believed.** The engine camera says where the view sits. It holds the size of
+a tile in pixels and the pixel offset of the tile at the origin, and every
+renderer draws the view that camera names. A control that moves the camera
+therefore moves what both renderers show, by the same amount.
+
+**True.** That holds for the flat map alone. The sketch renderer reads the
+camera only to name the window of tiles it must cover. It then fits that window
+to the frame with a scale of its own. The size of a tile on the camera reaches
+the picture through which tiles fall inside the frame, and through nothing
+else.
+
+Two things follow from that, and both are visible to a person.
+
+The window changes in whole tiles, because it comes from the address the camera
+gives nine corner pixels, widened by a margin. A pan of a few pixels therefore
+changes the sketch by nothing, and then by a whole tile.
+
+The fit is recomputed for each window, so a pan that changes the window by one
+tile also changes the scale of the page. Grab-and-move is exact on the flat map
+and approximate in the sketch, and no arithmetic in the control layer can
+change that.
+
+**Evidence.** The build pass takes the window and the frame size, derives its
+own scale from the two, and never reads the tile size of the camera. A drag of
+nine pixels for each frame at a tile size of twenty-four rebuilds the page on
+three frames out of six, and holds the page on the other three.
+
+**Follows.** Three things.
+
+**The camera is the one source of truth for where the view stands, and a
+renderer may still choose its own scale.** The two statements are not in
+conflict, and a reader who takes the first for a promise about pixels will be
+wrong about the second.
+
+**Do not make the sketch follow the camera scale in order to fix the drag.** A
+page keyed on a continuous camera rebuilds on every pixel of a pan. The whole
+tile window is what makes the page cacheable at all.
+
+**A renderer that composites on the graphics card can honour the camera
+exactly.** It has no page to cache and no rebuild to avoid, so the limit above
+belongs to the processor path and not to the design.
+
+
+## F. Sourcing
+
+### FND-595 — A test that names a handler cannot see that the window refuses to hold it
+
+**Believed.** The mouse controls were checked against the window library
+without a display. The check read the handler method names and compared them
+against the event names the library declares. That was called the strongest
+check a machine with no display can make.
+
+**True.** The library does not only call those methods. It holds the handler
+object by weak reference. A class that declares its attribute slots and names
+no weak reference slot cannot be referred to weakly, so the push raises
+`TypeError` before any name is read. The names were right and the push failed.
+
+**Evidence.** The demonstration raised `cannot create weak reference to
+'Controls' object` at the first window it opened. Adding the weak reference
+slot to the declared slots fixes it. Removing the slot again makes the new
+test fail with the same message the owner saw.
+
+**What follows.** A test that reads names is a test about names. When a
+library takes an object rather than calling a function, drive the real call:
+build the library's own dispatcher, push the handler onto it, and send one
+event. That needs no display and it catches what the name check cannot.
+
+### FND-596 — Every graphics test read a texture back, so none of them looked at the screen
+
+**Believed.** The device draws into a frame buffer of its own and reads the
+result back, so one path serves a window, a picture on a disk and a test with
+no display. The tests read the pixels back and compared them against the
+processor path, and they agreed. The graphics path was therefore held to work
+in a window.
+
+**True.** The device takes the application's context when the application has
+a window, because a second context would hold a second copy of every texture.
+Each pass points the frame buffer at a texture the device owns and leaves it
+pointed there. The window then presented into that texture instead of onto the
+screen, and the screen stayed black. The pixels the tests read were correct
+the whole time, because they came from the texture.
+
+**Evidence.** The demonstration drew a black window under the sketch flag on a
+machine with a display. Binding the frame buffer back to the window after the
+read fixes it. Removing that line again makes the new test fail, and the test
+reports the binding as 1 where it must be 0.
+
+**What follows.** A test that reads a target back proves the drawing is
+right. It cannot prove the screen shows it. When a module borrows a caller's
+state, test that the state is handed back, not only that the work was done.
+This is the second finding in one day where a test checked the work and not
+the hand-over.[^FND596A]
+
+**References**
+
+[^FND596A]: Findings register, FND-595. `docs/FINDINGS.md`
+
+### FND-597 — The relaxation reach of an approach field follows what the frame needs, not the block edge
+
+**Believed.** An approach field relaxes over twice the block edge, so its reach
+covers a whole block by a straight route and admits a detour of the same
+length. That count is a property of the instrument.
+
+**True.** It is a property of the question. A destination plane must lead a
+sent unit from anywhere in a block to one named tile, so its reach must cover
+the block. A field over stock must not: a block holds many stocked tiles, the
+engine derives the field again at every frame, and a unit takes one step in a
+frame. A reach beyond the step the unit takes now is derived again before the
+unit walks it.
+
+**Evidence.** Measured in the demonstration world named in the finding above.
+At the block reach the food ever taken reached 131, and one step cost 25.5
+milliseconds more than a step with no field at all. At a reach of two the food
+ever taken reached 160, which is more, and the step cost 6.6 milliseconds more
+than a step with no field. **Part of that 6.6 is not the field.** A population
+that walks moves more units and gathers more often, so the step does more of
+its own work, and the two runs are not the same simulation. A unit whose stock
+lies further reads no offset and takes the direction of its level 1 cell, which
+is the answer every unit read before the field existed.
+
+**A second measurement came out of the same work.** The derivation asked the
+terrain for the ground of one block once for each plane of that block. The
+terrain is generated and never stored, so each question costs a noise
+evaluation.[^F299A] The ground of a block depends on the block and on the
+water crossing of the plane, and never on the plane itself. A walk in block
+order that holds the ground while the block repeats cut the whole demonstration
+step from 34.9 to 30.0 milliseconds, before the new field was added at all.
+
+**What follows.** State the reach a field needs beside the field, not beside
+the instrument. The two figures above are derived on a development machine and
+not on the target platform, and the blocker that says which cost figures are
+measured stays open.[^28]
+
+### FND-598 — Two tests held that a store fills from production alone, and a unit that reaches food makes both false
+
+**Believed.** A site store fills from the production rate of the site and from
+nothing else. A conservation test over the store therefore names four terms:
+what production put in, what upkeep spent, what the cohorts drew, and what a
+birth cost. A starvation test therefore holds that a group whose site has no
+production rate loses every person.
+
+**True.** A fifth thing fills a store, and it always could. A unit that gathers
+from the ground and walks home moves its load into the store of its home site.
+Neither test was wrong when it was written, because no unit ever reached ground
+that carried the kind it was ordered to gather.[^F593A] Both went false on the
+frame that one did.
+
+**Evidence.** Both tests pass on the parent commit and fail on the commit that
+lets a gatherer reach stock. The conservation test misses by three whole loads,
+which is what the delivery ledger reports for the same run. The starvation test
+finds 30 of 120 seated people alive where it asserted none.
+
+**What follows.** A test that lists the terms of a balance states a count, and
+a count decays.[^F483G] Read a listed balance as a claim about what the engine
+can do, not as arithmetic. When a capability that was inert starts working, the
+tests that passed because it was inert are the ones to look at first.[^F498G]
+
+**The starvation test now claims the negation of the test it defends**, and no
+more. The test above it asserts that every seated person lives. This one takes
+the rate away and asserts that they do not. A survivor count would be the same
+decaying figure again.
 
 ### FND-599 — Giving the engine a raze rule made a seeded run burn far more cities than it keeps
 
@@ -15792,80 +15429,6 @@ the field is.
 [^F606A]: The contrast probe. `crates/cachette-core/examples/weather_contrast_probe.rs`
 
 
-### FND-620 — The height ceiling was the whole of the cooling error, and none of the rest
-
-**Believed.** The land of this world stands two to three times higher in its own
-range than the land of the Earth stands in its, so the published lapse rate took
-11 to 18 degrees off every land cell. Either the ceiling or the height
-distribution had to move.[^F603A]
-
-**True, and the ceiling alone was enough.** Moving the ceiling from 4000 metres
-to 1500 puts the mean land near 800 metres, which is the published mean for the
-Earth, and the cooling falls to between 4.0 and 6.7 degrees. **The distribution
-did not need to move.** A reshape of the terrain was specified and then
-withdrawn before any of it was written.
-
-**Evidence.** A water probe and the Köppen probe over the demonstration world,
-at an extent of 128, at seed `0x2f`, at the tile pitch, settled 400 ticks, on 7
-September 2026 on one development machine (x86-64). Every figure is derived.
-
-The land stands at 41 to 69 percent of its range, which is unchanged because the
-terrain is unchanged. At 1500 metres that is 620 to 1029 metres, and at the
-published lapse rate it is 4.0 to 6.7 degrees of cooling, against 11 to 18 at
-the old ceiling.
-
-**What follows.** **The class table did not come right, and the height was not
-why.** With the cooling corrected the polar band still grades desert and the
-equatorial band still misses tropical by about two degrees. Both are the cloud
-term, and the next finding holds the measurement.
-
-**Two figures were proposed for this and both were arithmetic from the same
-table.** The first was wrong by a factor of two and a half. The second was
-checked against a probe before anything was built on it, and it held.
-
-### FND-621 — The cloud term is load-bearing in both directions, and it reads the wrong quantity
-
-**Believed.** With the height corrected, the published energy balance would give
-the classes their published latitudes.
-
-**True for the middle latitudes and false at both ends.** The band at 37 degrees
-moved from 1 percent temperate to 23. The polar bands grade 80 to 84 percent
-desert, and the equatorial band misses tropical by two degrees.
-
-**An ablation proves the cause and refuses the fix.** Removing the cloud term
-entirely repairs the poles, which grade 84 to 90 percent tundra. In the same run
-the rain of the middle latitudes collapses, the band at 37 degrees falls from
-364 to 48 on the probe's rain scale and grades 94 percent desert. **The term is
-load-bearing in both directions, so its presence is not the defect and its
-absence is not the repair.**
-
-**The defect is the quantity it reads.** The term takes the water the air holds
-against what that air could hold, which is a relative humidity, and treats it as
-a cloud cover. In this field that quantity runs from 14 percent to 94 percent
-between bands. **Real cloud cover does not swing that far**, so the anomaly
-swings about twice as wide as it should: it warms a dry polar cell by about 7
-degrees and cools the wet equator by about 4.
-
-**Evidence.** Runs of the Köppen probe over the demonstration world at a 1500
-metre ceiling, with the cloud term at its published value and at zero, on 7
-September 2026 on one development machine (x86-64). Every figure is derived.
-
-**What follows.** **The two records are coupled and neither lands alone.** The
-right source for a cloud term is the condensed water that a second record adds
-as a plane, and that record already states that the two readers deriving cloud
-from humidity must move onto it.[^F608A] **Until they do, the energy balance has
-no correct cloud to read.**
-
-**A fourth reason not to land the driver was found by the tests.** The peak of
-the air plane visits three cells in about a thousand ticks, where the test
-requires four. The weather is pinned. A better class table bought by losing the
-motion of the field is not a trade this work will make quietly.
-
-## References
-
-[^F608A]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D1. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
-
-
 ### FND-610 — The cloud plane does not hold up beside the energy balance, and the run that said it did was reading a broken scale
 
 **Believed.** The energy balance reads a relative humidity where it wants a
@@ -16298,6 +15861,80 @@ work aside is sound; losing it from the ledger is the defect.** A deferred
 mechanism belongs in a register at the moment it is deferred, not at the moment
 it is finally needed.
 
+### FND-620 — The height ceiling was the whole of the cooling error, and none of the rest
+
+**Believed.** The land of this world stands two to three times higher in its own
+range than the land of the Earth stands in its, so the published lapse rate took
+11 to 18 degrees off every land cell. Either the ceiling or the height
+distribution had to move.[^F603A]
+
+**True, and the ceiling alone was enough.** Moving the ceiling from 4000 metres
+to 1500 puts the mean land near 800 metres, which is the published mean for the
+Earth, and the cooling falls to between 4.0 and 6.7 degrees. **The distribution
+did not need to move.** A reshape of the terrain was specified and then
+withdrawn before any of it was written.
+
+**Evidence.** A water probe and the Köppen probe over the demonstration world,
+at an extent of 128, at seed `0x2f`, at the tile pitch, settled 400 ticks, on 7
+September 2026 on one development machine (x86-64). Every figure is derived.
+
+The land stands at 41 to 69 percent of its range, which is unchanged because the
+terrain is unchanged. At 1500 metres that is 620 to 1029 metres, and at the
+published lapse rate it is 4.0 to 6.7 degrees of cooling, against 11 to 18 at
+the old ceiling.
+
+**What follows.** **The class table did not come right, and the height was not
+why.** With the cooling corrected the polar band still grades desert and the
+equatorial band still misses tropical by about two degrees. Both are the cloud
+term, and the next finding holds the measurement.
+
+**Two figures were proposed for this and both were arithmetic from the same
+table.** The first was wrong by a factor of two and a half. The second was
+checked against a probe before anything was built on it, and it held.
+
+### FND-621 — The cloud term is load-bearing in both directions, and it reads the wrong quantity
+
+**Believed.** With the height corrected, the published energy balance would give
+the classes their published latitudes.
+
+**True for the middle latitudes and false at both ends.** The band at 37 degrees
+moved from 1 percent temperate to 23. The polar bands grade 80 to 84 percent
+desert, and the equatorial band misses tropical by two degrees.
+
+**An ablation proves the cause and refuses the fix.** Removing the cloud term
+entirely repairs the poles, which grade 84 to 90 percent tundra. In the same run
+the rain of the middle latitudes collapses, the band at 37 degrees falls from
+364 to 48 on the probe's rain scale and grades 94 percent desert. **The term is
+load-bearing in both directions, so its presence is not the defect and its
+absence is not the repair.**
+
+**The defect is the quantity it reads.** The term takes the water the air holds
+against what that air could hold, which is a relative humidity, and treats it as
+a cloud cover. In this field that quantity runs from 14 percent to 94 percent
+between bands. **Real cloud cover does not swing that far**, so the anomaly
+swings about twice as wide as it should: it warms a dry polar cell by about 7
+degrees and cools the wet equator by about 4.
+
+**Evidence.** Runs of the Köppen probe over the demonstration world at a 1500
+metre ceiling, with the cloud term at its published value and at zero, on 7
+September 2026 on one development machine (x86-64). Every figure is derived.
+
+**What follows.** **The two records are coupled and neither lands alone.** The
+right source for a cloud term is the condensed water that a second record adds
+as a plane, and that record already states that the two readers deriving cloud
+from humidity must move onto it.[^F608A] **Until they do, the energy balance has
+no correct cloud to read.**
+
+**A fourth reason not to land the driver was found by the tests.** The peak of
+the air plane visits three cells in about a thousand ticks, where the test
+requires four. The weather is pinned. A better class table bought by losing the
+motion of the field is not a trade this work will make quietly.
+
+## References
+
+[^F608A]: ADR-0183, condensed water is carried state that falls on a published timescale, decision D1. `docs/adrs/draft/adr-0183-condensed-water-is-carried-state-that-falls-on-a-published-timescale.md`
+
+
 ### FND-624 — The difference between two rendered pictures was not the paint an overlay laid down
 
 **Believed.** The sketchbook renderer read an overlay by asking the engine for
@@ -16342,6 +15979,188 @@ the column from shade, ink, a mark, or a tile edge. The test that landed holds
 the column against the per-tile columns the engine already publishes: the
 holder column pins the palette and the tile order, the height column pins the
 ramp, and the cloud column pins the map from a tile to its weather cell.
+
+
+### FND-625 — The trainer does not write its weights after every generation
+
+**Believed.** The trainer checkpoints every generation, so a run stopped part
+way keeps what it has learned. A person who wants to end a run early can do so
+and keep the weights.
+
+**False as stated, and false in two different ways.** The trainer writes the
+weights only from inside its validation pass. That pass runs every few
+generations, and it writes only when the centre scored better than the best
+centre it has seen. **A run with no validation seeds writes nothing at all
+until a whole strategy finishes.** A run with validation seeds writes nothing
+until the first validation, and after that it keeps the best centre rather than
+the newest one.
+
+**Evidence.** A probe drove the trainer directly on a small world, over three
+generations, and watched the weights file from another thread. With no
+validation seeds the file never appeared while the run was going. It appeared
+only after the loop ended. With validation seeds, and a validation every
+generation, the file appeared 2.4 seconds into a 6.8 second run. The commit
+body holds the probe. A run under way on a development machine agrees. It
+started at 07:31, its first two generations ended at 07:39 and 07:47, and it
+first wrote its weights file at 07:49, which is its first validation.
+
+**What follows.** **A launcher that offers to stop a run early must refuse a
+configuration that would make an early stop lose everything.** The training
+launcher reads the validation count out of the trainer arguments. It stops
+before it creates anything when that count is zero.[^F625A] It also states, in
+the text a person confirms, which generation the first checkpoint lands on.
+
+Keeping the best centre rather than the newest one is correct, because an
+evolution strategy walks and a walk can end downhill. The defect is the claim,
+and not the behaviour.
+
+
+### FND-626 — Every upgrade was believed to be a mark in the middle of one tile
+
+**Believed.** An upgrade is a thing that stands on a tile. Both renderers
+therefore tinted the whole cell and drew a small shape in the middle of it. A
+report measured the readability of that pair and the drawing followed it, and a
+test asserted that a finished road washes the whole tile.[^F626A]
+
+**False for a road.** A road is a way. It runs from somewhere to somewhere, it
+joins another road at a junction, it bends, and it ends. A coloured cell says
+that a tile carries the road property. It does not draw a road, and a watcher
+cannot read where a road goes from a set of coloured cells.
+
+**Evidence.** Two pictures of one network, drawn from the same world. The first
+gives each road tile a tint and a bar. A watcher reads seven coloured cells and
+cannot say which of them are one road. The second draws a ribbon from the
+middle of each tile out to the middle of each edge it shares with a road, and a
+watcher follows the run, the branch and the junction. The commit body holds the
+command that made both.
+
+**What follows.** **A category is either a way or a thing that stands, and the
+drawing asks which.** The set is declared once, and both renderers and the
+tests read that one declaration.[^F626B] A way draws a ribbon that crosses the
+tile boundary, so it is drawn after every tile is painted rather than tile by
+tile. A thing that stands keeps the tint and the shape that the report chose.
+
+The test that asserted a finished site washes its tile now names a category
+that stands, because the claim was never about a road.
+
+Below the width at which a ribbon reads, the engine renderer still tints a road
+tile. A tint is the only mark a tile a few pixels wide can carry, and that is a
+statement about the zoom and not about what a road is.
+
+
+
+### FND-627 — The sky was drawn as though the world wrapped
+
+**Believed.** The sky pass reads the cloud of a point further down the page and
+the shadow of a point across it. Both readings rolled off one edge of the page
+and back onto the other, in both renderers, and a comment said that the shader
+rolled the field the way the array renderer does. The two agreed, so nothing
+failed.
+
+**The world does not wrap.** A neighbour outside the world is absent, and the
+edge of the world is an edge.[^F627A] A point off the page is not a point of
+another part of the world. It carries no cloud.
+
+**A shadow falls on something.** The cloud is drawn above the tallest ground,
+so its hatch crosses bare paper on purpose. The shadow crossed the paper with
+it and multiplied the paper down, which drew a grey copy of the terrain beside
+the terrain.
+
+**Evidence.** A world drawn at the camera that fits it, with paper visible
+beside the map. The roll drew a wedge of cloud hatch on the paper below the
+map, hard-edged, shaped like ground that stands on the far side of the world. A
+frame drawn with the sky switched off carried no mark on the paper at all,
+which is what separated the sky from every other pass. The commit body holds
+the counts and the commands.
+
+**What follows.** **A pass that reads a neighbouring point must ask whether
+that point exists.** The sky now reads nothing off the page, and its shadow
+lands on ground alone. The cloud itself still crosses the paper above the map,
+because a cloud stands above the ground and a watcher reads it there.
+
+The silhouette still rolls a mask by one point, and that roll is inert: the
+ground stops short of the edge of the page by a margin, so the mask is false on
+both sides of it.
+
+**The clamp in the shader was not the cause.** Every reader of the page clamps
+a point to the nearest edge texel rather than answering that the point is
+absent. A build that answered the empty value instead drew a frame identical to
+the clamped one, and every agreement test passed unchanged. The clamp is
+reachable only by the neighbour taps of the tone and of the silhouette, and
+those mirror the edge handling of the array renderer on purpose.
+
+### FND-628 — A resumed run inherited a best score that no later score could beat
+
+**Believed.** A resumed training run continues the run it reads. It takes the
+centre, the generation counter and the best score the earlier run reached, so
+it neither repeats generations already paid for nor overwrites a better centre
+with a worse one. The trainer states this in its own prose, and the resume path
+reads all three from the stored files.[^F628A]
+
+**False for the best score.** A run with no validation seeds chooses no centre,
+because it has no way to tell one centre from another. It stores a quiet value
+for the best score rather than leaving the key out, so that a file always loads.
+That quiet value is not a real number, and no comparison against it is ever
+true. A run resumed with validation seeds therefore held a best score that no
+score could beat. Its best centre could never move again.
+
+**The failure says nothing.** The resumed run validates on the schedule it was
+given, prints every score, writes the resume point every generation, and ends
+with a report. Only the chosen generation shows it, and that number reads as
+minus one, which is also what a run that has not validated yet reads.
+
+**Evidence.** A test starts a run of one generation with no validation seeds,
+then resumes it with two validation seeds and a validation every generation.
+With the defect in place the resumed run scored 14.5 at generation 1 and 17.0 at
+generation 2, printed both, and reported a chosen generation of minus one. With
+the fix in place it chooses generation 1. The defect was put back and the test
+went red, which is the only proof that the fixture reaches the case.[^F628B]
+
+**What follows.** **Read a value that means "nothing was chosen" as that state,
+not as a quantity.** The fix is at the read. A stored best score that is not a
+real number now reads back as the value a fresh run starts from, which is the
+state it describes. The write is unchanged, because a file that omits the key
+fails further away than the file.
+
+**A resume test must change the setting that the resume path reads.** A resume
+that keeps the validation setting of the first run never reaches this case, so
+it measures the fixture and not the trainer. The testing rule names this
+shape.[^F628C]
+
+### FND-629 — An annotation claimed less than the class held, and four correct callers took the blame
+
+**Believed.** The seated game of the league runner holds a world through the
+narrow door that one faction sees through. The class declared that door on the
+attribute, on the value its reset gives back, and on the property that reads it.
+A single-seat environment holds the same narrow door, and it widens the type in
+one place with a cast, for a test that hands it a watching proxy.[^F629A]
+
+**False.** The seated game builds a real world in its own reset and never adopts
+a foreign one. It has no widening door, because it needs none. The narrow door
+was therefore a second declaration of what the class holds, and it disagreed
+with the code. The reward reader takes a whole world, and a batch takes a
+sequence of whole worlds, so the narrower type was wrong at every use.
+
+**The errors appeared at the callers, not at the declaration.** One false
+annotation produced four type errors: two in the runner where it builds a batch,
+one where a reward reads the world, and one in a test that asked the world for
+its action layout. All four callers were correct. A reader working from the
+error list would have widened a caller or cast the value away, and the false
+declaration would have survived.
+
+**Evidence.** The test that injects a watching proxy carried a suppression to
+get past the same annotation. Correcting the class made that suppression
+unused, which is the checker saying that the annotation had been the
+defect.[^F629B]
+
+**What follows.** **An annotation is a declaration site.** The recurring defect
+rule names one value declared in two places, and it gives examples where a
+second copy of a constant loses to the first.[^F590A] This is the same shape
+pointing the other way: the code was right and the declaration was wrong, and
+nothing failed at run time because Python does not read an annotation.
+
+**Read the declaration before you widen a caller.** When one type error appears
+at several correct callers, the fault is upstream of all of them.
 
 
 ### FND-630 — A clamp inside one pass is not a clamp, because the next pass undoes it
@@ -16521,79 +16340,31 @@ and the register already holds one instance of that mistake.[^F618C]
 [^F624B]: The four bulk tile readers, and the test that holds them to the engine. `tests/test_bulk_tile_readers.py`
 
 
-### FND-628 — A resumed run inherited a best score that no later score could beat
+### FND-633 — The keyboard was believed to scroll the map the way the hand does
 
-**Believed.** A resumed training run continues the run it reads. It takes the
-centre, the generation counter and the best score the earlier run reached, so
-it neither repeats generations already paid for nor overwrites a better centre
-with a worse one. The trainer states this in its own prose, and the resume path
-reads all three from the stored files.[^F628A]
+**Believed.** The renderer says how a step across the frame reaches the ground,
+and the callers ask it. The rule is written once, beside the drag.
 
-**False for the best score.** A run with no validation seeds chooses no centre,
-because it has no way to tell one centre from another. It stores a quiet value
-for the best score rather than leaving the key out, so that a file always loads.
-That quiet value is not a real number, and no comparison against it is ever
-true. A run resumed with validation seeds therefore held a best score that no
-score could beat. Its best centre could never move again.
+**Only the drag asked it.** The keyboard called the pan verb of the camera
+directly, with no turn taken out. The sketch renderer stands the page at an
+angle, so a press for right scrolled the map along the axis of the flat map and
+the drawing went somewhere that is not right. The mouse was correct the whole
+time, which is why the rule looked like it was applied.[^F590A]
 
-**The failure says nothing.** The resumed run validates on the schedule it was
-given, prints every score, writes the resume point every generation, and ends
-with a report. Only the chosen generation shows it, and that number reads as
-minus one, which is also what a run that has not validated yet reads.
+**Evidence.** The two call sites, one calling the renderer and one not. A
+quarter turn sends a sideways press down the map, and the camera moved along
+one axis alone before the repair.
 
-**Evidence.** A test starts a run of one generation with no validation seeds,
-then resumes it with two validation seeds and a validation every generation.
-With the defect in place the resumed run scored 14.5 at generation 1 and 17.0 at
-generation 2, printed both, and reported a chosen generation of minus one. With
-the fix in place it chooses generation 1. The defect was put back and the test
-went red, which is the only proof that the fixture reaches the case.[^F628B]
+**What follows.** One method on the run answers the question, and both callers
+reach it. **The rule may be applied to the press rather than to the pixels the
+press asks for**, because the step the engine takes is one length on both axes
+and the rule is linear with no constant term. A pan verb that scaled its two
+axes differently would break that, and the repair would then have to work in
+pixels.
 
-**What follows.** **Read a value that means "nothing was chosen" as that state,
-not as a quantity.** The fix is at the read. A stored best score that is not a
-real number now reads back as the value a fresh run starts from, which is the
-state it describes. The write is unchanged, because a file that omits the key
-fails further away than the file.
 
-**A resume test must change the setting that the resume path reads.** A resume
-that keeps the validation setting of the first run never reaches this case, so
-it measures the fixture and not the trainer. The testing rule names this
-shape.[^F628C]
 
-### FND-629 — An annotation claimed less than the class held, and four correct callers took the blame
-
-**Believed.** The seated game of the league runner holds a world through the
-narrow door that one faction sees through. The class declared that door on the
-attribute, on the value its reset gives back, and on the property that reads it.
-A single-seat environment holds the same narrow door, and it widens the type in
-one place with a cast, for a test that hands it a watching proxy.[^F629A]
-
-**False.** The seated game builds a real world in its own reset and never adopts
-a foreign one. It has no widening door, because it needs none. The narrow door
-was therefore a second declaration of what the class holds, and it disagreed
-with the code. The reward reader takes a whole world, and a batch takes a
-sequence of whole worlds, so the narrower type was wrong at every use.
-
-**The errors appeared at the callers, not at the declaration.** One false
-annotation produced four type errors: two in the runner where it builds a batch,
-one where a reward reads the world, and one in a test that asked the world for
-its action layout. All four callers were correct. A reader working from the
-error list would have widened a caller or cast the value away, and the false
-declaration would have survived.
-
-**Evidence.** The test that injects a watching proxy carried a suppression to
-get past the same annotation. Correcting the class made that suppression
-unused, which is the checker saying that the annotation had been the
-defect.[^F629B]
-
-**What follows.** **An annotation is a declaration site.** The recurring defect
-rule names one value declared in two places, and it gives examples where a
-second copy of a constant loses to the first.[^F590A] This is the same shape
-pointing the other way: the code was right and the declaration was wrong, and
-nothing failed at run time because Python does not read an annotation.
-
-**Read the declaration before you widen a caller.** When one type error appears
-at several correct callers, the fault is upstream of all of them.
-
+## C. Defects found in specified rules
 
 ### FND-634 — One encoding was read as one rate, and the learner acts about ten times less often than the controller it is measured against
 
@@ -16946,6 +16717,35 @@ that does not hold the deciding quantity looks like.
 compare a policy that acts once for each window against a controller that acts
 many times, and the action rate alone accounts for a large part of the gap.
 
+### FND-644 — The observation reader refuses to answer once three policies have acted, and the demonstration is the first caller that reaches it
+
+**Believed.** A faction observation is a read. It answers at any tick, for any
+faction, whatever the factions did on the tick before. The learner environment
+reads it after every decision and never sees it refuse.
+
+**True.** The reader answers `None` and the binding raises a view error, once
+three seated policies have run their verbs for about a hundred ticks. The
+message says that the world cannot describe its own units.[^F644A] A world that
+runs the same ticks with nobody acting does not reach it, and a world with one
+seated policy does not reach it inside five hundred ticks.
+
+**Evidence.** Three probes on one world of 48 tiles a side, three factions, one
+thread, at seed `0x0CAC4E770472`. The first stepped 400 ticks with every faction
+externally controlled and nothing acting, and read every observation on every
+tick. It did not raise. The second seated one stored policy on faction zero,
+stepped 500 ticks and took 51 decisions. It did not raise. The third seated
+three stored policies, one for each faction, and raised at tick 110 after 34
+decisions. No renderer ran in any of the three, so the drawing pass is not
+involved.
+
+**What follows.** The demonstration can seat a stored policy, and a watcher
+cannot yet watch one play to the end of a game. The condition is engine side,
+because the three probes differ only in how many factions acted through the
+engine verb. The verbs the policies ran were the settling verb, the queue verb
+and the build verb, so the derived unit structure is the thing to look at
+first.[^F644B] An item holds the repair.[^F644C]
+
+
 ### FND-645 — The controller yardstick is a symmetric game, so it measures one third and not skill
 
 **Believed.** The built-in controller is the standard a learned policy must
@@ -17039,6 +16839,110 @@ rather than a number. Do not read the shard path as the cause of the first
 failure.
 
 
+### FND-647 — The observation named a rival by its seat, and one seat of a test agreed with it
+
+**Believed.** The observation array of a faction was correct. It reported the
+relation toward each faction and the trade board of each faction, and every test
+of it passed.
+
+**False.** Six fields of the array were addressed by the absolute seat number:
+the relation field and five board fields. A reader in seat zero and a reader in
+seat one therefore found two different factions at one position. The trainer
+turns the seat of a candidate at each seed index of a generation, so one set of
+weights read the array under two meanings inside one generation.[^F647A]
+
+**Evidence.** The addressing is now relative to the reader, and two tests read
+one world from every seat of it.[^F647B] The absolute indexing was put back
+behind an edit to the one function that states the mapping. Both tests then
+failed, at three factions and at five, and the assertion that failed named seat
+one. **Seat zero passed in both.** The rotation and the seat number agree for
+seat zero, so a test that read one seat could never have failed.
+
+**What follows.** A field of the array that holds one position for each faction
+is addressed by the distance from the reader.[^F647C] The layout version rose,
+so the fit check refuses every stored policy of the earlier layout.[^F647D]
+Those policies are retired and no migration recovers them, because a policy
+trained across seats learned a function of two meanings at once.
+
+**The shape.** A test of a per-reader field must read more than one reader. One
+reader agrees with a defect whenever that reader is the one the defect is
+indexed from.
+### FND-648 — A verb the control plane runs between two steps left the world unreadable, and the refusal named none of its cause
+
+**Believed.** The observation reader refused once three seated policies had
+acted, and the condition looked like a property of the number of policies or
+of an event of the world. Four reports named four different events before the
+traceback: nothing at all, a win by territory, the first character of the
+world, and the opening banner of the run.[^F648A]
+
+**True.** None of those events is the cause. **A verb that a caller runs
+between two steps changes the soldier arena and leaves the derived unit
+structure behind it.** The step rebuilds that structure at its barriers, and a
+verb outside a step reaches no barrier, so every reader between the verb and
+the next step meets a refusal. The action verb, the founding verb, the
+conversion verb, the spawn verb and the removal verb all did this. The
+observation of one faction is the reader that reported it, because the
+demonstration gives each seated policy its decision in seat order, and the
+policy of the second faction reads after the policy of the first has acted.
+
+**Why one policy never saw it.** A single pilot reads immediately after a
+step, so the barrier of that step has already repaired the structure. Two
+pilots put a read between a verb and the next step. That is the whole of the
+difference, and it is why a run with one policy took five hundred ticks
+without a refusal.
+
+**Why the line above each traceback misled.** The demonstration announces the
+events of a tick after it has given every pilot its decision. The last line a
+watcher sees therefore belongs to the tick before the refusal, and it names
+whatever the world announced then. Three readers took that line for the
+trigger.
+
+**Evidence.** A world of 48 tiles a side, two factions, one thread. A settler
+spawns, the world steps, and the action verb founds a city. The observation of
+the acting faction then refuses. The refusal now names the cause: the
+structure holds one revision and the arena holds another. A probe over the
+verbs of the binding refused after the spawn verb, the removal verb, the
+founding verb and the conversion verb, and answered after each of them once
+the verb restored the structure. A test drives each verb and reads
+afterwards.[^F648B]
+
+**What follows.** A verb that changes the arena calls the one refresh before
+it returns, and the public rebuild is the form a caller of a primitive
+calls.[^F648C] The reader carries a refusal that names its cause, so a stale
+structure states both revisions and a structure that was never built says
+so.[^F648D] The two failure families of the trainer are not shown to be this
+defect: neither crate holds unsafe code beyond two plain-data
+declarations, so a stale structure gives a refusal or a wrong count and never
+a bad dereference.[^F648E]
+
+### FND-649 — A rebuild that is free in training costs five percent of a frame at the target
+
+**Believed.** A verb that restores the derived unit to tile structure after it
+moves the arena is cheap, because the measurement of a training tick puts the
+four refresh stages of a step at 310 nanoseconds early and 2014 nanoseconds
+late, which is 0.013 percent of a frame.
+
+**True at the training shape and false at the target.** The register of the
+target platform puts one refresh at the step barrier at 41.8 milliseconds,
+which is 5.0 percent of a frame at 16.7 million tiles. The rebuild orders on
+one thread, so it does not divide over the workers of a batch.
+
+**Evidence.** The two figures come from the same stage table, read at two
+world sizes. The ratio between them is about four orders of magnitude, and
+the tile count between the two shapes is about seven thousand.
+
+**What follows.** Five caller-facing verbs now restore the structure when the
+arena moved, which is the repair for a reader that was refused between a verb
+and the next step. The repair is correct and its cost is a function of the
+world size. One of those verbs is the verb the learner calls for each
+decision.
+
+**A profile of the training shape cannot price this defect.** Anyone who
+reads the training table alone concludes the rebuild does not matter. The
+same table at the target says it is the fifth largest stage of a frame. Take
+a cost from the shape it will run at, and not from the shape that is
+convenient to measure.
+
 ### FND-650 — A nearly ternary score goes flat in five generations and a dense one still rises at sixty-seven
 
 **Believed.** The learner plateaued because the search was too narrow, or
@@ -17102,110 +17006,6 @@ cannot tell a slow generation from a stopped one.**
 The three failures now recorded are a segmentation fault, a lost worker
 process, and a live process that stops advancing. Nothing yet connects them,
 and the third one is the one that costs the most, because it is silent.
-
-### FND-647 — The observation named a rival by its seat, and one seat of a test agreed with it
-
-**Believed.** The observation array of a faction was correct. It reported the
-relation toward each faction and the trade board of each faction, and every test
-of it passed.
-
-**False.** Six fields of the array were addressed by the absolute seat number:
-the relation field and five board fields. A reader in seat zero and a reader in
-seat one therefore found two different factions at one position. The trainer
-turns the seat of a candidate at each seed index of a generation, so one set of
-weights read the array under two meanings inside one generation.[^F647A]
-
-**Evidence.** The addressing is now relative to the reader, and two tests read
-one world from every seat of it.[^F647B] The absolute indexing was put back
-behind an edit to the one function that states the mapping. Both tests then
-failed, at three factions and at five, and the assertion that failed named seat
-one. **Seat zero passed in both.** The rotation and the seat number agree for
-seat zero, so a test that read one seat could never have failed.
-
-**What follows.** A field of the array that holds one position for each faction
-is addressed by the distance from the reader.[^F647C] The layout version rose,
-so the fit check refuses every stored policy of the earlier layout.[^F647D]
-Those policies are retired and no migration recovers them, because a policy
-trained across seats learned a function of two meanings at once.
-
-**The shape.** A test of a per-reader field must read more than one reader. One
-reader agrees with a defect whenever that reader is the one the defect is
-indexed from.
-### FND-649 — A rebuild that is free in training costs five percent of a frame at the target
-
-**Believed.** A verb that restores the derived unit to tile structure after it
-moves the arena is cheap, because the measurement of a training tick puts the
-four refresh stages of a step at 310 nanoseconds early and 2014 nanoseconds
-late, which is 0.013 percent of a frame.
-
-**True at the training shape and false at the target.** The register of the
-target platform puts one refresh at the step barrier at 41.8 milliseconds,
-which is 5.0 percent of a frame at 16.7 million tiles. The rebuild orders on
-one thread, so it does not divide over the workers of a batch.
-
-**Evidence.** The two figures come from the same stage table, read at two
-world sizes. The ratio between them is about four orders of magnitude, and
-the tile count between the two shapes is about seven thousand.
-
-**What follows.** Five caller-facing verbs now restore the structure when the
-arena moved, which is the repair for a reader that was refused between a verb
-and the next step. The repair is correct and its cost is a function of the
-world size. One of those verbs is the verb the learner calls for each
-decision.
-
-**A profile of the training shape cannot price this defect.** Anyone who
-reads the training table alone concludes the rebuild does not matter. The
-same table at the target says it is the fifth largest stage of a frame. Take
-a cost from the shape it will run at, and not from the shape that is
-convenient to measure.
-
-### FND-648 — A verb the control plane runs between two steps left the world unreadable, and the refusal named none of its cause
-
-**Believed.** The observation reader refused once three seated policies had
-acted, and the condition looked like a property of the number of policies or
-of an event of the world. Four reports named four different events before the
-traceback: nothing at all, a win by territory, the first character of the
-world, and the opening banner of the run.[^F648A]
-
-**True.** None of those events is the cause. **A verb that a caller runs
-between two steps changes the soldier arena and leaves the derived unit
-structure behind it.** The step rebuilds that structure at its barriers, and a
-verb outside a step reaches no barrier, so every reader between the verb and
-the next step meets a refusal. The action verb, the founding verb, the
-conversion verb, the spawn verb and the removal verb all did this. The
-observation of one faction is the reader that reported it, because the
-demonstration gives each seated policy its decision in seat order, and the
-policy of the second faction reads after the policy of the first has acted.
-
-**Why one policy never saw it.** A single pilot reads immediately after a
-step, so the barrier of that step has already repaired the structure. Two
-pilots put a read between a verb and the next step. That is the whole of the
-difference, and it is why a run with one policy took five hundred ticks
-without a refusal.
-
-**Why the line above each traceback misled.** The demonstration announces the
-events of a tick after it has given every pilot its decision. The last line a
-watcher sees therefore belongs to the tick before the refusal, and it names
-whatever the world announced then. Three readers took that line for the
-trigger.
-
-**Evidence.** A world of 48 tiles a side, two factions, one thread. A settler
-spawns, the world steps, and the action verb founds a city. The observation of
-the acting faction then refuses. The refusal now names the cause: the
-structure holds one revision and the arena holds another. A probe over the
-verbs of the binding refused after the spawn verb, the removal verb, the
-founding verb and the conversion verb, and answered after each of them once
-the verb restored the structure. A test drives each verb and reads
-afterwards.[^F648B]
-
-**What follows.** A verb that changes the arena calls the one refresh before
-it returns, and the public rebuild is the form a caller of a primitive
-calls.[^F648C] The reader carries a refusal that names its cause, so a stale
-structure states both revisions and a structure that was never built says
-so.[^F648D] The two failure families of the trainer are not shown to be this
-defect: neither crate holds unsafe code beyond two plain-data
-declarations, so a stale structure gives a refusal or a wrong count and never
-a bad dereference.[^F648E]
 
 ### FND-664 — The destination field was derived four times in one frame, and three of the four were thrown away
 
@@ -17536,6 +17336,206 @@ No rule of the game hides a faction's own holdings from it. The scope is correct
 for a rival's ground and wrong for the reader's own, and one field carries both
 under one rule.
 
+### FND-672 — A wave of engine work landed with the Python suite unrun, and none of the thirteen failures was a regression
+
+**Believed.** Thirteen Python tests that drive the engine were failing on
+`main`. The economy figures and the trade figures moved together, and a wave of
+weather work had landed on 6 and 7 September, so the pattern read as a
+regression from the weather: weather moves tile water, and a site's production
+rate reads the ground.
+
+**True.** No failure of the thirteen was an engine regression. Eleven stated
+behaviour that a deliberate change had replaced. One restated a list that the
+engine declares. One used an instrument that cannot measure what it asserts;
+whether it once could was not established, because the weather module has
+changed by 1847 lines since that test landed and no older tree was built.
+Five changes, one stale list and one bad instrument account for all thirteen:
+
+    six  economy tests    the production pipeline scales the stored rate,
+                          and the upkeep gained a holding term
+    two  trade tests      the same holding term, taken on the tick the
+                          measured step crosses
+    one  land trade test  BLK-036 resolved and the refusal it asserted was
+                          removed on purpose
+    one  agent test       every caller-facing verb now leaves the world
+                          readable, so the refusal it asserted is repaired
+    one  controller test  the census table grew and the list in the test
+                          did not
+    one  weather test     the lattice gained a margin that the totals hold
+                          and the arrays crop away
+    one  wind test        the centre of a cropped array measured what left
+                          the world
+
+**Evidence.** Each failure was traced to the commit that changed the
+behaviour, and each change carries its own reasoning in its commit message or
+in a record. The economy and trade group is 17227805 and 60c33a2a, the land
+group is 62fefa40, the readable-world group is the repair that FND-648
+records, and the weather group is 4fc66047.[^F672A] **None of the five
+commits the reading named is the cause of any failure.** Weather is involved
+in one of the thirteen, and through the margin rather than through the water
+it moves.
+
+**The record predicted the work and nobody did it.** The draft record for the
+derived rate states in its own consequences that every test which sets a
+production rate, steps and asserts a store quantity now reads a different
+number, and that this is fallout of switching on a sink rather than a defect of
+the sink.[^F672B] The fallout was named and left.
+
+**What follows.** A record that names its own fallout has not carried it out. A
+change that lands with a suite unrun leaves the next reader unable to tell a
+regression from an intended change, and the reading of the pattern was wrong in
+this case. Put the fallout in the item, and run the suite the changed behaviour
+is stated in.
+
+## References
+
+[^F443A]: Review of backlog item 0390, section 5. `docs/reviews/0390-the-fallen-log.md`
+[^F443B]: Findings register, FND-148. `docs/FINDINGS.md`
+
+[^F470A]: PRD-0015, a unit has parents and children. `docs/product/accepted/prd-0015-a-unit-has-parents-and-children.md`
+[^F470B]: PRD-0016, somebody is in charge. `docs/product/accepted/prd-0016-somebody-is-in-charge.md`
+[^F589A]: Findings register, FND-576, the release of a sent unit that arrives, in this document.
+[^F590A]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+[^F591A]: Findings register, FND-590, in this document.
+[^F593A]: Findings register, FND-589, in this document.
+[^F591B]: Findings register, FND-029, in this document.
+[^F591C]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+[^F470D]: Findings register, FND-360, in this document.
+[^F471A]: Backlog item 0461, tell a caller which arena an identity belongs to. `docs/backlog/proposed/0461-tell-a-caller-which-arena-an-identity-belongs-to.md`
+[^F471B]: Decisions register, DEC-265. `docs/DECISIONS.md`
+[^F472A]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+[^F472C]: Decisions register, DEC-266. `docs/DECISIONS.md`
+[^F473A]: Blockers register, BLK-150. `docs/BLOCKERS.md`
+[^F485A]: Research report 24, demonstration readability, resources and weather, section 7. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+[^F485B]: The site economy reader of the bindings. `crates/cachette-py/src/lib.rs`
+[^F485C]: The type stub of the compiled module, the founding verbs and the site columns. `python/cachette/_core.pyi`
+[^F485D]: The type stub of the compiled module, the founding report of the seeding verb. `python/cachette/_core.pyi`
+[^F485E]: The demonstration application, the seeding call. `python/cachette/demo/app.py`
+[^F485F]: Backlog item 0490, let the control plane read the store of a seeded settlement. `docs/backlog/proposed/0490-let-the-control-plane-read-the-store-of-a-seeded-settlement.md`
+[^F485G]: PRD-0047, a game states its own economy. `docs/product/shaped/prd-0047-a-game-states-its-own-economy.md`
+[^F484J]: ADR-0146, a faction relation is one signed integer per ordered pair and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+[^F484H]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
+[^F484C]: The relation module, the storm step of the relation rules. `crates/cachette-core/src/relation.rs`
+[^F484D]: Balance register, the step when a storm falls on the ground of the other. `docs/reference/balance.md`
+[^F484E]: Blockers register, BLK-130. `docs/BLOCKERS.md`
+[^F484F]: Recurring Defect Shapes, shape 3, inert code that nothing invokes. `.agents/rules/recurring-defects.md`
+[^F484G]: Research report 24, demonstration readability, resources and weather, section 2.1. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+[^F411A]: ADR-0125, the control plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+[^F411B]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, the consequences. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+[^F411C]: The sent set test of the core. `crates/cachette-core/tests/a_sent_set_walks_to_its_destination.rs`
+[^F411D]: Backlog item 0401, decide how a sent unit gets around a barrier the field cannot see. `docs/backlog/proposed/0401-decide-how-a-sent-unit-gets-around-a-barrier.md`
+[^F410D]: ADR-0125, the control plane names the seed set of a destination field, decision D2. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+[^F431A]: Backlog item 0421, put the two quantity passes into the stage table. `docs/backlog/proposed/0421-put-the-two-quantity-passes-into-the-stage-table.md`
+
+[^F326A]: The head-up display, the row drawing. `crates/cachette-view/src/hud.rs`
+[^F218B]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
+[^F327B]: ADR-0094, the caller owns the camera and the pixels, decision D1. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
+[^F328A]: ADR-0070, the head-up display reports what the drawing pass read, decision D1. `docs/adrs/accepted/adr-0070-the-head-up-display-reports-what-the-drawing-pass-read.md`
+[^F315B]: The refused step test. `crates/cachette-core/tests/a_refused_step_does_not_freeze.rs`
+[^F318A]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D1 and the alternatives rejected. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+[^F318B]: ADR-0106, a cohort serves whole rations to a keyed subset, never an equal share to everybody, decision D2. `docs/adrs/draft/adr-0106-a-cohort-serves-whole-rations-to-a-keyed-subset.md`
+[^F317A]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/complete/0187-give-a-carried-load-somewhere-to-go.md`
+[^F317C]: Testing rules, section 5. `.claude/rules/testing.md`
+[^F317D]: Backlog item 0305, give a laden unit a reason to go home. `docs/backlog/complete/0305-give-a-laden-unit-a-reason-to-go-home.md`
+[^F316A]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/proposed/0279-let-a-golden-scenario-reach-the-position-pass.md`
+
+### FND-673 — Two tests read a cropped weather array as if it were the whole account
+
+**Believed.** A weather array is the weather of the world. The sum of the
+ground array therefore equals the ground total, and the centre of the air array
+is the centre of the water in the air.
+
+**True.** The engine steps a margin of weather cells outside the world so that
+the border has real upwind. The totals hold the margin, because the water
+account balances only when they do, and the arrays crop it away. The sum of an
+array is therefore at or below its total, and it falls below as soon as water
+crosses the border.[^F673A]
+
+**Evidence.** On a coastal world of 128 tiles a side, after 32 steps of 4
+ticks, the ground array sums to 32242 drops against a ground total of 79452.
+The margin holds 59 percent of the ground water.
+
+A god-strike at the centre of a world 32 weather cells across reaches both
+borders on the second step. By the eighth step 36450 drops of 393586 are
+outside the reading, and the losses on the two sides are of the same order, so
+the measured centre of the air had moved against the wind. A test that
+integrated eight steps therefore accused the wind reader of swapping an axis it
+had not swapped.
+
+**What follows.** A test that reads a cropped array must either compare it
+against the same cells read one at a time, or prove that the quantity has not
+reached the border. The two tests now do one each, and the second asserts the
+proof so that a longer span fails on the margin rather than on the axis.
+
+**The shape.** A reader that crops needs a guard and not a comment. Both
+bindings said in their doc comments that the reading crops the margin away, and
+both tests were written against them anyway. A sentence in a doc comment does
+not fail.
+
+### FND-674 — A list of engine names in a test is a second declaration site, and it decayed by nine rows
+
+**Believed.** A test that lists the names of an engine table pins the public
+interface, so a name that leaves the table fails in the suite rather than in a
+watcher's terminal.
+
+**True.** The list is a second declaration site of the thing it checks. The
+census table in the engine carries a doc comment that says it is the only
+declaration of the list, and that names a test as one of the readers of the
+table.[^F674A] The binding builds the dictionary from that table, so the only
+disagreement the list can find is one the table itself introduced.
+
+**Evidence.** The table grew from 31 rows to 40. Nine names went in the middle,
+so the list and the table diverged at index nine and the test failed. Nothing
+else broke. Two tests read the list, and one of them was checking that a
+printed run names every row, which is derivable from the census of a world of
+the same shape.
+
+**What follows.** Derive the list from the tree in the test. Pin by name only
+the names the test itself reads, which is the interface that test depends on.
+What is left for the boundary is what the boundary can get wrong on its own: a
+repeated key, a value of the wrong type, and an order that moves between two
+readings of one world.
+
+## D. Cost estimates that were wrong
+
+### FND-675 — The economy period was believed to cancel over a span, and the holding term ended that
+
+**Believed.** The stored rate is what one tick earns and the engine multiplies
+it by the period to get one application, so two worlds on different periods
+reach the same total over a whole number of periods and differ only part way
+through one. The accepted record that attaches a rate to a site states this as
+a consequence, and one Python test asserted the equality.[^F675A]
+
+**True.** The first half holds and the second does not. The rate is still what
+one tick earns and an application still pays for the period. The upkeep now
+carries a holding term derived from what the store holds at the application, so
+a longer period takes that term from a store read fewer times, and the two runs
+part company.[^F672B]
+
+**Evidence.** One site on a world of 16 tiles a side, a base production of one
+unit, a store starting empty, eight ticks. A period of one earns 372374 in the
+Q16.16 scale and a period of four earns 380928, a difference of 2.3 percent.
+The coarser period earns more, which is the direction the discretisation
+predicts. The term that ends the cancellation arrived in 60c33a2a, which
+switched the upkeep sink on. Whether the equality ever passed in the suite was
+not established, because the suite was not run when that change landed.
+
+**What follows.** The draft record for the derived rate now carries this
+consequence.[^F672B] **The accepted record still states the equality as exact,
+so it now says something false.** It has many dependents and the retcon window
+has passed, so the repair is a reviewer's call: either a superseding record or
+an in-place amendment under the registry rule.[^8] Nothing in the tree
+fails while it stands, because a record is prose.
+
+The statement that survives, and that a test may assert, is that the period
+scales an application and not the rate. The two defects the equality protected
+against both move a span total by a factor of four: a rate spent once for each
+application earns a quarter, and a period paid for twice earns four times as
+much. A bound of a factor of two on either side excludes both and admits the
+holding term.
+
+## B. Claims refuted
+
 ### FND-676 — A shaped reward of first differences is the terminal reward of the endpoints, under the optimiser this project uses
 
 **Believed.** The reward takes a weighted change of each term at every
@@ -17665,6 +17665,56 @@ that means the loss must cost less than half of what the win pays. A symmetric
 pair of outcome weights is the defect, and it is arithmetic rather than
 learning.
 
+### FND-680 — A derived field was rebuilt at the barrier of a frame whose inputs had not moved
+
+**Believed.** A derived structure rebuilds at the frame barrier, so one rebuild
+at the barrier is the right amount of work.[^F295A] An earlier finding cut four
+derivations of the destination field in one frame to one, and it did not ask
+whether the remaining one was needed.[^F680B]
+
+**True.** One derivation in a frame is still one too many when nothing the
+field reads moved in that frame. The field is a pure function of the seed set
+of each plane, the crossing of each plane and the ground. The ground never
+changes, and the built-in controller re-sends the same objective on most
+frames, so most frames already hold the answer.[^F680C]
+
+**Evidence.** The derivation cost about a third of the frame, and a send
+changed a seed set on about a tenth of the frames of the measured run. The send
+verb now marks the field only when the set it stores differs from the set the
+plane held, and the step derives only what a mark names. The frame is about a
+third cheaper and the state hash does not move.[^F680C]
+
+**What follows.** Ask what changed since the last derivation. A count of
+derivations in a frame is a weaker question than the inputs of one, and cutting
+the count to one answers the weaker question. The guard sits beside the field
+and compares every argument, so no counter declares the same fact a second
+time.[^F487B]
+
+### FND-681 — Two approach derivations were believed to be functions of the terrain and the site set, and one of them is not
+
+**Believed.** The home approach field and the stock approach field are the same
+kind of pass. Each walks the tiles of every seeded block, and each derives from
+the terrain and the set of sites. One guard would therefore serve both.
+
+**True.** Only the home field is that function. Its seed walk reads the terrain
+and the settlement columns, so its seed set repeats unless a frame founds a
+site, razes one or takes one. The stock seed walk reads the soldier arena for
+the occupied blocks, and then reads the tile stock, which is the generated
+stock less the depletion ledger.[^F182B] A unit position changes every frame,
+and the depletion changes on every gather and every recovery.
+
+**Evidence.** A new stage divided the stock rebuild into the seed walk and the
+derivation, and it showed the seed walk at about 65 percent of that stage
+before the change. The home derivation fell from over a millisecond for each
+frame to under a microsecond under its guard. The stock rebuild kept its walk,
+and the two stages together fell by about a third after the kind loop moved
+inside the tile loop.[^F681B]
+
+**What follows.** The two fields cannot share one guard, and each needs its
+own. Guarding the stock derivation alone would have left most of the cost in
+place, because the walk that feeds the guard is the larger half. Read the inputs
+of a derivation before you group it with another that looks like it.
+
 ### FND-682 — The observation pass held 96 percent of a frame in the cost table, and the fixture put it there
 
 **Believed.** The stage cost table reported the observation pass at about 32.5
@@ -17724,6 +17774,59 @@ changes which worker writes which block, and the record that governs the
 parallel passes requires disjoint outputs, so it is a decision and not a
 repair.[^F682C]
 
+### FND-683 — The terrain is immutable for the life of a world, so no upgrade reaches an approach field
+
+**Believed.** The ground that the approach derivations treat as passable
+follows what stands on it. A finished road or a burnt forest changes what a
+unit may cross, so a guard that compares the terrain must be able to fire
+during a run.
+
+**True.** The terrain never changes. It is a `Copy` type that holds a seed and
+a grid, the seeding pass builds it once, and nothing reassigns it.[^F682A] The
+two approach derivations ask the terrain for the ground of a tile and never ask
+the upgrade map, so no finished upgrade and no fire changes what they treat as
+passable. The decision record already states that the ground is a pure function
+of the seed and the address, and that a field a system writes is not
+terrain.[^F682B]
+
+**Evidence.** The engine holds one construction site for the terrain, in the
+seeding pass, and no assignment to the field anywhere.[^F682A] Two separate
+reviews reached this independently, one from the write sites and one from the
+type.
+
+**What follows.** The terrain term of each guard is a comparison that cannot
+fire. Keep it, because a complete argument set holds no exception for a reader
+to remember.
+
+**Record the forward risk plainly.** If movement admission ever reads an
+effective passability that an upgrade modifies, these fields will disagree with
+it and no test will fail. The disagreement is silent, because both answers are
+deterministic and the fields never ask the upgrade map.
+
+### FND-684 — One stage name over two walks reported a per-entry cost of two unrelated operations
+
+**Believed.** The stage list declares one entry for each frame for the holding
+candidate stage, and the frame opens that stage once.
+
+**True.** The holding rewrite opened it twice, around two different walks. One
+walk gathers the live cities from the settlement arena and the upgrade sites.
+The other walks the grid around each city for the tiles the rewrite can change.
+The declared count and the observed count are one fact in two places, and
+nothing compared them until the stage cost check ran.[^F683A]
+
+**Evidence.** The check failed with a declared count of one against two opens.
+Two earlier commits report the same failure on their own head and each states
+that it is not theirs.[^F680C] [^F681B]
+
+**What follows.** The fix split the stage and did not raise the declared count.
+One label over two walks averages two unrelated operations, so a raised count
+would have turned the check green and left the profile meaningless. The city
+walk now names a stage of its own, and the candidate stage keeps its name and
+its meaning.[^F683A]
+
+This is the redundant declaration shape, and the register holds an earlier
+instance in the same apparatus.[^F683B] [^F487B]
+
 ## References
 
 [^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
@@ -17770,3 +17873,8 @@ repair.[^F682C]
 [^F682A]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 [^F682B]: Testing rules, a fixture supplies the input, section 2a. `.agents/rules/testing.md`
 [^F682C]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
+[^F680B]: Findings register, FND-664. `docs/FINDINGS.md`
+[^F680C]: The commit `Derive the destination field only when a seed set changed`. Read its message for the figures, the frame counts and the commands.
+[^F681B]: The commit `Derive an approach field only when its arguments changed`. Read its message for the figures, the tests and the commands.
+[^F683A]: The commit `Give the holding city walk a stage of its own`. Read its message for the file table and the entry counts.
+[^F683B]: Findings register, FND-305. `docs/FINDINGS.md`
