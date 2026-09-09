@@ -726,7 +726,10 @@ impl World {
         // in.[^4]
         tiles.sort_unstable_by_key(|tile: &TileIdx| tile.0);
         tiles.dedup();
-        self.destination_seeds[destination as usize] = tiles;
+        if self.destination_seeds[destination as usize] != tiles {
+            self.destination_seeds[destination as usize] = tiles;
+            self.mark_destination_seeds_changed();
+        }
         // **The plane conducts through water when every unit sent to it
         // crosses water.** The caller states no flag. It states a set, and
         // the crossing of that set follows from the type of each unit in it,
@@ -748,7 +751,10 @@ impl World {
                     .unit_type(*unit)
                     .is_some_and(|unit_type| self.unit_types.row(unit_type).water_crossing > 0)
             });
-        self.destination_crossings[destination as usize] = u8::from(crosses);
+        if self.destination_crossings[destination as usize] != u8::from(crosses) {
+            self.destination_crossings[destination as usize] = u8::from(crosses);
+            self.mark_destination_seeds_changed();
+        }
         for unit in units {
             assert!(
                 self.soldiers.set_sent(*unit, Some(destination)),
@@ -768,9 +774,26 @@ impl World {
         // [^8]: Findings register, FND-664. `docs/FINDINGS.md`
         if !self.destinations_deferred {
             let _span = stage::open(Stage::SendDeriveDestinations);
-            self.derive_destination_fields();
+            self.derive_changed_destination_fields();
         }
         Ok(())
+    }
+
+    /// Marks the destination field as one that no longer describes the seeds.
+    ///
+    /// **The probe switch removes the mark.** The field then describes the
+    /// seed set of the first frame for the whole run, and a test that reads a
+    /// plane the control plane re-aimed reads the old answer. A guard with no
+    /// proven failure mode is decoration.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Testing rules, section 1. `.agents/rules/testing.md`
+    fn mark_destination_seeds_changed(&mut self) {
+        #[cfg(not(feature = "probe-frozen-destinations"))]
+        {
+            self.destination_seeds_changed = true;
+        }
     }
 
     /// Stops sending a set of units.
@@ -914,27 +937,73 @@ impl World {
         seeds
     }
 
-    /// Derives the coarse and the fine field of every destination plane.
+    /// Derives the coarse and the fine field of every destination plane, and
+    /// derives them whatever the seed sets did.
     ///
     /// **This is the one place that derives either of them.** Both come from
     /// one seed set, and a path that wrote one without the other would leave
     /// a stale value that nothing fails on.[^1] [^2]
     ///
+    /// **A caller outside a frame reaches this call and not the guarded one.**
+    /// A test compares the field that a step left against a fresh derivation,
+    /// so the fresh derivation must read the seeds again rather than trust a
+    /// flag. A test that compared the field against itself would pass on any
+    /// engine.[^3]
+    ///
     /// # References
     ///
     /// [^1]: Findings register, FND-029. `docs/FINDINGS.md`
     /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^3]: Testing rules, section 1. `.agents/rules/testing.md`
     pub(super) fn derive_destination_fields(&mut self) {
-        self.destinations.derive(
-            &self.pyramid,
-            &self.destination_seed_pairs(),
-            &self.destination_crossings,
-        );
-        self.approaches.derive(
-            self.terrain,
-            &self.destination_seed_tiles(),
-            &self.destination_crossings,
-        );
+        self.destination_seeds_changed = false;
+        {
+            let _span = stage::open(Stage::DestinationsCoarse);
+            self.destinations.derive(
+                &self.pyramid,
+                &self.destination_seed_pairs(),
+                &self.destination_crossings,
+            );
+        }
+        {
+            let _span = stage::open(Stage::DestinationsFine);
+            self.approaches.derive(
+                self.terrain,
+                &self.destination_seed_tiles(),
+                &self.destination_crossings,
+            );
+        }
+    }
+
+    /// Derives the destination field when a seed set or a crossing changed,
+    /// and returns without work when none did.
+    ///
+    /// **The field is a pure function of the seeds, the crossings and the
+    /// ground.** The ground is generated from the world seed and it never
+    /// changes, and the relaxation reads a level 1 cell only for its open tile
+    /// count, which the ground alone decides.[^1] [^2] A frame that changed no
+    /// seed set therefore already holds the answer that a derivation would
+    /// give, and the derivation is the second largest cost of a frame.
+    ///
+    /// The record that permits an incremental update asks that it give the
+    /// answer a full rebuild gives, and a test compares the two frame by
+    /// frame.[^3]
+    ///
+    /// **The pass count of the derivation is unchanged.** This call decides
+    /// whether the relaxation runs at all. It does not read what the field
+    /// holds, and it ends no solve early.[^4]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^3]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    /// [^4]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
+    pub(super) fn derive_changed_destination_fields(&mut self) {
+        if !self.destination_seeds_changed {
+            return;
+        }
+        self.derive_destination_fields();
     }
 
     /// Reports whether the ground at an address admits a unit.

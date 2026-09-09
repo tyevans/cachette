@@ -708,11 +708,19 @@ impl World {
             self.run_controller();
             self.destinations_deferred = false;
         }
-        // **The destination field is derived here, once for each frame.** The
-        // barrier above left it, and the controller changed the seed set of
-        // every plane it sent on. This is the last thing in the frame that
-        // touches the field, and a caller between two steps reads what it
-        // wrote.[^26]
+        // **The destination field is derived here, and once at most for each
+        // frame.** The barrier above left it, and the controller changed the
+        // seed set of a plane whenever it sent that plane somewhere new. This
+        // is the last thing in the frame that touches the field, and a caller
+        // between two steps reads what it wrote.[^26]
+        //
+        // **A frame that changed no seed set derives nothing.** The field
+        // reads the seeds, the crossings and the ground, the ground never
+        // changes, and the controller re-sends the same objective on most
+        // frames. The field then already holds the answer a derivation would
+        // give.[^43]
+        //
+        // [^43]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
         //
         // The probe switch removes this derivation, so the field describes
         // the seed set as it stood before the controller sent anything. A
@@ -720,7 +728,7 @@ impl World {
         #[cfg(not(feature = "probe-stale-destinations"))]
         {
             let _span = stage::open(Stage::RebuildDestinations);
-            self.derive_destination_fields();
+            self.derive_changed_destination_fields();
         }
         // **A step leaves the world readable.** The controller founds cities,
         // and a founding seats a group and spends the settler. Both change

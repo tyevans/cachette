@@ -263,6 +263,7 @@ impl World {
             destination_seeds: vec![Vec::new(); config.destination_plane_count() as usize],
             destination_crossings: vec![0; config.destination_plane_count() as usize],
             destinations_deferred: false,
+            destination_seeds_changed: true,
             carry_mark: CARRY_MARK_DEFAULT,
             holding: Holding::new(layout),
             luxuries: LuxuryField::new(),

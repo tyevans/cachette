@@ -94,6 +94,8 @@ mod contest;
 mod controller;
 mod controller_targets;
 mod conversion;
+#[cfg(test)]
+mod destination_guard;
 mod errors;
 mod event_memory;
 mod fire;
@@ -402,6 +404,36 @@ pub struct World {
     /// [^2]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
     /// [^3]: Findings register, FND-664. `docs/FINDINGS.md`
     destinations_deferred: bool,
+    /// Whether a seed set or a crossing changed since the last derivation of
+    /// the destination field.
+    ///
+    /// **The destination field is a pure function of three things.** It reads
+    /// the seed set of each plane, the crossing of each plane, and the
+    /// ground. The ground is generated from the world seed and it never
+    /// changes, and the relaxation reads the level 1 cell only for the open
+    /// tile count, which the ground alone decides.[^1] [^2] The field
+    /// therefore holds the answer a fresh derivation gives for as long as no
+    /// send changes a seed set.
+    ///
+    /// The send verb writes this flag, and it writes it only when the set it
+    /// stores differs from the set the plane held. The controller re-sends
+    /// the same objective on most frames, so most frames change nothing and
+    /// pay for no derivation. Skipping a derivation whose answer is already
+    /// held is an incremental update, and the record that permits one asks
+    /// that it give the answer a full rebuild would give.[^3]
+    ///
+    /// **The public rebuild derives the field whatever this flag says.** A
+    /// test compares the field the step leaves against a fresh derivation,
+    /// and a rebuild that read the flag would compare the field against
+    /// itself.[^4]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+    /// [^2]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D5. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
+    /// [^3]: ADR-0022, level 0 is the only truth, and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    /// [^4]: Testing rules, section 1. `.agents/rules/testing.md`
+    destination_seeds_changed: bool,
     /// The load at which a unit counts as laden.
     ///
     /// A laden unit takes the option that carries its load home, and a unit

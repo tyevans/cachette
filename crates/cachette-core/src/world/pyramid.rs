@@ -234,7 +234,14 @@ impl World {
         // because a caller outside a frame reads it as soon as the call
         // returns.[^1]
         //
+        // **This path derives the field whatever the seed sets did.** The step
+        // derives the field only when a send changed a seed set, and a test
+        // compares the field the step left against the field this path gives.
+        // A path that read the same flag would compare the field against
+        // itself.[^6]
+        //
         // [^5]: Findings register, FND-664. `docs/FINDINGS.md`
+        // [^6]: Testing rules, section 1. `.agents/rules/testing.md`
         if destinations == Destinations::Derive {
             let _span = stage::open(Stage::RebuildDestinations);
             self.derive_destination_fields();
