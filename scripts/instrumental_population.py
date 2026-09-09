@@ -142,6 +142,7 @@ from cachette.learn.policy import (
     RandomPolicy,
     load_policy,
 )
+from cachette.learn.record import end_tick_of
 from cachette.learn.reward import Weighting
 from cachette.learn.structured import STRUCTURED_KIND, StructuredPolicy
 
@@ -423,14 +424,21 @@ def read_episode(arm: str, seed: int, env: Env) -> Reading:
     The signals come from the catalogue the environment built out of the
     schema of the engine, so this names no position and no field.
 
-    The path and the tick come from the game end record. A game that no
-    reader ended holds no record, so the path is the absent-path name and the
-    tick is the clock of the world.
+    The path comes from the game end record. A game that no reader ended
+    holds no record, so the path is the absent-path name.
+
+    **The end tick comes from the one reader the record module holds for
+    it.** The rule was declared twice, and the two copies disagreed until one
+    of them was removed.[^1]
+
+    References
+    ----------
+    [^1]: Findings register, FND-689. ``docs/FINDINGS.md``
     """
     world = env.world
     end = world.game_end()
     limit = world.tick_limit
-    end_tick = int(world.tick) if end is None else int(end["tick"])
+    end_tick = end_tick_of(world)
     return Reading(
         arm=arm,
         seed=seed,

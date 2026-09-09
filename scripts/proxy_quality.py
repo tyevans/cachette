@@ -71,9 +71,9 @@ IGNORED: frozenset[str] = frozenset(
 )
 
 # What the reward would have to weigh to target each reported field. The
-# reading names the tick of the end differently from the schema, and a reader
-# who takes the reported name into a weighting gets an error rather than a
-# reward.
+# engine publishes no observation field that carries the tick of the end, so a
+# reward cannot weigh the reported name at all and must weigh the remaining
+# ticks instead.
 WEIGHABLE_AS: dict[str, str] = {"end_tick": "remaining_ticks"}
 
 
@@ -97,8 +97,9 @@ def candidate_fields(probe: Env) -> list[str]:
     written here would be a second declaration of that set, and a name the
     schema stopped carrying would read as a missing value rather than fail.
 
-    The engine spells the tick of the end ``tick`` and a reading also carries
-    it as ``end_tick``, so both names are candidates.
+    The engine publishes no field that carries the tick of the end. A reading
+    carries it as ``end_tick``, read from the world rather than from a
+    signal, so this adds that one name to the candidates.
     """
     named = [signal.name for signal in probe.signals.scalars()]
     return [name for name in (*named, "end_tick") if name not in IGNORED]
@@ -204,9 +205,19 @@ def main() -> None:
         f"worlds hold both a winner and a loser and so can order anything\n"
     )
 
-    # The end tick of each episode, which the rate divides by. It is never
-    # zero, because an episode takes at least one decision before it ends.
+    # The end tick of each episode, which the rate of every field divides by.
+    # **A zero here destroys the whole rate column and not one row of it.** The
+    # check above refuses a field the reading leaves out, and it cannot see a
+    # field the reading reports as zero. The end tick read zero for every
+    # episode once, and this run then divided every field by nothing.
     ticks = columns["end_tick"]
+    if not ticks.all():
+        message = (
+            "the end tick reads zero for at least one episode, so the rate of "
+            "every field divides by nothing. An episode takes at least one "
+            "tick, so a zero here is a defect in the reading and not a game"
+        )
+        raise AssertionError(message)
 
     rankings: list[Ranking] = []
     for field in fields:

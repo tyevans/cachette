@@ -122,9 +122,9 @@ def test_the_catalogue_names_the_alternatives_when_a_name_is_absent(
 ) -> None:
     """The failure this replaces was a caller carrying a name across a boundary.
 
-    The trainer reports the tick of the end as ``end_tick`` and a reward must
-    ask for ``tick``. A reader who carries the reported name here must be told
-    what the layout does hold.
+    The trainer reports the tick of the end as ``end_tick`` and the engine
+    publishes no signal that carries it at all. A reader who carries the
+    reported name here must be told what the layout does hold.
     """
     with pytest.raises(KeyError, match="names no signal") as raised:
         catalogue.signal("end_tick")

@@ -194,9 +194,10 @@ def test_an_episode_reading_holds_every_quantity_the_engine_publishes() -> None:
     assert set(row.signals) == published
     reading = row.as_row()
     assert published <= set(reading)
-    # The engine spells the tick of the end ``tick``, and a report spells it
-    # ``end_tick``. Both names carry the same number.
-    assert reading["end_tick"] == reading["tick"]
+    # The engine publishes no signal that carries the tick of the end, so the
+    # reading takes it from the world and the row holds no name ``tick``.
+    assert "tick" not in reading
+    assert reading["end_tick"] == float(row.end_tick)
     assert (
         reading["won"] + reading["lost"] + reading["drawn"] + reading["unresolved"]
         == 1.0
