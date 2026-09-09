@@ -129,4 +129,3 @@ policy asks for an observation after a game ends.[^C2]
 [^C3]: ADR-0193, an observation names another faction by a position relative to the reader. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
 [^C4]: Findings register, FND-666. `docs/FINDINGS.md`
 [^C5]: Findings register, FND-667. `docs/FINDINGS.md`
-[^C6]: Findings register, FND-686. `docs/FINDINGS.md`
