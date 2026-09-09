@@ -265,10 +265,14 @@ pub const OBJECTIVE_WEIGHT_COUNT: u32 = 12;
 /// revision claims them.
 ///
 /// **A revision that claims a position takes it from here and holds the
-/// length.** The event history gained two kinds, which widened five fields of
-/// the memory block by ten positions between them. The domination path gained two
-/// counts at the end of the layout. This reserve paid for all twelve.
-pub const LAYOUT_RESERVE: u32 = 17;
+/// length.** A field added anywhere else moves the start of every field after
+/// it, and that refuses every stored weight file.
+///
+/// Three revisions claimed thirteen positions between them. The event history
+/// gained two kinds, which widened five fields of the memory block by ten
+/// positions. The domination path gained two counts at the end of the layout.
+/// The founding chain gained the settler count.
+pub const LAYOUT_RESERVE: u32 = 16;
 
 /// How a reader reads every position of one field.
 ///
@@ -1163,6 +1167,28 @@ declare_observation_fields! {
     /// it is still seated or not, because a seat that changed hands is still
     /// a seat a winner must hold.
     RivalSeats => "rival_seats", 1, Magnitude;
+    /// The settlers the faction holds.
+    ///
+    /// A settler is a unit whose type row holds a settle column above zero,
+    /// and this reads the reader the settle verb reads.[^1]
+    ///
+    /// **The founding flag says whether the verb would found now, and this
+    /// says whether the faction owns the unit the verb needs.** The two
+    /// answer different questions, and a faction with no settler reads zero
+    /// for both. A reader of the flag alone cannot tell a faction that holds
+    /// no settler from a faction whose settler stands on ground a city may
+    /// not take, and those two states ask for different actions.
+    ///
+    /// **The position comes from the reserve, so no other field moved.** The
+    /// reserve exists for this, and a claim on it keeps every stored weight
+    /// file placeable.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: The reserve. [`LAYOUT_RESERVE`]
+    Settlers => "settlers", 1, Magnitude;
+
     /// **Reserved.** The positions the layout holds back for a later signal.
     LayoutReserve => "layout_reserve", LAYOUT_RESERVE, Reserved;
 }
@@ -2314,6 +2340,7 @@ struct Reading {
     board: Vec<i64>,
     legality: Vec<i64>,
     settle_flag: i64,
+    settlers: i64,
     held_tiles: i64,
     live_units: i64,
     strength: i64,
@@ -2429,6 +2456,7 @@ impl World {
             board: self.board_statistics(seats),
             legality: self.upgrade_legality(&legal),
             settle_flag: self.verb_flag(&legal, Verb::Settle),
+            settlers: i64::from(self.settler_count(faction).unwrap_or(0)),
             held_tiles: self.holding_of(faction),
             live_units: i64::from(self.population_of(faction)),
             strength: self.faction_strength(faction).0,
@@ -2790,6 +2818,7 @@ impl World {
                     span[0] = share(ground.own_held_fire, ground.own_held_seen_now);
                 }
                 ObsField::MayFound => span[0] = read.settle_flag,
+                ObsField::Settlers => span[0] = magnitude(read.settlers),
                 ObsField::UpgradeLegality => {
                     fill(span, |class| read.legality.get(class).copied().unwrap_or(0));
                 }

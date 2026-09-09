@@ -255,6 +255,48 @@ impl PyWorld {
         Ok(outcomes.iter().filter(|outcome| outcome.founded()).count())
     }
 
+    /// Names why the settle verb refuses each settler of one faction.
+    ///
+    /// The faction is the number of the faction that holds the settlers.
+    ///
+    /// Returns one name for each settler the faction holds, in the order the
+    /// engine walks the settlers. A settler the verb would accept carries the
+    /// name `accepted`. A faction that holds no settler gets an empty list.
+    ///
+    /// **The verb answers one byte and names no reason.** A caller that took
+    /// the settle action and read a refusal cannot say which rule refused, so
+    /// it reads this instead. The names are the ones the engine states, and
+    /// this call recomputes nothing.
+    ///
+    /// The names are `accepted`, `no_such_unit`, `not_a_settler`,
+    /// `outside_world`, `faction_may_not_found`, `ground_is_held`,
+    /// `settlement_stands`, `ground_admits_nobody`, `too_close_to_a_city` and
+    /// `founding_refused_the_place`.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the number names no faction of this world.
+    fn settle_refusals(&self, faction: u16) -> PyResult<Vec<&'static str>> {
+        self.lock()
+            .settle_refusal_names(FactionId(faction))
+            .ok_or_else(|| ViewError::new_err(format!("{faction} names no faction of this world")))
+    }
+
+    /// Returns how many settlers one faction holds, as an integer.
+    ///
+    /// A settler is a unit whose type row holds a settle column above zero.
+    /// The observation of the faction publishes the same count under the
+    /// name `settlers`, so a reader of either one reads the same quantity.
+    ///
+    /// # Errors
+    ///
+    /// Raises `ViewError` when the number names no faction of this world.
+    fn settler_count(&self, faction: u16) -> PyResult<u32> {
+        self.lock()
+            .settler_count(FactionId(faction))
+            .ok_or_else(|| ViewError::new_err(format!("{faction} names no faction of this world")))
+    }
+
     /// Gives every soldier the identities name one unit type.
     ///
     /// The units are a sequence of identities, or the NumPy array of

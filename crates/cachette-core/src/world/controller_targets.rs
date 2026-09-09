@@ -298,23 +298,29 @@ impl World {
     /// number of tiles around each, so its cost does not grow with the
     /// world.[^1]
     ///
-    /// The places the faction already holds are the places taken, so the
-    /// sample offers ground at least the founding distance away from every
-    /// site the faction owns. The settle verb applies the same distance rule
-    /// again when the settler arrives, so a place that became too near while
-    /// the settler walked is still refused.[^2]
+    /// **Every settlement that stands is a place taken, whatever faction owns
+    /// it.** The sample therefore offers ground at least the founding distance
+    /// away from every city in the world, which is the list the settle verb
+    /// compares against when the settler arrives. A place that became too near
+    /// while the settler walked is still refused.[^2] [^5]
     ///
     /// **The order takes the best eligible candidate inside the reach of a
     /// settler.** The rule has three parts, and each part is a filter or an
     /// order over the sample.
     ///
     /// **Beyond a distance.** A candidate must keep the founding distance
-    /// from every site the faction holds. The survey applies that rule, with
-    /// the sites of the faction as the places taken, and the settle verb
-    /// applies the same rule again when the settler arrives.[^2] The distance
-    /// is the founding distance and not a second one. A second constant would
-    /// be one fact in two places, and the verb would then admit a place the
-    /// target choice refused.[^4]
+    /// from every settlement that stands. The survey applies that rule, with
+    /// every standing place as the places taken, and the settle verb applies
+    /// the same rule over the same list when the settler arrives.[^2] The
+    /// distance is the founding distance and not a second one. A second
+    /// constant would be one fact in two places, and the verb would then
+    /// admit a place the target choice refused.[^4]
+    ///
+    /// **The reach is measured from the seats of this faction alone.** The
+    /// distance a settler must walk runs from the city it leaves, and a
+    /// faction leaves from its own city. The separation list and the reach
+    /// list are therefore two lists, and each answers the question it is
+    /// asked.
     ///
     /// **Eligible.** A candidate must be what the survey already calls
     /// eligible: ground that admits a settlement, ground that keeps the
@@ -343,6 +349,7 @@ impl World {
     /// [^2]: ADR-0076, a founding keeps a fixed distance from the foundings before it, decision D1. `docs/adrs/accepted/adr-0076-a-founding-keeps-a-fixed-distance-from-the-foundings-before-it.md`
     /// [^3]: ADR-0004, iteration order is explicit, decision D4. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     /// [^4]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^5]: Findings register, FND-693. `docs/FINDINGS.md`
     #[must_use]
     pub fn settling_target_of(&self, faction: FactionId) -> Option<Axial> {
         self.settling_target(faction)
@@ -363,10 +370,19 @@ impl World {
     }
 
     pub(super) fn settling_target(&self, faction: FactionId) -> Option<Axial> {
+        // **The separation rule reads the reader the settle verb reads.** The
+        // verb compares a place against every settlement that stands, of every
+        // faction, so a target chosen against the sites of one faction alone
+        // is a place the verb then refuses. The two lists disagreed, and the
+        // walk sent settlers at ground beside a rival city for the whole
+        // run.[^5]
+        //
+        // [^5]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+        let taken = self.standing_places();
         // The walk is over the settlement slots in ascending order, so the
-        // list of taken places is a property of the arena and not of a visit
-        // order.
-        let taken: Vec<Axial> = self
+        // list of the seats of this faction is a property of the arena and
+        // not of a visit order.
+        let mine: Vec<Axial> = self
             .settlements
             .iter()
             .filter(|site| self.settlements.faction(*site) == Some(faction))
@@ -386,7 +402,7 @@ impl World {
             .filter_map(|candidate| {
                 let tile = candidate.tile();
                 let address = self.grid.address_of(tile)?;
-                let near = taken
+                let near = mine
                     .iter()
                     .map(|seat| seat.distance(address))
                     .min()

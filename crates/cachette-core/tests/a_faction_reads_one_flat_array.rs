@@ -35,6 +35,7 @@ use cachette_core::obs_ring::{ring_cell_counts, RING_STACK_CELLS, RING_STACK_CHA
 use cachette_core::obs_ring_stack::RING_STACK_CHANNEL_NAMES;
 use cachette_core::obs_token::TokenSet;
 use cachette_core::sim_math;
+use cachette_core::unit_type::SETTLER;
 use cachette_core::{Axial, Entity, FactionId, SightRules, World, WorldConfig};
 
 /// A world wide enough to hold ground that one faction never reaches.
@@ -1001,5 +1002,92 @@ fn a_published_count_of_the_world_inverts_to_that_count() {
         invert_through(&row.form(), published),
         tiles,
         "the schema recovers the tile count of the world from what it published"
+    );
+}
+
+/// The array publishes the settlers of the faction, and it separates that
+/// count from the founding flag.
+///
+/// **A reader of the flag alone cannot tell a faction that holds no settler
+/// from a faction whose settler stands on ground a city may not take.** The
+/// two states ask for different actions: the first asks for a queued settler
+/// and the second asks for a walk. The fixture therefore builds both, and it
+/// asserts that the two positions differ between them.
+///
+/// The fixture places the settler on ground nobody holds, at a distance from
+/// every city, so the flag reads one. A fixture that placed it beside a city
+/// would leave the flag at zero in both states, and the assertion would then
+/// measure the fixture.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+#[test]
+fn the_array_publishes_the_settlers_of_the_faction() {
+    let mut world = a_still_world();
+    world.step(1).expect("the step runs");
+    let empty = observation_of(&world, WATCHER);
+    assert_eq!(
+        one(&empty, "settlers"),
+        0,
+        "a faction with no settler publishes no settler"
+    );
+    assert_eq!(
+        one(&empty, "may_found"),
+        0,
+        "a faction with no settler founds nothing"
+    );
+
+    let place = ground_near(&world, Axial::new(40, 40), 8);
+    let settler = a_unit_at(&mut world, place, WATCHER);
+    assert!(
+        world.set_unit_type(settler, SETTLER),
+        "the fixture retypes the unit"
+    );
+    world.step(1).expect("the step runs");
+    let held = observation_of(&world, WATCHER);
+
+    assert!(
+        one(&held, "settlers") > 0,
+        "the faction holds a settler, and the array must publish it"
+    );
+    assert_eq!(
+        world.settler_count(WATCHER),
+        Some(1),
+        "the reader and the array read one set of settlers"
+    );
+    assert!(
+        one(&held, "may_found") > 0,
+        "the fixture placed the settler where the verb accepts it, so the \
+         flag and the count both moved and neither alone carried the change"
+    );
+}
+
+/// The reserve gave up one position for the settler count, and the whole
+/// length stayed where it was.
+///
+/// **A field added anywhere but directly above the reserve moves the start of
+/// every field after it, and every stored weight file then places its weights
+/// on the wrong positions.** This asserts the shape of the claim rather than
+/// the number of positions left, because the number changes with the next
+/// claim and the shape does not.
+#[test]
+fn the_settler_count_sits_directly_above_the_reserve() {
+    let fields = ObsField::ALL;
+    let last = fields.last().copied().expect("the layout holds a field");
+    assert_eq!(
+        last,
+        ObsField::LayoutReserve,
+        "the reserve is the last field of the layout"
+    );
+    let above = fields[fields.len() - 2];
+    assert_eq!(
+        above,
+        ObsField::Settlers,
+        "the settler count is the newest claim on the reserve"
+    );
+    assert!(
+        !ObsField::Settlers.value_kind().is_reserved(),
+        "the settler count reads a value, so it is no longer reserved"
     );
 }

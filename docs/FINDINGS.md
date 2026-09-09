@@ -24,6 +24,7 @@ precedent.[^1]
 
 **Next number: FND-703**
 **Next number: FND-703**
+**Next number: FND-695**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18196,6 +18197,72 @@ the term. This row records the arithmetic and the reasoning, and it does not
 claim a behaviour change.
 
 ### FND-700 — Every shaped weight of the strategy table telescoped, so eight strategies trained against a terminal reward
+### FND-697 — The settle target and the settle verb kept two lists of the places taken
+
+**Believed.** The choice of where a faction sends its settlers applied the
+founding distance rule, and the settle verb applied the same rule again when
+the settler arrived. The comment on the choice said so in those words.
+
+**True.** The two applied the rule over two different lists. The target choice
+compared a candidate place against the sites of the choosing faction alone.
+The verb compares the place against every settlement that stands, of every
+faction. A target beside a rival city therefore passed the choice and failed
+the verb, and the settler walked there and founded nothing until it starved.
+
+**Evidence.** A probe played a scripted arm that queues a settler whenever the
+action row is legal and founds whenever the settle row is legal, over six
+held-out seeds of a 48 by 48 world of three factions. Under the two lists the
+arm ended each episode with 2.33 settlements and made 1.33 foundings. Under
+one list it ended with 6.83 settlements and made 6.17 foundings. The refusal
+reader named the distance rule 147 times under the two lists. The commit holds
+the command and both tables.
+
+**Follows.** The target choice reads the reader the verb reads, and the two
+cannot part again. The reach of a settler is still measured from the seats of
+its own faction, because the distance a settler walks runs from the city it
+leaves. The separation list and the reach list answer different questions, and
+each now takes the list its question asks for.
+
+A test asserts the rule over every settlement that stands, on a world of four
+factions, and it fails when the old list goes back.
+
+### FND-698 — No link of the settler chain refused, and no policy took the row
+
+**Believed.** No trained policy of this project has founded a city, and the
+settle verb was never offered as legal in a recorded sample of decisions. The
+project read that as a broken link in the chain that ends in a founded city:
+the queue verb, the site queue, the production pass, or the settle verb.
+
+**True.** Every link passes. The action row that queues a settler is offered
+as legal, and the two policies measured never took it once. A scripted arm
+that takes the row whenever it is legal reaches a settler in every episode and
+founds cities.
+
+The settle row is illegal because the seat holds no settler, and the seat
+holds no settler because nothing ever queued one. **A legality byte of zero on
+the settle row is therefore a report about the policy and not about the
+engine.**
+
+**Evidence.** A probe played four arms over six held-out seeds of a 48 by 48
+world of three factions, at 120 decisions of five ticks each. The settler row
+was legal on 100 percent of the decisions of one policy and on 14 percent of
+the decisions of the other, and neither took it on any decision. The scripted
+arm took it on 25 percent of its decisions, reached 14.5 settlers for each
+episode, and ended with 6.83 settlements against 1.00 for each policy. The
+built-in controller ended with 1.50. The commit holds the command and the
+table.
+
+**Follows.** Do not look for a refused verb when a policy never reaches an
+outcome. Ask first whether the policy took the action at all, and measure the
+share of decisions on which the row was legal beside the share on which the
+policy took it. The two numbers separate an engine defect from a choice.
+
+The observation now publishes the settler count of the faction, so a reward
+term and a policy can both read the state that gates the settle verb. The
+environment now reports why the settle verb refuses each settler, because the
+verb answers one byte and names nothing.
+
+## References
 
 **Believed.** The eight rows of the strategy table held dense rewards. Each row
 named a field and a weight, one row weighed the ground and another weighed the
