@@ -251,3 +251,63 @@ fn a_world_with_no_unit_gathers_the_candidates_and_decides_nothing() {
         "an empty candidate list applies nothing"
     );
 }
+
+#[test]
+fn the_observation_pass_divides_into_three_nested_stages() {
+    // The observation pass held the whole cost of a frame in one row, and a
+    // row for the whole pass cannot say which of the three passes spends it.
+    // This test drives the engine, so a span that nothing reaches reports
+    // zero entries rather than passing on a mechanism the step never opens.
+    let _alone = alone();
+    let mut world = world_with_units(32);
+    world.step(1).expect("the step must run");
+
+    stage::reset();
+    world.step(1).expect("the step must run");
+    let costs = stage::costs();
+
+    for stage in [
+        Stage::ObserveStamps,
+        Stage::ObserveBlocks,
+        Stage::ObserveApply,
+    ] {
+        assert_eq!(
+            costs.cost(stage).entries,
+            1,
+            "one frame must open {} once",
+            stage.name()
+        );
+        assert!(
+            stage.is_nested(),
+            "{} divides the observation pass, so the frame total must skip it",
+            stage.name()
+        );
+    }
+    assert!(
+        !Stage::Observe.is_nested(),
+        "the observation pass adds to the frame, so it is not nested"
+    );
+}
+
+#[test]
+fn a_nested_stage_stays_out_of_the_frame_total() {
+    // The three nested rows sit inside the observation pass, so a total that
+    // added them would count the same time twice. The check is a count and
+    // not a duration: the total walks the stages that are not nested, and
+    // this test states which stages that walk must leave out.
+    let counted: Vec<&str> = STAGES
+        .iter()
+        .filter(|stage| !stage.is_nested())
+        .map(|stage| stage.name())
+        .collect();
+    for name in ["observe_stamps", "observe_blocks", "observe_apply"] {
+        assert!(
+            !counted.contains(&name),
+            "{name} divides the observation pass and must not be in the total"
+        );
+    }
+    assert!(
+        counted.contains(&"observe"),
+        "the observation pass must be in the frame total"
+    );
+}

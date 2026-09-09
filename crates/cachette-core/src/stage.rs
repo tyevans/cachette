@@ -206,6 +206,9 @@ declare_stages! {
     WeatherSolve,             "weather_solve",              true,  1, false;
     PresenceFold,             "presence_fold",              true,  1, false;
     Observe,                  "observe",                    true,  1, false;
+    ObserveStamps,            "observe_stamps",             false, 1, true;
+    ObserveBlocks,            "observe_blocks",             true,  1, true;
+    ObserveApply,             "observe_apply",              false, 1, true;
     RelationDrift,            "relation_drift",             false, 1, false;
     Controller,               "controller",                 false, 1, false;
     ControllerSolvePlan,      "controller_solve_plan",      false, 1, true;
