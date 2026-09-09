@@ -44,8 +44,10 @@
 #                             taken back, and the trainer resumes
 #   CACHETTE_TRAIN_CONFIRM    set to `yes` to skip the prompt. Use it only
 #                             from something that already asked a person
-#   CACHETTE_TRAIN_STOP_ON_COLLAPSE  set to 0 to keep paying after the
-#                             search stops. Default 1, which ends the run
+#   CACHETTE_TRAIN_STOP_ON_COLLAPSE  set to 0 to keep paying after every
+#                             strategy stops searching. Default 1, which ends
+#                             the run. One strategy that stops never ends it,
+#                             and the dashboard names the ones that stopped
 #   CACHETTE_TRAIN_PROBE_ONLY set to 1 to measure the throughput and train
 #                             nothing. This is the cheap way to get a
 #                             ticks-a-second figure for the costs register
@@ -157,8 +159,14 @@ esac
 # What the trainer runs. Every axis is a parameter, so a longer or a wider
 # run is a setting here and not a change to a file.
 #
-# The worker count matches the cores of the instance, because the batch step
-# takes it and the throughput probe reports what each worker contributed.
+# **One trainer process holds a share of the machine and never the whole of
+# it.** The run starts one process for each strategy and divides the cores
+# between them, so a run of four strategies on sixty-four cores gives each
+# strategy sixteen workers. The sizing reasoning here assumed sixty-four, and
+# a configuration asking for twenty generations delivered between three and
+# nine. The plan below takes the workers one strategy receives, and it says
+# before the machine exists whether the run finishes inside the cap.
+#
 # **The validation seeds are the only figure that compares across
 # generations**, so they carry the resolution of the whole run. A win moves
 # the return by the win weight divided by the seed count, so eight seeds can
@@ -174,10 +182,21 @@ esac
 # yardstick shows over chance, so thirty-two worlds cannot separate the two.
 # Over one hundred and twenty-eight worlds the error is near 0.04.
 #
-# They are nearly free. Validation plays one policy, so it runs as many
-# worlds as it has seeds, and one hundred and twenty-eight worlds on
-# sixty-four workers takes about two minutes against the ten minutes of a
-# generation.
+# **A validation pass is not nearly free, and this script said it was.** It
+# compared one hundred and twenty-eight worlds on sixty-four workers against
+# a generation of ten minutes, and it read as a fifth of a generation. The
+# comparison contradicted the episode counts beside it. A generation of
+# twenty-four candidates over six seeds plays one hundred and forty-four
+# worlds, and a validation pass of one hundred and twenty-eight worlds runs
+# through the same batch at the same worker count. A validation pass
+# therefore costs about nine tenths of a generation, and not a fifth.
+#
+# **The trainer counts every episode a run plays, and the plan prints the
+# count.** A held-out pass now runs at its own interval as well, so a reader
+# who took the old comparison would be wrong by more than it was. The trainer
+# owns the schedule of every pass, so it does the counting and this script
+# does none.
+#
 # **The default names no world.** The trainer declares the world a run trains
 # in, and this launcher asks it rather than holding a copy. A copy here goes
 # stale the first time a run states another extent, and nothing fails when it
@@ -194,36 +213,7 @@ default_args="--generations 20 --population 24 --seeds 6 --holdout 256 \
 --learning-rate 0.3 --validation 128 --validate-every 2"
 train_args="${CACHETTE_TRAIN_ARGS:-$default_args}"
 
-# How many generations the whole run takes, read out of the arguments and
-# multiplied by the strategies the trainer will train. The progress feed
-# needs it to say how many are left. A run that names no strategy trains
-# every one the trainer declares.
-generations="$(printf '%s' "$train_args" | sed -n 's/.*--generations \([0-9]*\).*/\1/p')"
-generations="${generations:-20}"
-
-# How many worlds one generation holds. The trainer plays every candidate on
-# every seed, and it puts the whole set in one batch, so this product is the
-# batch the throughput probe must measure. **The probe once gave each worker
-# one world, and the trainer never runs that shape.** A figure taken that way
-# describes the probe and not a training run.
-population="$(printf '%s' "$train_args" | sed -n 's/.*--population \([0-9]*\).*/\1/p')"
-population="${population:-24}"
-probe_seeds="$(printf '%s' "$train_args" | sed -n 's/.*--seeds \([0-9]*\).*/\1/p')"
-probe_seeds="${probe_seeds:-6}"
-probe_worlds=$((population * probe_seeds))
-# **The trainer answers how many strategies it would train.** It reads
-# `--only` and it reads the play styles, and a style run holds a table the
-# built-in weightings do not. A count taken any other way here is a second
-# declaration of the list, and this script held two of them: one that counted
-# the rows of the trainer's source with a regular expression, and one that
-# read the table before the styles replaced it. Both were wrong for a style
-# run, and the run failed after it paid for the instance.
-strategies="$(cd "$root" && uv run python -m cachette.learn \
-    --print-strategies $train_args 2>/dev/null | wc -w)"
-[ "${strategies:-0}" -ge 1 ] || strategies=1
-total_generations=$((generations * strategies))
-
-# **The trainer answers the world as well.** The extent, the faction count and
+# **The trainer answers the world.** The extent, the faction count and
 # the tick limit all reach the cost of a run: a tick of a larger world costs
 # more, and a longer game holds more ticks. The preview below states them, so
 # the person who approves the price sees the world the price is for. This
@@ -251,11 +241,11 @@ world_preview="${world_preview:-unknown}"
 #
 # References
 #   [^2]: Findings register, FND-625. `docs/FINDINGS.md`
-validation="$(printf '%s' "$train_args" | sed -n 's/.*--validation \([0-9]*\).*/\1/p')"
-validation="${validation:-6}"
-validate_every="$(printf '%s' "$train_args" \
-    | sed -n 's/.*--validate-every \([0-9]*\).*/\1/p')"
-validate_every="${validate_every:-3}"
+#
+# **This script read the intervals out of its own argument string, with a
+# fallback for each one it could not find.** Every fallback was a second copy
+# of a default the trainer owns, and two of them disagreed with it. The plan
+# below carries every one of these figures, so this script holds none.
 
 
 # ------------------------------------------------------------------ the price
@@ -473,6 +463,14 @@ follow() {
             # The search has stopped when every candidate of the last few
             # generations scored the same. A run in that state learns nothing
             # and keeps billing, so it ends here.
+            #
+            # **Every strategy answers, and the threshold is a share of the
+            # reward.** The strategies of a run write their lines into one
+            # file, and this test read the last strategy parsed, which is
+            # whichever process wrote last. It therefore tested one arbitrary
+            # quarter of a run of four strategies. The reader now ends the run
+            # only when every strategy has stopped, and it prints the ones
+            # that stopped early on the dashboard above.
             if python3 "$root/scripts/train_progress.py" "$out_dir/train.log" \
                 --collapsed; then :; else
                 say "The search stopped. Ending the run and keeping the weights"
@@ -530,6 +528,61 @@ cores="$(aws ec2 describe-instance-types --region "$REGION" \
     --instance-types "$INSTANCE_TYPE" \
     --query 'InstanceTypes[0].VCpuInfo.DefaultVCpus' --output text)"
 
+# **The trainer answers the plan, and the plan needs the machine.** It counts
+# every episode a run plays, it divides the cores by the strategies it would
+# train, and it says how many generations finish inside the wall clock cap.
+#
+# The strategy count comes from the same answer. This script counted the
+# strategies itself once, twice over: one count read the rows of the trainer's
+# source with a regular expression, and one read the table before the play
+# styles replaced it. Both were wrong for a style run, and the run failed
+# after it had paid for the instance.
+plan="$(cd "$root" && uv run python -m cachette.learn \
+    --print-plan --cores "$cores" --wall-minutes "$MAX_MINUTES" \
+    $train_args 2>/dev/null)"
+[ -n "$plan" ] || die "The trainer could not state the plan of this run.
+Nothing was created. A run whose size nobody knows is worse than no run."
+plan_field() { printf '%s\n' "$plan" | awk -F'\t' -v k="$1" '$1==k{print $2}'; }
+strategies="$(plan_field strategies)"
+workers_each="$(plan_field workers_each)"
+total_generations="$(plan_field generations_total)"
+probe_worlds="$(plan_field generation_worlds)"
+validate_every="$(plan_field validate_every)"
+holdout_every="$(plan_field holdout_every)"
+measurement_share="$(plan_field measurement_share)"
+measurement_episodes="$(plan_field measurement_episodes)"
+total_episodes="$(plan_field total_episodes)"
+estimated_minutes="$(plan_field estimated_minutes)"
+generations_reached="$(plan_field generations_reached)"
+generations_asked="$(plan_field generations_asked)"
+fits="$(plan_field fits)"
+
+# **The estimate is a floor on the time and not a measurement.** It bounds
+# every episode at the tick limit, and it takes a rate for each worker that
+# was measured on the target with twelve workers in one process. The rate for
+# each worker falls as the worker count rises, so a process of more than
+# twelve reaches less than the estimate gives it. A run that does not fit
+# under a floor certainly does not fit.
+# **The held-out seeds choose nothing, so their pass is the honest figure a
+# capped run leaves behind.** An interval of zero turns that pass off, and a
+# run in that state leaves only a figure the validation seeds selected.
+holdout_words="It plays the held-out seeds every $holdout_every generations, and those
+  seeds choose nothing, so a capped run still leaves an honest figure behind."
+if [ "$holdout_every" = "0" ]; then
+    holdout_words="It plays the held-out seeds only when a strategy ends, so a
+  capped run leaves a figure that the validation seeds selected and nothing
+  that measures."
+fi
+
+size_warning=""
+if [ "$fits" != "yes" ]; then
+    size_warning="  DOES NOT FINISH  the estimate needs $estimated_minutes minutes for \
+$generations_asked generations
+                   and the cap is $MAX_MINUTES. About $generations_reached generations \
+finish, at best.
+                   Lower --generations, lower --validation, or raise the cap."
+fi
+
 # The cap is the honest bound. Whatever the run does, the instance destroys
 # itself after it, so this multiplication is the most the run can cost.
 max_cost="$(python3 -c "print(f'{$price * $MAX_MINUTES / 60:.2f}')")"
@@ -551,16 +604,24 @@ cat >&2 <<PLAN
   trainer       $train_args
   world         $world_preview
   generations   $total_generations across $strategies strategies
+  each strategy $workers_each of the $cores cores, because one process trains one
+                strategy and they all run at once
+  episodes      $total_episodes for one strategy, of which $measurement_episodes measure
+                rather than train, which is a share of $measurement_share
+  estimate      $estimated_minutes minutes against a cap of $MAX_MINUTES, and this is a
+                floor on the time rather than a measurement
   results       $out_dir
+$size_warning
 
-  The cap is the bound, not the estimate. The run stops when the trainer
-  finishes, when the search stops, or at the cap, whichever comes first.
+  The cap is the bound and the estimate above is a floor. The run stops when
+  the trainer finishes, when every strategy stops searching, or at the cap,
+  whichever comes first.
 
   Stopping early keeps the weights. The trainer writes a resume point every
   generation, so an interruption costs one generation and never a strategy.
   It validates every $validate_every generations and keeps the best centre
-  beside that. A spot instance can be taken back at any time, and the same
-  rule holds.
+  beside that. $holdout_words
+  A spot instance can be taken back at any time, and the same rule holds.
 
 PLAN
 
@@ -848,11 +909,26 @@ export CACHETTE_ENGINE_KEY="${CACHETTE_ENGINE_KEY:-}"
 # weighting, every one of them failed on the first name it looked up, and the
 # instance was paid for and torn down without a generation.
 names="$(uv run python -m cachette.learn --print-strategies $TRAIN_ARGS)"
+
+# **The trainer answers the worker split as well.** This script divided the
+# cores by the strategy count itself, and the launcher on the other machine
+# sized the run from the same division. Two copies of one rule is the defect
+# shape this project names first, and the launcher held the stale one: its
+# reasoning read the whole machine while each process held a quarter of it.
+#
+# **The plan reads the arguments before the strip below.** A run narrowed with
+# `--only` trains what it names, and a plan taken after the strip would count
+# every strategy of the table.
+remote_plan="$(uv run --no-sync python -m cachette.learn --print-plan \
+    --cores "$cores" --wall-minutes "${WALL_MINUTES:-0}" $TRAIN_ARGS)"
 TRAIN_ARGS="$(printf '%s' "$TRAIN_ARGS" | sed 's/--only [^ ]*//')"
-count="$(printf '%s' "$names" | wc -w)"
-each="$((cores / count))"
-[ "$each" -ge 1 ] || each=1
+plan_field() {
+    printf '%s\n' "$remote_plan" | awk -F'\t' -v k="$1" '$1==k{print $2}'
+}
+count="$(plan_field strategies)"
+each="$(plan_field workers_each)"
 printf '# strategies\t%s\n# workers each\t%s\n' "$count" "$each"
+printf '%s\n' "$remote_plan" | sed 's/^/# plan /'
 
 # --------------------------------------------------- the throughput figure
 #
@@ -902,6 +978,31 @@ uv run python scripts/train_throughput.py \
     --decisions 20 --price "${PRICE:-0}" --out /tmp/throughput.txt \
     2>&1 | tee -a /tmp/throughput-console.txt | tee -a runs/learn/train.log
 tee -a runs/learn/train.log < /tmp/throughput.txt
+
+# **The plan the launcher printed took a rate from the register, and this one
+# takes the rate the probe just measured.** The launcher must answer before
+# the machine exists, so its estimate rests on a figure measured on another
+# instance at another worker count. This one rests on this machine at the
+# worker count this run gives one strategy, and it reaches the log a person
+# reads while the run bills.
+#
+# A failure here must not end the run. It states a figure and changes nothing.
+measured_rate="$(awk -F'\t' '
+    /^processes\t/ {
+        for (i = 1; i <= NF; i++)
+            if ($i == "ticks_per_second_per_worker") column = i
+        next
+    }
+    /^#/ { next }
+    column && NF >= column { rate = $column }
+    END { if (rate) print rate }' /tmp/throughput.txt)"
+if [ -n "$measured_rate" ]; then
+    uv run --no-sync python -m cachette.learn --print-plan \
+        --cores "$cores" --wall-minutes "${WALL_MINUTES:-0}" \
+        --ticks-for-each-worker "$measured_rate" --only "$(printf '%s' "$names" | tr ' ' ',')" \
+        $TRAIN_ARGS 2>&1 \
+        | sed 's/^/# measured plan /' | tee -a runs/learn/train.log || true
+fi
 
 if [ "${PROBE_ONLY:-0}" = "1" ]; then
     exit 0
@@ -1001,6 +1102,7 @@ scp "${ssh_options[@]}" "$out_dir/remote.sh" "$remote:remote.sh" >/dev/null
 ssh "${ssh_options[@]}" "$remote" \
     "TRAIN_ARGS='$train_args' PRICE='$price' \
      PROBE_WORLDS='$probe_worlds' \
+     WALL_MINUTES='$MAX_MINUTES' \
      CACHETTE_ENGINE_KEY='$wheel_key' \
      PROBE_ONLY='${CACHETTE_TRAIN_PROBE_ONLY:-0}' \
      nohup setsid bash remote.sh > run.log 2>&1 < /dev/null & echo started"

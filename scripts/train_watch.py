@@ -155,6 +155,11 @@ BASELINE_END = re.compile(
 # The held-out controller row, printed once before any training.
 CONTROLLER = re.compile(r"^\s+controller (?P<body>\{.*\})\s*$")
 
+# The line that names the weighting the row above was measured under.
+CONTROLLER_WEIGHTING = re.compile(
+    r"^\s+the controller bar is measured under the (?P<name>\S+) weighting"
+)
+
 # The heading the trainer prints for one strategy, for example:
 #   === land-structured (structured) ===
 HEADING = re.compile(r"^===\s+(?P<name>\S+)(?:\s+\((?P<kind>[^)]*)\))?\s+===\s*$")
@@ -403,6 +408,10 @@ class Reading:
 
     strategies: dict[str, Strategy] = field(default_factory=dict)
     controller: dict[str, float] | None = None
+    # The strategy whose weighting the run-level controller row was measured
+    # under. The return of that row answers for that strategy and for no
+    # other, so the screen never prints it without this name.
+    controller_weighting: str = ""
     heartbeats: int = 0
     probed: bool = False
     # The pass that names no strategy, which is the controller baseline one
@@ -548,6 +557,11 @@ def read(text: str) -> Reading:
             strategy.baseline_return = float(base.group("value"))
             ended(strategy, "baseline")
             continue
+        if not reading.controller_weighting:
+            under = CONTROLLER_WEIGHTING.match(line)
+            if under:
+                reading.controller_weighting = under.group("name")
+                continue
         if reading.controller is None:
             found = CONTROLLER.match(line)
             if found:
@@ -762,12 +776,25 @@ def header(
             )
         )
     if reading.controller:
+        # **The return of this row answers for one weighting.** One process
+        # measures the row once for the whole run, under the weighting of the
+        # first strategy the run names, and every strategy later measures its
+        # own. A reader who met the return without the name took a figure for
+        # the run that answered for one strategy of it. The win share needs
+        # no qualification, because no weighting changes who won.
+        under = reading.controller_weighting
+        weighted = (
+            f", and the return reads under the {under} weighting alone"
+            if under
+            else ", and the log does not name the weighting the return reads under"
+        )
         lines.append(
             paint(
                 "dim",
                 f"  baseline  the controller took return "
                 f"{reading.controller.get('return', 0.0):.1f} "
-                f"and won {reading.controller.get('won', 0.0):.3f} of its games",
+                f"and won {reading.controller.get('won', 0.0):.3f} of its games"
+                f"{weighted}",
             )
         )
     return lines

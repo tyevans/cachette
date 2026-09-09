@@ -125,6 +125,7 @@ from .search import (
     unit,
 )
 from .shard import ShardPool, run_sharded_generation
+from .sizing import measures_holdout, validates
 from .structured import layout_of
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
@@ -803,8 +804,11 @@ def train(
             record = generation_record(generation, seeds, played, update)
             records.append(record)
 
-            last = generation == train_config.generations - 1
-            validating = last or generation % validate_every == validate_every - 1
+            # **The schedule of a pass is declared once and read twice.** The
+            # sizing module counts what a run will play, and this loop plays
+            # it. Two copies of one interval would leave a plan that counted a
+            # schedule the run does not run, and nothing would fail.
+            validating = validates(generation, train_config.generations, validate_every)
             checked = judge.check(policy, generation) if validating else None
             if validating and checked is not None and train_config.validate_candidate:
                 report_candidate(
@@ -815,9 +819,7 @@ def train(
             # centre the run would publish, and it chooses nothing. A run that
             # a wall clock cap ends therefore leaves an honest figure behind
             # at the last interval it reached.
-            measuring = holdout_every > 0 and generation % holdout_every == (
-                holdout_every - 1
-            )
+            measuring = measures_holdout(generation, holdout_every)
             held = judge.measure_holdout(policy, generation) if measuring else None
 
             store_centres(checkpoint, policy, judge, record, checked)
