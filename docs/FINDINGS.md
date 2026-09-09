@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-704**
+**Next number: FND-705**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18742,3 +18742,52 @@ fails when it disagrees with the rule it mirrors.
 
 [^F703A]: Testing rules, a determinism test cannot tell correct from consistently wrong, section 2. `.agents/rules/testing.md`
 [^F703B]: PRD-0057, more than one way to win decides a game. `docs/product/shaped/prd-0057-more-than-one-way-to-win-decides-a-game.md`
+
+### FND-704 — A faction of workers cannot inflict one casualty, so three of the four win paths were unreachable by construction
+
+**Believed.** The conquest strategies trained badly because their reward was
+sparse, and the conquest policies sat still because nothing rewarded moving.
+Renown ended no game because its target was too high, and domination stayed
+with the built-in controller because no policy learned to press an attack.
+
+**True.** Those readings are all partly right and they miss the mechanism. **A
+faction of this training world holds no unit that can harm anything.**
+
+The worker row carries an attack of zero and an armour of zero. A decision
+record states that an attacker whose attack does not exceed the defender's
+armour contributes exactly zero, and the casualty function returns zero for
+harm that is not positive.[^F486E] Zero does not exceed zero. **Two factions
+of workers standing on adjacent ground therefore resolve a meeting with no
+casualties, for ever.**
+
+One site in the whole world module promotes a unit to the soldier type, and it
+is the verb that raises a campaign. A faction reaches an army by raising a
+campaign, or by queueing the soldier type into a settlement.
+
+**What follows from that, path by path.** Renown has one source, which gives a
+quarter of a point to a champion for each unit its faction fells, so a faction
+that cannot fell anything cannot gain renown at any target. Domination is won
+by holding every rival seat or by every rival holding no units, and neither is
+reachable without an army. Territory at the tick limit needs no army at all.
+So of the four ways to win, **one was reachable by a faction that never fought
+and three were not.**
+
+**Evidence.** Over 252 rated games with every seat rotated, renown ended no
+game, and only the built-in controller won by domination, taking 21 of the 22
+domination wins. The controller raises campaigns; no trained policy took the
+campaign row often, and the row was legal on about a sixth of decisions
+because it requires a rival settlement the faction has observed. A separate
+worker read the training log and found the published military strength at
+zero, which is the same fact from the other end: the field is written
+correctly and the world holds no strength.
+
+**Follows.** The reward repair was necessary and it was not sufficient. A
+policy needs a dense reason to build an army before any conflict path is open
+to it, and the strength field that gives that reason went from unwritten to
+live on the same day this was found.
+
+**The published unit count is not a measure of force.** The objective that
+names the military reads the live unit count, which counts workers, so a style
+meant to be militaristic rewarded holding bodies. That is the redundant
+declaration shape once more: two quantities, one name, and nothing that fails
+when the reader wants the other one.
