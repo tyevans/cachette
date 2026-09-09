@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-706**
+**Next number: FND-707**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18846,3 +18846,46 @@ tail was. A repeat run of the probe replaces the figures.
 [^F705B]: Findings register, FND-692. `docs/FINDINGS.md`
 [^F705C]: The world scale probe. `scripts/world_scale.py`
 [^F705D]: Reinforcement learning parameters, the world a training run plays. `docs/reference/rl-costs.md`
+
+### FND-706 — A golden hash that moves when a threshold moves says nothing about whether the threshold is reached
+
+**Believed.** The renown target fell from 1000 whole units to 50, the golden
+state hash then failed, and setting the target back to 1000 made it pass. The
+dispatcher read that isolation as evidence about the game: the scenario reaches
+50 and does not reach 1000, so a target of 50 is one the simulation meets.
+
+**True.** The isolation was sound and the inference from it was not. **The
+balance values are written into the state hash directly.** The hash function
+folds them in, and the comment beside that line states the reason: a reader
+compares a threshold on every tick, so two worlds that differ only in a
+balance value must diverge, and the hash must say so.[^F706A]
+
+So the hash moved because a hashed constant moved. It would have moved for any
+change to the value, at any world, whether or not one champion ever came near
+the target. **The measurement proved the constant reached the hash and nothing
+about the game.**
+
+**Evidence, from the other direction.** The built-in controller was then
+measured over 256 episodes of a 128 by 128 world of three factions under a
+tick limit of 6000, as the shared baseline of a training run. Its mean best
+renown read 29559.75 in the raw fixed-point scale, which is 0.45 of one point.
+The rate is a quarter of a point for each unit felled, so the controller fells
+about two units in a whole episode.
+
+A target of 50 points asks for 200 felled units. **The controller reaches
+about one percent of one percent of that**, so the renown path stays out of
+reach by a factor near 110 after a cut of twenty fold.
+
+**Follows.** The renown path needs a lower target again, or a second source
+that is not felling, and the choice is a balance decision rather than a
+defect. The deeper reading is the one the register already holds: a faction of
+workers cannot fell anything, so almost every episode produces no kills at
+all, and a rate for each kill cannot rescue a game with no kills in it.[^F706B]
+
+**The shape of the error is worth more than the number.** A determinism gate
+compares two runs, and a configuration value inside the hash makes it also a
+configuration gate. A reader who forgets which of the two a failure came from
+will read a behaviour change into a constant change. The gate is working
+exactly as designed; the inference was the defect.
+[^F706A]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D1. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
+[^F706B]: Findings register, FND-704. `docs/FINDINGS.md`
