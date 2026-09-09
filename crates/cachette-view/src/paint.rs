@@ -205,25 +205,73 @@ const WET_BLUE_GAIN: i32 = 44;
 /// [^1]: Research report 23, defect 2. `docs/research/reports/23-demonstration-readability-review-1.md`
 const AIR_LEAST_TILE: f32 = 8.0;
 
-/// The smallest weight at which the viewer draws the air overlay.
+/// The whole of the cloud mass over one tile, which is the unit that decides
+/// how much of the air colour that tile takes.
+const CLOUD_MASS_WHOLE: i64 = 255;
+
+/// The tiles across one cell of the lattice the broad cloud mass is built on.
 ///
-/// A cell at rest that still tinted its tiles put an edge on the cell lattice
-/// that followed nothing in the world.[^1]
+/// **This is the size of a cloud, in tiles.** A larger figure gives fewer and
+/// wider masses. The figure is not a measurement of anything in the world. It
+/// is the scale at which a watcher reads a shape as one cloud.
+const CLOUD_LATTICE: i64 = 24;
+
+/// The divisor that turns the broad lattice into the fine one.
 ///
-/// **The floor rose with the quantity the overlay reads.** It once read the
-/// drops over a cell against the ceiling of the whole plane, and a cell at
-/// rest then gave a few parts in 255. It now reads the share of the sky that
-/// a watcher sees as cloud, because the engine pours out whatever stands above
-/// the capacity of a cell and that capacity follows the temperature.[^2] An
-/// ordinary sky stands between a fifth and nine tenths of its own mark, so a
-/// floor of a few parts drew every cell of the map. The floor now marks a sky
-/// at half its own mark or more.
+/// One lattice alone draws a field of even blobs. A second lattice at a
+/// smaller pitch breaks the rim of each blob, so a mass reads as cloud rather
+/// than as a circle.
+const CLOUD_LATTICE_DIVISOR: i64 = 3;
+
+/// The weight the fine lattice carries against the broad one.
+const CLOUD_FINE_WEIGHT: i64 = 1;
+
+/// The weight the broad lattice carries against the fine one.
+const CLOUD_BROAD_WEIGHT: i64 = 2;
+
+/// The half width of the rim of a cloud, in the unit the cloud share counts
+/// in.
+///
+/// **A cloud with no rim is a paper cut-out.** The mass rises from none to
+/// whole across twice this figure, so the edge of a mass carries part of the
+/// air colour and the shape reads as cloud.
+const CLOUD_EDGE: i64 = 26;
+
+/// The cloud share at which the air colour starts to darken toward the storm
+/// colour.
+///
+/// A sky at half its own mark is bright. A sky at its own mark is not, and a
+/// watcher who cannot tell the two apart reads one flat wash over both.
+const CLOUD_DARK_FROM: i64 = 140;
+
+/// The ticks of drift that one step of the wind is worth.
+///
+/// A larger divisor moves the cloud mass more slowly across the ground. The
+/// figure is not a measurement. The field under a place barely changes over
+/// four hundred ticks, so the motion a watcher sees is the motion of the mass
+/// and not the motion of the field.[^1]
 ///
 /// # References
 ///
-/// [^1]: Research report 24, defect 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
-/// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-const AIR_LEAST_WEIGHT: u8 = (AIR_WEIGHT_CEILING / 2) as u8;
+/// [^1]: Findings register, FND-715. `docs/FINDINGS.md`
+const CLOUD_DRIFT_DIVISOR: i64 = 64;
+
+/// The fixed-point unit that the interpolation between two lattice corners
+/// counts in.
+const CLOUD_FINE: i64 = 256;
+
+/// The colour the viewer mixes over a tile under a storm.
+///
+/// **A storm is a dark sky and not a bright one.** The air colour alone said
+/// only that water stands overhead. It could not tell a fair sky at its own
+/// mark from a cyclone, because both filled the sky.
+const STORM_COLOUR: u32 = 0x0048_5460;
+
+/// The least mass the viewer gives a tile under a storm.
+///
+/// A storm that broke into separate masses read as fair weather. The deficit
+/// cone is a real object of the engine, so the picture of it is whole.
+const STORM_LEAST_MASS: i64 = 200;
 
 /// The stride the luxury hue turns by, for each step of the kind ordinal.
 ///
@@ -580,17 +628,17 @@ pub fn unit_radius(tile_width: f32) -> i32 {
     ((tile_width * 0.3) as i32).max(UNIT_LEAST_RADIUS)
 }
 
-/// Returns the smallest weight at which the viewer draws the air overlay.
+/// Returns the colour the viewer mixes over a tile under a storm.
 ///
-/// A test reads this rather than a literal, so the floor has one declaration
+/// A test reads this rather than a literal, so the colour has one declaration
 /// site.[^1]
 ///
 /// # References
 ///
-/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 #[must_use]
-pub const fn air_least_weight() -> u8 {
-    AIR_LEAST_WEIGHT
+pub const fn storm_colour() -> u32 {
+    STORM_COLOUR
 }
 
 /// Returns the smallest tile width at which the viewer draws the air overlay,
@@ -2256,6 +2304,9 @@ pub fn draw_paced(
     // Three switches, read once for each frame, so a world in which nothing
     // has happened pays nothing for the layers that would show it.
     let dry = world.weather().is_dry();
+    // The tiles the cloud mass has drifted, read once for each frame. A read
+    // for each tile would give the same answer at the cost of the window.
+    let drift = if dry { (0, 0) } else { cloud_drift(world) };
     let any_upgrade = !world.upgrade_sites().is_empty();
     let any_luxury = !world.luxuries().is_empty();
     // The overlay the caller chose, and the low and the high it declared for
@@ -2331,9 +2382,11 @@ pub fn draw_paced(
                     ground_colour = mix(ground_colour, layer.colour(value), strength);
                 }
             } else if !dry && camera.tile_width >= AIR_LEAST_TILE {
-                let weight = air_weight(world.cloud_share_at(address).unwrap_or(0));
-                if weight >= AIR_LEAST_WEIGHT {
-                    ground_colour = mix(ground_colour, AIR_COLOUR, weight);
+                let weight = air_weight(cloud_mass_at(world, address, drift));
+                if weight > 0 {
+                    let share = world.cloud_share_at(address).unwrap_or(0);
+                    let storming = world.tile_under_a_storm(address) == Some(true);
+                    ground_colour = mix(ground_colour, sky_colour(share, storming), weight);
                 }
             }
             let (left, top, wide, tall) = tile_rect(camera, address);
@@ -2723,22 +2776,210 @@ fn upgrade_weight(site: UpgradeSite, asked: i64) -> u8 {
     u8::try_from(weight.clamp(0, 255)).unwrap_or(u8::MAX)
 }
 
-/// Returns how much of the air colour covers a tile, from the share of the sky
-/// over it that a watcher sees as cloud.
+/// Returns how much of the air colour covers a tile, from the mass of cloud
+/// standing over that tile.
 ///
-/// The shade saturates at a whole sky, so a sky at its own mark draws the same
-/// wherever it stands.
+/// **The argument is the mass over one tile and not the share of a sky.** The
+/// share says how much of the sky of a whole weather cell holds cloud, and a
+/// weather cell covers many tiles. A viewer that mixed the share into every
+/// tile of a cell painted each cell one flat colour, and the picture then drew
+/// the cell lattice rather than the weather.[^2] Take the mass from
+/// [`cloud_mass`].
+///
+/// The shade saturates at a whole mass, so a tile under solid cloud draws the
+/// same wherever it stands.
 ///
 /// A test reads this rather than repeating the arithmetic, so the weight has
 /// one declaration site.[^1]
 ///
 /// # References
 ///
-/// [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: Research report 24, defect 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
 #[must_use]
-pub fn air_weight(share: i64) -> u8 {
-    let held = share.clamp(0, AIR_AT_FULL_SHADE);
-    u8::try_from(held * AIR_WEIGHT_CEILING / AIR_AT_FULL_SHADE).unwrap_or(u8::MAX)
+pub fn air_weight(mass: i64) -> u8 {
+    let held = mass.clamp(0, CLOUD_MASS_WHOLE);
+    u8::try_from(held * AIR_WEIGHT_CEILING / CLOUD_MASS_WHOLE).unwrap_or(u8::MAX)
+}
+
+/// Returns a value from none to [`CLOUD_FINE`] that rises smoothly with a
+/// part of a lattice pitch.
+///
+/// The curve is flat at both ends, so two lattice cells meet without a crease.
+fn cloud_ease(part: i64, pitch: i64) -> i64 {
+    let step = (part * CLOUD_FINE / pitch.max(1)).clamp(0, CLOUD_FINE);
+    (3 * step * step * CLOUD_FINE - 2 * step * step * step) / (CLOUD_FINE * CLOUD_FINE)
+}
+
+/// Returns a value from none to [`CLOUD_MASS_WHOLE`] for one corner of the
+/// cloud lattice.
+///
+/// **The hash is integer arithmetic and never a float.** A float hash answers
+/// differently on different hardware, and the picture would then depend on the
+/// machine that drew it.
+fn cloud_corner(x: i64, y: i64) -> i64 {
+    let mut value = (x as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+    value ^= (y as u64).wrapping_mul(0xc2b2_ae3d_27d4_eb4f);
+    value ^= value >> 29;
+    value = value.wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    value ^= value >> 32;
+    (value & 0xff) as i64
+}
+
+/// Returns the value of one smooth noise lattice at a place, from none to
+/// [`CLOUD_MASS_WHOLE`].
+fn cloud_lattice(x: i64, y: i64, pitch: i64) -> i64 {
+    let pitch = pitch.max(1);
+    let column = x.div_euclid(pitch);
+    let row = y.div_euclid(pitch);
+    let across = cloud_ease(x.rem_euclid(pitch), pitch);
+    let down = cloud_ease(y.rem_euclid(pitch), pitch);
+    let near =
+        cloud_corner(column, row) * (CLOUD_FINE - across) + cloud_corner(column + 1, row) * across;
+    let far = cloud_corner(column, row + 1) * (CLOUD_FINE - across)
+        + cloud_corner(column + 1, row + 1) * across;
+    (near * (CLOUD_FINE - down) + far * down) / (CLOUD_FINE * CLOUD_FINE)
+}
+
+/// Returns the shape of the cloud field at one place, from none to
+/// [`CLOUD_MASS_WHOLE`].
+///
+/// Two lattices make it. The broad one gives the size of a mass and the fine
+/// one breaks its rim.
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+#[must_use]
+pub fn cloud_shape(x: i64, y: i64) -> i64 {
+    let broad = cloud_lattice(x, y, CLOUD_LATTICE);
+    let fine = cloud_lattice(
+        x + CLOUD_LATTICE,
+        y - CLOUD_LATTICE,
+        CLOUD_LATTICE / CLOUD_LATTICE_DIVISOR,
+    );
+    (broad * CLOUD_BROAD_WEIGHT + fine * CLOUD_FINE_WEIGHT)
+        / (CLOUD_BROAD_WEIGHT + CLOUD_FINE_WEIGHT)
+}
+
+/// Returns the mass of cloud over one tile, from none to
+/// [`CLOUD_MASS_WHOLE`].
+///
+/// **The share decides how much of a sky holds cloud. The shape decides which
+/// part of it.** So a cell at a third of a sky gives a third of its tiles a
+/// mass and leaves the rest open, and a watcher reads separate clouds over
+/// open ground. The old rule mixed the share itself into every tile of the
+/// cell, which is a wash and never a cloud.[^1]
+///
+/// The mass rises from none to whole across twice [`CLOUD_EDGE`], so a cloud
+/// carries a rim.
+///
+/// **The painted area follows the share and does not equal it.** The shape is
+/// two smoothed lattices, and a smoothed lattice does not spread its values
+/// evenly, so the area a share paints is more than the share near the middle
+/// of the range and less at each end. The order is what the picture needs: a
+/// larger share always paints more.
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+#[must_use]
+pub fn cloud_mass(share: i64, shape: i64) -> i64 {
+    let cover = share.clamp(0, AIR_AT_FULL_SHADE);
+    if cover <= 0 {
+        return 0;
+    }
+    let across = cover - shape + CLOUD_EDGE;
+    (across * CLOUD_MASS_WHOLE / (2 * CLOUD_EDGE)).clamp(0, CLOUD_MASS_WHOLE)
+}
+
+/// Returns the mass of cloud the picture puts over one tile, from none to
+/// [`CLOUD_MASS_WHOLE`].
+///
+/// **This is the one declaration of what the picture draws over a tile.** The
+/// painter calls it for each tile of the window, and a test calls it to say
+/// what the painter must have drawn. A test that repeated the arithmetic would
+/// be a second declaration of it, and nothing would fail when the two
+/// disagreed.[^1]
+///
+/// The caller reads the drift once for a frame and passes it, because the
+/// drift is one answer for the whole map and a read for each tile would cost
+/// the window.[^2]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: The drift of the cloud mass. [`cloud_drift`]
+#[must_use]
+pub fn cloud_mass_at(world: &World, address: Axial, drift: (i64, i64)) -> i64 {
+    let share = world.cloud_share_at(address).unwrap_or(0);
+    let shape = cloud_shape(
+        i64::from(address.q) + drift.0,
+        i64::from(address.r) + drift.1,
+    );
+    let mass = cloud_mass(share, shape);
+    if world.tile_under_a_storm(address) == Some(true) {
+        mass.max(STORM_LEAST_MASS)
+    } else {
+        mass
+    }
+}
+
+/// Returns the colour of the cloud over one tile.
+///
+/// **A sky darkens as it fills.** The air colour alone said only that water
+/// stands overhead, so a fair sky at its own mark and a cyclone drew the same
+/// pale wash. The colour now runs from the air colour to the storm colour as
+/// the share passes [`CLOUD_DARK_FROM`].
+///
+/// A tile under a storm takes the storm colour whatever its share is. The
+/// deficit cone is a real object of the engine, and a watcher must be able to
+/// find it.
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+#[must_use]
+pub fn sky_colour(share: i64, storming: bool) -> u32 {
+    if storming {
+        return STORM_COLOUR;
+    }
+    let above = (share.clamp(0, AIR_AT_FULL_SHADE) - CLOUD_DARK_FROM).max(0);
+    let span = (AIR_AT_FULL_SHADE - CLOUD_DARK_FROM).max(1);
+    let depth = u8::try_from(above * 255 / span).unwrap_or(u8::MAX);
+    mix(AIR_COLOUR, STORM_COLOUR, depth)
+}
+
+/// Returns the tiles the cloud mass has drifted along each axis by one tick.
+///
+/// **One wind carries the mass of the whole map, and it is the wind at the
+/// middle tile of the world.** A drift that took the wind of each cell would
+/// move the pattern by a different step in each cell, and the seam between two
+/// cells would draw the cell lattice. That is the defect the air floor was
+/// raised to hide, and this rule must not bring it back.[^1]
+///
+/// The wind of the middle tile is a property of the world and of the tick. It
+/// does not follow the camera, so a watcher who scrolls does not move the
+/// clouds.
+///
+/// **This is public so that a test can draw the same mass the picture draws.**
+///
+/// # References
+///
+/// [^1]: Research report 24, defect 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+#[must_use]
+pub fn cloud_drift(world: &World) -> (i64, i64) {
+    let grid = world.grid();
+    let middle = Axial::new((grid.width() / 2) as i32, (grid.height() / 2) as i32);
+    let Some(wind) = world.wind_at(middle) else {
+        return (0, 0);
+    };
+    let ticks = world.tick().0 as i64;
+    (
+        i64::from(wind.q) * ticks / CLOUD_DRIFT_DIVISOR,
+        i64::from(wind.r) * ticks / CLOUD_DRIFT_DIVISOR,
+    )
 }
 
 /// Paints the mark of a luxury in the middle of a tile.

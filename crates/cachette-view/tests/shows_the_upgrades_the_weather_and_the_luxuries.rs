@@ -68,15 +68,18 @@ const FALLING_TICKS: u32 = 60;
 /// The ticks the rest test gives a stormed sky to fall under the mark at which
 /// the overlay draws.
 ///
-/// **This is longer than the fall of a storm onto the ground.** The engine
-/// pours out whatever stands above the capacity of a cell within one step, and
-/// the cell then drizzles the rest away a share at a time. The overlay reads
-/// the sky against the capacity of that cell, so the share it must cross is
-/// the same at every temperature and the drizzle alone has to carry it.
-const THINNING_TICKS: u32 = 900;
-
 /// The strength of the storm the fixture inflicts.
 const STRENGTH: u8 = 4;
+
+/// The share of a sky at which the picture must leave most of the ground open.
+const THIN_SKY: i64 = 96;
+
+/// A whole sky, in the unit the cloud share counts in.
+const WHOLE_SKY: i64 = cachette_core::weather::CLOUD_SHARE_WHOLE;
+
+/// The tiles along one side of the patch the cloud test samples. It is wider
+/// than several cloud lattices, so it holds several clouds.
+const PATCH: u32 = 192;
 
 /// The size of a tile in the picture, in pixels.
 const TILE: f32 = 8.0;
@@ -404,9 +407,13 @@ fn a_storm_keeps_the_faction_that_holds_the_ground() {
     // capacity of a cell follows its temperature, so one quantity of drops
     // fills a cold sky and leaves a warm one clear.
     let air = stormy.cloud_share_at(place).unwrap_or(0);
-    let weight = paint::air_weight(air);
+    let weight = paint::air_weight(paint::cloud_mass_at(
+        &stormy,
+        place,
+        paint::cloud_drift(&stormy),
+    ));
     assert!(
-        weight >= paint::air_least_weight(),
+        weight > 0,
         "the storm must put enough water over the tile to draw: {air} of a whole sky"
     );
 
@@ -418,13 +425,13 @@ fn a_storm_keeps_the_faction_that_holds_the_ground() {
     // The colour the old order gave: the overlay mixed over the finished
     // pixel. The picture must not give it, and it must keep more of the
     // world than it did.
-    let overlaid = paint::mixed(before, paint::air_colour(), weight);
+    let overlaid = paint::mixed(before, paint::storm_colour(), weight);
     assert_ne!(
         after, overlaid,
         "the air must reach the ground before the holder mix at {place:?}"
     );
     assert!(
-        apart(after, paint::air_colour()) > apart(overlaid, paint::air_colour()),
+        apart(after, paint::storm_colour()) > apart(overlaid, paint::storm_colour()),
         "a storm must leave more of the holding than an overlay on the \
          finished pixel: {after:06x} against {overlaid:06x}"
     );
@@ -445,7 +452,11 @@ fn the_air_overlay_is_off_below_eight_pixels_a_tile() {
     stormy.step(1).expect("the step must run");
     settled.step(1).expect("the step must run");
     assert!(
-        paint::air_weight(stormy.cloud_share_at(place).unwrap_or(0)) >= paint::air_least_weight(),
+        paint::air_weight(paint::cloud_mass_at(
+            &stormy,
+            place,
+            paint::cloud_drift(&stormy)
+        )) > 0,
         "the storm must put enough water over the tile to draw"
     );
 
@@ -473,51 +484,69 @@ fn the_air_overlay_is_off_below_eight_pixels_a_tile() {
     );
 }
 
-#[test]
-fn a_cell_at_rest_draws_no_air() {
-    // The air over a cell at rest gives a weight of a few parts in 255. A
-    // cell that still tinted its tiles put an edge on the cell lattice that
-    // followed nothing in the world.[^5]
-    //
-    // [^5]: Research report 24, defect 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
-    let (mut world, _) = a_held_band();
-    let place = a_held_tile(&world);
-    world
-        .inflict_weather(FactionId(0), &[place], STRENGTH)
-        .expect("the faction holds the ground it storms");
-
-    // The air falls tick by tick. The moment this test needs is the one at
-    // which the weight is above zero and below the floor, because that is
-    // the band the floor exists for.
-    let mut found = false;
-    for _ in 0..THINNING_TICKS {
-        world.step(1).expect("the step must run");
-        let weight = paint::air_weight(world.cloud_share_at(place).unwrap_or(0));
-        if weight > 0 && weight < paint::air_least_weight() {
-            found = true;
-            break;
+/// Returns how many tiles of a square patch the picture clouds, and how many
+/// it leaves open, at one share of a sky.
+///
+/// The patch is wider than several cloud lattices, because a patch narrower
+/// than one lattice samples one cloud and measures that cloud.
+fn clouded_of(share: i64) -> (u32, u32) {
+    let mut clouded = 0;
+    let mut open = 0;
+    for down in 0..PATCH {
+        for across in 0..PATCH {
+            let shape = paint::cloud_shape(i64::from(across), i64::from(down));
+            if paint::air_weight(paint::cloud_mass(share, shape)) > 0 {
+                clouded += 1;
+            } else {
+                open += 1;
+            }
         }
     }
+    (clouded, open)
+}
+
+#[test]
+fn a_thin_sky_draws_clouds_over_open_ground_and_a_whole_sky_covers_it() {
+    // A cell that tinted every one of its tiles put an edge on the cell
+    // lattice that followed nothing in the world.[^5] A floor under the
+    // weight used to hide that, at the cost of every sky below half its own
+    // mark: such a sky drew nothing at all. The share now decides how many
+    // tiles of a cell carry cloud, and the shape decides which, so a thin sky
+    // paints separate clouds and leaves open ground between them.
+    //
+    // [^5]: Research report 24, defect 10. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+    let (thin_clouded, thin_open) = clouded_of(THIN_SKY);
     assert!(
-        found,
-        "the fixture must reach a tick at which the air is thin and not gone"
+        thin_open > thin_clouded,
+        "a thin sky must leave most of the ground open: \
+         {thin_clouded} clouded against {thin_open} open"
+    );
+    assert!(
+        thin_clouded > 0,
+        "a thin sky must draw cloud, and the old floor drew none: \
+         {thin_clouded} clouded against {thin_open} open"
     );
 
-    // The overlay is off below eight pixels a tile, so the colour there is
-    // the colour of the tile with no air. A large tile must give the same
-    // colour, because a weight under the floor draws nothing.
-    let read = |tile: f32| {
-        corner_of(
-            &drawn_at(&world, place, tile),
-            camera_at(&world, place, tile),
-            place,
-        )
-    };
+    // A sky at its own mark is one overcast, and it must read as one.
+    let (full_clouded, full_open) = clouded_of(WHOLE_SKY);
     assert_eq!(
-        read(6.0),
-        read(32.0),
-        "a cell at rest must draw no overlay at any zoom"
+        full_open, 0,
+        "a whole sky must cover the ground: {full_clouded} clouded against {full_open} open"
     );
+
+    // The order between the two is what the picture needs. A larger share
+    // always clouds more ground.
+    let mut before = 0;
+    for share in [0, THIN_SKY, WHOLE_SKY / 2, WHOLE_SKY] {
+        let (clouded, _) = clouded_of(share);
+        assert!(
+            clouded >= before,
+            "a larger share must cloud more ground: {share} gave {clouded} after {before}"
+        );
+        before = clouded;
+    }
+    let (none_clouded, _) = clouded_of(0);
+    assert_eq!(none_clouded, 0, "an empty sky must draw nothing");
 }
 
 #[test]

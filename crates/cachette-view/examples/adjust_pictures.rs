@@ -115,10 +115,12 @@ fn main() {
     // so the drops the picture drew are the drops one step on.
     let mut after = world.clone();
     after.step(THREADS).expect("the step must run");
+    let drift = cachette_view::paint::cloud_drift(&after);
     println!(
-        "storm: {} drops over the seat, overlay weight {} of 255",
+        "storm: {} drops over the seat, {} of a whole sky, overlay weight {} of 255",
         after.air_at(seat).unwrap_or(0),
-        cachette_view::paint::air_weight(after.air_at(seat).unwrap_or(0))
+        after.cloud_share_at(seat).unwrap_or(0),
+        cachette_view::paint::air_weight(cachette_view::paint::cloud_mass_at(&after, seat, drift))
     );
 }
 
