@@ -415,6 +415,16 @@ def load_policy(
     Raises ``PolicyFitError`` when a fit is asked for and the file does not
     match it, when a fit is asked for and the file states none, and when a
     layout is asked for and the file reads another one.
+
+    **A file that names a kind this package no longer builds is refused by
+    name.** The project deleted one kind, and a file written under it holds
+    its two layers and no single weight matrix. Reading it as a linear policy
+    raised an error about a missing archive entry, which named the storage
+    and not the cause.[^1]
+
+    References
+    ----------
+    [^1]: Findings register, FND-686. ``docs/FINDINGS.md``
     """
     stored = np.load(path, allow_pickle=False)
     kind = str(stored["kind"]) if "kind" in stored.files else "linear"
@@ -446,6 +456,13 @@ def load_policy(
         if layout is not None:
             policy.check_layout(layout, path)
         return policy, meta
+    if "weights" not in stored.files:
+        message = (
+            f"the stored policy at {path} names the kind {kind!r}, which this "
+            "package does not build. The kinds it builds are 'linear' and "
+            "'structured'. Train a policy against this world."
+        )
+        raise PolicyFitError(message)
     return LinearPolicy(stored["weights"]), meta
 
 

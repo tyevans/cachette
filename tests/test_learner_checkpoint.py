@@ -266,3 +266,33 @@ def test_a_resume_that_adds_validation_seeds_can_still_choose_a_centre(
     chosen = result["best_validation"]
     assert chosen is not None
     assert math.isfinite(chosen), "the resumed run kept the quiet value"
+
+
+def test_a_written_file_names_no_hidden_width_and_still_loads(
+    tmp_path: Path, pool: list[int]
+) -> None:
+    """The trainer dropped a stored key, and the reader takes the file anyway.
+
+    A file used to carry a hidden width. One policy kind read that width, the
+    project deleted the kind, and the trainer then wrote the key as a constant
+    zero that nothing read back. Dropping it changes the shape of every file a
+    run writes, so this drives a real run and reads the file from disk.
+
+    **A file that stopped loading over this would be the defect.** The reader
+    builds what a file names from the keys the file holds, so an absent key
+    costs it nothing. The stored index covers the other direction, where a
+    file written by an older run still carries the key.[^1]
+
+    References
+    ----------
+    [^1]: The stored policy index test. ``tests/test_stored_policy_index.py``
+    """
+    train("t", WORLD, WEIGHTING, TRAIN, tmp_path, pool, validation=[])
+    for name in ("t.npz", "t-latest.npz"):
+        policy, meta = load_policy(tmp_path / name)
+        assert policy is not None, f"{name} did not load"
+        assert "hidden" not in meta, f"{name} still names a hidden width"
+        assert "generation" in meta, f"{name} lost the generation counter"
+        assert meta["kind"] == "linear"
+        assert meta["width"] == WORLD.width, f"{name} lost the fit of its world"
+        assert meta["faction_count"] == WORLD.faction_count

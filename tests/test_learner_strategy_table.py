@@ -38,10 +38,6 @@ BUILT: dict[str, type] = {
     STRUCTURED_KIND: StructuredPolicy,
 }
 
-# The hidden width the builder still takes and no kind reads. The policy that
-# read it held a frozen projection, and this project removed that policy.
-UNREAD_WIDTH = 0
-
 
 def _probe() -> Env:
     """Build the probe environment the table's own world states.
@@ -67,7 +63,7 @@ def test_every_strategy_names_a_kind_the_trainer_can_build() -> None:
     for name, (_, _, kind) in STRATEGIES.items():
         assert kind in BUILT, f"{name} names the kind {kind}, which nothing builds"
     for kind, wanted in BUILT.items():
-        built = shell_policy(kind, probe, UNREAD_WIDTH)
+        built = shell_policy(kind, probe)
         assert isinstance(built, wanted), f"the builder gave {type(built)} for {kind}"
 
 
@@ -113,7 +109,7 @@ def test_the_structured_strategies_train_fewer_weights_than_the_linear_ones() ->
     table costs.
     """
     probe = _probe()
-    linear = shell_policy("linear", probe, UNREAD_WIDTH)
-    structured = shell_policy(STRUCTURED_KIND, probe, UNREAD_WIDTH)
+    linear = shell_policy("linear", probe)
+    structured = shell_policy(STRUCTURED_KIND, probe)
     assert structured.flat().size < linear.flat().size
     assert structured.flat().size * 10 < linear.flat().size
