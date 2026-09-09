@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-689**
+**Next number: FND-690**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18000,6 +18000,43 @@ search shape earns its alignment only when the parameters it trains span the
 rules the policy must state. Do not reach for a fixed random bottleneck again
 in order to make a trainable count small.
 
+### FND-689 — The verb that a change touched cannot test the rule that repairs it
+
+**Believed.** A test of how a stored policy survives a change to the action
+table should be built around the verb that the change touched. The campaign
+verb gained a place argument, so a fixture that puts campaign back to no
+argument reproduces the failure exactly. A rule proved against that fixture is
+proved against the case the project paid for.
+
+**True.** That fixture cannot separate the rule the project chose from the rule
+it rejected. Campaign held exactly one row before it took the place argument.
+The mean of the rows of a one-row block is that one row, so "take the weight of
+the coarse row you narrow" and "take the mean of the rows of your verb" give
+the same numbers for every new row of that verb. A perturbation that swapped
+one rule for the other left every assertion green.
+
+The gather verb separates them, because it holds one row for each resource
+kind. A fixture that gives gather a further argument position asserts that each
+new row takes the row of its own resource, and not the average over the kinds.
+That assertion goes red under the same perturbation.
+
+A second instance of the same shape sat inside the fixture data. A readout of
+rows that rise as a straight line has, for an odd row count, a mean equal to
+its middle row. The middle resource therefore read the same answer under both
+rules, and the guard that was meant to prove the fixture discriminating fired
+on that row. The values now rise as a square.
+
+**Evidence.** The project found both by putting the wrong rule back and
+watching the tests stay green, which is what the testing rule asks for.[^F689A]
+Reading the test found neither. The commit holds the perturbation, the command,
+and the numbers the failing assertion printed.[^F689B]
+
+**Follows.** When a change breaks something for one subject, do not build the
+regression fixture only from that subject. Ask which subject makes the
+candidate rules disagree, and build that one as well. A block of one element is
+the degenerate case of almost every rule over a block, so a fixture whose block
+holds one element measures nothing about the rule.
+
 ## References
 
 [^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
@@ -18060,3 +18097,5 @@ in order to make a trainable count small.
 [^F688B]: The stored policy index. `checkpoints/README.md`
 [^F688C]: The commit `Remove what the deleted frozen projection policy left behind`. Read its message for the counts, the alignment figures and the commands.
 [^F668B]: Findings register, FND-688. `docs/FINDINGS.md`
+[^F689A]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
+[^F689B]: The commit `Name each stored action row by its verb and its coordinates`. Read its message for the perturbation and the figures.

@@ -665,6 +665,29 @@ class StructuredPolicy:
             parts[walked + 1],
         )
 
+    def with_readout(self, readout: np.ndarray) -> StructuredPolicy:
+        """Return this policy with another readout, and every tower unchanged.
+
+        The readout is the one layer whose row count is the row count of the
+        action table. A reader that carries a stored policy onto another
+        table rebuilds this layer and keeps the rest.[^1]
+
+        References
+        ----------
+        [^1]: ADR-0200, a stored policy names each row of the action table by
+        its verb and its candidate coordinates, decision D3.
+        ``docs/adrs/draft/adr-0200-a-stored-policy-names-each-action-row-by-verb-and-coordinates.md``
+        """
+        return StructuredPolicy(
+            self.layout,
+            self.shape,
+            self.scalars,
+            self.ring,
+            self.tokens,
+            self.trunk,
+            readout,
+        )
+
     def features(self, encoded: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
         """Join the three towers into the row the trunk reads."""
         parts = [self.scalars.features(encoded), self.ring.features(encoded)]
