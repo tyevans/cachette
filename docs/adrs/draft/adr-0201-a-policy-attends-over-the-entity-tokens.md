@@ -93,7 +93,29 @@ preferred to one that raises it. This project has never trained a policy whose
 reward was dense, so the smallest design that tests the claim is worth more
 than the largest design the machine can afford.
 
-### D5. The action stays a deterministic argmax, and the policy draws nothing
+### D5. A population budget is paid from the parameter count before the seed count
+
+A generation plays one seed set, and every candidate of the generation plays
+it. Two knobs buy the alignment of a step at a fixed episode budget. A design
+lowers its parameter count, or a run lowers the seed count of a generation and
+raises the population by the same factor.
+
+**The parameter knob is the stronger one, and it carries no qualitative risk.**
+Alignment falls as one over the square root of the parameter count. It falls as
+one over the square root of the seed count plus a constant, so each halving of
+the seed count buys less than each halving of the parameter count.[^law]
+
+A low seed count also carries a failure the parameter knob does not. The
+ranking of a whole generation then comes from a few worlds, and rank shaping
+gives a candidate full weight for an advantage that may hold on those worlds
+alone.
+
+**A run lowers the seed count only against a measurement.** The measurement
+compares the rank order a small seed set gives against the rank order a large
+one gives, on candidates the run already scored. A run that lowers the seed
+count without it states an assumption as a fact.
+
+### D6. The action stays a deterministic argmax, and the policy draws nothing
 
 The policy scores each row of the action table and returns the highest-scoring
 legal row. The value that crosses into the engine is one action integer, and
@@ -104,7 +126,7 @@ A stochastic policy is not forbidden by this record. It is forbidden until a
 record states the key of its draw, because thread-local random state destroys
 determinism.[^det]
 
-### D6. The rating over rotated seats settles a comparison of architectures
+### D7. The rating over rotated seats settles a comparison of architectures
 
 Two policies trained under two reward weightings hold scores that do not
 compare. The rating tool seats the policies against each other and against the
@@ -114,6 +136,45 @@ whether an architecture stays.
 
 A run that raises the training return and does not raise the rating has not
 shown that the architecture reads better.
+
+## Alternatives rejected
+
+**Attention over the ring cells.** D2 refuses it, and the reasoning is there.
+
+**A stack of attention layers over every cell and every token at once.** The
+research report names this as the state of the art and says plainly that it
+needs a gradient method.[^report] This project trains by an evolution strategy,
+and the law prices such a design at a population the project cannot run.
+
+**One token slot for each unit.** The width of the observation is constant in
+the world shape and in the faction count, and a per-unit slot gives that
+up.[^width] A set of fixed size, selected by the engine and masked by validity,
+keeps the width and loses the units that drive no decision.
+
+**A stochastic policy.** A draw would let a policy explore inside an episode.
+It is refused until a record states the key of the draw, because thread-local
+random state destroys determinism.[^det]
+
+**A framework that brings a compiled runtime.** The project trains with one
+array library today. A framework would buy a gradient the evolution strategy
+does not use, and it would put a second arithmetic implementation beside the
+one the checkpoints were written under.
+
+**Moving the arithmetic to a graphics device.** The research already measured
+this and answered it.[^device] The simulation holds nearly the whole training
+clock, so moving the policy alone buys almost nothing, and the report found the
+processor ahead at every policy size it tried. Moving the simulation is a
+rewrite and not a port, and it would put a second implementation of the engine
+beside the first. The two would have to agree byte for byte, and only the
+golden state hash would say when they did not. No published batch simulator
+states a bit-exact guarantee across thread counts, block counts or devices, and
+the determinism claim outranks speed.[^det]
+
+The float ban removes the obstacle a reader expects here, and that is worth
+recording so that nobody rediscovers it as an opening. An integer atomic add
+gives the same total in any order, and the counter-based keyed draw suits such
+a device well.[^device] **The obstacle is the second implementation and the
+absent guarantee, not the arithmetic.**
 
 ## Consequences
 
@@ -155,3 +216,5 @@ The determinism claim is unaffected, and no test of it changes.
 [^shape]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^action]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D4. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^league]: The policy rating tool. `scripts/policy_league.py`
+[^width]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D1. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+[^device]: Report 38, where the training time goes, sections 3, 6 and 7. `docs/research/reports/38-where-the-training-time-goes.md`

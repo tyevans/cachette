@@ -3,7 +3,7 @@ id: 0532
 title: Train an attention policy over the entity tokens
 status: refined
 created: 2026-09-08
-implements: [ADR-0201 D1, ADR-0201 D3, ADR-0201 D4, ADR-0201 D5, ADR-0201 D6]
+implements: [ADR-0201 D1, ADR-0201 D3, ADR-0201 D4, ADR-0201 D5, ADR-0201 D6, ADR-0201 D7]
 changes: []
 creates: [ADR-0201]
 serves: [PRD-0056]
@@ -112,16 +112,29 @@ the scalar layer and hold the population fixed.
 
 ### Trading seeds for population
 
-A generation plays one seed set, and every candidate of the generation plays
-it.[^seeds] The pair is antithetic, so the difficulty of the world is common to
-both members of a pair. What remains is the interaction between a candidate and
-a world, and that falls as the seed count rises.
+**This is the second lever, and it is worth more attention than the
+architecture.** A generation plays one seed set, and every candidate of the
+generation plays it.[^seeds] The pair is antithetic, so the difficulty of the
+world is common to both members of a pair. What remains is the interaction
+between a candidate and a world, and that falls as the seed count rises.
 
 The register measures one point: scoring on a single world halves the
 cosine.[^law] The rows below model the penalty as the square root of one plus
 three over the seed count, which reproduces that point and gives no penalty in
-the limit. **The middle rows are interpolation and are unverified.** Every row
-holds the episode count of the last run.
+the limit. **The middle rows are interpolation and are unverified.**
+
+Put the model into the law and the seed count leaves the expression as one
+term. At a fixed episode budget `E` and a trainable count `N`:
+
+    effective alignment = sqrt( E / (2 * N * (s + 3)) )
+
+**The whole trade is the product of `N` and `s + 3`, and the smaller product
+wins.** Halving the trainable count divides that product by two. Halving the
+seed count from 4 to 2 divides it by seven fifths. The parameter knob is
+therefore worth about 1.4 times the seed knob for each halving, and it carries
+none of the risk the seed knob carries.
+
+At the last run's episode count, and at the trainable count of the control:
 
 | Seeds | Population | Pairs | Alignment by the law | Modelled penalty | Effective |
 |---|---|---|---|---|---|
@@ -130,17 +143,93 @@ holds the episode count of the last run.
 | 2 | 512 | 256 | 0.2187 | 1.581 | 0.1383 |
 | 1 | 1,024 | 512 | 0.3093 | 2.000 | 0.1547 |
 
-**The floor on seeds is 4, and the recommendation is to move to it and stop.**
-Three reasons. The whole generation shares one seed set, so at one or two seeds
-the ranking of the generation is a ranking on one opening, and the step chases
-the opening. The viable-seed filter refuses a generation whose candidates all
-score the same, and one unlucky world can waste a whole generation. The model
-above carries evidence at its two ends only, and 4 is the largest step from the
-present setting that stays near the measured end.
+The whole range from 8 seeds to 1 buys 1.66 times the alignment. The first step
+from 8 to 4 buys 1.25 of that. The step from 4 to 2 buys a further 1.19, and
+the step from 2 to 1 buys 1.12. **The trade is real and it is shallow.**
 
-**Run the seed change as its own comparison.** It is a second variable, and a
-run that moves the architecture and the seed count together cannot say which
-one moved the rating.
+### The large policy, and what one night buys
+
+A policy of about 100,000 weights needs population 1,200 to hold 0.0773. At 8
+seeds that is 9,600 episodes a generation, about 65 minutes, and about 43 hours
+for 40 generations. That is not affordable on one machine.
+
+The cost model above reproduces both figures, and it reproduces the alternative
+as well: population 1,024 at 2 seeds is 2,048 episodes, about 832 seconds a
+generation, and about 9.2 hours for 40 generations. That is one night.
+
+**Set that option against the one it hides.** One night holds about 2,048
+episodes a generation. Two designs fit it, and the law gives them the same raw
+alignment, because the product of the trainable count and the seed count is the
+same in both.
+
+| Option | Weights | Seeds | Population | Alignment by the law | Modelled penalty | Effective |
+|---|---|---|---|---|---|---|
+| A | 100,000 | 2 | 1,024 | 0.0716 | 1.581 | 0.0453 |
+| B | 50,000 | 4 | 512 | 0.0716 | 1.323 | 0.0541 |
+
+**Option B is better aimed by a fifth, for the same money and the same night.**
+Halve the policy rather than halve the seed set, whenever both are open. Option
+B still trains nine times the weights of the control.
+
+One honest figure goes with this. The control, at its own budget, holds an
+effective alignment near 0.0659. **Both large options are worse aimed than the
+policy the project trains today**, by a third and by a fifth. That is the price
+of the twenty-fold and ten-fold size, and it is the strongest argument for
+building the smallest attention design first.
+
+### The floor on seeds
+
+**The floor is 4. Two seeds is not safe today, and it becomes safe against a
+measurement rather than against an argument.**
+
+The failure mode is not the variance of one candidate's fitness. Every
+candidate of a generation plays the same seed set, so an easy world is easy for
+all of them and the antithetic pair cancels most of it. The failure mode is
+that the whole generation is then ranked on two worlds. **Rank shaping gives
+the top candidates their full weight whatever the size of their true
+advantage**, so a candidate that exploits one map feature moves the centre as
+hard as a candidate that plays better everywhere. The seed set moves every
+generation, so the bias is a fresh draw each time and 40 generations average
+some of it away. Nothing measures how much.
+
+The second risk is cheaper to state. The trainer refuses a generation whose
+candidates all score the same. With two seeds one degenerate world can waste a
+whole generation.
+
+Two measurements would settle the floor, and both are cheap.
+
+**The rank agreement.** Take the candidates of a finished generation. Replay
+them on a large seed set. Compare the rank order that gives against the rank
+order the small set gave. The rank correlation is the quantity the trade rests
+on. **This needs no new training run**, only a replay of scored candidates.
+
+**The seed axis of the alignment sweep.** The sweep that measured the law
+already measures the cosine against a known direction, and it already measured
+the single-world cost.[^law] Run it again with the seed count as the swept
+axis. That replaces the model above with measured points and ends the
+interpolation.
+
+Run the seed change as its own comparison, whichever floor the measurement
+gives. It is a second variable, and a run that moves the architecture and the
+seed count together cannot say which one moved the rating.
+
+### Where the arithmetic runs
+
+**This item proposes no move to a graphics device, and a reader who wants one
+should read the research before reopening it.**[^device] The simulation holds
+nearly the whole training clock, so moving the policy alone buys almost
+nothing, and the research found the processor ahead at every policy size it
+tried, including networks far larger than any row of this item. Moving the
+simulation is a rewrite and not a port. It would put a second implementation of
+the engine beside the first, the two would have to agree byte for byte, and
+only the golden state hash would say when they did not. No published batch
+simulator states a bit-exact guarantee across thread counts, block counts or
+devices, and the determinism claim outranks speed.[^det]
+
+The float ban removes the obstacle a reader expects here, and that is the part
+worth knowing. An integer atomic add gives the same total in any order, and the
+counter-based keyed draw suits such a device well.[^device] The obstacle is the
+second implementation and the absent guarantee, not the arithmetic.
 
 ## Impact review
 
@@ -148,7 +237,10 @@ one moved the rating.
 row 2 and nothing else. ADR-0201 D2 forbids row 4 and row 5, so the item must
 not build them. ADR-0201 D3 requires the mask to come from the validity
 channel. ADR-0201 D4 requires the population figure before the run. ADR-0201 D5
-keeps the argmax and forbids a draw. ADR-0201 D6 makes the rating the verdict.
+makes the parameter count the first knob and forbids a lower seed count without
+a measurement, so this item holds the seed count of the last run and proposes
+the measurement instead. ADR-0201 D6 keeps the argmax and forbids a draw.
+ADR-0201 D7 makes the rating the verdict.
 
 ADR-0195 D4 requires a reader to treat a token set as a set, and an attention
 over a set with a learned set identity meets it.[^set] ADR-0195 D8 requires an
@@ -269,4 +361,5 @@ Filled in when the item moves to `complete/`.
 [^token]: The entity token block, the channel list of a rival token. `crates/cachette-core/src/obs_token.rs`
 [^ring]: The ring stack block, the channels this block cannot fill. `crates/cachette-core/src/obs_ring_stack.rs`
 [^draw]: Findings register, FND-679. `docs/FINDINGS.md`
+[^device]: Report 38, where the training time goes, sections 3, 6 and 7. `docs/research/reports/38-where-the-training-time-goes.md`
 [^fixture]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
