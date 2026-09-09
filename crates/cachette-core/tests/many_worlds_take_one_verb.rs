@@ -118,7 +118,7 @@ fn build(seed: u64) -> World {
 /// Reads the observation and the legality answer, and checks both against the
 /// layouts the world declares.
 fn check_layouts(world: &World) {
-    let schema = world.observation_schema();
+    let schema = cachette_core::faction_observation::observation_schema();
     let values = world
         .faction_observation(SEAT)
         .expect("the seat must hold an observation");
