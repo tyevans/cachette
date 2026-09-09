@@ -77,6 +77,7 @@ documents cite it.
 | 0054 | A god's ground is the ground around its cities | Shaped | Game developer | `shaped/prd-0054-a-gods-ground-is-the-ground-around-its-cities.md` |
 | 0055 | A god raises the ground its people hold, and sees what stands there | Shaped | Game developer | `shaped/prd-0055-a-god-raises-the-ground-its-people-hold-and-sees-what-stands-there.md` |
 | 0056 | A learner plays one faction against the controllers | Accepted | AI researcher | `accepted/prd-0056-a-learner-plays-one-faction-against-the-controllers.md` |
+| 0057 | More than one way to win decides a game | Shaped | Game developer | `shaped/prd-0057-more-than-one-way-to-win-decides-a-game.md` |
 
 ## What does not belong in a record
 
