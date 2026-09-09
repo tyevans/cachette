@@ -26,7 +26,7 @@
 //! [^4]: Findings register, FND-051. `docs/FINDINGS.md`
 
 use cachette_core::{Axial, FactionId, World, WorldConfig};
-use cachette_view::paint::{faction_colour, unit_rim_colour};
+use cachette_view::paint::{faction_colour, unit_halo_colour, unit_radius, unit_rim_colour};
 use cachette_view::{paint, Camera, Canvas, FrameSize, Motion, Pace};
 
 /// The size of every canvas these tests draw into.
@@ -81,10 +81,11 @@ fn centre(camera: Camera, address: Axial) -> (i32, i32) {
 }
 
 #[test]
-fn a_unit_disc_carries_a_dark_rim() {
-    // The rim is what separates a disc from the tint of its own faction's
-    // ground. Without it the edge of the disc is the faction colour, and the
-    // pixel this test reads carries that colour instead.
+fn a_unit_bead_carries_a_halo_outside_a_dark_rim() {
+    // The outline is what separates a bead from the tint of its own
+    // faction's ground, and from any other background. It takes the outer two
+    // pixels of the bead. The halo sits outside, the rim sits inside it, and
+    // the faction colour holds the rest.
     let mut world = world();
     let place = open_tile(&world);
     world
@@ -93,21 +94,30 @@ fn a_unit_disc_carries_a_dark_rim() {
     world.rebuild_bridge(1).expect("the bridge rebuilds");
 
     let mut canvas = Canvas::new(CANVAS.0, CANVAS.1);
-    let camera = Camera::at_tile_size(32.0).looking_at(place, &canvas);
+    let tile = 32.0;
+    let camera = Camera::at_tile_size(tile).looking_at(place, &canvas);
     paint::draw(&world, camera, &mut canvas).expect("the world draws");
 
+    // The radius comes from the reader the pass itself calls. A test that
+    // repeated the arithmetic would be a second declaration site.[^1]
+    //
+    // [^1]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
     let (x, y) = centre(camera, place);
-    // A tile of 32 pixels gives a radius of nine, so the ninth pixel out is
-    // the edge of the disc and the middle is the faction colour.
+    let radius = unit_radius(tile);
     assert_eq!(
-        pixel(&canvas, x + 9, y),
+        pixel(&canvas, x + radius, y),
+        unit_halo_colour(),
+        "the edge of a bead must carry the halo"
+    );
+    assert_eq!(
+        pixel(&canvas, x + radius - 1, y),
         unit_rim_colour(),
-        "the edge of a disc must carry the rim"
+        "the pixel inside the halo must carry the rim"
     );
     assert_eq!(
         pixel(&canvas, x, y),
         faction_colour(FactionId(0)),
-        "the middle of a disc must carry the faction colour"
+        "the middle of a bead must carry the faction colour"
     );
 }
 
@@ -115,7 +125,8 @@ fn a_unit_disc_carries_a_dark_rim() {
 fn a_unit_holds_a_radius_floor_below_sixteen_pixels_a_tile() {
     // At four pixels a tile the radius from the tile width alone is one
     // pixel, and a unit is then one pixel of its faction colour over ground
-    // its own faction tints. The floor holds it at three.
+    // its own faction tints. The floor holds it wide enough to carry the two
+    // outline bands and a core of its faction colour.
     let mut world = world();
     let place = open_tile(&world);
     world
@@ -129,9 +140,9 @@ fn a_unit_holds_a_radius_floor_below_sixteen_pixels_a_tile() {
 
     let (x, y) = centre(camera, place);
     assert_eq!(
-        pixel(&canvas, x + 3, y),
-        unit_rim_colour(),
-        "a unit must reach three pixels from its centre at every zoom"
+        pixel(&canvas, x + unit_radius(4.0), y),
+        unit_halo_colour(),
+        "a unit must reach its floor radius from its centre at every zoom"
     );
 }
 
