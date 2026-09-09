@@ -62,6 +62,7 @@ if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
 
     from .config import TrainConfig
     from .env import EnvConfig
+    from .policy import FeatureNormalizer
     from .reward import Scoring
 
 # The variables that hold a matrix library to one thread. Each library reads
@@ -92,6 +93,12 @@ class ShardTask:
     The pair range names the candidates the shard owns. Candidate
     ``2 * pair`` is the plus half of a pair and ``2 * pair + 1`` is the minus
     half, which is the order the trainer builds them in.
+
+    **The normalizer travels in the task.** It comes from a reference sample
+    of played episodes, and a worker that derived one of its own would give
+    its candidates a different feature transform from the candidates of every
+    other shard. Two candidates of one generation that read two transforms
+    are not comparable, so the rank over them would say nothing.
     """
 
     env_config: EnvConfig
@@ -104,6 +111,7 @@ class ShardTask:
     first_pair: int
     last_pair: int
     label: str = ""
+    normalizer: FeatureNormalizer | None = None
 
 
 @dataclass(frozen=True)
@@ -181,7 +189,7 @@ def play_shard(task: ShardTask) -> ShardScore:
         raise RuntimeError(message)
     config = task.train_config
     probe = Env(task.env_config, task.scoring)
-    shell = shell_policy(task.kind, probe)
+    shell = shell_policy(task.kind, probe, task.normalizer)
     noise = generation_noise(
         config.seed, task.generation, config.pairs, task.centre.size
     )
@@ -327,12 +335,13 @@ def run_sharded_generation(
     pool: ShardPool,
     kind: str = "linear",
     label: str = "",
+    normalizer: FeatureNormalizer | None = None,
 ) -> Generation:
     """Score one generation across the pool, and combine it in candidate order.
 
     The answer holds the numbers the single-process runner gives for the same
-    centre, the same generation and the same seeds. The shard count changes
-    how the work is spread, and it changes nothing else.
+    centre, the same generation, the same seeds and the same normalizer. The
+    shard count changes how the work is spread, and it changes nothing else.
     """
     pairs = train_config.pairs
     width = max(1, len(train_config.learner_seats))
@@ -349,6 +358,7 @@ def run_sharded_generation(
             first_pair=first,
             last_pair=last,
             label=f"{label} shard {index + 1}/{len(ranges)}" if label else "",
+            normalizer=normalizer,
         )
         for index, (first, last) in enumerate(ranges)
     ]
