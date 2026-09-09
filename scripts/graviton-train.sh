@@ -211,6 +211,19 @@ strategies="$(cd "$root" && uv run python -m cachette.learn \
 [ "${strategies:-0}" -ge 1 ] || strategies=1
 total_generations=$((generations * strategies))
 
+# **The trainer answers the world as well.** The extent, the faction count and
+# the tick limit all reach the cost of a run: a tick of a larger world costs
+# more, and a longer game holds more ticks. The preview below states them, so
+# the person who approves the price sees the world the price is for. This
+# script derives none of them.
+world_preview="$(cd "$root" && uv run python -m cachette.learn \
+    --print-world $train_args 2>/dev/null \
+    | awk -F'\t' '{ held[$1] = $2 }
+        END { printf "%sx%s, %s factions, tick limit %s, interval %s",
+              held["width"], held["height"], held["factions"],
+              held["tick_limit"], held["decision_interval"] }')"
+world_preview="${world_preview:-unknown}"
+
 # **The trainer does not write its weights after every generation.** It
 # writes them when a validation pass finds a centre better than the best it
 # has seen, and it validates every few generations.
@@ -524,6 +537,7 @@ cat >&2 <<PLAN
   MOST IT COSTS \$$max_cost for the instance, plus \$$volume_cost for the disk
 
   trainer       $train_args
+  world         $world_preview
   generations   $total_generations across $strategies strategies
   results       $out_dir
 
@@ -844,7 +858,33 @@ mkdir -p runs/learn
 # **The figure must reach the log the follower reads.** It went to two files
 # under `/tmp`, and the follower reads neither, so the one tick rate this
 # project owns on the target never appeared on the dashboard.
+
+# **The probe must measure the world the run trains in.** A tick of a 48 by
+# 48 world is not a tick of a 256 by 256 world, so a probe that took its own
+# default extent would report a figure that describes no training run. The
+# trainer answers the world, for the whole argument set of this run, through
+# one flag that runs the same setup path a run runs. This script therefore
+# holds no extent, no faction count and no decision interval of its own.
+#
+# The launcher held two copies of the strategy list once, and a run failed
+# after it had paid for the instance. A world copied here would be the same
+# shape.[^3]
+#
+# References
+#   [^3]: Findings register, FND-693. `docs/FINDINGS.md`
+world="$(uv run python -m cachette.learn --print-world $TRAIN_ARGS)"
+world_field() { printf '%s\n' "$world" | awk -F'\t' -v k="$1" '$1==k{print $2}'; }
+probe_width="$(world_field width)"
+probe_height="$(world_field height)"
+probe_factions="$(world_field factions)"
+probe_interval="$(world_field decision_interval)"
+printf '# world\t%sx%s, %s factions, interval %s\n' \
+    "$probe_width" "$probe_height" "$probe_factions" "$probe_interval"
+
 uv run python scripts/train_throughput.py \
+    --width "$probe_width" --height "$probe_height" \
+    --factions "$probe_factions" \
+    --decision-interval "$probe_interval" \
     --workers "$each" \
     --worlds "${PROBE_WORLDS:-144}" \
     --decisions 20 --price "${PRICE:-0}" --out /tmp/throughput.txt \

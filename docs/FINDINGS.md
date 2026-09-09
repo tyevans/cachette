@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-705**
+**Next number: FND-706**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18791,3 +18791,58 @@ names the military reads the live unit count, which counts workers, so a style
 meant to be militaristic rewarded holding bodies. That is the redundant
 declaration shape once more: two quantities, one name, and nothing that fails
 when the reader wants the other one.
+
+### FND-705 — The cluster of games at the tick limit is the limit, and not indecisive play
+
+**Believed.** A game against the built-in controller resolves early or runs to
+the tick limit, and nothing lies between the two clusters. A register read the
+second cluster as a signal of indecisive play, and the reward gained a term
+that pays a win for the time it left on the clock.[^F692C] [^F705B]
+
+**True.** The second cluster is the limit itself. A probe replayed the same
+kind of world under a tick limit of 12000 rather than 2500, and the games that
+had ended at the limit resolved on their own well above it. Over 16 held-out
+seeds of a 48 by 48 world with three factions, and with the built-in
+controller in every seat, the end ticks run from 458 to 12000 with a median of
+1787 and an upper quartile of 2749. **Nine of the sixteen resolve above 2500,
+and one reaches the ceiling.** There is no gap in that distribution.
+
+The earlier reading is not wrong about what it saw. It measured under a limit
+of 2500, so every game that would have run longer reported 2500, and a
+continuous tail became a spike at the limit.
+
+**Evidence.** The probe plays whole episodes and reads the end tick from the
+game end record of each world.[^F705C] The commit holds the command and the
+whole distribution of each arm and each extent.
+
+**A larger world does not resolve later. It resolves sooner and more
+tightly.** The median end tick is 1787 at extent 48, 4221 at extent 96, 3675
+at extent 128, 3520 at extent 192 and 2763 at extent 256. The highest end tick
+of a 256 by 256 world is 3676 over twelve episodes, and a 48 by 48 world runs
+past 12000. A faction with room grows, and a faction that grows reaches a win
+path.
+
+The share of games that resolve under the limit of 2500 falls from 0.62 at
+extent 48 to 0.19 at extent 96, and it is at or below 0.25 at every extent
+above that. **The limit binds hardest in the middle sizes**, where a faction
+survives but cannot win.
+
+**Follows.** The tick limit is an argument of a training run, and the register
+holds the limit each extent needs.[^F705D] A run that raises the extent and
+keeps the limit trains against a game that almost always ends by a comparison
+of held ground, which is the one ending a policy cannot aim at.
+
+**A limit is a measurement and not a default.** Read the end tick distribution
+of a world before you set the limit of a run in it. A limit chosen for one
+extent says nothing about another.
+
+**These figures come from the engine with the renown target at 1000 units, and
+the target is now 50.** A lower target opens the renown path, so a game can
+end on it and no game ends later than it did before. The distribution above is
+therefore an upper bound on the current engine, and the correction it records
+holds either way: the earlier reading saw a spike at 2500 where a continuous
+tail was. A repeat run of the probe replaces the figures.
+
+[^F705B]: Findings register, FND-692. `docs/FINDINGS.md`
+[^F705C]: The world scale probe. `scripts/world_scale.py`
+[^F705D]: Reinforcement learning parameters, the world a training run plays. `docs/reference/rl-costs.md`
