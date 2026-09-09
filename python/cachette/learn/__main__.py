@@ -63,7 +63,6 @@ from .baseline import available_workers, controller_baseline, controller_baselin
 from .env import Env, EnvConfig, viable_seeds
 from .policy import (
     LinearPolicy,
-    MLPPolicy,
     Policy,
     PolicyFit,
     RandomPolicy,
@@ -71,7 +70,7 @@ from .policy import (
 )
 from .presets import ObjectiveSchedule, load_library, schedule_of
 from .reward import Scoring, Weighting
-from .structured import StructuredPolicy
+from .structured import STRUCTURED_KIND, StructuredPolicy
 from .train import TrainConfig, evaluate, first_scoring, train, write_report
 
 # How many ticks one decision covers. The engine changes little in five
@@ -209,13 +208,13 @@ STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
         Weighting(terms={"held_tiles": 0.1}, won=WIN, lost=-LOSS, drawn=0.0),
         "linear",
     ),
-    # The same scoring as the conquest strategy, over a policy with one
-    # hidden layer. This varies the policy and holds the reward fixed, so
-    # the pair measures what the depth is worth.
-    "conquer-net": (
+    # The same scoring as the conquest strategy, over the structured
+    # policy. This varies the policy and holds the reward fixed, so the pair
+    # measures what the structure is worth.
+    "conquer-structured": (
         WORLD,
         Weighting(terms={"held_tiles": 0.1}, won=WIN, lost=-LOSS, drawn=0.0),
-        "mlp",
+        STRUCTURED_KIND,
     ),
     # Take ground and hold it. Nothing else scores.
     "land": (
@@ -223,18 +222,18 @@ STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
         Weighting(terms={"held_tiles": 1.0}, won=WIN, lost=-LOSS, drawn=0.0),
         "linear",
     ),
-    # The same scoring as the ground strategy, over a policy with one hidden
-    # layer. **The pair measures depth against a dense score.** The conquest
-    # pair measures depth against a nearly ternary one, and that pair went
-    # flat after five generations while the ground strategy was still rising
-    # at sixty-seven. Neither pair alone says whether the depth or the
-    # density carried it.[^1]
+    # The same scoring as the ground strategy, over the structured policy.
+    # **The pair measures the structure against a dense score.** The conquest
+    # pair measures it against a nearly ternary one, and that pair went flat
+    # after five generations while the ground strategy was still rising at
+    # sixty-seven. Neither pair alone says whether the policy or the density
+    # carried it.[^1]
     #
     # [^1]: Findings register, FND-650. `docs/FINDINGS.md`
-    "land-net": (
+    "land-structured": (
         WORLD,
         Weighting(terms={"held_tiles": 1.0}, won=WIN, lost=-LOSS, drawn=0.0),
-        "mlp",
+        STRUCTURED_KIND,
     ),
     # Fill the stores. Ground scores a little, for the same reason.
     "wealth": (
@@ -247,6 +246,17 @@ STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
         ),
         "linear",
     ),
+    # The same scoring as the wealth strategy, over the structured policy.
+    "wealth-structured": (
+        WORLD,
+        Weighting(
+            terms={"store_total": STORE_SCALE, "held_tiles": 0.5},
+            won=WIN,
+            lost=-LOSS,
+            drawn=0.0,
+        ),
+        STRUCTURED_KIND,
+    ),
     # Grow the people. Ground scores a little, because a faction with no
     # ground grows nobody.
     "people": (
@@ -258,6 +268,17 @@ STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
             drawn=0.0,
         ),
         "linear",
+    ),
+    # The same scoring as the people strategy, over the structured policy.
+    "people-structured": (
+        WORLD,
+        Weighting(
+            terms={"population": 3.0, "held_tiles": 0.25},
+            won=WIN,
+            lost=-LOSS,
+            drawn=0.0,
+        ),
+        STRUCTURED_KIND,
     ),
 }
 
@@ -427,7 +448,6 @@ def main() -> int:
     # holdout runs once, at the end, so the whole cost is a few minutes
     # against a run of hours.
     parser.add_argument("--holdout", type=int, default=256)
-    parser.add_argument("--hidden", type=int, default=24)
     # Sigma is a relative size, and its working range was measured rather
     # than guessed. On the real decisions of a trained policy, a
     # perturbation of 0.25 changed 0.8 percent of the choices and one of 1.5
@@ -497,7 +517,7 @@ def main() -> int:
         "--style-kind",
         type=str,
         default="linear",
-        choices=("linear", "mlp", "structured"),
+        choices=("linear", STRUCTURED_KIND),
         help="which policy each play style trains",
     )
     parser.add_argument(
@@ -630,10 +650,8 @@ def main() -> int:
         The structured kind reads the whole layout, so it takes the signal
         catalogue of the probe rather than the two lengths.
         """
-        if kind == "structured":
+        if kind == STRUCTURED_KIND:
             return StructuredPolicy.of_catalogue(actions, probe.signals)
-        if kind == "mlp":
-            return MLPPolicy.zeros(actions, features, arguments.hidden)
         return LinearPolicy.zeros(actions, features)
 
     # **The controller baseline is one number for the whole run, and one
@@ -688,7 +706,6 @@ def main() -> int:
             out,
             pool,
             kind=kind,
-            hidden=arguments.hidden,
             resume=arguments.resume,
             validation=validation,
             validate_every=validate_every,

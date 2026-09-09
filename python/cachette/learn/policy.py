@@ -380,107 +380,15 @@ class LinearPolicy:
         return cls(stored["weights"]), meta
 
 
-class MLPPolicy:
-    """One hidden layer over the features, and one score for each action.
-
-    A linear policy scores each action row as a weighted sum of the features,
-    so it cannot state a rule that two features must hold together. This
-    policy can. The hidden layer is small, the activation is the hyperbolic
-    tangent, and the whole forward pass is two matrix products.
-
-    An evolution strategy needs no gradient, so the depth costs the trainer
-    nothing but the parameter count. That count is the whole cost: a wider
-    hidden layer needs more samples to find a direction in.
-    """
-
-    def __init__(self, first: np.ndarray, second: np.ndarray) -> None:
-        """Take the two weight matrices, from the features to the actions."""
-        self.first = np.asarray(first, dtype=np.float64)
-        self.second = np.asarray(second, dtype=np.float64)
-
-    @classmethod
-    def zeros(
-        cls, action_length: int, observation_length: int, hidden: int = 32
-    ) -> MLPPolicy:
-        """Build a policy whose second layer is zero, so every score is zero.
-
-        **The first layer is not zero.** A network of two zero layers has a
-        zero gradient in the first layer under every perturbation, so it
-        would never leave the origin. The first layer therefore holds a fixed
-        random projection, drawn from one fixed seed so that a repeat of a
-        run builds the same starting policy.
-
-        The second layer is zero, so this policy takes the no-op at every
-        decision, in the way the untrained linear policy does.
-        """
-        rng = np.random.default_rng(20260907)
-        scale = 1.0 / np.sqrt(observation_length + 1)
-        return cls(
-            rng.standard_normal((hidden, observation_length + 1)) * scale,
-            np.zeros((action_length, hidden)),
-        )
-
-    @property
-    def shapes(self) -> tuple[tuple[int, int], tuple[int, int]]:
-        """The shape of each weight matrix."""
-        first: tuple[int, int] = self.first.shape
-        second: tuple[int, int] = self.second.shape
-        return first, second
-
-    def scores(self, features: np.ndarray) -> np.ndarray:
-        """Return one score for each action row of each feature row."""
-        hidden = np.tanh(features @ self.first.T)
-        return hidden @ self.second.T
-
-    def choose(self, observation: np.ndarray, mask: np.ndarray) -> int:
-        """Return the action integer of the highest-scoring legal row."""
-        scores = self.scores(encode(observation)[None, :])[0]
-        scores = np.where(mask > 0, scores, -np.inf)
-        return int(np.argmax(scores))
-
-    def choose_many(self, observations: np.ndarray, masks: np.ndarray) -> list[int]:
-        """Return one action for each row of a stack of observations."""
-        scores = self.scores(encode_many(observations))
-        scores = np.where(masks > 0, scores, -np.inf)
-        return [int(value) for value in np.argmax(scores, axis=1)]
-
-    def flat(self) -> np.ndarray:
-        """Return every trainable weight as one vector.
-
-        The first layer is a fixed projection and is not trainable, so this
-        returns the second layer alone. A trainer perturbs this vector and
-        rebuilds a policy from it.
-        """
-        return self.second.reshape(-1)
-
-    def rebuild(self, flat: np.ndarray) -> MLPPolicy:
-        """Return a policy with this projection and the given second layer."""
-        return MLPPolicy(self.first, flat.reshape(self.second.shape))
-
-    def save(self, path: Path, meta: Mapping[str, object]) -> None:
-        """Write both layers and what they were trained against."""
-        path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez(
-            path,
-            first=self.first,
-            second=self.second,
-            kind=np.array("mlp"),
-            # numpy declares allow_pickle beside its keyword arguments, so a
-            # string-keyed unpack can collide with it and no annotation fixes
-            # that. The caller passes a fixed key set.
-            **{key: np.array(value) for key, value in meta.items()},  # type: ignore[arg-type]
-        )
-
-
 def load_policy(
     path: Path,
     wanted: PolicyFit | None = None,
     layout: ObservationLayout | None = None,
-) -> tuple[LinearPolicy | MLPPolicy | StructuredPolicy, dict[str, object]]:
+) -> tuple[LinearPolicy | StructuredPolicy, dict[str, object]]:
     """Read a weight file, and return the policy it holds and what it names.
 
-    The file states its own kind. A file written before this module held two
-    kinds names none, and it holds a linear policy.
+    The file states its own kind. A file that names none holds a linear
+    policy, which is what the runs of the first night wrote.
 
     **Pass the fit of the world the policy will play.** The reader then
     refuses a file that was trained against another world, and it names both
@@ -500,15 +408,7 @@ def load_policy(
     """
     stored = np.load(path, allow_pickle=False)
     kind = str(stored["kind"]) if "kind" in stored.files else "linear"
-    skip = {
-        "weights",
-        "first",
-        "second",
-        "kind",
-        "flat",
-        "projection",
-        "architecture",
-    }
+    skip = {"weights", "kind", "flat", "architecture"}
     meta = {
         key: stored[key].tolist()
         for key in stored.files
@@ -536,8 +436,6 @@ def load_policy(
         if layout is not None:
             policy.check_layout(layout, path)
         return policy, meta
-    if kind == "mlp":
-        return MLPPolicy(stored["first"], stored["second"]), meta
     return LinearPolicy(stored["weights"]), meta
 
 

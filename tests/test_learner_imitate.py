@@ -23,7 +23,7 @@ import numpy as np
 import pytest
 
 from cachette.learn.env import Env, EnvConfig, viable_seeds
-from cachette.learn.imitate import Dataset, fit_linear, fit_mlp, record, score
+from cachette.learn.imitate import Dataset, fit_linear, record, score
 from cachette.learn.reward import Weighting
 
 # A weighting with every weight set, so the reward runs. The values are the
@@ -158,8 +158,8 @@ def test_the_recording_states_the_share_the_table_could_not_express() -> None:
     assert data.lost_windows == 0
 
 
-def test_a_fit_loads_in_the_shapes_the_trainer_plays() -> None:
-    """Both fitted policies have the shape the trainer builds and plays.
+def test_a_fit_loads_in_the_shape_the_trainer_plays() -> None:
+    """The fitted policy has the shape the trainer builds and plays.
 
     A fit that returned a matrix of another shape would fail only when a
     training run loaded it, which is hours later.
@@ -168,14 +168,9 @@ def test_a_fit_loads_in_the_shapes_the_trainer_plays() -> None:
     env = Env(WORLD, WEIGHTING)
     linear = fit_linear(data)
     assert linear.shape == (env.action_length, env.observation_length + 1)
-    network = fit_mlp(data, hidden=8)
-    first, second = network.shapes
-    assert first == (8, env.observation_length + 1)
-    assert second == (env.action_length, 8)
-    for policy in (linear, network):
-        reading = score(policy, data)
-        assert 0.0 <= reading["command_accuracy"] <= 1.0
-        assert reading["windows"] == float(len(data))
+    reading = score(linear, data)
+    assert 0.0 <= reading["command_accuracy"] <= 1.0
+    assert reading["windows"] == float(len(data))
 
 
 def test_a_saved_dataset_reads_back_as_the_one_that_was_written(

@@ -270,6 +270,7 @@ def _expected_count(
     accounted for.
     """
     channels = layout.ring.channels
+    scalars = shape.scalar_width * (layout.scalar_slots + 1)
     ring = (
         channels * shape.sector_kernel
         + channels
@@ -286,12 +287,12 @@ def _expected_count(
     trunk = shape.trunk_width * (features + 1)
     readout = actions * (shape.trunk_width + 1)
     return {
-        "scalars": 0,
+        "scalars": scalars,
         "ring": ring,
         "tokens": tokens,
         "trunk": trunk,
         "readout": readout,
-        "total": ring + tokens + trunk + readout,
+        "total": scalars + ring + tokens + trunk + readout,
     }
 
 
@@ -307,12 +308,12 @@ def test_the_stated_layout_trains_the_count_the_design_claims() -> None:
     policy = StructuredPolicy.zeros(9, layout, shape)
     assert policy.counts() == _expected_count(layout, 9, shape)
     assert policy.counts() == {
-        "scalars": 0,
+        "scalars": 48,
         "ring": 45,
         "tokens": 56,
-        "trunk": 684,
+        "trunk": 540,
         "readout": 117,
-        "total": 902,
+        "total": 806,
     }
     assert policy.flat().size == policy.parameter_count
 
@@ -398,6 +399,41 @@ def test_a_rebuilt_policy_holds_the_weights_it_was_given() -> None:
     np.testing.assert_array_equal(rebuilt.flat(), weights)
     encoded = encode_many(_rows(layout))
     assert not np.allclose(rebuilt.scores(encoded), shell.scores(encoded))
+
+
+def test_the_vector_holds_the_scalar_tower_and_the_scores_read_it() -> None:
+    """The scalar tower is trainable, so the flat vector carries it.
+
+    **This is the test the earlier design could not pass.** That design held
+    the scalar layer at a fixed draw, kept it out of the vector, and trained
+    nothing in it. A change to the scalar weights then reached no score,
+    whatever the trainer did.
+
+    The readout of a fresh policy is zero, so every score of it is zero and
+    no change to an earlier layer can move a choice. The policy below
+    therefore starts from a full vector of draws, which is what a run holds
+    after its first generation.
+    """
+    layout = _small_layout()
+    shell = StructuredPolicy.zeros(9, layout)
+    scalars = shell.counts()["scalars"]
+    assert scalars == shell.shape.scalar_width * (layout.scalar_slots + 1)
+    np.testing.assert_array_equal(
+        shell.flat()[:scalars], shell.scalars.weights.reshape(-1)
+    )
+
+    rng = np.random.default_rng(29)
+    trained = shell.rebuild(rng.standard_normal(shell.parameter_count) * 0.5)
+    moved = trained.flat().copy()
+    moved[:scalars] += 1.5
+    encoded = encode_many(_rows(layout))
+
+    assert not np.allclose(
+        trained.rebuild(moved).scores(encoded), trained.scores(encoded)
+    )
+    np.testing.assert_array_equal(
+        trained.rebuild(moved).flat()[scalars:], trained.flat()[scalars:]
+    )
 
 
 def test_a_rebuild_refuses_a_vector_of_another_size() -> None:
@@ -572,10 +608,9 @@ def test_the_search_builds_the_structured_shell_from_the_probe_schema() -> None:
     builder does not know would train nothing. This drives that builder with
     a real probe environment.
 
-    **The engine does not yet declare the ring geometry, so the builder fails
-    today**, and it fails with the message that names the entries to add. The
-    assertion below is the statement of what the schema must carry. It turns
-    into a built policy on its own when the schema carries it.
+    The schema of the engine carries the ring geometry, so the builder gives
+    a policy. A schema that stopped carrying it would raise here, and the
+    message would name the entries to add.
     """
     config = EnvConfig(
         width=WIDTH,
@@ -587,11 +622,6 @@ def test_the_search_builds_the_structured_shell_from_the_probe_schema() -> None:
         decision_interval=10,
     )
     probe = Env(config, Weighting(terms={}, won=0.0, lost=0.0, drawn=0.0))
-    try:
-        policy = shell_policy("structured", probe, 32)
-    except LayoutError as error:
-        assert "space" in str(error)
-        assert "ring" in str(error)
-        return
+    policy = shell_policy("structured", probe, 32)
     assert isinstance(policy, StructuredPolicy)
     assert policy.parameter_count < probe.observation_length

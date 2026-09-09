@@ -13,7 +13,7 @@ trainable count.[^2] Every trainable weight therefore costs alignment at a
 fixed population.
 
 A dense first layer over the whole observation costs the width of the
-observation for each hidden unit. At the current layout that is over one
+observation for each feature it gives. At the current layout that is over one
 hundred thousand weights, and the step it buys points almost nowhere.
 
 The answer is weight sharing. A structure that uses the geometry of the
@@ -53,11 +53,16 @@ An absent token reads zero in every channel, including its validity channel.
 The encoder sees that channel, so it can learn to answer a constant for an
 absent token.
 
-**The scalar tower** keeps a fixed random projection, and it trains nothing.
-The scalar blocks hold no structure to share a weight across, so a trainable
-layer over them would cost more alignment than the rest of the design
-together. The trainable count then follows the widths of this policy and not
-the length of the observation.[^2]
+**The scalar tower** is a dense trainable layer, and it is the one place
+this policy pays position by position. The scalar blocks hold no structure to
+share a weight across, so no kernel and no pool applies to them. Its width is
+therefore the largest single term in the trainable count, and it is the knob
+that buys reading power against alignment.[^2]
+
+**No layer of this policy is frozen.** A layer the trainer never moves states
+a rule the run cannot revise, and this project rejects that shape. Every layer
+except the readout starts at a draw, because a layer of zeros behind another
+layer of zeros gives no change under any perturbation.
 
 # The trunk and the readout
 
@@ -103,8 +108,8 @@ if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
 
 STRUCTURED_KIND = "structured"
 
-# The seed the fixed parts of this policy are drawn from. The trainer and
-# every worker process build the same shell, so the draw must not depend on
+# The seed the start of this policy is drawn from. The trainer and every
+# worker process build the same shell, so the draw must not depend on
 # anything a process holds.
 SHELL_SEED = 20260908
 
@@ -122,16 +127,26 @@ class StructuredShape:
     """Every width of the architecture, and nothing about one world.
 
     Each width trades what the policy can state against how well one
-    generation points the right way. The defaults put the whole trainable
-    count near twice the count of the fixed-projection network, which is the
-    policy this one replaces.[^1]
+    generation points the right way. The cosine between the step one
+    generation takes and the direction it looks for is near the square root of
+    the pair count divided by the trainable count.[^1]
+
+    **The scalar width is the dominant term.** The scalar tower holds one
+    weight for each unstructured position and each feature, and every other
+    tower shares its weights. A caller that wants a better aligned step lowers
+    this width first.
+
+    **The default holds the whole trainable count below the length of the
+    observation.** That is the claim this architecture makes against a dense
+    layer, and a wider scalar tower breaks it. A test asserts it against the
+    layout the engine publishes.
 
     References
     ----------
     [^1]: Findings register, FND-668. ``docs/FINDINGS.md``
     """
 
-    scalar_width: int = 16
+    scalar_width: int = 4
     ring_width: int = 4
     ring_bands: int = 3
     sector_kernel: int = 3
@@ -208,38 +223,62 @@ def _agree(stored: Mapping[str, np.ndarray], key: str, held: int) -> None:
         raise ShapeError(message)
 
 
-class ScalarProjection:
-    """A fixed random projection of every unstructured position.
+class ScalarTower:
+    """The trainable dense layer over every unstructured position.
 
-    This trains nothing. The scalar blocks hold a few hundred positions with
-    no structure, so no weight can be shared across them, and a trainable
-    layer over them would dominate the trainable count.
+    The scalar blocks hold a few hundred positions with no structure, so no
+    weight can be shared across them. This layer therefore states one weight
+    for each position and each feature, and it holds the largest single term
+    of the trainable count.
 
-    The projection comes from one fixed seed, so the trainer and every worker
-    process build the same one.
+    **The trainer moves every weight of this layer.** An earlier design held
+    the layer at a fixed draw and trained nothing in it, which stated a rule
+    that no run could revise.
     """
 
     def __init__(self, positions: npt.NDArray[np.int64], weights: np.ndarray) -> None:
-        """Take the positions this reads and the projection it reads them with."""
+        """Take the positions this reads and the weights it reads them with."""
         self.positions = np.asarray(positions, dtype=np.int64)
         self.weights = np.asarray(weights, dtype=np.float64)
 
     @classmethod
-    def fixed(
+    def initial(
         cls, layout: ObservationLayout, width: int, rng: np.random.Generator
-    ) -> ScalarProjection:
-        """Draw the projection of one layout from one stream of draws.
+    ) -> ScalarTower:
+        """Build the layer a fresh run starts from, over one layout.
 
-        The caller owns the stream, so every fixed and every initial weight of
-        one policy comes from one draw sequence. Two streams from one seed
-        would give the projection and the first tower the same numbers.
+        The caller owns the stream of draws, so every initial weight of one
+        policy comes from one draw sequence. Two streams from one seed would
+        give this layer and the first tower the same numbers.
+
+        **This layer starts at a draw and not at zero.** A layer of zeros
+        gives a zero change under every perturbation of the layer above it, so
+        a network of zero layers never leaves the origin.
 
         The bias position of the encoded observation joins the scalar
-        positions, so the projection carries an offset without a second array.
+        positions, so the layer carries an offset without a second array.
         """
         positions = np.asarray([*layout.scalars, layout.length], dtype=np.int64)
         scale = 1.0 / np.sqrt(positions.size)
         return cls(positions, rng.standard_normal((width, positions.size)) * scale)
+
+    @property
+    def shapes(self) -> tuple[tuple[int, ...], ...]:
+        """The shape of each trainable array, in the order the vector holds them."""
+        return (self.weights.shape,)
+
+    def arrays(self) -> tuple[np.ndarray, ...]:
+        """Every trainable array, in the order the vector holds them."""
+        return (self.weights,)
+
+    def with_arrays(self, arrays: Sequence[np.ndarray]) -> ScalarTower:
+        """Give back a layer over these positions with the given weights."""
+        return ScalarTower(self.positions, *arrays)
+
+    @property
+    def parameter_count(self) -> int:
+        """How many weights this layer trains."""
+        return int(sum(array.size for array in self.arrays()))
 
     @property
     def width(self) -> int:
@@ -466,7 +505,7 @@ class StructuredPolicy:
         self,
         layout: ObservationLayout,
         shape: StructuredShape,
-        scalars: ScalarProjection,
+        scalars: ScalarTower,
         ring: RingTower,
         tokens: Sequence[TokenTower],
         trunk: np.ndarray,
@@ -502,7 +541,7 @@ class StructuredPolicy:
         """
         chosen = shape or StructuredShape()
         rng = np.random.default_rng(seed)
-        scalars = ScalarProjection.fixed(layout, chosen.scalar_width, rng)
+        scalars = ScalarTower.initial(layout, chosen.scalar_width, rng)
         ring = RingTower.initial(layout.ring, chosen, rng)
         towers = [TokenTower.initial(block, chosen, rng) for block in layout.tokens]
         width = scalars.width + ring.width + sum(tower.width for tower in towers)
@@ -553,7 +592,7 @@ class StructuredPolicy:
         fails rather than costing alignment nobody accounted for.
         """
         parts = {
-            "scalars": 0,
+            "scalars": self.scalars.parameter_count,
             "ring": self.ring.parameter_count,
             "tokens": int(sum(tower.parameter_count for tower in self.tokens)),
             "trunk": int(self.trunk.size),
@@ -569,7 +608,7 @@ class StructuredPolicy:
 
     def _shapes(self) -> tuple[tuple[int, ...], ...]:
         """Give the shape of every trainable array, in the order of the vector."""
-        shapes: list[tuple[int, ...]] = list(self.ring.shapes)
+        shapes: list[tuple[int, ...]] = [*self.scalars.shapes, *self.ring.shapes]
         for tower in self.tokens:
             shapes.extend(tower.shapes)
         shapes.append(self.trunk.shape)
@@ -579,10 +618,10 @@ class StructuredPolicy:
     def flat(self) -> npt.NDArray[np.float64]:
         """Return every trainable weight as one vector.
 
-        The fixed scalar projection is not in it. A trainer perturbs this
-        vector and rebuilds a policy from it.
+        Every layer of the policy is in it. A trainer perturbs this vector and
+        rebuilds a policy from it.
         """
-        arrays: list[np.ndarray] = list(self.ring.arrays())
+        arrays: list[np.ndarray] = [*self.scalars.arrays(), *self.ring.arrays()]
         for tower in self.tokens:
             arrays.extend(tower.arrays())
         arrays.append(self.trunk)
@@ -593,6 +632,10 @@ class StructuredPolicy:
         """Return a policy of this layout and these widths with the given weights."""
         parts = _split(np.asarray(flat, dtype=np.float64), self._shapes())
         walked = 0
+        scalars = self.scalars.with_arrays(
+            parts[walked : walked + len(self.scalars.shapes)]
+        )
+        walked += len(self.scalars.shapes)
         ring = self.ring.with_arrays(parts[walked : walked + len(self.ring.shapes)])
         walked += len(self.ring.shapes)
         towers = []
@@ -603,7 +646,7 @@ class StructuredPolicy:
         return StructuredPolicy(
             self.layout,
             self.shape,
-            self.scalars,
+            scalars,
             ring,
             towers,
             parts[walked],
@@ -649,7 +692,6 @@ class StructuredPolicy:
         path.parent.mkdir(parents=True, exist_ok=True)
         stored: dict[str, np.ndarray] = {
             "flat": self.flat(),
-            "projection": self.scalars.weights,
             "layout_ring_cells": np.asarray(
                 self.layout.ring.stack.ring_cells, dtype=np.int64
             ),
@@ -717,7 +759,6 @@ class StructuredPolicy:
         _agree(stored, "observation_length", length)
         _agree(stored, "action_length", actions)
         shell = cls.zeros(actions, layout, shape)
-        shell.scalars.weights[...] = np.asarray(stored["projection"], dtype=np.float64)
         return shell.rebuild(np.asarray(stored["flat"], dtype=np.float64))
 
     def check_layout(self, wanted: ObservationLayout, path: Path | None = None) -> None:
@@ -741,9 +782,9 @@ class StructuredPolicy:
 def layout_of(policy: object) -> ObservationLayout | None:
     """Give the layout one policy reads, or nothing when it reads none.
 
-    The linear policy and the fixed-projection network read a flat vector and
-    hold no layout. A caller that wants to compare layouts asks here rather
-    than testing the type of a policy.
+    The linear policy reads a flat vector and holds no layout. A caller that
+    wants to compare layouts asks here rather than testing the type of a
+    policy.
     """
     found = getattr(policy, "layout", None)
     return found if isinstance(found, ObservationLayout) else None
@@ -754,7 +795,7 @@ __all__ = [
     "SHELL_SEED",
     "STRUCTURED_KIND",
     "RingTower",
-    "ScalarProjection",
+    "ScalarTower",
     "ShapeError",
     "StructuredPolicy",
     "StructuredShape",

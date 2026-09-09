@@ -23,9 +23,9 @@ the candidates are noise rather than neighbours of the centre.
 
 The number is a property of the policy shape and the observation, not of the
 machine, so a port to another platform does not change it by itself. A change
-to the observation schema, to the action table, or to the hidden width does
-change it. Re-run this after any of those, and after any change that alters how
-many action rows are legal at once.
+to the observation schema, to the action table, or to a width of the policy
+does change it. Re-run this after any of those, and after any change that
+alters how many action rows are legal at once.
 
 # Usage
 

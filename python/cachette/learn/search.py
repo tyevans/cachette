@@ -46,7 +46,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
-from .policy import LinearPolicy, MLPPolicy
+from .policy import LinearPolicy
 from .structured import STRUCTURED_KIND, StructuredPolicy
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
@@ -54,7 +54,7 @@ if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
 
 # A policy the search can perturb. Every kind answers ``flat`` and
 # ``rebuild``, so the search never asks which kind it holds.
-Trainable = LinearPolicy | MLPPolicy | StructuredPolicy
+Trainable = LinearPolicy | StructuredPolicy
 
 
 @dataclass(frozen=True)
@@ -214,8 +214,8 @@ def shell_policy(kind: str, probe: Env, hidden: int) -> Trainable:
 
     **The trainer and a worker process both build this, and they must build
     the same thing.** A worker rebuilds its candidates from the centre, so it
-    needs the shell the centre was taken from. The projection of a network
-    comes from one fixed seed, so two processes build one projection.
+    needs the shell the centre was taken from. Every fixed part of a shell
+    comes from one fixed seed, so two processes build one shell.
 
     The lengths come from the engine schemas through the probe environment.
     This module states none of its own.
@@ -223,11 +223,15 @@ def shell_policy(kind: str, probe: Env, hidden: int) -> Trainable:
     The structured kind reads the whole layout and not only the length, so it
     takes the signal catalogue of the probe. That catalogue is the schema the
     engine published, and this module states no part of it.
+
+    **No kind reads the hidden width.** It served the policy that held a
+    frozen projection and a trained readout, and this project removed that
+    policy. The argument stays until the two callers of this function drop
+    it.
     """
+    del hidden
     if kind == STRUCTURED_KIND:
         return StructuredPolicy.of_catalogue(probe.action_length, probe.signals)
-    if kind == "mlp":
-        return MLPPolicy.zeros(probe.action_length, probe.observation_length, hidden)
     return LinearPolicy.zeros(probe.action_length, probe.observation_length)
 
 

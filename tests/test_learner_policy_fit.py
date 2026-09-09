@@ -36,7 +36,6 @@ import pytest
 from cachette.learn.env import Env, EnvConfig
 from cachette.learn.policy import (
     LinearPolicy,
-    MLPPolicy,
     PolicyFit,
     PolicyFitError,
     load_policy,
@@ -185,20 +184,6 @@ def test_a_reader_that_asks_for_no_fit_still_reads_an_old_file(tmp_path: Path) -
     _, meta = load_policy(path)
 
     assert meta["best_score"] == 1.5
-
-
-def test_a_network_policy_carries_the_same_fit(tmp_path: Path) -> None:
-    """The check reads the file and not the kind of policy inside it."""
-    path = tmp_path / "net.npz"
-    env = Env(TRAINED, WEIGHTING)
-    policy = MLPPolicy.zeros(env.action_length, env.observation_length, hidden=4)
-    policy.save(path, PolicyFit.of_env(env).as_meta())
-
-    loaded, _ = load_policy(path, fit_of(TRAINED))
-    assert isinstance(loaded, MLPPolicy)
-
-    with pytest.raises(PolicyFitError):
-        load_policy(path, fit_of(LARGER))
 
 
 def test_the_engine_owns_the_version_the_file_states(tmp_path: Path) -> None:
