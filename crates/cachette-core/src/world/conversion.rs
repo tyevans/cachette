@@ -7,6 +7,7 @@
 use super::errors::{ConvertError, StepError};
 use super::World;
 use crate::conversion::{self, Convert, UnitConverted};
+use crate::event_memory::MemoryKind;
 use crate::types::{Entity, FactionId};
 
 impl World {
@@ -151,10 +152,18 @@ impl World {
     /// cohorts, which are the other total that follows the faction of a
     /// unit.[^2]
     ///
+    /// **The decayed event history takes its arrivals here and not from the
+    /// log at the end of the step.** The field pass clears the log at the
+    /// start of the next step, before the advance runs, so a conversion that
+    /// a control plane asked for between two steps would never reach the
+    /// history. This site sees both routes, because both come through
+    /// here.[^3]
+    ///
     /// # References
     ///
     /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     /// [^2]: ADR-0132, conversion changes the faction of a unit and adds no second allegiance, decision D5. `docs/adrs/draft/adr-0132-conversion-changes-the-faction-of-a-unit.md`
+    /// [^3]: The event history. [`crate::event_memory`]
     fn apply_converts(&mut self, marks: &[Convert]) {
         if marks.is_empty() {
             return;
@@ -194,6 +203,10 @@ impl World {
                 from,
                 mark.faction,
             ));
+            self.event_memory
+                .record_blamed(from, mark.faction, MemoryKind::OwnUnitsConverted, 1);
+            self.event_memory
+                .record_blamed(mark.faction, from, MemoryKind::RivalUnitsConverted, 1);
             // The faction that lost the unit lowers toward the faction that
             // took it. The marks are in slot order, so the writes are
             // too.[^3]

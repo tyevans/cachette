@@ -230,11 +230,24 @@ pub enum MemoryKind {
     RelationsFellAgainstMe,
     /// Resource amounts that the units of the faction took from tiles.
     ResourceGathered,
+    /// Units of the faction that another faction's belief took.
+    ///
+    /// A conversion removes a unit from the reader without a meeting and
+    /// without a shortage. A policy that read it under the felled kind would
+    /// answer a loss of belief by building soldiers, and the two losses ask
+    /// for different play.
+    OwnUnitsConverted,
+    /// Units of another faction that this faction's belief took.
+    ///
+    /// This is the gain that answers the loss above. A faction that grows by
+    /// conversion grows without founding and without a meeting, and no other
+    /// counter of this list rises when it does.
+    RivalUnitsConverted,
 }
 
 impl MemoryKind {
     /// Every kind, in the order the observation holds them.
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 13] = [
         Self::OwnUnitsFelled,
         Self::RivalUnitsFelled,
         Self::OwnUnitsStarved,
@@ -246,6 +259,8 @@ impl MemoryKind {
         Self::OwnUpgradesLost,
         Self::RelationsFellAgainstMe,
         Self::ResourceGathered,
+        Self::OwnUnitsConverted,
+        Self::RivalUnitsConverted,
     ];
 
     /// Returns the name of the kind.
@@ -263,6 +278,8 @@ impl MemoryKind {
             Self::OwnUpgradesLost => "own_upgrades_lost",
             Self::RelationsFellAgainstMe => "relations_fell_against_me",
             Self::ResourceGathered => "resource_gathered",
+            Self::OwnUnitsConverted => "own_units_converted",
+            Self::RivalUnitsConverted => "rival_units_converted",
         }
     }
 
@@ -281,6 +298,8 @@ impl MemoryKind {
             Self::OwnUpgradesLost => 8,
             Self::RelationsFellAgainstMe => 9,
             Self::ResourceGathered => 10,
+            Self::OwnUnitsConverted => 11,
+            Self::RivalUnitsConverted => 12,
         }
     }
 
@@ -291,7 +310,9 @@ impl MemoryKind {
             Self::OwnUnitsFelled
             | Self::RivalUnitsFelled
             | Self::OwnUnitsStarved
-            | Self::OwnUnitsBurned => Stock::LiveUnits,
+            | Self::OwnUnitsBurned
+            | Self::OwnUnitsConverted
+            | Self::RivalUnitsConverted => Stock::LiveUnits,
             Self::OwnGroundLost | Self::GroundGained | Self::OwnUpgradesLost => Stock::HeldTiles,
             Self::OwnSitesLost | Self::SitesTaken => Stock::Sites,
             Self::RelationsFellAgainstMe => Stock::Rivals,
@@ -317,6 +338,8 @@ impl MemoryKind {
             Self::OwnSitesLost => Some(2),
             Self::SitesTaken => Some(3),
             Self::RelationsFellAgainstMe => Some(4),
+            Self::OwnUnitsConverted => Some(5),
+            Self::RivalUnitsConverted => Some(6),
             Self::OwnUnitsStarved
             | Self::OwnUnitsBurned
             | Self::OwnGroundLost

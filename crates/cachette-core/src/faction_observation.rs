@@ -59,8 +59,15 @@
 //! **A reserved field reads zero in every position, and the schema says so.**
 //! Its declared bounds are zero and zero. A field is reserved for one of two
 //! reasons: the engine keeps no aggregate that answers it, or the value needs
-//! a window of past frames that the engine does not carry. A reserved field
+//! a reading of a past frame that the engine does not store. A reserved field
 //! is not a zero that states a real quantity of zero.
+//!
+//! **The engine carries a window of events and no window of readings.** A
+//! decayed history counts the events of each kind as they arrive, so a field
+//! that names a count over a window is answerable and a field that names the
+//! change of a snapshot quantity is not. The doc of each reserved field
+//! states which case it is, and it names the history where the history
+//! answers.
 //!
 //! A reserved field holds its declared positions, so every later field starts
 //! where the design puts it and a builder fills the reserve without moving
@@ -145,7 +152,7 @@
 
 use crate::action::{CandidateKind, Verb};
 use crate::event_layout::ColumnKind;
-use crate::event_memory::{Decay, BLAMED_KIND_COUNT, KIND_COUNT};
+use crate::event_memory::{Decay, MemoryKind, BLAMED_KIND_COUNT, KIND_COUNT};
 use crate::faction_memory_observation as memory;
 use crate::faction_view::{BlockMask, FactionViewError};
 use crate::hex::Axial;
@@ -185,7 +192,7 @@ use crate::world::World;
 ///
 /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 /// [^2]: Findings register, FND-689. `docs/FINDINGS.md`
-pub const OBSERVATION_VERSION: u32 = 6;
+pub const OBSERVATION_VERSION: u32 = 7;
 
 /// The good classes that the layout carries.
 ///
@@ -256,7 +263,12 @@ pub const OBJECTIVE_WEIGHT_COUNT: u32 = 12;
 /// A width change invalidates every trained policy and every stored
 /// checkpoint, so the layout carries spare positions that read zero until a
 /// revision claims them.
-pub const LAYOUT_RESERVE: u32 = 29;
+///
+/// **A revision that claims a position takes it from here and holds the
+/// length.** The event history gained two kinds, which widened five fields of
+/// the memory block by ten positions between them. The domination path gained two
+/// counts at the end of the layout. This reserve paid for all twelve.
+pub const LAYOUT_RESERVE: u32 = 17;
 
 /// How a reader reads every position of one field.
 ///
@@ -500,9 +512,35 @@ declare_observation_fields! {
     UnitsForEachHeldTile => "units_for_each_held_tile", 1, Share;
     /// The live settlements of the faction.
     Settlements => "settlements", 1, Magnitude;
-    /// The people the settlements of the faction hold.
+    /// The residents of the settlements of the faction.
+    ///
+    /// **A resident is a unit that a settlement is the home of.** The engine
+    /// holds no person apart from a unit. A settlement counts the units whose
+    /// home column names it, and this field sums that count over the
+    /// settlements of the faction.[^1]
+    ///
+    /// **This field therefore equals the live unit count whenever every unit
+    /// of the faction is homed at a settlement it holds**, which is the
+    /// ordinary case. It falls below the live unit count for a unit that is
+    /// homed nowhere, and for a unit whose home the faction has lost. A
+    /// reader that wants a quantity of people distinct from an army reads
+    /// nothing of the sort here, and a blocker holds that question.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+    /// [^2]: Blockers register, BLK-159. `docs/BLOCKERS.md`
     Population => "population", 1, Magnitude;
-    /// The population over the settlement count.
+    /// The residents over the settlement count.
+    ///
+    /// **A faction of one settlement reads the same value here as it reads
+    /// for the residents above.** The division is by the settlement count,
+    /// and the count is one. A reader that meets three equal fields is
+    /// meeting that case and the case the residents doc names.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Blockers register, BLK-159. `docs/BLOCKERS.md`
     PopulationForEachSettlement => "population_for_each_settlement", 1, Magnitude;
     /// The upgrades that stand on ground the faction holds.
     FinishedUpgrades => "finished_upgrades", 1, Magnitude;
@@ -540,15 +578,50 @@ declare_observation_fields! {
     ConsumptionOfClass => "consumption_of_class", GOOD_CLASS_COUNT, Magnitude;
     /// The stores of every settlement of the faction, summed.
     StoreTotal => "store_total", 1, Magnitude;
-    /// **Reserved.** The military strength of the faction.
+    /// The military strength of the faction, as a compressed magnitude.
     ///
-    /// The engine keeps no military strength aggregate. The unit type table
-    /// holds an attack and an armour column, and no record states how to
-    /// combine them into a strength. A sum invented here would read as a real
-    /// quantity.
-    MilitaryStrength => "military_strength", 1, Reserved;
-    /// **Reserved.** The military strength over the live unit count.
-    StrengthForEachUnit => "strength_for_each_unit", 1, Reserved;
+    /// **This definition is provisional, and a blocker holds the open
+    /// question.**[^1] The strength is the sum over the live units of the
+    /// faction of the attack column plus the armour column of the unit type
+    /// of each one.
+    ///
+    /// **The engine states that sum in one place, and this field reads it.**
+    /// The unit type table answers the strength of one type, the world folds
+    /// it over the per-type headcount the arena keeps, and this position
+    /// publishes that one number. No arithmetic of the strength lives
+    /// here.[^2]
+    ///
+    /// The sum is monotone in both columns the table holds, so it cannot rank
+    /// a stronger army below a weaker one on either axis. A product of the
+    /// two columns is the more tempting shape and it is not used: it is
+    /// nonlinear, it reaches the range limit sooner, and it makes a unit of
+    /// no attack worth nothing when a wall of armour holds ground.
+    ///
+    /// The value carries the fixed-point scale of the two columns, in the way
+    /// the store total does, so a reader that inverts the compression reads a
+    /// Q16.16 total and not a headcount.
+    ///
+    /// **A provisional definition is published on purpose.** A field that
+    /// reads a constant zero states a false quantity to every policy that
+    /// reads it, and nothing fails. A definition that is wrong is revisable,
+    /// and the blocker is where the revision is argued.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Blockers register, BLK-158. `docs/BLOCKERS.md`
+    /// [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    MilitaryStrength => "military_strength", 1, Magnitude;
+    /// The military strength over the live unit count, as a compressed
+    /// magnitude.
+    ///
+    /// The value says how strong the average unit of the faction is, so a
+    /// reader tells a large weak army from a small strong one. It carries the
+    /// provisional definition of the strength above and its blocker.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Blockers register, BLK-158. `docs/BLOCKERS.md`
+    StrengthForEachUnit => "strength_for_each_unit", 1, Magnitude;
     /// The units of each type class over the live units the faction sees.
     UnitShareOfClass => "unit_share_of_class", UNIT_CLASS_COUNT, Share;
     /// The units under no order over the live units the faction sees.
@@ -565,27 +638,76 @@ declare_observation_fields! {
     FoodCoverageTicks => "food_coverage_ticks", 1, Magnitude;
     /// **Reserved.** The change in the population over a window.
     ///
-    /// The engine carries no window. Nothing stores the observation of a past
-    /// frame, so no first difference of any quantity is available. Every
-    /// field of this layout whose doc names a window is reserved for that one
-    /// reason.
+    /// Nothing stores the observation of a past frame, so no first difference
+    /// of a snapshot quantity is available. **The decayed event history is
+    /// not a substitute for it.** That history counts the events of a kind as
+    /// they arrive, and a population that grew carries no event, so no
+    /// counter of it rises.[^1]
+    ///
+    /// Every field of this layout whose doc names a change over a window is
+    /// reserved for that one reason.
+    ///
+    /// # References
+    ///
+    /// [^1]: The event history. [`crate::event_memory`]
     PopulationChange => "population_change", 1, Reserved;
     /// **Reserved.** The change in the held tiles over a window.
     HeldTileChange => "held_tile_change", 1, Reserved;
     /// **Reserved.** The change in the live units over a window.
     UnitCountChange => "unit_count_change", 1, Reserved;
     /// **Reserved.** The change in the military strength over a window.
+    ///
+    /// The strength is a snapshot quantity, and nothing stores the reading of
+    /// a past frame. The decayed event history counts events and no event
+    /// names a change of strength, so no counter of it rises.
     StrengthChange => "strength_change", 1, Reserved;
     /// **Reserved.** The change in the store total over a window.
     StoreValueChange => "store_value_change", 1, Reserved;
     /// **Reserved.** The upgrades finished over a window.
     UpgradeCompletions => "upgrade_completions", 1, Reserved;
     /// **Reserved.** The tiles taken from a rival over a window.
+    ///
+    /// The engine counts the ground each faction gained, and gained ground is
+    /// not taken ground. A tile changes hands because the reach of a city
+    /// moved, and the holder column carries the holder of this step and not
+    /// the holder of the last one, so nothing says whether a tile the faction
+    /// gained came from a rival or from nobody.[^1]
+    ///
+    /// A count of ground newly held would answer under this name and would
+    /// state a different quantity, and a policy rewarded on it would score
+    /// for settling an empty plain.
+    ///
+    /// # References
+    ///
+    /// [^1]: The event history. [`crate::event_memory`]
     TilesTaken => "tiles_taken", 1, Reserved;
-    /// **Reserved.** The tiles lost to a rival over a window.
-    TilesLost => "tiles_lost", 1, Reserved;
-    /// **Reserved.** The settlements lost over a window.
-    SettlementsLost => "settlements_lost", 1, Reserved;
+    /// The tiles the faction stopped holding over a window, as a share of the
+    /// tiles it holds.
+    ///
+    /// **The memory block publishes the same value.** The decayed event
+    /// history counts the ground each faction lost, one function reads that
+    /// counter, and both positions call it.[^1]
+    ///
+    /// Held ground carries no event of its own. A tile changes hands because
+    /// the reach of a city moved, so the count is the fall of the held total
+    /// between two steps and it names no taker.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: The event history. [`crate::event_memory`]
+    TilesLost => "tiles_lost", 1, Share;
+    /// The settlements the faction lost over a window, as a share of the
+    /// settlements it holds.
+    ///
+    /// The count holds a settlement that a rival kept and a settlement that a
+    /// rival destroyed, because both end the seat of the reader on that
+    /// ground. **The memory block publishes the same value from the same
+    /// counter.**[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: The event history. [`crate::event_memory`]
+    SettlementsLost => "settlements_lost", 1, Share;
     /// The highest renown of a live character of the faction.
     BestRenown => "best_renown", 1, Magnitude;
     /// The best renown of the faction over the best renown of every faction.
@@ -647,8 +769,17 @@ declare_observation_fields! {
     DecisionsTaken => "decisions_taken", 1, Reserved;
     /// **Reserved.** The length of the window, in ticks.
     ///
-    /// The value is zero because no window exists. A reader that finds zero
-    /// here knows that every window field of this layout reads zero.
+    /// **The layout carries two window lengths and not one.** The decayed
+    /// event history keeps a short memory and a long memory of every kind,
+    /// because one counter cannot separate a spike from a trend, and one
+    /// position cannot state both lengths.[^1]
+    ///
+    /// The two lengths are structural, so a reader that needs them reads the
+    /// history and never this position.
+    ///
+    /// # References
+    ///
+    /// [^1]: The event history. [`crate::event_memory`]
     WindowTicks => "window_ticks", 1, Reserved;
     /// The season phase, as a triangle wave and a quarter-shifted triangle
     /// wave.
@@ -732,10 +863,21 @@ declare_observation_fields! {
     /// The value of a rival counts the units standing on ground the faction
     /// sees this frame.
     PowerUnits => "power_units", POWER_STATISTIC_COUNT, Statistic;
-    /// **Reserved.** The seven order statistics of the military strength.
+    /// The seven order statistics of the military strength.
     ///
-    /// The engine keeps no military strength aggregate for any faction.
-    PowerStrength => "power_strength", POWER_STATISTIC_COUNT, Reserved;
+    /// The own value is exact, and it is the strength the world folds over
+    /// the whole army of the faction. The value of a rival is the strength of
+    /// the rival units that stand on ground the faction sees this frame,
+    /// which is an estimate from below. The confidence statistic states how
+    /// much of the ground the faction sees now.
+    ///
+    /// **The strength carries a provisional definition, and a blocker holds
+    /// the open question.**[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Blockers register, BLK-158. `docs/BLOCKERS.md`
+    PowerStrength => "power_strength", POWER_STATISTIC_COUNT, Statistic;
     /// The seven order statistics of the finished upgrade count.
     ///
     /// The value of a rival counts the upgrades standing on ground the
@@ -870,12 +1012,22 @@ declare_observation_fields! {
     /// **Reserved.** The change in each held-ground hazard share over a
     /// window.
     HazardShareChange => "hazard_share_change", 3, Reserved;
-    /// **Reserved.** The units lost to a hazard over a window.
+    /// The units a hazard took over a window, as a share of the live units.
     ///
-    /// The engine holds a per-frame log of the units a fire burned. A frame
-    /// is not a window, and a count over one frame is a different quantity.
-    UnitsLostToHazard => "units_lost_to_hazard", 1, Reserved;
+    /// A fire has no aggressor. A policy that read this loss under a loss to
+    /// a rival would learn to fear ground that nobody threatens, so the two
+    /// counters are separate. **The memory block publishes the same value
+    /// from the same counter.**[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: The event history. [`crate::event_memory`]
+    UnitsLostToHazard => "units_lost_to_hazard", 1, Share;
     /// **Reserved.** The tiles burnt over a window.
+    ///
+    /// The engine counts the units a fire took and counts no ground it
+    /// burned. The fire logs name the tile a fire started on and the tile it
+    /// ended on, and neither says that the ground of the reader changed.
     TilesBurnt => "tiles_burnt", 1, Reserved;
     /// **Reserved.** The concentration of the hazard across the twelve
     /// sectors.
@@ -982,6 +1134,35 @@ declare_observation_fields! {
     /// reader tells one enemy from a field of them by this position alone.
     MemoryConcentration => "memory_concentration", BLAMED_KIND_COUNT as u32, Share;
 
+    /// The seats of rivals that the faction holds, as a compressed magnitude.
+    ///
+    /// **A domination win asks for every rival seat, so the win condition is
+    /// a count.** The domination block of this layout publishes the progress
+    /// as a share of the seated factions, and a share cannot say that one
+    /// seat is left. A policy that chases the domination path reads this
+    /// position and the one below it, and it knows how many seats remain.[^1]
+    ///
+    /// The seat of the faction itself is not counted here. A faction holds
+    /// its own seat in the ordinary case, so a count that held it would never
+    /// reach zero and would mean a different thing on a lost seat.
+    ///
+    /// **This field and the one below sit at the end of the layout on
+    /// purpose.** They take their positions from the reserve, so no earlier
+    /// field moves.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Research report 42, what a policy should be able to see, section 9. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+    /// [^2]: ADR-0195, the observation of a faction is a fixed-width scale-free table, the reserve. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+    RivalSeatsHeld => "rival_seats_held", 1, Magnitude;
+    /// The seats of rivals that exist, as a compressed magnitude.
+    ///
+    /// The value is the seated factions less one, so a reader divides the
+    /// count above by it and gets the part of the win path the faction has
+    /// walked. It holds every rival seat, whether the rival that started on
+    /// it is still seated or not, because a seat that changed hands is still
+    /// a seat a winner must hold.
+    RivalSeats => "rival_seats", 1, Magnitude;
     /// **Reserved.** The positions the layout holds back for a later signal.
     LayoutReserve => "layout_reserve", LAYOUT_RESERVE, Reserved;
 }
@@ -1342,6 +1523,7 @@ struct GroundScan {
     observed_water: i64,
     held_seen_now: Vec<i64>,
     units_seen_now: Vec<i64>,
+    strength_seen_now: Vec<i64>,
     own_units_seen: i64,
     own_idle_units: i64,
     own_type_counts: [i64; UNIT_TYPE_COUNT],
@@ -1425,6 +1607,7 @@ impl World {
         let mut scan = GroundScan {
             held_seen_now: vec![0; seats],
             units_seen_now: vec![0; seats],
+            strength_seen_now: vec![0; seats],
             ..GroundScan::default()
         };
         let visible = observation.visible_layer(faction);
@@ -1506,11 +1689,18 @@ impl World {
             if let Some(place) = scan.units_seen_now.get_mut(usize::from(owner.0)) {
                 *place += 1;
             }
+            let class = self.unit_type(*unit);
+            if let Some(class) = class {
+                if let Some(place) = scan.strength_seen_now.get_mut(usize::from(owner.0)) {
+                    let one = self.unit_types().strength(class);
+                    *place = sim_math::combine(Accum(*place), Accum(i64::from(one.0))).0;
+                }
+            }
             if owner != faction {
                 continue;
             }
             scan.own_units_seen += 1;
-            if let Some(class) = self.unit_type(*unit) {
+            if let Some(class) = class {
                 if let Some(place) = scan.own_type_counts.get_mut(class.index()) {
                     *place += 1;
                 }
@@ -1712,6 +1902,20 @@ impl World {
             }
         }
         scan
+    }
+
+    /// Reports whether one faction holds the seat it started on.
+    ///
+    /// **A seat holder carries no fog rule**, because the reader that ends
+    /// the game reads the same column.
+    fn faction_holds_its_own_seat(&self, faction: FactionId) -> bool {
+        let Some(tile) = self.seat(faction) else {
+            return false;
+        };
+        let Some(address) = self.grid().address_of(tile) else {
+            return false;
+        };
+        self.tile_holder(address).and_then(Holder::faction) == Some(faction)
     }
 
     /// Returns the seats each faction holds, by faction number.
@@ -2112,6 +2316,7 @@ struct Reading {
     settle_flag: i64,
     held_tiles: i64,
     live_units: i64,
+    strength: i64,
     store_total: i64,
     renown_total: i64,
     world_tiles: i64,
@@ -2124,6 +2329,8 @@ struct Reading {
     board_rows: i64,
     board_free: i64,
     weights: Vec<i64>,
+    rival_seats_held: i64,
+    rival_seats: i64,
     domination: Track,
     wonder: Track,
     renown: Track,
@@ -2131,6 +2338,7 @@ struct Reading {
     power_held: PowerVector,
     power_settlements: PowerVector,
     power_units: PowerVector,
+    power_strength: PowerVector,
     power_upgrades: PowerVector,
     power_renown: PowerVector,
     power_wonder: PowerVector,
@@ -2170,12 +2378,17 @@ impl World {
         if let Some(place) = units.get_mut(seat) {
             *place = i64::from(self.population_of(faction));
         }
+        let mut strengths = ground.strength_seen_now.clone();
+        if let Some(place) = strengths.get_mut(seat) {
+            *place = self.faction_strength(faction).0;
+        }
         let wonder_work = self
             .victory_claims()
             .into_iter()
             .map(|pair| pair.1)
             .collect::<Vec<i64>>();
         let seats_held = self.seats_held_by_each(seats);
+        let own_seat_held = i64::from(self.faction_holds_its_own_seat(faction));
 
         let world = self.pyramid().total();
         let requirement = self
@@ -2218,6 +2431,7 @@ impl World {
             settle_flag: self.verb_flag(&legal, Verb::Settle),
             held_tiles: self.holding_of(faction),
             live_units: i64::from(self.population_of(faction)),
+            strength: self.faction_strength(faction).0,
             store_total: settlement.own_stock.iter().sum(),
             renown_total: character.best_renown.iter().sum(),
             world_tiles: i64::from(self.grid().tile_count()),
@@ -2230,6 +2444,12 @@ impl World {
             board_rows,
             board_free: board_rows - board_used,
             weights,
+            rival_seats_held: seats_held
+                .get(seat)
+                .copied()
+                .unwrap_or(0)
+                .saturating_sub(own_seat_held),
+            rival_seats: (seats as i64 - 1).max(0),
             domination: Track::of(&seats_held, seat, seats as i64),
             wonder: Track::of(&wonder_work, seat, requirement),
             renown: Track::of(&character.best_renown, seat, renown_target),
@@ -2241,6 +2461,10 @@ impl World {
             },
             power_units: PowerVector {
                 values: units,
+                confidence,
+            },
+            power_strength: PowerVector {
+                values: strengths,
                 confidence,
             },
             power_upgrades: PowerVector {
@@ -2382,6 +2606,26 @@ impl World {
                 ObsField::MemoryConcentration => {
                     memory::write_concentration(self, faction, span);
                 }
+                ObsField::MilitaryStrength => span[0] = magnitude(read.strength),
+                ObsField::StrengthForEachUnit => {
+                    span[0] = magnitude(read.strength / read.live_units.max(1));
+                }
+                ObsField::TilesLost => {
+                    span[0] =
+                        memory::kind_share(self, faction, MemoryKind::OwnGroundLost, Decay::Recent);
+                }
+                ObsField::SettlementsLost => {
+                    span[0] =
+                        memory::kind_share(self, faction, MemoryKind::OwnSitesLost, Decay::Recent);
+                }
+                ObsField::UnitsLostToHazard => {
+                    span[0] = memory::kind_share(
+                        self,
+                        faction,
+                        MemoryKind::OwnUnitsBurned,
+                        Decay::Recent,
+                    );
+                }
                 ObsField::RingStack => span.copy_from_slice(read.ring_stack.slots()),
                 ObsField::FrontierBySector => span.copy_from_slice(read.frontier.slots()),
                 ObsField::TokenOwnSettlements => {
@@ -2506,6 +2750,9 @@ impl World {
                 ObsField::PowerUnits => {
                     span.copy_from_slice(&read.power_units.statistics(read.seat));
                 }
+                ObsField::PowerStrength => {
+                    span.copy_from_slice(&read.power_strength.statistics(read.seat));
+                }
                 ObsField::PowerUpgrades => {
                     span.copy_from_slice(&read.power_upgrades.statistics(read.seat));
                 }
@@ -2553,14 +2800,14 @@ impl World {
                 ObsField::ReachHeadroomShare => {
                     span[0] = share((read.reach_cap - radius).max(0), read.reach_cap);
                 }
+                ObsField::RivalSeatsHeld => span[0] = magnitude(read.rival_seats_held),
+                ObsField::RivalSeats => span[0] = magnitude(read.rival_seats),
                 ObsField::ObjectiveWeight => {
                     fill(span, |element| {
                         read.weights.get(element).copied().unwrap_or(0)
                     });
                 }
                 ObsField::HeldInsideReachShare
-                | ObsField::MilitaryStrength
-                | ObsField::StrengthForEachUnit
                 | ObsField::UnitShareInsideReach
                 | ObsField::UnitShareBesideRival
                 | ObsField::PopulationChange
@@ -2570,8 +2817,6 @@ impl World {
                 | ObsField::StoreValueChange
                 | ObsField::UpgradeCompletions
                 | ObsField::TilesTaken
-                | ObsField::TilesLost
-                | ObsField::SettlementsLost
                 | ObsField::NewlyObserved
                 | ObsField::MeanStaleness
                 | ObsField::CentroidMovement
@@ -2583,7 +2828,6 @@ impl World {
                 | ObsField::RenownTicks
                 | ObsField::GroundTicks
                 | ObsField::PowerPopulation
-                | ObsField::PowerStrength
                 | ObsField::PowerStoreValue
                 | ObsField::PowerTileGain
                 | ObsField::PowerReachArea
@@ -2591,7 +2835,6 @@ impl World {
                 | ObsField::StormShareObserved
                 | ObsField::StormShareHeld
                 | ObsField::HazardShareChange
-                | ObsField::UnitsLostToHazard
                 | ObsField::TilesBurnt
                 | ObsField::HazardConcentration
                 | ObsField::SettleCostCoverage
@@ -2599,7 +2842,12 @@ impl World {
                 | ObsField::UpgradeAffordability
                 | ObsField::AcceptableContracts
                 | ObsField::RelationChange
-                | ObsField::LayoutReserve => {}
+                | ObsField::LayoutReserve => {
+                    debug_assert!(
+                        row.field.value_kind().is_reserved(),
+                        "a field this arm leaves unwritten must declare the reserved form"
+                    );
+                }
             }
         }
         Ok(out)

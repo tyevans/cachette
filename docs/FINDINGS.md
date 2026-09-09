@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-694**
+**Next number: FND-696**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18310,3 +18310,85 @@ second answer appears.
 copy of something is evidence that somebody worried about it. It is not
 evidence that the copy is absent. This one was two lines above one of the two
 copies it denied.
+
+### FND-694 — A declared observation field that reads a constant zero cannot be told from a real zero, and forty-two of them were declared
+
+**Believed.** A reserved field of the observation is a safe placeholder. It
+holds its positions so that a later revision fills them without moving
+anything, it declares its bounds as zero and zero, and a reader that meets one
+knows the engine answers nothing there.
+
+**True.** The engine says so and no reader of the control plane asked. The
+schema publishes the value form of each field, so the reserved form is
+readable from Python, and nothing in the reward path, the objective path or the
+play style table looked at it. A term that named a reserved field resolved, read
+zero on every decision, and scored a constant for as long as the run lasted.
+
+**Evidence.** The field list declared 42 reserved fields of 141. The ten that a
+conflict objective would name were among them: the tiles taken, the tiles lost,
+the settlements lost, the tiles burnt, the units a hazard took, the military
+strength, the change in it, the strength for each unit, the units beside a
+rival and the decisions taken. No policy trained by this project could read its
+own military strength or whether its units stood beside a rival.
+
+The nine objectives of the play style table each named a live field, so no
+measurement was lost to this. That is luck and not a mechanism: nothing
+compared the name in the table against the form the engine published for it.
+
+**Follows.** Three things, and the third is the one that lasts.
+
+A reserved field is now written where the meaning was already settled, from the
+decayed event history that the step advances. The military strength is defined
+provisionally against an open blocker rather than left at zero, because a
+definition that is wrong is revisable and a silent zero is not.[^F694A]
+
+A field whose meaning is not settled keeps the reserved form and its doc says
+which of the two reasons applies: the engine keeps no aggregate that answers
+it, or the value needs a reading of a past frame that nothing stores.
+
+**A term that names a reserved field is now refused where it binds.** The
+objective set resolves every signal against the catalogue, and that is the one
+place every play style and every schedule passes through. A test walks the play
+style table and the strategy table and fails on a reserved form, and the test
+was proved able to fail by pointing a term at one.
+
+**A reserved field is a zero that lies, and a bounded field that nothing writes
+is the same defect wearing a form.** The engine now asserts that every field
+its writer leaves alone declares the reserved form, so a field cannot be given
+a real form and left unwritten.
+
+[^F694A]: Blockers register, BLK-158. `docs/BLOCKERS.md`
+
+### FND-695 — Three observation fields publish one number, because the engine holds no person apart from a unit
+
+**Believed.** The observation publishes the people a faction feeds, the units
+it keeps alive, and the people of each settlement. The three names promise
+three quantities, and a play style rewards population growth through the first
+of them.
+
+**True.** The three are one quantity in the ordinary case. A settlement counts
+its residents as the units whose home column names it.[^F695A] The resident
+total of a faction is therefore the units of the faction that are homed, the
+live unit count is the units of the faction, and the two agree whenever every
+unit is homed. The residents for each settlement divides the first by the
+settlement count, and a faction of one settlement divides by one.
+
+**No reader is wrong.** Each field computes what its doc says. The engine holds
+no person that is not a unit, so the three docs describe one thing.
+
+**Evidence.** A measurement over three seeds and 618 decisions read the three
+fields as identical at every decision, and sixteen further episodes across a
+no-op policy and three random policies agreed. The reader of a settlement
+resident count sums the cohort rows of the site, and the cohort table derives
+every row from the home column of the unit arena.
+
+**What follows.** A strategy that weighs the resident count and the live unit
+count weighs one quantity twice. A play style that means to train growth apart
+from an army cannot express that against this engine.
+
+**The fix is a decision and not a patch**, so a blocker holds it rather than a
+field doc inventing a person.[^F695B] The three field docs now say plainly what
+they count and when they agree.
+
+[^F695A]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+[^F695B]: Blockers register, BLK-159. `docs/BLOCKERS.md`

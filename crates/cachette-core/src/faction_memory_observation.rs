@@ -194,7 +194,22 @@ pub(crate) fn rival_shares(
 
 /// Returns the share of the stock of one kind that the events of one step
 /// move.
-fn kind_share(world: &World, faction: FactionId, kind: MemoryKind, length: Decay) -> i64 {
+///
+/// **Three fields outside this block read this same function.** The tiles a
+/// faction lost, the settlements it lost and the units a hazard took are each
+/// declared in their own block of the layout as well as here. One function
+/// answers both positions, so no revision can move one and leave the
+/// other.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+pub(crate) fn kind_share(
+    world: &World,
+    faction: FactionId,
+    kind: MemoryKind,
+    length: Decay,
+) -> i64 {
     let held = world.event_memory().total(faction, kind, length);
     let stock = world.memory_stock(faction, kind.stock());
     let scale = 1i64 << length.bits();
