@@ -49,6 +49,28 @@ A signal of many positions becomes a scalar through an aggregation, and the
 caller chooses which. The aggregation is part of the objective and not a
 property of the engine, so it belongs to the caller that states the weighting.
 
+# A published value is not the quantity, and the engine says which form it is
+
+The engine publishes every quantity in one of several forms. A count such as a
+population, a settlement total, a held tile total or a store total crosses as a
+compressed magnitude. Others are shares, signed relations, or groups of the
+three over one quantity.
+
+The schema states the form of each field and the parameters an inversion of
+that form needs, so this module inverts a value and states no compression rule
+of its own. A rule declared twice fails silently when one copy moves, and that
+is the defect shape this project names first.[^5]
+
+**The inversion belongs on the signal and not at each call site.** A
+measurement of a population against a baseline compares two published values
+exactly, because the compression is monotone. It cannot state the difference in
+people until it inverts them, and a tool that held the compression would hold a
+second copy of an engine rule.
+
+A share and a signed relation are not invertible. Neither value carries the
+denominator it divided by, so the signal refuses and the message says what the
+value would need.
+
 # References
 
 [^1]: ADR-0154, the observation and the action of a faction are
@@ -57,6 +79,7 @@ schema-declared bounded tables the engine owns, decision D1.
 [^2]: Findings register, FND-669. ``docs/FINDINGS.md``
 [^3]: Findings register, FND-670. ``docs/FINDINGS.md``
 [^4]: Findings register, FND-689. ``docs/FINDINGS.md``
+[^5]: Recurring defect shapes, shape 1. ``.agents/rules/recurring-defects.md``
 """
 
 from __future__ import annotations
@@ -107,6 +130,107 @@ class Aggregation(Enum):
 
 
 @dataclass(frozen=True)
+class ValueForm:
+    """One value form of the observation, and how to invert it.
+
+    The engine publishes every quantity in one of several forms. A count such
+    as a population, a settlement total or a store total crosses as a
+    compressed magnitude, and a compressed magnitude hides the count it came
+    from. A reader that wanted the count therefore had to restate the
+    compression, which put an engine rule in two places with nothing that
+    fails when the two disagree.[^5]
+
+    This class holds the parameters the engine publishes for one form. It
+    states no parameter of its own, so a change to the compression reaches
+    every reader through the schema.
+    """
+
+    name: str
+    low: int
+    high: int
+    unit: int
+    uniform: bool
+    invertible: bool
+    denominator: str | None = None
+    log_base: int | None = None
+    log_offset: int | None = None
+    divisor_bits: int | None = None
+
+    @classmethod
+    def of_row(cls, name: str, row: Mapping[str, object]) -> ValueForm:
+        """Read one form from the entry the schema publishes for it."""
+        return cls(
+            name=str(row.get("name", name)),
+            low=int(row["low"]),  # type: ignore[arg-type]
+            high=int(row["high"]),  # type: ignore[arg-type]
+            unit=int(row["unit"]),  # type: ignore[arg-type]
+            uniform=bool(row["uniform"]),
+            invertible=bool(row["invertible"]),
+            denominator=_text_or_none(row.get("denominator")),
+            log_base=_int_or_none(row.get("log_base")),
+            log_offset=_int_or_none(row.get("log_offset")),
+            divisor_bits=_int_or_none(row.get("divisor_bits")),
+        )
+
+    @property
+    def relative_precision(self) -> float:
+        """The relative error the divisor puts on an inversion of this form.
+
+        The compression divides a logarithm by the divisor and truncates, so
+        the recovered quantity is near the true one and rarely equal to it. A
+        caller that reports a recovered count must report this figure beside
+        it. A difference smaller than this figure is not a difference the
+        observation carries.
+
+        **Read this as the scale of the error and not as a strict cap.** The
+        engine truncates the logarithm as well, by a much smaller amount, and
+        this figure does not add that term.
+
+        A form that takes no logarithm carries no such error and answers zero.
+        """
+        if self.divisor_bits is None or self.log_base is None:
+            return 0.0
+        return float(self.log_base ** (self.divisor_bits / self.unit) - 1.0)
+
+    def invert(self, value: float | np.ndarray) -> np.ndarray:
+        """Recover the quantity behind one published value, or an array of them.
+
+        The inversion raises the published base to the recovered exponent and
+        subtracts the published offset. It restores the sign of the value,
+        because the compression keeps it.
+
+        A form the engine does not call invertible refuses, and the message
+        says what the value would need. A share divides by a whole that the
+        doc of each field names and that no position carries. A signed
+        relation divides by the sum of the two magnitudes it compares, and one
+        value cannot give both back.
+        """
+        if not self.invertible:
+            message = (
+                f"the {self.name!r} form is not invertible. "
+                f"Its denominator is {self.denominator!r}, and no position of "
+                f"the observation carries it."
+            )
+            raise ValueError(message)
+        if self.log_base is None or self.log_offset is None:
+            message = (  # pragma: no cover - schema contract
+                f"the {self.name!r} form claims to be invertible and "
+                f"publishes no logarithm"
+            )
+            raise ValueError(message)
+        if self.divisor_bits is None:
+            message = (  # pragma: no cover - schema contract
+                f"the {self.name!r} form claims to be invertible and "
+                f"publishes no divisor"
+            )
+            raise ValueError(message)
+        magnitude = np.abs(np.asarray(value, dtype=np.float64))
+        exponent = magnitude * self.divisor_bits / self.unit
+        recovered = np.float_power(self.log_base, exponent) - self.log_offset
+        return np.sign(np.asarray(value, dtype=np.float64)) * recovered
+
+
+@dataclass(frozen=True)
 class Signal:
     """One named quantity of the observation, and where it sits.
 
@@ -123,7 +247,12 @@ class Signal:
     channels entry names the quantities of a signal that holds several of them
     over one set of places.
 
-    Each of the four defaults to absent, so a schema that states none of them
+    The form entry names how the engine wrote every position of the signal,
+    and it carries the parameters an inversion of that form needs. A reader
+    that wants the count behind a compressed magnitude asks the signal for it,
+    and holds no compression rule of its own.
+
+    Each of the five defaults to absent, so a schema that states none of them
     gives the same catalogue it gave before they existed.
     """
 
@@ -134,6 +263,7 @@ class Signal:
     block: str | None = None
     gate: str | None = None
     channels: tuple[str, ...] = ()
+    form: ValueForm | None = None
 
     @property
     def scalar(self) -> bool:
@@ -167,12 +297,107 @@ class Signal:
             raise ValueError(message)
         return aggregation.apply(window)
 
+    def invert(self, value: float | np.ndarray) -> np.ndarray:
+        """Recover the quantity behind one published value of this signal.
+
+        The engine names the form of the signal and publishes the parameters
+        of that form, so the arithmetic lives here once rather than at each
+        call site.
+
+        A signal whose schema states no form refuses, and so does a signal of
+        a form the engine does not call invertible. A signal whose form groups
+        several forms over one quantity also refuses, because its positions do
+        not share one rule and a reader must go by channel.
+        """
+        form = self._invertible_form()
+        return form.invert(value)
+
+    def quantities(self, observation: np.ndarray) -> np.ndarray:
+        """Recover the quantity behind every position of this signal.
+
+        This is what a caller that wants a count reads. A measurement of a
+        population against a baseline can compare two published values
+        exactly, because the compression is monotone, and it cannot state the
+        difference in people until it inverts them.
+        """
+        window = observation[self.start : self.start + self.positions]
+        return self.invert(window)
+
+    @property
+    def invertible(self) -> bool:
+        """Whether this signal recovers its quantity from a published value."""
+        form = self.form
+        return form is not None and form.invertible and form.uniform
+
+    def _invertible_form(self) -> ValueForm:
+        """Return the form of this signal, or say why it cannot be inverted."""
+        form = self.form
+        if form is None:
+            message = (
+                f"the schema states no value form for {self.name!r}, so "
+                f"nothing here knows how the engine wrote it"
+            )
+            raise ValueError(message)
+        if not form.uniform:
+            message = (
+                f"{self.name!r} holds the {form.name!r} form, which groups "
+                f"several forms over one quantity. Read its channels, because "
+                f"its positions do not share one rule."
+            )
+            raise ValueError(message)
+        return form
+
 
 def _text_or_none(value: object) -> str | None:
     """Read one optional text entry of a schema row."""
     if value is None:
         return None
     return str(value)
+
+
+def _int_or_none(value: object) -> int | None:
+    """Read one optional integer entry of a schema row."""
+    if value is None:
+        return None
+    return int(value)  # type: ignore[call-overload]
+
+
+def _forms_of(published: object) -> dict[str, ValueForm]:
+    """Read the value form table of a schema, which may state none."""
+    if published is None:
+        return {}
+    if not isinstance(published, dict):  # pragma: no cover - schema contract
+        message = (
+            f"a value form table must be a dict, and this schema holds {published!r}"
+        )
+        raise TypeError(message)
+    return {
+        str(name): ValueForm.of_row(str(name), row) for name, row in published.items()
+    }
+
+
+def _form_of(
+    row: Mapping[str, object], forms: Mapping[str, ValueForm]
+) -> ValueForm | None:
+    """Resolve the value form one field names, against the table of forms.
+
+    A field that names a form the table does not hold is refused rather than
+    left without one. The two come from one declaration in the engine, so a
+    name with no entry means the schema disagrees with itself, and a reader
+    that took the absence for a field with no form would invert nothing and
+    report no error.
+    """
+    named = _text_or_none(row.get("form"))
+    if named is None:
+        return None
+    found = forms.get(named)
+    if found is None:
+        message = (
+            f"the field {row.get('name')!r} names the value form {named!r}, "
+            f"and the schema publishes {sorted(forms)}"
+        )
+        raise KeyError(message)
+    return found
 
 
 def _names(value: object) -> tuple[str, ...]:
@@ -223,6 +448,7 @@ class SignalCatalogue:
         if not isinstance(fields, list):  # pragma: no cover - schema contract
             message = "the schema of the observation holds no field list"
             raise TypeError(message)
+        forms = _forms_of(schema.get("value_forms"))
         signals = [
             Signal(
                 name=str(row["name"]),
@@ -232,6 +458,7 @@ class SignalCatalogue:
                 block=_text_or_none(row.get("block")),
                 gate=_text_or_none(row.get("gate")),
                 channels=_names(row.get("channels")),
+                form=_form_of(row, forms),
             )
             for row in fields
         ]
@@ -250,6 +477,30 @@ class SignalCatalogue:
     def geometry(self) -> Mapping[str, object]:
         """Every schema entry that is not a field and is not the length."""
         return dict(self._geometry)
+
+    @property
+    def value_forms(self) -> Mapping[str, ValueForm]:
+        """Every value form the layout uses, keyed by the name of the form.
+
+        A signal carries its own form, so a caller that reads one value needs
+        this table for nothing. A caller that reports what the whole layout
+        publishes reads it, because it names every rule the engine wrote a
+        value under.
+        """
+        return {
+            signal.form.name: signal.form
+            for signal in self._signals
+            if signal.form is not None
+        }
+
+    def invertible(self) -> tuple[Signal, ...]:
+        """Every signal whose quantity a reader recovers from its value.
+
+        A tool that reports a count reads this. A signal left out either
+        divides by a whole that no position carries, or holds a form that
+        groups several rules over one quantity.
+        """
+        return tuple(signal for signal in self._signals if signal.invertible)
 
     def __len__(self) -> int:
         """How many signals the layout holds."""

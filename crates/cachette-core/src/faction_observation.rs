@@ -39,6 +39,21 @@
 //! The four functions live in the arithmetic module, so no block of this file
 //! states arithmetic of its own.[^7] Every division truncates toward zero.
 //!
+//! **The schema names the form of each field, and it publishes what an
+//! inversion of that form needs.** A start, a width and a pair of bounds say
+//! where a value sits and how far it reaches. They do not say what the value
+//! means. A reader that wanted the population count behind a compressed
+//! magnitude therefore had to restate the compression, and a rule stated
+//! twice fails silently when one copy moves.[^15]
+//!
+//! The form travels with the field. The field list gives one kind for each
+//! field, the writer takes its arithmetic from that kind, and the schema
+//! publishes that same kind. A compressed magnitude publishes its base, its
+//! offset and its divisor, so a reader recovers the quantity. A share and a
+//! signed relation publish the denominator convention and say that they are
+//! not invertible, because neither value carries the denominator it divided
+//! by.[^6]
+//!
 //! # What a reserved field means
 //!
 //! **A reserved field reads zero in every position, and the schema says so.**
@@ -126,6 +141,7 @@
 //! [^12]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D1. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 //! [^13]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D8. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
 //! [^14]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D4. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+//! [^15]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 
 use crate::action::{CandidateKind, Verb};
 use crate::event_layout::ColumnKind;
@@ -159,9 +175,16 @@ use crate::world::World;
 /// Raise this number whenever the field list, a length rule or a bound rule
 /// changes.
 ///
+/// **Do not raise it for an addition that describes the layout it already
+/// had.** A stored weight file names a position by its index, so a weight is
+/// wrong only when a position moves or a value changes. A revision that adds
+/// a descriptive entry to the schema moves nothing, and a raise refuses every
+/// stored file for nothing. This has cost a set of weights once.[^2]
+///
 /// # References
 ///
 /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+/// [^2]: Findings register, FND-689. `docs/FINDINGS.md`
 pub const OBSERVATION_VERSION: u32 = 6;
 
 /// The good classes that the layout carries.
@@ -263,7 +286,137 @@ pub enum ValueKind {
     Reserved,
 }
 
+/// The value form of one kind, and the parameters an inversion of it needs.
+///
+/// **A reader outside the engine inverts a published value through this row
+/// and never through a rule of its own.** A compressed magnitude hides the
+/// quantity it came from, so a reader that wanted the count had to restate
+/// the compression. That second statement of an engine rule is the defect
+/// shape this project names first, and nothing fails when the two copies
+/// disagree.[^1]
+///
+/// The row carries numbers and never a formula, so a caller acts on it
+/// without parsing text.
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ValueForm {
+    /// The name a reader acts on.
+    pub name: &'static str,
+    /// The lowest value a position of this form may hold.
+    pub low: i64,
+    /// The highest value a position of this form may hold.
+    pub high: i64,
+    /// The integer that stands for one unit of the fixed-point scale.
+    pub unit: i64,
+    /// Whether every position of a field of this form holds this one form.
+    ///
+    /// A form that groups several forms over one quantity answers false. A
+    /// reader that meets a false answer must read the channel and not the
+    /// field.
+    pub uniform: bool,
+    /// Whether a reader recovers the quantity from the value and this row
+    /// alone.
+    pub invertible: bool,
+    /// What the form divides by, or nothing where it divides by nothing.
+    ///
+    /// A share divides by a denominator that the doc of each field names, and
+    /// the schema does not carry that denominator. A signed relation divides
+    /// by the sum of the two magnitudes, which the value itself does not
+    /// carry either. Neither form is therefore invertible.
+    pub denominator: Option<&'static str>,
+    /// The base of the logarithm the form takes, or nothing.
+    pub log_base: Option<u32>,
+    /// The amount the form adds before it takes the logarithm, or nothing.
+    pub log_offset: Option<i64>,
+    /// The bit width the form divides the logarithm by, or nothing.
+    pub divisor_bits: Option<u32>,
+}
+
+/// The denominator a share divides by.
+///
+/// The doc of each field names it, and the schema does not carry it. A reader
+/// that meets this answer knows the value is a part of a whole and that the
+/// whole is not published.
+const DENOMINATOR_PER_FIELD: &str = "per_field";
+
+/// The denominator a signed relation divides by.
+const DENOMINATOR_SUM_OF_MAGNITUDES: &str = "sum_of_magnitudes";
+
 impl ValueKind {
+    /// Every value form, in one order.
+    pub const ALL: &'static [Self] = &[
+        Self::Share,
+        Self::Relation,
+        Self::Magnitude,
+        Self::Statistic,
+        Self::Reserved,
+    ];
+
+    /// Returns the name a reader outside the engine acts on.
+    #[must_use]
+    pub const fn form_name(self) -> &'static str {
+        match self {
+            Self::Share => "share",
+            Self::Relation => "relation",
+            Self::Magnitude => "magnitude",
+            Self::Statistic => "statistic",
+            Self::Reserved => "reserved",
+        }
+    }
+
+    /// Returns the form of this kind, with the parameters an inversion needs.
+    ///
+    /// **Every number here comes from the arithmetic module that writes the
+    /// value.** This file states no base, no offset and no divisor of its
+    /// own, so a change to the compression reaches the published form without
+    /// a second edit.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+    #[must_use]
+    pub const fn form(self) -> ValueForm {
+        let (low, high) = self.bounds();
+        let unit = Fix32::ONE.0 as i64;
+        let plain = ValueForm {
+            name: self.form_name(),
+            low,
+            high,
+            unit,
+            uniform: true,
+            invertible: false,
+            denominator: None,
+            log_base: None,
+            log_offset: None,
+            divisor_bits: None,
+        };
+        match self {
+            Self::Share => ValueForm {
+                denominator: Some(DENOMINATOR_PER_FIELD),
+                ..plain
+            },
+            Self::Relation => ValueForm {
+                denominator: Some(DENOMINATOR_SUM_OF_MAGNITUDES),
+                ..plain
+            },
+            Self::Magnitude => ValueForm {
+                invertible: true,
+                log_base: Some(sim_math::MAGNITUDE_LOG_BASE),
+                log_offset: Some(sim_math::MAGNITUDE_LOG_OFFSET as i64),
+                divisor_bits: Some(sim_math::MAGNITUDE_CAP_BITS),
+                ..plain
+            },
+            Self::Statistic => ValueForm {
+                uniform: false,
+                ..plain
+            },
+            Self::Reserved => plain,
+        }
+    }
+
     /// Returns the lowest and the highest value a position of this kind may
     /// hold.
     #[must_use]
@@ -925,6 +1078,28 @@ impl FieldRow {
         self.field.channels()
     }
 
+    /// Returns the name of the value form of the field.
+    ///
+    /// **The form comes from the same declaration that decides how the field
+    /// is written.** The field list gives one kind for each field, the writer
+    /// takes its arithmetic from that kind, and this answer reads the same
+    /// kind. A form declared beside the field could disagree with the writer,
+    /// and nothing would fail.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub const fn form_name(&self) -> &'static str {
+        self.field.value_kind().form_name()
+    }
+
+    /// Returns the value form of the field, with its inversion parameters.
+    #[must_use]
+    pub const fn form(&self) -> ValueForm {
+        self.field.value_kind().form()
+    }
+
     /// Returns how a reader reads each position of the field.
     ///
     /// Every position of the array is a signed eight-byte integer that holds
@@ -988,6 +1163,26 @@ impl ObservationSchema {
     #[must_use]
     pub fn ring_cells(&self) -> &[u32] {
         &self.ring_cells
+    }
+
+    /// Returns every value form the layout uses, with its parameters.
+    ///
+    /// A field names its form, and this table says what the name means. The
+    /// table sits beside the field list rather than inside each row, because
+    /// one form serves many fields and a parameter repeated for each field is
+    /// a parameter stated many times.
+    ///
+    /// **A reader inverts a published value through this table alone.** A
+    /// count crosses the boundary as a compressed magnitude, so a reader that
+    /// wanted the count had to hold the compression itself, and that second
+    /// copy of an engine rule fails silently when the engine moves.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn value_forms(&self) -> Vec<ValueForm> {
+        ValueKind::ALL.iter().map(|kind| kind.form()).collect()
     }
 
     /// Returns the axis that runs first where a block holds channels over

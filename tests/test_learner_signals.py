@@ -16,6 +16,13 @@ WIDTH = 48
 HEIGHT = 48
 FACTIONS = 3
 
+# One unit of the fixed-point scale of the engine.
+UNIT = 65536
+
+# A tile count one below a power of two, which a compressed magnitude inverts
+# exactly. The world of the inversion test holds this many tiles.
+EXACT_TILE_COUNT = 1023
+
 
 @pytest.fixture(scope="module")
 def world() -> World:
@@ -163,6 +170,181 @@ def test_an_aggregation_over_no_position_fails() -> None:
     """A signal of zero positions is a schema this module cannot serve."""
     with pytest.raises(ValueError, match="at least one position"):
         Aggregation.SUM.apply(np.zeros(0))
+
+
+def test_the_engine_publishes_a_value_form_for_every_field(
+    world: World, catalogue: SignalCatalogue
+) -> None:
+    """A field with no form is a value nothing outside the engine can read back.
+
+    The engine names the form of each field and publishes what an inversion of
+    that form needs. A reader that met a field with no form would hold the
+    compression itself, which puts one engine rule in two places.
+    """
+    published = world.observation_schema()["value_forms"]
+    assert published
+    for signal in catalogue:
+        assert signal.form is not None, signal.name
+        assert signal.form.name in published
+        assert signal.form.unit == UNIT
+
+
+def test_a_known_count_inverts_from_the_value_the_engine_published() -> None:
+    """A count crosses as a compressed magnitude, and the signal inverts it.
+
+    **This is the round trip the published form exists for.** The world holds
+    one tile fewer than a power of two, so the inversion is exact and the
+    assertion needs no tolerance beyond the float arithmetic.
+
+    The test drives the engine rather than a hand-built schema, so it proves
+    that the form reaches a real observation.[^1]
+
+    # References
+
+    [^1]: Testing rules, section 5. ``.agents/rules/testing.md``
+    """
+    built = World(width=31, height=33, seed=2, faction_count=FACTIONS)
+    built.seed_world()
+    catalogue = SignalCatalogue.of_world(built)
+    signal = catalogue.signal("world_tiles")
+    assert signal.form is not None
+    assert signal.form.name == "magnitude"
+    assert signal.invertible
+
+    observation = np.asarray(built.faction_observation(0))
+    published = signal.read(observation)
+    assert published != EXACT_TILE_COUNT
+    assert signal.quantities(observation) == pytest.approx(EXACT_TILE_COUNT)
+
+
+def test_a_compound_magnitude_inverts_every_one_of_its_positions(
+    world: World, catalogue: SignalCatalogue
+) -> None:
+    """A caller that wants a count reads one quantity for each position.
+
+    The stock of each good class is a compressed magnitude of a store total, so
+    every position of it inverts. A stock the world does not hold reads zero,
+    and zero inverts to zero.
+    """
+    signal = catalogue.signal("stock_of_class")
+    assert signal.form is not None
+    assert signal.form.name == "magnitude"
+    observation = np.asarray(world.faction_observation(0))
+    recovered = signal.quantities(observation)
+    assert recovered.shape == (signal.positions,)
+    assert np.all(recovered >= 0.0)
+
+
+def test_a_share_refuses_an_inversion_and_names_its_denominator(
+    catalogue: SignalCatalogue,
+) -> None:
+    """A share divides by a whole that no position of the array carries.
+
+    A reader that inverted a share anyway would report a count the engine never
+    published. The refusal names the denominator convention, so the caller
+    learns what the value would need.
+    """
+    signal = catalogue.signal("held_share_world")
+    assert signal.form is not None
+    assert signal.form.name == "share"
+    assert not signal.invertible
+    with pytest.raises(ValueError, match="per_field"):
+        signal.invert(1000.0)
+
+
+def test_a_statistic_refuses_an_inversion_and_sends_the_reader_to_the_channels(
+    catalogue: SignalCatalogue,
+) -> None:
+    """A statistic groups several forms over one quantity.
+
+    The seven order statistics of a power quantity hold shares and signed
+    relations together, so the positions do not share one rule. **This is the
+    field class the layout cannot classify at the field level**, and the schema
+    says so rather than naming a form the positions do not all hold.
+    """
+    signal = catalogue.signal("power_held_tiles")
+    assert signal.form is not None
+    assert signal.form.name == "statistic"
+    assert not signal.form.uniform
+    assert not signal.invertible
+    with pytest.raises(ValueError, match="channels"):
+        signal.invert(1000.0)
+
+
+def test_only_a_magnitude_carries_an_inversion_error(
+    catalogue: SignalCatalogue,
+) -> None:
+    """A form that truncates a logarithm cannot recover a count exactly.
+
+    A caller that reports a recovered count must report this bound beside it. A
+    difference smaller than the bound is not a difference the observation
+    carries. A form that takes no logarithm has no such error.
+    """
+    magnitude = catalogue.signal("population")
+    share = catalogue.signal("held_share_world")
+    assert magnitude.form is not None
+    assert share.form is not None
+    assert magnitude.form.relative_precision > 0.0
+    assert magnitude.form.relative_precision < 0.001
+    assert share.form.relative_precision == 0.0
+
+
+def test_a_field_that_names_an_unpublished_form_is_refused() -> None:
+    """Prove the resolution can fail rather than leave a field without a form.
+
+    The engine derives the form of a field and the form table from one
+    declaration, so it cannot publish a name the table lacks. A reader that
+    took the absence for a field with no form would invert nothing and report
+    no error, so the catalogue refuses instead.
+
+    This builds a layout by hand, because the engine cannot produce the case.
+    """
+
+    class Broken:
+        """A world whose schema names a form it does not publish."""
+
+        def observation_schema(self) -> dict[str, object]:
+            """Return a layout of one field that names a missing form."""
+            return {
+                "version": 1,
+                "length": 1,
+                "value_forms": {},
+                "fields": [
+                    {"name": "count", "start": 0, "positions": 1, "form": "magnitude"}
+                ],
+            }
+
+    with pytest.raises(KeyError, match="magnitude"):
+        SignalCatalogue.of_world(Broken())
+
+
+def test_a_catalogue_of_a_schema_with_no_form_table_still_reads(
+    world: World,
+) -> None:
+    """A schema that states no form gives the catalogue it gave before forms.
+
+    The form entry defaults to absent, so a caller that built a catalogue by
+    hand builds the same one it built before. Such a signal refuses an
+    inversion and says that the schema stated no form.
+    """
+    schema = dict(world.observation_schema())
+    del schema["value_forms"]
+    for row in schema["fields"]:
+        row.pop("form", None)
+
+    class Formless:
+        """A world whose schema states no value form."""
+
+        def observation_schema(self) -> dict[str, object]:
+            """Return the layout with every form entry removed."""
+            return schema
+
+    catalogue = SignalCatalogue.of_world(Formless())
+    signal = catalogue.signal("population")
+    assert signal.form is None
+    assert not signal.invertible
+    with pytest.raises(ValueError, match="states no value form"):
+        signal.invert(1000.0)
 
 
 def test_a_signal_reads_from_its_own_window_and_not_its_neighbour() -> None:

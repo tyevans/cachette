@@ -28,10 +28,13 @@
 //! [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
 //! [^3]: Findings register, FND-670. `docs/FINDINGS.md`
 
-use cachette_core::faction_observation::{observation_schema, ObsField, OBSERVATION_VERSION};
+use cachette_core::faction_observation::{
+    observation_schema, ObsField, ValueForm, ValueKind, OBSERVATION_VERSION,
+};
 use cachette_core::obs_ring::{ring_cell_counts, RING_STACK_CELLS, RING_STACK_CHANNELS};
 use cachette_core::obs_ring_stack::RING_STACK_CHANNEL_NAMES;
 use cachette_core::obs_token::TokenSet;
+use cachette_core::sim_math;
 use cachette_core::{Axial, Entity, FactionId, SightRules, World, WorldConfig};
 
 /// A world wide enough to hold ground that one faction never reaches.
@@ -745,5 +748,258 @@ fn the_schema_reports_the_layout_version() {
         observation_schema().version(),
         OBSERVATION_VERSION,
         "the schema carries the version of the layout"
+    );
+}
+
+/// The exponents at which a compressed magnitude inverts exactly.
+///
+/// The compression divides a Q16.16 logarithm by the cap width and truncates,
+/// so a general inversion carries a small relative error. The division leaves
+/// no remainder where the cap width divides the scaled exponent, and at those
+/// exponents the round trip is exact. The list gives such exponents, and the
+/// helper asserts that each one is one of them rather than trusting this
+/// comment.
+const EXACT_EXPONENTS: [u32; 8] = [0, 5, 10, 15, 20, 25, 30, 35];
+
+/// Returns the value form the schema publishes under one name.
+fn form_named(name: &str) -> ValueForm {
+    observation_schema()
+        .value_forms()
+        .into_iter()
+        .find(|form| form.name == name)
+        .unwrap_or_else(|| panic!("the schema publishes a value form named {name}"))
+}
+
+/// Compresses a count through the published parameters alone.
+///
+/// **The helper reads no engine function.** It states the forward map from
+/// the offset and the divisor the schema publishes, so a disagreement between
+/// the published parameters and the arithmetic the engine runs fails the test.
+fn compress_through(form: &ValueForm, exponent: u32) -> i64 {
+    let bits = i64::from(form.divisor_bits.expect("a magnitude publishes a divisor"));
+    let scaled = i64::from(exponent) * form.unit;
+    assert_eq!(
+        scaled % bits,
+        0,
+        "the exponent {exponent} must divide exactly for an exact round trip"
+    );
+    scaled / bits
+}
+
+/// Recovers a count from a published value, through the published parameters
+/// alone.
+fn invert_through(form: &ValueForm, value: i64) -> i64 {
+    let bits = i64::from(form.divisor_bits.expect("a magnitude publishes a divisor"));
+    let base = i64::from(form.log_base.expect("a magnitude publishes a base"));
+    let offset = form.log_offset.expect("a magnitude publishes an offset");
+    let scaled = value * bits;
+    assert_eq!(
+        scaled % form.unit,
+        0,
+        "an exact inversion needs a value the unit divides"
+    );
+    let exponent = u32::try_from(scaled / form.unit).expect("the exponent is small");
+    base.pow(exponent) - offset
+}
+
+/// Every field names a value form, and the form table says what the name
+/// means.
+///
+/// **The form comes from the same declaration that decides how the field is
+/// written.** The field list gives one kind for each field, the writer takes
+/// its arithmetic from that kind, and the row publishes that same kind. The
+/// bounds of the row therefore have to equal the bounds of the form, and this
+/// test is what fails if the two ever come from different places.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[test]
+fn every_field_publishes_a_value_form() {
+    let schema = observation_schema();
+    let forms = schema.value_forms();
+    assert_eq!(
+        forms.len(),
+        ValueKind::ALL.len(),
+        "the form table holds one entry for each value kind"
+    );
+    for row in schema.rows() {
+        let named = forms
+            .iter()
+            .find(|form| form.name == row.form_name())
+            .unwrap_or_else(|| {
+                panic!(
+                    "the field {} names the form {} and the table holds it",
+                    row.name(),
+                    row.form_name()
+                )
+            });
+        assert_eq!(
+            (named.low, named.high),
+            (row.low, row.high),
+            "the field {} and its form agree on the bounds",
+            row.name()
+        );
+        assert_eq!(
+            named.unit, ONE,
+            "the form {} states one unit of the fixed-point scale",
+            named.name
+        );
+    }
+}
+
+/// A form that divides by a whole the value does not carry is not invertible.
+///
+/// A share divides by a denominator the doc of each field names, and a signed
+/// relation divides by the sum of the two magnitudes it compares. Neither
+/// denominator travels with the value, so a reader cannot recover the
+/// quantity from one position.
+///
+/// A statistic groups several forms over one quantity, so its positions do
+/// not share one rule and it publishes that it is not uniform. **That is the
+/// field class this layout cannot classify at the field level**, and the
+/// schema says so rather than naming a form the positions do not all hold.
+#[test]
+fn a_form_states_whether_a_reader_can_invert_it() {
+    let share = form_named("share");
+    assert!(!share.invertible, "a share carries no denominator");
+    assert_eq!(
+        share.denominator,
+        Some("per_field"),
+        "a share divides by a whole the field names"
+    );
+    assert!(share.uniform, "every position of a share field is a share");
+
+    let relation = form_named("relation");
+    assert!(!relation.invertible, "a relation carries no denominator");
+    assert_eq!(
+        relation.denominator,
+        Some("sum_of_magnitudes"),
+        "a relation divides by the sum of the two magnitudes"
+    );
+
+    let statistic = form_named("statistic");
+    assert!(
+        !statistic.uniform,
+        "a statistic groups several forms over one quantity"
+    );
+    assert!(
+        !statistic.invertible,
+        "a form whose positions differ cannot be inverted at the field level"
+    );
+
+    let reserved = form_named("reserved");
+    assert!(!reserved.invertible, "a reserved field states no quantity");
+    assert_eq!(
+        (reserved.low, reserved.high),
+        (0, 0),
+        "a reserved field reads zero"
+    );
+
+    let magnitude = form_named("magnitude");
+    assert!(
+        magnitude.invertible,
+        "a compressed magnitude carries every parameter its inversion needs"
+    );
+    assert_eq!(
+        magnitude.denominator, None,
+        "a compressed magnitude divides by no quantity of the world"
+    );
+    assert!(
+        magnitude.uniform,
+        "every position of a magnitude field is a magnitude"
+    );
+}
+
+/// A known count compresses to the published value and inverts back to the
+/// count.
+///
+/// **This is the round trip the published form exists for.** A reader outside
+/// the engine holds no compression rule, so it must recover a count from the
+/// published value and the published parameters alone. The forward map here
+/// reads no engine function, and it therefore fails when the published
+/// parameters and the arithmetic the engine runs disagree.
+///
+/// The fixture walks the whole range the cap admits rather than one middling
+/// case. A count of zero is the low extreme, and the largest exponent reaches
+/// thirty-four billion.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+#[test]
+fn the_published_parameters_recover_a_known_count() {
+    let form = form_named("magnitude");
+    let base = i64::from(form.log_base.expect("a magnitude publishes a base"));
+    let offset = form.log_offset.expect("a magnitude publishes an offset");
+    let mut largest = 0i64;
+    for exponent in EXACT_EXPONENTS {
+        let count = base.pow(exponent) - offset;
+        let expected = compress_through(&form, exponent);
+        assert_eq!(
+            i64::from(sim_math::compressed_magnitude(count).0),
+            expected,
+            "the engine compresses {count} to the value the parameters give"
+        );
+        assert_eq!(
+            invert_through(&form, expected),
+            count,
+            "the published parameters recover {count} from its value"
+        );
+        largest = largest.max(count);
+    }
+    assert!(
+        largest > 1_000_000_000,
+        "the fixture must reach a count no world total would give by accident"
+    );
+    assert_eq!(
+        i64::from(sim_math::compressed_magnitude(0).0),
+        0,
+        "an empty quantity reads empty, so its inversion reads empty"
+    );
+}
+
+/// The engine publishes a count of the world, and the schema inverts it back.
+///
+/// The test drives the reader a caller drives, so it proves that the published
+/// form reaches a real observation and not only the form table.[^1] The world
+/// holds one tile fewer than a power of two, so the round trip is exact and
+/// the assertion needs no tolerance.
+///
+/// # References
+///
+/// [^1]: Testing rules, section 5. `.agents/rules/testing.md`
+#[test]
+fn a_published_count_of_the_world_inverts_to_that_count() {
+    let world = a_still_world_of(WorldConfig {
+        width: 31,
+        height: 33,
+        ..WIDE
+    });
+    let tiles = i64::from(world.grid().tile_count());
+    assert_eq!(
+        tiles, 1023,
+        "the fixture must hold one tile fewer than a power of two"
+    );
+
+    let values = observation_of(&world, WATCHER);
+    let row = observation_schema()
+        .row("world_tiles")
+        .expect("the schema declares the world tile count");
+    assert_eq!(
+        row.form_name(),
+        "magnitude",
+        "the world tile count crosses as a compressed magnitude"
+    );
+
+    let published = one(&values, "world_tiles");
+    assert_ne!(
+        published, tiles,
+        "the published value must not already be the count"
+    );
+    assert_eq!(
+        invert_through(&row.form(), published),
+        tiles,
+        "the schema recovers the tile count of the world from what it published"
     );
 }
