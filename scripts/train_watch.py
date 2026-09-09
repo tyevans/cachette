@@ -7,31 +7,63 @@ enough for a one second refresh.
 
 # What the screen answers
 
-A reader of a run asks four questions, and the screen answers them in the
+A reader of a run asks six questions, and the screen answers them in the
 order that they matter.
 
-1. **Is it working?** Every strategy prints a line while a generation runs,
-   so a strategy that says nothing has stopped. The screen names the age of
-   the last word from each one.
-2. **How fast?** Each line carries the ticks a second that the strategy
-   reached. The screen adds them, and that sum is what the machine reached.
-3. **What has it learned?** The held-out bar is what the built-in controller
-   scored. A strategy beats it or it does not.
-4. **What does it cost?** The price an hour and the time so far give the
-   money, and the generations left give the rest.
+1. **Can I see the run?** The caller says whether it reached the instance,
+   how old its copy of the log is, and whether the instance still exists.
+   The screen never reports a silent instance as a dead one.
+2. **What is it doing?** A run builds the engine, measures the ticks a
+   second, measures the controller baseline, and then trains. The screen
+   names the phase.
+3. **Is it working?** Every strategy prints a heartbeat while a pass runs,
+   and a terminal line when the pass ends. A strategy whose last word was a
+   terminal line has finished that pass and started nothing. A strategy that
+   has fallen behind the others is quiet.
+4. **How fast, and how busy?** Each heartbeat carries the ticks a second
+   that the strategy reached. The screen adds the heartbeats of the working
+   strategies only. The load average against the core count says whether
+   the machine is full.
+5. **Is it winning?** The yardstick is what the built-in controller scored
+   on the validation seeds. The screen prints the newest validation figure
+   of each strategy beside the difference from its own yardstick.
+6. **What does it cost, and how long is left?** The wall clock and the price
+   an hour give the money. The generations finished give the rest.
+
+# The rule that keeps the screen honest
+
+**A frozen line is not a working process.** A pass that ends leaves its last
+heartbeat in the log for as long as the log lives. A reader that took the
+last heartbeat of each strategy for the state of that strategy counted four
+finished baseline passes as four live processes, and added their frozen
+rates into one machine rate of about four times the truth.[^1]
+
+The order of the lines settles it. A heartbeat says a pass runs. A terminal
+line for the same pass says it ended. Whichever came last is the truth.
+
+**A training-seed column does not compare across generations.** The trainer
+draws a new training seed set for each generation, so the mean, the best,
+the spread and the win share answer a different question every generation.
+The screen marks each of those columns with a star. Only the validation
+figure holds still, because the validation seeds never move.
 
 # What it does not do
 
 It takes no measurement of its own and it reaches no machine. It reads a log
-file. The caller brings the log.
+file. The caller brings the log and every fact about the machine.
+
+# References
+
+[^1]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
 """
 
 from __future__ import annotations
 
 import argparse
+import json
+import os
 import re
 import sys
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -48,16 +80,6 @@ DONE = re.compile(
 
 # One `name value` pair of the body. A value is a number or a bare `-`.
 FIELD = re.compile(r"(?P<key>[a-z][a-z-]*)\s+(?P<value>-?[\d.]+|-)")
-
-
-def fields(body: str) -> dict[str, float | None]:
-    """Return the named fields of a row, with a bare dash as no value."""
-    found: dict[str, float | None] = {}
-    for match in FIELD.finditer(body):
-        text = match.group("value")
-        found[match.group("key")] = None if text == "-" else float(text)
-    return found
-
 
 # A heartbeat from inside a long pass, for example:
 #   conquer generation  3 working  decisions 120 live 87/144 ticks 174000
@@ -89,103 +111,321 @@ WAITING = re.compile(
     r"^\s+(?P<name>\S+) (?P<what>baseline) waiting (?P<seconds>[\d.]+)s"
 )
 
-# The controller yardstick, printed once for each strategy.
+# The controller yardstick, printed once for each strategy. It is the bar to
+# beat on the validation seeds, and it is the terminal line of the yardstick
+# pass.
 YARDSTICK = re.compile(r"^\s+(?P<name>\S+) controller yardstick\s+(?P<value>-?[\d.]+)")
+
+# The end of the baseline pass of one strategy. A process that measured the
+# number says `measured`, and a process that took it from another process
+# says `cached`. Either way the pass has ended, for example:
+#   conquer controller measured return     1480.2 won  0.34
+BASELINE_END = re.compile(
+    r"^\s+(?P<name>\S+) controller (?:measured|cached) return\s+"
+    r"(?P<value>-?[\d.]+)\s+won\s+(?P<won>-?[\d.]+)"
+)
 
 # The held-out controller row, printed once before any training.
 CONTROLLER = re.compile(r"^\s+controller (?P<body>\{.*\})\s*$")
 
+# The heading the trainer prints for one strategy, for example:
+#   === land-structured (structured) ===
+HEADING = re.compile(r"^===\s+(?P<name>\S+)(?:\s+\((?P<kind>[^)]*)\))?\s+===\s*$")
+
+# The throughput probe the run takes before it trains anything.
+PROBE = re.compile(r"^\s+measuring\s+(?P<processes>\d+) process")
+
+# How many rounds of heartbeats from the other strategies may pass before a
+# strategy counts as quiet. Every strategy heartbeats on the same cadence,
+# so three whole rounds of silence from one of them is not scheduling noise.
+QUIET_ROUNDS = 3
+
+# How often a strategy heartbeats. The trainer prints one line for each
+# strategy about this often, so three of these is the silence that means a
+# worker went rather than a pass being long.
+HEARTBEAT_SECONDS = 30.0
+
+# The colour of each meaning the screen carries. A name states the meaning,
+# never the colour, so a reader of the code cannot use green for a warning.
+CODES = {
+    "good": "32",
+    "bad": "31",
+    "warn": "33",
+    "note": "36",
+    "dim": "2",
+    "head": "1",
+}
+
+
+class Paint:
+    """Wrap text in an ANSI colour, or hand it back unchanged.
+
+    Colour carries meaning on this screen and never decoration. A reader
+    with colour turned off must lose nothing, so every coloured field also
+    says its meaning in words.
+    """
+
+    def __init__(self, enabled: bool) -> None:
+        """Hold whether this painter writes escapes at all."""
+        self.enabled = enabled
+
+    def __call__(self, meaning: str, text: str) -> str:
+        """Return the text in the colour of this meaning."""
+        code = CODES.get(meaning)
+        if not self.enabled or code is None:
+            return text
+        return f"\x1b[{code}m{text}\x1b[0m"
+
+
+def wants_colour(mode: str, stream: object) -> bool:
+    """Say whether to write ANSI escapes.
+
+    The `NO_COLOR` convention wins over every other setting, because a
+    reader who asked for no colour asked last. `watch` hands its child a
+    pipe rather than a terminal, so a caller that wants colour under `watch`
+    must say so with `CLICOLOR_FORCE` or with the mode.
+
+    # References
+
+    [^1]: The NO_COLOR convention. https://no-color.org/
+    """
+    if os.environ.get("NO_COLOR"):
+        return False
+    if mode == "never":
+        return False
+    if mode == "always" or os.environ.get("CLICOLOR_FORCE"):
+        return True
+    return bool(getattr(stream, "isatty", lambda: False)())
+
+
+def fields(body: str) -> dict[str, float | None]:
+    """Return the named fields of a row, with a bare dash as no value."""
+    found: dict[str, float | None] = {}
+    for match in FIELD.finditer(body):
+        text = match.group("value")
+        found[match.group("key")] = None if text == "-" else float(text)
+    return found
+
+
+@dataclass
+class Row:
+    """One finished generation of one strategy."""
+
+    generation: int
+    mean: float
+    best: float
+    spread: float | None
+    won: float | None
+    validation: float | None
+
 
 @dataclass
 class Strategy:
-    """What one strategy has done and is doing."""
+    """What one strategy has done, and what its last word says it is doing.
+
+    The three `last_` fields hold the newest line of each shape, and
+    `heartbeat_mark` holds how many heartbeats the whole log had seen when
+    this strategy last spoke. The difference between that mark and the total
+    is how far behind the other strategies this one has fallen.
+    """
 
     name: str
-    # One row for each finished generation: the number, the mean, the best,
-    # the spread, the win share, and the validation score when the generation
-    # validated. **The validation is the only figure that compares across
-    # generations.** The seed set moves every generation, so the mean and the
-    # win share answer a different question each time. The validation seeds
-    # never move.
-    done: list[tuple[int, float, float, float | None, float | None, float | None]] = (
-        field(default_factory=list)
-    )
+    kind: str = ""
+    done: list[Row] = field(default_factory=list)
     last_working: dict[str, str] | None = None
-    # The last line of a process that waits for another process to measure
-    # the controller baseline. It answers the same question the working line
-    # answers, and it reports no rate because a waiter runs no world.
     last_waiting: dict[str, str] | None = None
+    last_ended: str | None = None
     yardstick: float | None = None
-    validations: list[float] = field(default_factory=list)
+    baseline_return: float | None = None
+    heartbeat_mark: int = 0
+
+    @property
+    def last_validation(self) -> float | None:
+        """Return the newest validation figure, or nothing if it has none."""
+        for row in reversed(self.done):
+            if row.validation is not None:
+                return row.validation
+        return None
+
+    @property
+    def validations(self) -> list[tuple[int, float]]:
+        """Return every validation figure against its generation number."""
+        return [
+            (row.generation, row.validation)
+            for row in self.done
+            if row.validation is not None
+        ]
+
+    @property
+    def margin(self) -> float | None:
+        """Return how far the newest validation figure sits above the bar."""
+        latest = self.last_validation
+        if latest is None or self.yardstick is None:
+            return None
+        return latest - self.yardstick
 
 
-def read(text: str) -> tuple[dict[str, Strategy], dict[str, float] | None]:
-    """Return what each strategy has reached, and the controller row."""
-    strategies: dict[str, Strategy] = {}
+@dataclass
+class Reading:
+    """Everything one log says about one run."""
+
+    strategies: dict[str, Strategy] = field(default_factory=dict)
     controller: dict[str, float] | None = None
+    heartbeats: int = 0
+    probed: bool = False
 
-    def named(name: str) -> Strategy:
-        found = strategies.get(name)
+
+def read(text: str) -> Reading:
+    """Return what each strategy has reached, and the controller row.
+
+    **The order of the lines decides what a strategy is doing.** A heartbeat
+    says a pass runs, and a terminal line for that pass says it ended. The
+    later line wins, so a finished pass never counts as a working one.
+    """
+    reading = Reading()
+
+    def named(name: str, kind: str = "") -> Strategy:
+        found = reading.strategies.get(name)
         if found is None:
-            found = Strategy(name=name)
-            strategies[name] = found
+            found = Strategy(name=name, kind=kind)
+            reading.strategies[name] = found
+        elif kind and not found.kind:
+            found.kind = kind
         return found
 
+    def ended(strategy: Strategy, what: str) -> None:
+        """Record that a pass of this strategy reached its end."""
+        strategy.last_ended = what
+        strategy.last_working = None
+        strategy.last_waiting = None
+        strategy.heartbeat_mark = reading.heartbeats
+
     for line in text.splitlines():
+        heading = HEADING.match(line)
+        if heading:
+            named(heading.group("name"), heading.group("kind") or "")
+            continue
+        if PROBE.match(line):
+            reading.probed = True
+            continue
         row = DONE.match(line)
         if row and "working" not in row.group("body"):
             values = fields(row.group("body"))
-            if "mean" not in values or "best" not in values:
-                continue
-            strategy = named(row.group("name"))
-            mean = values["mean"]
-            best = values["best"]
+            mean = values.get("mean")
+            best = values.get("best")
             if mean is None or best is None:
                 continue
-            valid = values.get("valid")
+            strategy = named(row.group("name"))
             strategy.done.append(
-                (
-                    int(row.group("generation")),
-                    mean,
-                    best,
-                    values.get("spread"),
-                    values.get("won"),
-                    valid,
+                Row(
+                    generation=int(row.group("generation")),
+                    mean=mean,
+                    best=best,
+                    spread=values.get("spread"),
+                    won=values.get("won"),
+                    validation=values.get("valid"),
                 )
             )
-            if valid is not None:
-                strategy.validations.append(valid)
+            ended(strategy, f"generation {row.group('generation')}")
             continue
         work = WORKING.match(line)
         if work:
+            reading.heartbeats += 1
             strategy = named(work.group("name"))
             strategy.last_working = work.groupdict()
-            # **The last word decides what the screen says.** A process that
-            # waited and then measured the number itself prints working lines
-            # after its waiting lines, and a screen that kept the waiting line
-            # would report it as idle while it played.
             strategy.last_waiting = None
+            strategy.last_ended = None
+            strategy.heartbeat_mark = reading.heartbeats
             continue
         held = WAITING.match(line)
         if held:
+            reading.heartbeats += 1
             strategy = named(held.group("name"))
             strategy.last_waiting = held.groupdict()
             strategy.last_working = None
+            strategy.last_ended = None
+            strategy.heartbeat_mark = reading.heartbeats
             continue
         yard = YARDSTICK.match(line)
         if yard:
-            named(yard.group("name")).yardstick = float(yard.group("value"))
+            strategy = named(yard.group("name"))
+            strategy.yardstick = float(yard.group("value"))
+            ended(strategy, "yardstick")
             continue
-        if controller is None:
+        base = BASELINE_END.match(line)
+        if base:
+            strategy = named(base.group("name"))
+            strategy.baseline_return = float(base.group("value"))
+            ended(strategy, "baseline")
+            continue
+        if reading.controller is None:
             found = CONTROLLER.match(line)
             if found:
                 try:
-                    import json
-
-                    controller = json.loads(found.group("body").replace("'", '"'))
+                    reading.controller = json.loads(
+                        found.group("body").replace("'", '"')
+                    )
                 except ValueError:
-                    controller = None
-    return strategies, controller
+                    reading.controller = None
+    return reading
+
+
+def rounds_behind(reading: Reading, strategy: Strategy) -> int:
+    """Return how many whole rounds of heartbeats this strategy has missed.
+
+    Every strategy heartbeats on the same cadence, so the heartbeats of the
+    others are a clock that needs no wall clock. This keeps the reading of a
+    stored log fixed, whatever the hour it is read at.
+    """
+    others = max(1, len(reading.strategies) - 1)
+    return (reading.heartbeats - strategy.heartbeat_mark) // others
+
+
+def state_of(reading: Reading, strategy: Strategy, log_quiet: float) -> str:
+    """Return one word for what this strategy is doing.
+
+    The words are `working`, `waiting`, `quiet`, `ended` and `silent`.
+    `ended` says the last pass finished and nothing has started since.
+    `quiet` says a pass claims to run while the strategy has stopped
+    speaking, which is the shape a crashed worker leaves.
+    """
+    if strategy.last_working is None and strategy.last_waiting is None:
+        return "ended" if strategy.last_ended else "silent"
+    if log_quiet >= QUIET_ROUNDS * HEARTBEAT_SECONDS:
+        return "quiet"
+    if rounds_behind(reading, strategy) >= QUIET_ROUNDS:
+        return "quiet"
+    return "waiting" if strategy.last_waiting else "working"
+
+
+def phase(reading: Reading, states: dict[str, str]) -> str:
+    """Return what the run is doing right now, in the reader's words.
+
+    A run builds the engine, measures the ticks a second, measures the
+    controller baseline and the yardstick, and then trains. The phase comes
+    from the passes that are running, never from a guess about the order.
+    """
+    if not reading.strategies:
+        return (
+            "measuring the ticks a second"
+            if reading.probed
+            else "building the engine, the trainer has said nothing"
+        )
+    passes = [
+        " ".join(strategy.last_working["what"].split())
+        for name, strategy in reading.strategies.items()
+        if strategy.last_working and states[name] in {"working", "waiting"}
+    ]
+    for pass_name in ("baseline", "yardstick"):
+        if any(what.startswith(pass_name) for what in passes):
+            return f"measuring the controller {pass_name}"
+    training = [what for what in passes if what.startswith("generation")]
+    if training:
+        numbers = sorted(int(what.split()[-1]) for what in training)
+        return f"training generation {numbers[0]}"
+    if any(word == "quiet" for word in states.values()):
+        return "nothing has spoken lately"
+    return "between passes"
 
 
 def clock(seconds: float) -> str:
@@ -193,172 +433,302 @@ def clock(seconds: float) -> str:
     return f"{int(seconds) // 3600}h{(int(seconds) % 3600) // 60:02d}m"
 
 
-def render(
-    strategies: dict[str, Strategy],
-    controller: dict[str, float] | None,
-    price: float,
-    generations: int,
-    elapsed: float,
-    log_age: float,
-    facts: str,
-    recent: int,
-) -> str:
-    """Return the screen."""
-    lines: list[str] = []
-    spent = price * elapsed / 3600.0
-    lines.append(f"=== {facts}")
+def link_words(link: str, asked: float) -> tuple[str, str]:
+    """Return the sentence about the connection, and its meaning for colour.
 
-    total_done = sum(len(s.done) for s in strategies.values())
-    # The caller gives the target for the whole run, not for one strategy, so
-    # this script holds no count of the strategies. The log names them.
-    target = generations
-    rate_now = 0.0
-    for strategy in strategies.values():
-        if strategy.last_working:
-            rate_now += float(strategy.last_working["rate"])
+    Three states look the same to a careless reader and are not the same
+    thing. `cached` says this watcher did not ask. `silent` says it asked
+    and got nothing. `gone` says the instance no longer exists, which is
+    what a reclaimed spot instance leaves behind.
+    """
+    age = f"{asked:.0f}s old" if asked >= 0 else "of an unknown age"
+    if link == "live":
+        return "live, the instance answered just now", "good"
+    if link == "cached":
+        return f"live, showing a copy {age}, no read due yet", "good"
+    if link == "silent":
+        return f"the instance did not answer, showing data {age}", "warn"
+    if link == "gone":
+        return f"the instance is gone, showing the last data, {age}", "bad"
+    if link == "local":
+        return "the run ended, reading the log it brought back", "note"
+    return f"unknown, showing data {age}", "warn"
 
-    left = ""
-    if total_done and elapsed:
-        # **This rate already holds the parallelism.** It is the wall clock
-        # divided by every generation that finished anywhere, so the strategies
-        # running at once are counted in it. Dividing again by the strategy
-        # count was wrong, and it reported a quarter of the time that was left.
-        each = elapsed / total_done
-        remaining = max(target - total_done, 0) * each
-        left = f"   left ~{clock(remaining)}"
-    lines.append(
-        f"  elapsed {clock(elapsed)}   spent ${spent:.2f}   "
-        f"generations {total_done}/{target}{left}"
-    )
-    lines.append(
-        f"  machine rate {rate_now:9.1f} ticks/s across "
-        f"{sum(1 for s in strategies.values() if s.last_working)} live processes"
-        + (f"   log age {log_age:.0f}s" if log_age >= 0 else "")
-    )
-    if controller:
-        lines.append(
-            f"  bar to beat   controller wins {controller.get('won', 0.0):.3f} "
-            f"return {controller.get('return', 0.0):9.1f}"
+
+@dataclass
+class Facts:
+    """What the caller measured about the machine and the run."""
+
+    heading: str = "training run"
+    link: str = "unknown"
+    asked: float = -1.0
+    log_quiet: float = -1.0
+    elapsed: float = 0.0
+    price: float = 0.0
+    generations: int = 0
+    load: float = -1.0
+    cores: int = 0
+
+
+def header(
+    reading: Reading, states: dict[str, str], facts: Facts, paint: Paint
+) -> list[str]:
+    """Return the lines above the table.
+
+    **A price of zero is an unknown price, not a free run.** The teardown of
+    a run removes the state file that holds the price. A screen of an ended
+    run must not report that the run cost nothing.
+    """
+    lines = [paint("head", f"=== {facts.heading}")]
+
+    sentence, meaning = link_words(facts.link, facts.asked)
+    quiet = ""
+    if facts.log_quiet >= 0:
+        quiet_meaning = (
+            "warn" if facts.log_quiet >= QUIET_ROUNDS * HEARTBEAT_SECONDS else "dim"
         )
-    lines.append("")
+        quiet = "   " + paint(
+            quiet_meaning, f"the run last wrote {facts.log_quiet:.0f}s ago"
+        )
+    lines.append(f"  link      {paint(meaning, sentence)}{quiet}")
 
-    header = (
-        f"  {'strategy':<14}{'gen':>5} {'mean':>10} {'best':>10} "
-        f"{'spread':>9} {'won':>5}  now"
+    working = [name for name, word in states.items() if word == "working"]
+    busy = ""
+    if facts.load >= 0 and facts.cores:
+        share = facts.load / facts.cores
+        load_meaning = "good" if 0.5 <= share <= 1.15 else "warn"
+        busy = "   " + paint(
+            load_meaning, f"load {facts.load:.1f} of {facts.cores} cores ({share:.0%})"
+        )
+    lines.append(
+        f"  phase     {paint('note', phase(reading, states))}"
+        f"   {len(working)} of {len(reading.strategies)} strategies working{busy}"
     )
-    recent_header = (
-        f"  {'strategy':<14}{'gen':>5} {'mean':>10} {'best':>10} "
-        f"{'spread':>9} {'won':>5} {'valid':>9}"
+
+    total_done = sum(len(s.done) for s in reading.strategies.values())
+    spent = f"spent ${facts.price * facts.elapsed / 3600.0:.2f}"
+    if facts.price <= 0:
+        spent = "spend unknown, no price for this run"
+    target = f"/{facts.generations}" if facts.generations > 0 else ""
+    left = ""
+    projected = ""
+    if total_done and facts.elapsed and facts.generations > 0:
+        each = facts.elapsed / total_done
+        remaining = max(facts.generations - total_done, 0) * each
+        left = f"   left ~{clock(remaining)}"
+        if facts.price > 0:
+            whole = facts.price * (facts.elapsed + remaining) / 3600.0
+            projected = f"   whole run ~${whole:.2f}"
+    lines.append(
+        f"  clock     elapsed {clock(facts.elapsed)}   {spent}"
+        f"   generations {total_done}{target}{left}{projected}"
     )
-    lines.append(header)
-    for name in sorted(strategies):
-        strategy = strategies[name]
+
+    beats = [
+        reading.strategies[name].last_working
+        for name in working
+        if reading.strategies[name].last_working
+    ]
+    rate = sum(float(beat["rate"]) for beat in beats if beat)
+    lines.append(
+        f"  machine   {rate:.0f} ticks/s across {len(working)} working "
+        f"{'process' if len(working) == 1 else 'processes'}"
+    )
+    if reading.controller:
+        lines.append(
+            paint(
+                "dim",
+                f"  baseline  the controller took return "
+                f"{reading.controller.get('return', 0.0):.1f} "
+                f"and won {reading.controller.get('won', 0.0):.3f} of its games",
+            )
+        )
+    return lines
+
+
+def now_words(strategy: Strategy, word: str) -> str:
+    """Return the short sentence for the state column of one strategy."""
+    if word == "silent":
+        return "no word yet"
+    if word == "ended":
+        ended = " ".join((strategy.last_ended or "").split())
+        return f"ended {ended}, nothing started since"
+    if strategy.last_waiting:
+        held = strategy.last_waiting
+        return (
+            f"{held['what']} waiting on another process [{float(held['seconds']):.0f}s]"
+        )
+    work = strategy.last_working
+    if work is None:
+        return "no word yet"
+    what = " ".join(work["what"].split())
+    body = (
+        f"{what} d{work['decisions']} live {work['live']}/{work['worlds']} "
+        f"{float(work['rate']):.0f}t/s [{float(work['seconds']):.0f}s]"
+    )
+    return f"QUIET, last said {body}" if word == "quiet" else body
+
+
+STATE_MEANING = {
+    "working": "good",
+    "waiting": "note",
+    "quiet": "bad",
+    "ended": "dim",
+    "silent": "warn",
+}
+
+
+def table(reading: Reading, states: dict[str, str], paint: Paint) -> list[str]:
+    """Return the one row for each strategy, newest figures first.
+
+    The starred columns come from the training seeds of their own
+    generation, and that seed set moves every generation. They do not
+    compare with the same column of another generation.
+    """
+    lines = [
+        paint(
+            "head",
+            f"  {'strategy':<19}{'kind':<11}{'gen':>4} {'mean*':>10} {'best*':>10} "
+            f"{'spread*':>9} {'won*':>5} {'valid':>10} {'vs bar':>8}  state",
+        )
+    ]
+    for name in sorted(reading.strategies):
+        strategy = reading.strategies[name]
         if strategy.done:
-            generation, mean, best, spread, won, _ = strategy.done[-1]
-            spread_text = "        -" if spread is None else f"{spread:9.1f}"
-            won_text = "    -" if won is None else f"{won:5.2f}"
-            body = (
-                f"{generation:>5} {mean:>10.1f} {best:>10.1f} {spread_text} {won_text}"
+            newest = strategy.done[-1]
+            spread = "        -" if newest.spread is None else f"{newest.spread:9.1f}"
+            won = "    -" if newest.won is None else f"{newest.won:5.2f}"
+            body = paint(
+                "dim",
+                f"{newest.generation:>4} {newest.mean:>10.1f} {newest.best:>10.1f} "
+                f"{spread} {won}",
             )
         else:
-            body = f"{'-':>5} {'-':>10} {'-':>10} {'-':>9} {'-':>5}"
-        now = "no word yet"
-        if strategy.last_working:
-            work = strategy.last_working
-            now = (
-                f"{work['what']} d{work['decisions']} "
-                f"live {work['live']}/{work['worlds']} "
-                f"{float(work['rate']):.0f}t/s [{float(work['seconds']):.0f}s]"
-            )
-        if strategy.last_waiting:
-            held = strategy.last_waiting
-            now = (
-                f"{held['what']} waiting on another process "
-                f"[{float(held['seconds']):.0f}s]"
-            )
-        lines.append(f"  {name:<14}{body}  {now}")
+            body = paint("dim", f"{'-':>4} {'-':>10} {'-':>10} {'-':>9} {'-':>5}")
+        latest = strategy.last_validation
+        valid = f"{'-':>10}" if latest is None else f"{latest:>10.1f}"
+        margin = strategy.margin
+        if margin is None:
+            versus = f"{'-':>8}"
+        else:
+            versus = paint("good" if margin > 0 else "bad", f"{margin:>+8.0f}")
+        word = states[name]
+        lines.append(
+            f"  {name:<19}{strategy.kind or '-':<11}{body} {valid} {versus}  "
+            + paint(STATE_MEANING.get(word, "dim"), now_words(strategy, word))
+        )
+    lines.append(
+        paint(
+            "dim",
+            "  * taken on the training seeds of that generation. The seed set moves "
+            "every generation, so a starred column does not compare across them.",
+        )
+    )
+    lines.append(
+        paint(
+            "dim",
+            "    `valid` and `vs bar` play the validation seeds, which never move. "
+            "`vs bar` is the newest validation figure less the controller yardstick.",
+        )
+    )
+    return lines
 
-    lines.append("")
-    lines.append("  --- recent generations")
-    lines.append(recent_header)
+
+def curves(reading: Reading, paint: Paint) -> list[str]:
+    """Return one line for each strategy that has a validation series.
+
+    Every other column moves with the seed set of its generation. These play
+    the same seeds every time, so this is the row that says whether the run
+    is learning.
+    """
+    lines: list[str] = []
+    for name in sorted(reading.strategies):
+        strategy = reading.strategies[name]
+        series = strategy.validations
+        if not series:
+            continue
+        if not lines:
+            lines.append("")
+            lines.append(paint("head", "  --- the validation seeds, which never move"))
+        body = " ".join(f"g{number}:{value:.0f}".ljust(13) for number, value in series)
+        margin = strategy.margin
+        verdict = "   bar not measured yet"
+        if margin is not None:
+            verdict = paint(
+                "good" if margin > 0 else "bad",
+                f"   {'above' if margin > 0 else 'below'} the bar "
+                f"{strategy.yardstick:.0f} by {abs(margin):.0f}",
+            )
+        lines.append(f"  {name:<19}{body}{verdict}")
+    if lines:
+        lines.append(
+            paint(
+                "dim",
+                "  The bar plays the built-in controller in every seat, so it is the "
+                "chance line and not a standard of play.",
+            )
+        )
+    return lines
+
+
+def recent(reading: Reading, keep: int, paint: Paint) -> list[str]:
+    """Return the newest finished generations across every strategy."""
+    lines = [
+        "",
+        paint("head", "  --- recent generations"),
+        paint(
+            "head",
+            f"  {'strategy':<19}{'gen':>4} {'mean*':>10} {'best*':>10} "
+            f"{'spread*':>9} {'won*':>5} {'valid':>9}",
+        ),
+    ]
     rows: list[tuple[int, str, str]] = []
-    for name in sorted(strategies):
-        for generation, mean, best, spread, won, valid in strategies[name].done:
-            spread_text = "        -" if spread is None else f"{spread:9.1f}"
-            won_text = "    -" if won is None else f"{won:5.2f}"
-            valid_text = "        -" if valid is None else f"{valid:9.1f}"
+    for name in sorted(reading.strategies):
+        for row in reading.strategies[name].done:
+            spread = "        -" if row.spread is None else f"{row.spread:9.1f}"
+            won = "    -" if row.won is None else f"{row.won:5.2f}"
+            valid = "        -" if row.validation is None else f"{row.validation:9.1f}"
             rows.append(
                 (
-                    generation,
+                    row.generation,
                     name,
-                    f"  {name:<14}{generation:>5} {mean:>10.1f} {best:>10.1f} "
-                    f"{spread_text} {won_text} {valid_text}",
+                    f"  {name:<19}{row.generation:>4} {row.mean:>10.1f} "
+                    f"{row.best:>10.1f} {spread} {won} {valid}",
                 )
             )
     rows.sort(key=lambda row: (row[0], row[1]))
-    for _, _, text in rows[-recent:]:
-        lines.append(text)
     if not rows:
         lines.append("  none finished yet. The rows above say what is running.")
+        return lines
+    for _, _, text in rows[-keep:]:
+        lines.append(text)
+    return lines
 
-    # **The learning curve.** Every other column moves with the seed set of
-    # its generation, so two of them do not compare. These play the same
-    # seeds every time, so this row is the one that says whether the run is
-    # learning.
-    for name in sorted(strategies):
-        strategy = strategies[name]
-        series = [
-            (generation, valid)
-            for generation, _, _, _, _, valid in strategy.done
-            if valid is not None
-        ]
-        if not series:
-            continue
-        lines.append("")
-        yard = strategy.yardstick
-        lines.append(
-            f"  --- {name}: the validation seeds, which never move"
-            + (f"   chance reaches {yard:.1f}" if yard is not None else "")
-        )
-        lines.append(
-            "      "
-            + "  ".join(f"g{generation}:{value:.0f}" for generation, value in series)
-        )
-        if len(series) >= 2:
-            first, last = series[0][1], series[-1][1]
-            moved = last - first
-            way = "up" if moved > 0 else "down"
-            gap = f", {yard - last:.0f} from chance" if yard is not None else ""
-            lines.append(
-                f"      moved {moved:+.0f} over {len(series)} validations, {way}{gap}"
-            )
 
-    for name in sorted(strategies):
-        strategy = strategies[name]
-        if strategy.validations and strategy.yardstick is not None:
-            best = max(strategy.validations)
-            # **The yardstick is the chance line, not a measure of skill.** The
-            # yardstick world gives the learner seat back to the built-in
-            # controller, so every faction of that game is the same controller.
-            # One seat of a symmetric game takes one share of the wins for each
-            # faction, whatever the controller does. A screen that reads
-            # "beats the controller" invites a reader to take chance for
-            # quality, and it did.
-            verdict = "above" if best > strategy.yardstick else "below"
-            lines.append(
-                f"  {name:<14}validation best {best:9.1f} "
-                f"{verdict} the yardstick {strategy.yardstick:9.1f}"
-            )
-            lines.append(
-                f"  {'':<14}the yardstick plays the controller in every seat, "
-                f"so it is the chance line and not a standard of play"
-            )
+def render(
+    reading: Reading, facts: Facts, keep: int = 15, paint: Paint | None = None
+) -> str:
+    """Return the whole screen.
+
+    The painter is a parameter so that a test reads plain text and a
+    terminal reads colour from the same code.
+    """
+    paint = paint or Paint(False)
+    states = {
+        name: state_of(reading, strategy, facts.log_quiet)
+        for name, strategy in reading.strategies.items()
+    }
+    lines = header(reading, states, facts, paint)
+    lines.append("")
+    lines.extend(table(reading, states, paint))
+    lines.extend(recent(reading, keep, paint))
+    lines.extend(curves(reading, paint))
     return "\n".join(lines)
 
 
 def main() -> int:
     """Read the log the caller names, and print the screen."""
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description="Render one training watch screen.")
     parser.add_argument("log", type=Path)
     parser.add_argument("--price", type=float, default=0.0)
     parser.add_argument(
@@ -367,30 +737,59 @@ def main() -> int:
         default=100,
         help="how many generations the whole run holds, across every strategy",
     )
-    parser.add_argument("--started", type=float, default=0.0)
+    parser.add_argument(
+        "--elapsed",
+        type=float,
+        default=0.0,
+        help="the wall clock seconds since the run started",
+    )
     parser.add_argument("--facts", type=str, default="training run")
+    parser.add_argument(
+        "--link",
+        choices=["live", "cached", "silent", "gone", "local", "unknown"],
+        default="unknown",
+        help="what the caller knows about reaching the instance",
+    )
+    parser.add_argument(
+        "--asked",
+        type=float,
+        default=-1.0,
+        help="seconds since the caller last got an answer from the instance",
+    )
+    parser.add_argument(
+        "--log-quiet",
+        type=float,
+        default=-1.0,
+        help="seconds since the run last wrote a line, measured on the instance",
+    )
+    parser.add_argument("--load", type=float, default=-1.0)
+    parser.add_argument("--cores", type=int, default=0)
     parser.add_argument("--recent", type=int, default=15)
+    parser.add_argument(
+        "--colour",
+        choices=["auto", "always", "never"],
+        default="auto",
+        help="auto writes colour to a terminal only. NO_COLOR wins over all three.",
+    )
     arguments = parser.parse_args()
 
-    if not arguments.log.exists():
-        print(f"no log at {arguments.log} yet")
-        return 0
-    text = arguments.log.read_text(errors="replace")
-    age = time.time() - arguments.log.stat().st_mtime
-    elapsed = time.time() - arguments.started if arguments.started else 0.0
-    strategies, controller = read(text)
-    print(
-        render(
-            strategies,
-            controller,
-            arguments.price,
-            arguments.generations,
-            elapsed,
-            age,
-            arguments.facts,
-            arguments.recent,
-        )
+    paint = Paint(wants_colour(arguments.colour, sys.stdout))
+
+    text = ""
+    if arguments.log.exists():
+        text = arguments.log.read_text(errors="replace")
+    facts = Facts(
+        heading=arguments.facts,
+        link=arguments.link,
+        asked=arguments.asked,
+        log_quiet=arguments.log_quiet,
+        elapsed=arguments.elapsed,
+        price=arguments.price,
+        generations=arguments.generations,
+        load=arguments.load,
+        cores=arguments.cores,
     )
+    print(render(read(text), facts, arguments.recent, paint))
     return 0
 
 

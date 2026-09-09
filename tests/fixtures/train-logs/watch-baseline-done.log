@@ -1,0 +1,17 @@
+  measuring 1 process(es) of 10 workers over 512 worlds each
+=== alpha (linear) ===
+=== beta (linear) ===
+=== gamma (structured) ===
+=== delta (structured) ===
+  alpha baseline working  decisions    43 live  233/256  ticks    107650 rate   3517.5 t/s [31s]
+  beta baseline working  decisions    43 live  233/256  ticks    107650 rate   3515.9 t/s [31s]
+  gamma baseline working  decisions    43 live  233/256  ticks    107650 rate   3516.0 t/s [31s]
+  delta baseline working  decisions    43 live  233/256  ticks    107650 rate   3515.6 t/s [31s]
+  alpha baseline working  decisions   218 live   91/256  ticks    378100 rate   1288.0 t/s [183s]
+  beta baseline working  decisions   218 live   91/256  ticks    378100 rate   1288.0 t/s [183s]
+  gamma baseline working  decisions   218 live   91/256  ticks    378100 rate   1288.0 t/s [183s]
+  delta baseline working  decisions   218 live   91/256  ticks    378100 rate   1288.0 t/s [183s]
+  alpha controller measured return     1480.2 won  0.34
+  beta controller cached return     1480.2 won  0.34
+  gamma controller cached return     1480.2 won  0.34
+  delta controller cached return     1480.2 won  0.34

@@ -49,22 +49,36 @@ import argparse
 import json
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# One generation line. Every field after the best score is optional, because
-# the trainer prints the spread, the win share and the validation figure only
-# when it has them.
+# One generation line, for example:
+#   conquer generation  1 mean 884.5 best 1586.5 spread 1298.8 abs-spread
+#   1298.8 won 0.06 ticks 852690 refused 0.00 valid 870.4 [1231s]
+#
+# **The fields are read by name, not by their order.** A pattern that fixed
+# the order stopped matching every generation line the moment `abs-spread`
+# appeared between the spread and the win share. The feed then reported a run
+# with no generation, no elapsed time and no spend, rather than an error, and
+# it reported that for every real log.
 GENERATION = re.compile(
     r"^\s+(?P<name>\S+) generation\s+(?P<generation>\d+)\s+"
-    r"mean\s+(?P<mean>-?[\d.]+)\s+"
-    r"best\s+(?P<best>-?[\d.]+)"
-    r"(?:\s+spread\s+(?P<spread>-?[\d.]+))?"
-    r"(?:\s+won\s+(?P<won>-?[\d.]+))?"
-    r"(?:\s+ticks\s+(?P<ticks>\d+))?"
-    r"(?:\s+valid\s+(?P<validation>-|-?[\d.]+))?"
-    r"\s+\[(?P<seconds>[\d.]+)s\]"
+    r"(?P<body>.*?)\s*\[(?P<seconds>[\d.]+)s\]\s*$"
 )
+
+# One `name value` pair of the body. A value is a number or a bare `-`.
+FIELD = re.compile(r"(?P<key>[a-z][a-z-]*)\s+(?P<value>-?[\d.]+|-)")
+
+
+def fields(body: str) -> dict[str, float | None]:
+    """Return the named fields of a generation line, a dash meaning none."""
+    found: dict[str, float | None] = {}
+    for match in FIELD.finditer(body):
+        text = match.group("value")
+        found[match.group("key")] = None if text == "-" else float(text)
+    return found
+
 
 # The heading that starts a strategy, for example `=== conquer (linear) ===`.
 HEADING = re.compile(r"^=== (?P<name>[\w-]+)(?: \((?P<kind>\w+)\))? ===\s*$")
@@ -144,6 +158,10 @@ class Progress:
 
     strategies: list[Strategy] = field(default_factory=list)
     controller: dict[str, float] = field(default_factory=dict)
+    # The wall clock the run has used, which the caller measures from the
+    # start of the run. The log cannot supply it, so a caller that knows the
+    # start must set it.
+    wall_clock_seconds: float | None = None
 
     @property
     def generations_done(self) -> int:
@@ -154,13 +172,25 @@ class Progress:
     def elapsed_seconds(self) -> float:
         """Return the wall clock the run has used.
 
-        The trainer counts from zero at each strategy, so the total is the
-        sum of the last figure of each one.
+        **The wall clock the caller measured wins.** A run spends money from
+        the first minute, through the engine build and through the controller
+        baseline, and the log names no generation in that time.
+
+        The log is the fallback, and it gives the cumulative seconds of the
+        newest generation. The strategies run at the same time, so the
+        longest one is the wall clock and the sum of them is not. A reader
+        that summed them reported six times the truth on a run of six
+        strategies, and reported zero before the first generation finished.
         """
-        return sum(
-            strategy.generations[-1].seconds
-            for strategy in self.strategies
-            if strategy.generations
+        if self.wall_clock_seconds is not None:
+            return self.wall_clock_seconds
+        return max(
+            (
+                strategy.generations[-1].seconds
+                for strategy in self.strategies
+                if strategy.generations
+            ),
+            default=0.0,
         )
 
     @property
@@ -215,37 +245,28 @@ def parse(text: str) -> Progress:
             continue
 
         row = GENERATION.match(line)
-        if row:
+        if row and "working" not in row.group("body"):
+            values = fields(row.group("body"))
+            mean = values.get("mean")
+            best = values.get("best")
+            if mean is None or best is None:
+                continue
             # The row names its strategy, so it does not go to whichever
             # heading came last. With several trainers writing one file, the
             # last heading is usually another strategy entirely.
             owner = strategy_named(row.group("name"))
-            validation = row.group("validation")
+            ticks = values.get("ticks")
             owner.generations.append(
                 Generation(
                     name=row.group("name"),
                     generation=int(row.group("generation")),
-                    mean=float(row.group("mean")),
-                    best=float(row.group("best")),
+                    mean=mean,
+                    best=best,
                     seconds=float(row.group("seconds")),
-                    spread=(
-                        float(row.group("spread"))
-                        if row.group("spread") is not None
-                        else None
-                    ),
-                    won=(
-                        float(row.group("won"))
-                        if row.group("won") is not None
-                        else None
-                    ),
-                    ticks=(
-                        int(row.group("ticks"))
-                        if row.group("ticks") is not None
-                        else None
-                    ),
-                    validation=(
-                        None if validation in (None, "-") else float(str(validation))
-                    ),
+                    spread=values.get("spread"),
+                    won=values.get("won"),
+                    ticks=None if ticks is None else int(ticks),
+                    validation=values.get("valid"),
                 )
             )
             continue
@@ -476,6 +497,13 @@ def main() -> int:
         help="how many generations of each strategy to print. Zero prints "
         f"every one. Default {RECENT_GENERATIONS}",
     )
+    parser.add_argument(
+        "--started",
+        type=float,
+        default=0.0,
+        help="the Unix time the run started. It gives the wall clock, and "
+        "without it the newest generation of the log is the fallback",
+    )
     parser.add_argument("--instance-type", type=str, default="")
     parser.add_argument("--zone", type=str, default="")
     parser.add_argument("--run-id", type=str, default="local")
@@ -503,6 +531,8 @@ def main() -> int:
         return 1
 
     progress = parse(text)
+    if arguments.started > 0:
+        progress.wall_clock_seconds = max(0.0, time.time() - arguments.started)
     if arguments.report:
         report = read_report(arguments.report)
         controller = report.get("controller")
