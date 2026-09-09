@@ -184,28 +184,36 @@ def test_a_refusal_changes_the_ranking() -> None:
     # A refusal must reach the arithmetic. A style whose refusals changed
     # nothing would rank exactly as a style that weighted everything, and
     # every style of the table would then train one policy.
+    #
+    # **The objective this test adds must be one the fixture separates.** The
+    # world here is small and the horizon is short, so most objectives read
+    # nearly one number over the whole episode. Adding such an objective
+    # shifts every score by nearly the same amount and preserves the order,
+    # and the test then measures the fixture rather than the refusal. The
+    # army strength is the objective that separates the candidates of this
+    # fixture furthest, so this test adds that one.
     played = played_episodes("aggressive")
     library = a_library()
     trade = library.style("trade_led")
-    assert "wonder" in trade.refuses
+    assert "military" in trade.refuses
 
-    also_wonder = PlayStyle(
-        name="trade-and-wonder",
-        weights={**trade.weights, "wonder": 3.0},
-        refuses=tuple(name for name in trade.refuses if name != "wonder"),
+    also_army = PlayStyle(
+        name="trade-and-army",
+        weights={**trade.weights, "military": 3.0},
+        refuses=tuple(name for name in trade.refuses if name != "military"),
         won=trade.won,
         lost=trade.lost,
         drawn=trade.drawn,
     )
 
     by_trade = rank_under(trade, played)
-    by_both = rank_under(also_wonder, played)
+    by_both = rank_under(also_army, played)
 
     assert spread(by_trade) > 0.0
     assert spread(by_both) > 0.0
     assert np.argsort(by_trade).tolist() != np.argsort(by_both).tolist(), (
         "the refusal of an objective changed no ranking, so the refusal is "
-        f"decoration. Trade scored {by_trade} and trade with the wonder "
+        f"decoration. Trade scored {by_trade} and trade with the army "
         f"scored {by_both}."
     )
 
@@ -683,3 +691,201 @@ def test_a_fixed_point_term_divides_by_the_published_unit() -> None:
     assert objectives.read(observation).values["ground"] == 1.0
     observation[signal.start] = form.unit // 4
     assert objectives.read(observation).values["ground"] == pytest.approx(0.25)
+
+
+def test_a_compressed_magnitude_term_refuses_a_field_of_another_form() -> None:
+    """The kind entry of a term is a check of a belief and not a label.
+
+    The engine writes each field of the observation under one form and
+    publishes that form in the schema. A compressed magnitude term over a
+    field of another form takes a base-two logarithm of a value the engine
+    already wrote against the unit. The answer stays inside the bounds, so
+    nothing fails, and the term reads a quarter of its range for one part in
+    a hundred of the quantity.
+
+    Two objectives of the shipped table held that shape. This asserts that a
+    term over a share and a term over a group of mixed forms are both
+    refused.[^7]
+
+    References
+    ----------
+    [^7]: Recurring defect shapes, shape 1, two copies that agree are still
+    two copies. ``.agents/rules/recurring-defects.md``
+    """
+    catalogue = a_catalogue()
+    share = catalogue.signal("wonder_progress")
+    assert share.form is not None
+    assert share.form.name == "share"
+
+    with pytest.raises(ObjectiveError, match="as a compressed magnitude") as caught:
+        ObjectiveSet(
+            [
+                Objective(
+                    name="work",
+                    terms=(Term(signal=share.name, kind=TermKind.MAGNITUDE),),
+                )
+            ],
+            catalogue,
+        )
+    message = str(caught.value)
+    assert "share" in message
+    assert TermKind.FIXED_POINT.value in message
+
+    mixed = catalogue.signal("trade_board")
+    assert mixed.form is not None
+    assert not mixed.form.uniform
+
+    with pytest.raises(ObjectiveError, match="as a compressed magnitude"):
+        ObjectiveSet(
+            [
+                Objective(
+                    name="board",
+                    terms=(
+                        Term(
+                            signal=mixed.name,
+                            kind=TermKind.MAGNITUDE,
+                            aggregation=Aggregation.SUM,
+                        ),
+                    ),
+                )
+            ],
+            catalogue,
+        )
+
+
+def test_every_shipped_objective_names_the_kind_the_engine_wrote() -> None:
+    """No objective of the table reads a field under the wrong rule.
+
+    The refusal above covers one term at a time. This drives the shipped
+    table itself, because a table that binds is the only proof that every
+    term of it agrees with the schema of the world the run plays.
+    """
+    library = a_library()
+    catalogue = a_catalogue()
+    objectives = library.objective_set(catalogue)
+
+    for objective in objectives:
+        for term in objective.terms:
+            form = catalogue.signal(term.signal).form
+            assert form is not None, f"{term.signal} carries no form"
+            compressed = form.invertible and form.uniform
+            assert (term.kind is TermKind.MAGNITUDE) == compressed, (
+                f"the objective {objective.name!r} reads {term.signal!r} as "
+                f"{term.kind.value!r} and the engine wrote it as {form.name!r}"
+            )
+
+
+def test_the_renown_objective_reads_the_target_and_not_the_lead() -> None:
+    """A renown win reads the target, so the objective reads the target.
+
+    The engine publishes two shares of renown. One divides the best renown of
+    the faction by the best renown of every faction, so it reads one whole as
+    soon as the faction leads, at any renown. The other divides the best
+    renown by the target a win needs, so it reads one whole only at the win.
+
+    A style led by renown must climb toward the win and not toward the lead.
+    This builds a state in which the faction leads on renown at a quarter of
+    the target, and asserts that the objective reads the quarter.
+    """
+    catalogue = a_catalogue()
+    objectives = a_library().objective_set(catalogue)
+    lead = catalogue.signal("best_renown_share")
+    target = catalogue.signal("renown_progress")
+    form = target.form
+    assert form is not None
+
+    observation = np.zeros(catalogue.observation_length, dtype=np.int64)
+    observation[lead.start] = form.unit
+    observation[target.start] = form.unit // 4
+
+    assert objectives.read(observation).values["renown"] == pytest.approx(0.25)
+
+
+def test_the_trade_objective_separates_two_states_of_a_real_episode() -> None:
+    """The trade objective must read two numbers on two board states.
+
+    A bounded term that pins at one value over a whole episode ranks every
+    candidate the same, and a style led by it trains nothing. The engine
+    publishes a board of market statistics whose positions carry a price, a
+    spread and a depth under three different rules, and no aggregation over
+    them combines one rule.
+
+    This plays a real episode and collects what the objective read at each
+    decision. A fixture that never puts a good on the board would give one
+    value and would measure the fixture, so the assertion names the count it
+    saw.[^3]
+    """
+    library = a_library()
+    catalogue = a_catalogue()
+    objectives = library.objective_set(catalogue)
+    env = Env(CONFIG, library.scoring("trade_led", catalogue))
+    policy = RandomPolicy(seed=0)
+
+    observation = env.reset(SEEDS[0])
+    seen = set()
+    while not env.done:
+        seen.add(round(objectives.read(np.asarray(observation)).values["trade"], 9))
+        mask = env.action_mask()
+        action = policy.choose_many(observation[None, :], mask[None, :])[0]
+        observation = env.step(action).observation
+
+    assert len(seen) > 1, (
+        f"the trade objective read one value, {seen}, over the whole episode. "
+        "A style led by it would rank every candidate the same."
+    )
+
+
+def test_the_military_objective_reads_the_strength_and_not_the_head_count() -> None:
+    """A faction of workers fields no army, and the objective must say so.
+
+    A worker carries no attack and no armour, and an attacker whose attack
+    does not exceed the armour of the defender inflicts nothing. A faction of
+    workers can therefore take no casualty from anybody, however many workers
+    it holds. The engine also holds no person that is not a unit, so the live
+    unit count and the people are one number.
+
+    A military objective over the unit count rewards bodies under the name of
+    an army. This builds a state with many units and no strength, and asserts
+    that the military objective reads nothing while the population objective
+    reads the bodies.
+    """
+    catalogue = a_catalogue()
+    objectives = a_library().objective_set(catalogue)
+    strength = catalogue.signal("military_strength")
+    people = catalogue.signal("population")
+    units = catalogue.signal("live_units")
+    form = people.form
+    assert form is not None
+
+    observation = np.zeros(catalogue.observation_length, dtype=np.int64)
+    crowd = form.unit // 8
+    observation[people.start] = crowd
+    observation[units.start] = crowd
+    observation[strength.start] = 0
+
+    read = objectives.read(observation)
+    assert read.values["military"] == 0.0, (
+        "the military objective read a strength on a faction of workers, so "
+        "it reads the head count and not the army"
+    )
+    assert read.values["population"] > 0.0
+
+
+def test_the_renown_style_leads_on_renown_and_says_nothing_twice() -> None:
+    """The renown style rewards two objectives and refuses the other seven.
+
+    A contest raises the renown of the champion that fells a unit, so the
+    renown objective pays for spending an army. The military objective pays
+    for fielding one, and the style weights it below the renown because it is
+    the means and not the end. The style pays for a win, because the renown
+    path is a win path.
+    """
+    library = a_library()
+    champion = library.style("renown_champion")
+    objectives = tuple(objective.name for objective in library.objectives)
+
+    assert set(champion.weights) == {"renown", "military"}
+    assert set(champion.weights) | set(champion.refuses) == set(objectives)
+    assert champion.won > 0.0
+    assert champion.lost < 0.0
+    assert "renown" in library.style("aggressive").refuses
