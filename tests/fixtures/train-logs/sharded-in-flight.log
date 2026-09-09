@@ -1,0 +1,97 @@
+  measuring 1 process(es) of 16 workers over 1024 worlds each
+  baseline working  decisions    80 live  197/256  ticks    188700 rate   6219.9 t/s [30s]
+  baseline working  decisions   162 live  120/256  ticks    318220 rate   4316.7 t/s [60s]
+  aggressive controller measured return        5.3 won  0.34
+  defensive_expansionist controller measured return        0.6 won  0.34
+  wonder_rush controller measured return      -10.3 won  0.34
+  trade_led controller measured return      -36.7 won  0.34
+
+=== controller baseline ===
+
+=== controller baseline ===
+
+=== controller baseline ===
+
+=== controller baseline ===
+  aggressive baseline working  decisions    36 live  240/256  ticks     91040 rate   2961.6 t/s [31s]
+  wonder_rush baseline working  decisions    36 live  240/256  ticks     91040 rate   2962.9 t/s [31s]
+  defensive_expansionist baseline working  decisions    36 live  240/256  ticks     91040 rate   2961.7 t/s [31s]
+  trade_led baseline working  decisions    36 live  240/256  ticks     91040 rate   2960.5 t/s [31s]
+  defensive_expansionist baseline working  decisions   215 live   91/256  ticks    375370 rate   1617.2 t/s [183s]
+  wonder_rush baseline working  decisions   215 live   91/256  ticks    375370 rate   1617.2 t/s [183s]
+  aggressive baseline working  decisions   215 live   91/256  ticks    375370 rate   1616.9 t/s [183s]
+  trade_led baseline working  decisions   215 live   91/256  ticks    375370 rate   1616.9 t/s [183s]
+  controller {'return': -10.328630043354613, 'episodes': 256.0, 'acceptable_contracts': 0.0, 'alliance_share': 0.0, 'best_renown': 16612.671875, 'best_renown_share': 21978.32421875, 'best_sector_admits_settlement': 0.0, 'board_row_headroom': 40960.0, 'border_length': 2904.23828125, 'centroid_movement': 0.0, 'centroid_offset': 23391.84375, 'committed_stock_share': 79.63671875, 'contested_border_share': 12727.67578125, 'contract_share': 128.0, 'decisions_taken': 0.0, 'domination_gap': -18432.01171875, 'domination_leader': 33108.89453125, 'domination_progress': 18005.06640625, 'domination_rank': 17152.0, 'drawn': 0.0, 'end_tick': 1580.51953125, 'finished_upgrades': 4861.8359375, 'fire_share_held': 0.0, 'fire_share_observed': 0.0, 'food_coverage_ticks': 43264.0, 'free_unit_share': 6156.80859375, 'ground_gap': 37301.40625, 'ground_leader': 11335.8984375, 'ground_progress': 11333.74609375, 'ground_rank': 44672.0, 'hazard_concentration': 0.0, 'held_inside_reach_share': 0.0, 'held_share_observed': 26438.453125, 'held_share_world': 11333.74609375, 'held_tile_change': 0.0, 'held_tiles': 9325.515625, 'held_under_hazard_share': 20475.2421875, 'idle_unit_share': 6156.80859375, 'live_characters': 2055.2421875, 'live_units': 2866.08203125, 'lost': 0.66015625, 'may_found': 10240.0, 'mean_staleness': 0.0, 'military_strength': 0.0, 'newly_observed': 0.0, 'objective.diplomacy': -66.34423828125, 'objective.military': 39.80015044991308, 'objective.population': 39.80015044991308, 'objective.renown': 45.99059581756592, 'objective.settlements': 36.89113521071418, 'objective.territory': 29.84005618095398, 'objective.trade': -41.8551455896119, 'objective.wealth': 51.199452800543554, 'objective.wonder': 18.990141215209192, 'observed_passable_share': 59665.3125, 'observed_share_world': 18107.17578125, 'peace_share': 30208.0, 'population': 2866.08203125, 'population_change': 0.0, 'population_for_each_settlement': 2485.33984375, 'reach_area_share': 16446.3125, 'reach_headroom_share': 31168.0, 'reach_radius': 4138.6328125, 'reach_radius_share': 22911.72265625, 'relation_asymmetry': 1680.0, 'relation_from_leader': 0.0, 'relation_max_out': -9056.0, 'relation_mean_in': -26672.0, 'relation_mean_out': -24992.0, 'relation_min_in': -43136.0, 'relation_min_out': -40928.0, 'relation_to_leader': -256.0, 'remaining_ticks': 11377.19140625, 'renown_gap': -14773.16796875, 'renown_leader': 919.9765625, 'renown_progress': 503.609375, 'renown_rank': 28928.0, 'rival_pair_relation_mean': -26624.0, 'rival_pair_war_share': 35840.0, 'seated_faction_share': 12288.0, 'settle_cost_coverage': 0.0, 'settlements': 1373.53125, 'settlements_lost': 0.0, 'settlements_under_hazard_share': 24725.32421875, 'store_total': 25153.15234375, 'store_value_change': 0.0, 'storm_share_held': 0.0, 'storm_share_observed': 0.0, 'strength_change': 0.0, 'strength_for_each_unit': 0.0, 'tick_share': 41539.265625, 'tiles_burnt': 0.0, 'tiles_lost': 0.0, 'tiles_taken': 0.0, 'unit_count_change': 0.0, 'unit_share_beside_rival': 0.0, 'unit_share_inside_reach': 0.0, 'units_for_each_held_tile': 147.953125, 'units_lost_to_hazard': 0.0, 'unresolved': 0.0, 'upgrade_completions': 0.0, 'upgrades_for_each_settlement': 4460.21875, 'upgrades_underway': 4140.453125, 'war_share': 35328.0, 'water_share_held': 20475.2421875, 'water_share_observed': 4918.01953125, 'window_ticks': 0.0, 'won': 0.33984375, 'wonder_progress': 2024.2265625, 'wonder_track_gap': -24376.61328125, 'wonder_track_leader': 6827.6015625, 'wonder_track_progress': 2024.2265625, 'wonder_track_rank': 24192.0, 'world_passable_tiles': 17232.3359375, 'world_tiles': 18301.0, 'chosen': 0.0, 'refused': 0.0, 'refusal_share': 0.0}
+  the controller baseline was measured
+
+=== wonder_rush (structured) ===
+  the controller baseline was measured
+
+=== defensive_expansionist (structured) ===
+  the controller baseline was measured
+
+=== aggressive (structured) ===
+  the controller baseline was measured
+
+=== trade_led (structured) ===
+  aggressive yardstick working  decisions    60 live  109/128  ticks     72380 rate   2384.0 t/s [30s]
+  defensive_expansionist yardstick working  decisions    60 live  109/128  ticks     72380 rate   2383.8 t/s [30s]
+  trade_led yardstick working  decisions    60 live  109/128  ticks     72380 rate   2383.1 t/s [30s]
+  wonder_rush yardstick working  decisions    60 live  109/128  ticks     72380 rate   2382.2 t/s [30s]
+  aggressive yardstick working  decisions   188 live   52/128  ticks    173370 rate   1590.9 t/s [91s]
+  defensive_expansionist yardstick working  decisions   188 live   52/128  ticks    173370 rate   1590.4 t/s [91s]
+  trade_led yardstick working  decisions   188 live   52/128  ticks    173370 rate   1588.4 t/s [91s]
+  wonder_rush yardstick working  decisions   188 live   52/128  ticks    173370 rate   1588.6 t/s [91s]
+  aggressive controller yardstick      -1.3
+  aggressive scores each generation in 2 processes of 8 workers
+  defensive_expansionist controller yardstick      -6.3
+  defensive_expansionist scores each generation in 2 processes of 8 workers
+  wonder_rush controller yardstick     -18.4
+  wonder_rush scores each generation in 2 processes of 8 workers
+  trade_led controller yardstick     -42.3
+  trade_led scores each generation in 2 processes of 8 workers
+  aggressive generation  0 shard 1/2 working  decisions    18 live  512/512  ticks     92160 rate   2970.8 t/s [31s]
+  defensive_expansionist generation  0 shard 1/2 working  decisions    18 live  512/512  ticks     92160 rate   2972.6 t/s [31s]
+  wonder_rush generation  0 shard 1/2 working  decisions    18 live  512/512  ticks     92160 rate   2973.2 t/s [31s]
+  trade_led generation  0 shard 1/2 working  decisions    18 live  512/512  ticks     92160 rate   2973.2 t/s [31s]
+  aggressive generation  0 shard 2/2 working  decisions    18 live  512/512  ticks     92160 rate   2936.2 t/s [31s]
+  defensive_expansionist generation  0 shard 2/2 working  decisions    18 live  512/512  ticks     92160 rate   2932.7 t/s [31s]
+  trade_led generation  0 shard 2/2 working  decisions    18 live  512/512  ticks     92160 rate   2934.1 t/s [31s]
+  wonder_rush generation  0 shard 2/2 working  decisions    18 live  512/512  ticks     92160 rate   2932.6 t/s [31s]
+  wonder_rush generation  0 shard 2/2 working  decisions   243 live  198/512  ticks    911790 rate   1874.9 t/s [398s]
+  aggressive generation  0 shard 2/2 working  decisions   244 live  196/512  ticks    913770 rate   1874.5 t/s [399s]
+  defensive_expansionist generation  0 shard 2/2 working  decisions   244 live  196/512  ticks    913770 rate   1869.7 t/s [399s]
+  trade_led generation  0 shard 2/2 working  decisions   244 live  196/512  ticks    913770 rate   1875.0 t/s [399s]
+  wonder_rush generation  0 shard 1/2 working  decisions   237 live  211/512  ticks    909420 rate   1877.6 t/s [400s]
+  aggressive generation  0 shard 1/2 working  decisions   238 live  210/512  ticks    911530 rate   1882.2 t/s [401s]
+  trade_led generation  0 shard 1/2 working  decisions   238 live  210/512  ticks    911530 rate   1881.9 t/s [401s]
+  defensive_expansionist generation  0 shard 1/2 working  decisions   238 live  210/512  ticks    911530 rate   1881.6 t/s [401s]
+  aggressive generation  0 mean     -48.5 best       7.8 spread     81.7 abs-spread     81.7 won  0.05 ticks 1860920 refused  0.02 valid - [417s]
+  trade_led generation  0 mean     -89.9 best      17.5 spread    129.4 abs-spread    129.4 won  0.05 ticks 1860920 refused  0.02 valid - [417s]
+  defensive_expansionist generation  0 mean     -60.8 best      -5.4 spread     75.6 abs-spread     75.6 won  0.05 ticks 1860920 refused  0.02 valid - [417s]
+  wonder_rush generation  0 mean     -78.9 best       0.4 spread     97.3 abs-spread     97.3 won  0.05 ticks 1860920 refused  0.02 valid - [418s]
+  trade_led generation  1 shard 1/2 working  decisions    18 live  512/512  ticks     92160 rate   3020.4 t/s [31s]
+  trade_led generation  1 shard 2/2 working  decisions    18 live  512/512  ticks     92160 rate   2992.6 t/s [31s]
+  defensive_expansionist generation  1 shard 2/2 working  decisions    18 live  512/512  ticks     92160 rate   3000.3 t/s [31s]
+  aggressive generation  1 shard 1/2 working  decisions    18 live  512/512  ticks     92160 rate   2982.6 t/s [31s]
+  defensive_expansionist generation  1 shard 1/2 working  decisions    18 live  512/512  ticks     92160 rate   2985.6 t/s [31s]
+  wonder_rush generation  1 shard 2/2 working  decisions    18 live  512/512  ticks     92160 rate   3008.7 t/s [31s]
+  aggressive generation  1 shard 2/2 working  decisions    18 live  512/512  ticks     92160 rate   2966.4 t/s [31s]
+  wonder_rush generation  1 shard 1/2 working  decisions    18 live  512/512  ticks     92160 rate   2989.5 t/s [31s]
+  trade_led generation  1 shard 2/2 working  decisions   229 live  176/512  ticks    856640 rate   1748.4 t/s [400s]
+  aggressive generation  1 shard 2/2 working  decisions   234 live  163/512  ticks    862610 rate   1759.6 t/s [401s]
+  aggressive generation  1 shard 1/2 working  decisions   229 live  167/512  ticks    851450 rate   1718.7 t/s [401s]
+  wonder_rush generation  1 shard 2/2 working  decisions   237 live  152/512  ticks    866440 rate   1741.3 t/s [402s]
+  defensive_expansionist generation  1 shard 2/2 working  decisions   237 live  152/512  ticks    860420 rate   1731.8 t/s [403s]
+  wonder_rush generation  1 shard 1/2 working  decisions   228 live  179/512  ticks    856150 rate   1686.2 t/s [403s]
+  defensive_expansionist generation  1 shard 1/2 working  decisions   226 live  179/512  ticks    847810 rate   1669.9 t/s [405s]
+  trade_led generation  1 shard 1/2 working  decisions   248 live  157/512  ticks    895650 rate   1673.3 t/s [428s]
+  aggressive validation  1 working  decisions    56 live  119/128  ticks     69710 rate   2294.6 t/s [30s]
+  wonder_rush validation  1 working  decisions    78 live  116/128  ticks     96140 rate   3159.7 t/s [30s]
+  defensive_expansionist validation  1 working  decisions    56 live  121/128  ticks     69990 rate   2287.3 t/s [31s]
+  trade_led validation  1 working  decisions    66 live  115/128  ticks     81400 rate   2671.2 t/s [30s]
+  wonder_rush validation  1 working  decisions   151 live   84/128  ticks    171510 rate   2486.4 t/s [61s]
+  defensive_expansionist validation  1 working  decisions   106 live  107/128  ticks    126750 rate   1858.8 t/s [61s]
+  trade_led validation  1 working  decisions   118 live  105/128  ticks    138300 rate   1890.4 t/s [61s]
+  aggressive validation  1 working  decisions   156 live   89/128  ticks    175900 rate   1688.6 t/s [91s]
+  wonder_rush generation  1 mean     -61.5 best      10.2 spread    104.0 abs-spread    104.0 won  0.10 ticks 1775860 refused  0.00 valid      -6.0 [936s]

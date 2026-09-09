@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-695**
+**Next number: FND-696**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18353,3 +18353,42 @@ that it did. A single-seat score is a statement about one seat of one world.
 The rotations here are cyclic and not the full six permutations, so the seat is
 cancelled and the neighbour is not. Which faction sits to a player's left is
 still unmeasured.
+
+### FND-695 — A field added between the pass and its marker made every working line invisible, and the watch screen reported an idle machine
+
+**Believed.** The watch screen was taken to say what a training run is doing.
+It reads the heartbeat each scoring process prints, and it holds a pattern for
+that line. The pattern named the pass, then the word `working`, then the
+fields.
+
+**True.** The trainer started splitting a generation over several processes,
+and it now prints the shard between the pass and the marker. The pattern
+matched no heartbeat after that. The screen then reported zero ticks a second
+across zero working processes, named the phase "between passes", and said
+"ended generation 0, nothing started since" for every strategy. The machine
+was at about 13700 ticks a second across eight busy processes, each about
+seven tenths of the way through generation 1.
+
+Two more readings were wrong at the same moment. A validation pass named no
+phase, so a run inside one read as a run between passes. The heartbeat clock
+divided by the count of strategies, so a strategy of two shards read as twice
+as talkative as a strategy of one, and one round of silence read as more than
+two.
+
+**Evidence.** A real log of the run held 238 heartbeats for generation 1 and
+no result for it. The screen of that log, rendered before the change, said
+"0 ticks/s across 0 working processes". The same log after the change says
+"13729 ticks/s across 8 working shards of 4 strategies", and each strategy
+reads "generation 1 68% of 1024 worlds 2/2 shards". A fixture holds those real
+lines, and reverting the shard field turns four tests red.
+
+**What follows.** Read the marker, never the fields. A finished pass and a
+pass in flight open with the same words, so the only stable difference is the
+marker, and both readers of the log now test it first. A line that carries the
+marker and that no pattern can read raises a count that the screen prints, so
+the next field the trainer adds is visible rather than silent.
+
+The derived figures were already right. The count of finished generations, the
+spend for each generation and the estimate of the time left read the same
+before and after on the real log, because a substring test had kept the
+heartbeats out of them. That test is now the explicit marker.

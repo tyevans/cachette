@@ -70,6 +70,38 @@ GENERATION = re.compile(
 # One `name value` pair of the body. A value is a number or a bare `-`.
 FIELD = re.compile(r"(?P<key>[a-z][a-z-]*)\s+(?P<value>-?[\d.]+|-)")
 
+# The marker that separates a pass in flight from a pass that ended, for
+# example:
+#   wonder_rush generation  1 shard 1/2 working  decisions 202 live 214/512
+#   ticks 804310 rate 1754.8 t/s [373s]
+#
+# **Read the marker, never the fields.** The pattern above matches this line
+# as well, because it reads the body by name. A reader that told the two
+# kinds apart by which fields it found took a heartbeat for a generation
+# that scored nothing. The fields of this trainer move: `abs-spread` arrived
+# between the spread and the win share, and `shard 1/2` arrived between the
+# generation and the marker. The marker itself has not moved.
+IN_FLIGHT = re.compile(r"(?:^|\s)working(?:\s|$)")
+
+# A heartbeat, which one process prints about every thirty seconds while it
+# scores. The strategy name and the shard are both optional. One process
+# measures the shared controller baseline for every strategy and names none
+# of them, and a pass that one process scores whole reports no shard.
+WORKING = re.compile(
+    r"^\s+(?:(?P<name>\S+) )?(?P<what>generation\s+\d+|yardstick|baseline"
+    r"|validation\s+\d+)"
+    r"(?: shard (?P<shard>\d+)/(?P<shards>\d+))?"
+    r" working\s+decisions\s+(?P<decisions>\d+)\s+"
+    r"live\s+(?P<live>\d+)/(?P<worlds>\d+)\s+"
+    r"ticks\s+(?P<ticks>\d+)\s+rate\s+(?P<rate>[\d.]+) t/s\s+"
+    r"\[(?P<seconds>[\d.]+)s\]"
+)
+
+
+def in_flight(body: str) -> bool:
+    """Say whether this line reports work in flight rather than a result."""
+    return IN_FLIGHT.search(body) is not None
+
 
 def fields(body: str) -> dict[str, float | None]:
     """Return the named fields of a generation line, a dash meaning none."""
@@ -122,6 +154,53 @@ class Generation:
 
 
 @dataclass
+class Beat:
+    """The newest heartbeat of one shard, as numbers."""
+
+    decisions: int
+    live: int
+    worlds: int
+    rate: float
+    seconds: float
+
+
+@dataclass
+class Flight:
+    """The pass one strategy is running now, with every shard combined.
+
+    A strategy splits a generation over several processes. Each of them
+    scores one shard of the population and prints its own heartbeat, so one
+    pass reports several lines a round. The parts combine this way.
+
+    - The live worlds and the worlds add. The shards hold disjoint parts of
+      the population, so a sum counts each world once.
+    - The decisions add. Each shard counts only the decisions it took.
+    - The rates add. The shards run at the same time on different cores.
+    - The elapsed time is the longest. The pass ends with its slowest shard.
+
+    **A pass in flight contributes nothing to a derived figure.** The spend
+    for each generation, the generations remaining and the estimate of the
+    time left all divide by the generations that finished. A pass that is
+    six minutes into a seven minute generation has produced no result, so
+    counting it would report a generation that cost six minutes and scored
+    nothing, and it would shorten every estimate that follows.
+    """
+
+    what: str
+    live: int = 0
+    worlds: int = 0
+    decisions: int = 0
+    rate: float = 0.0
+    seconds: float = 0.0
+    shards: int = 0
+
+    @property
+    def share(self) -> float | None:
+        """Return the part of the pass that has finished, from 0 to 1."""
+        return None if self.worlds <= 0 else (self.worlds - self.live) / self.worlds
+
+
+@dataclass
 class Strategy:
     """One policy under training, and what it has scored so far."""
 
@@ -129,6 +208,26 @@ class Strategy:
     kind: str = ""
     generations: list[Generation] = field(default_factory=list)
     baselines: dict[str, dict[str, float]] = field(default_factory=dict)
+    # The newest heartbeat of each shard of the pass this strategy runs now,
+    # keyed on the shard number. A terminal line empties it.
+    working: dict[int, Beat] = field(default_factory=dict)
+    pass_name: str = ""
+
+    @property
+    def flight(self) -> Flight | None:
+        """Return the pass in flight, or nothing when none is running."""
+        beats = self.working
+        if not beats:
+            return None
+        return Flight(
+            what=self.pass_name,
+            live=sum(beat.live for beat in beats.values()),
+            worlds=sum(beat.worlds for beat in beats.values()),
+            decisions=sum(beat.decisions for beat in beats.values()),
+            rate=sum(beat.rate for beat in beats.values()),
+            seconds=max(beat.seconds for beat in beats.values()),
+            shards=len(beats),
+        )
 
     @property
     def last_validation(self) -> float | None:
@@ -244,8 +343,31 @@ def parse(text: str) -> Progress:
                 pass
             continue
 
+        # **The marker decides the kind of the line, and it is read first.**
+        # The pattern for a finished generation matches a heartbeat as well,
+        # because both open with the strategy and the generation number. A
+        # heartbeat that reached that pattern was read as a generation with
+        # no mean and no best.
+        if in_flight(line):
+            beat = WORKING.match(line)
+            if beat is None or beat.group("name") is None:
+                continue
+            owner = strategy_named(beat.group("name"))
+            what = " ".join(beat.group("what").split())
+            if owner.pass_name != what:
+                owner.working = {}
+                owner.pass_name = what
+            owner.working[int(beat.group("shard") or 0)] = Beat(
+                decisions=int(beat.group("decisions")),
+                live=int(beat.group("live")),
+                worlds=int(beat.group("worlds")),
+                rate=float(beat.group("rate")),
+                seconds=float(beat.group("seconds")),
+            )
+            continue
+
         row = GENERATION.match(line)
-        if row and "working" not in row.group("body"):
+        if row:
             values = fields(row.group("body"))
             mean = values.get("mean")
             best = values.get("best")
@@ -269,6 +391,10 @@ def parse(text: str) -> Progress:
                     validation=values.get("valid"),
                 )
             )
+            # A finished generation ends every shard of the pass. A frozen
+            # heartbeat left behind would report a pass that runs.
+            owner.working = {}
+            owner.pass_name = ""
             continue
 
         # **A baseline row does not name its strategy.** It goes to the
@@ -291,7 +417,7 @@ def parse(text: str) -> Progress:
     progress.strategies = [
         strategy
         for strategy in progress.strategies
-        if strategy.generations or strategy.baselines
+        if strategy.generations or strategy.baselines or strategy.working
     ]
     return progress
 
@@ -326,6 +452,12 @@ def projection(
     The rate comes from the generations this run has already finished, so a
     machine that runs faster or slower than the estimate corrects itself
     after the first few of them.
+
+    **Only a finished generation counts here.** A generation in flight has
+    produced no result, so it cannot say what a generation costs. A run that
+    counted the pass it is running would divide the elapsed time by one more
+    generation than it has, report a generation cheaper than any it
+    finished, and shorten the estimate of the time left.
     """
     done = progress.generations_done
     elapsed = progress.elapsed_seconds
@@ -389,9 +521,23 @@ def render(
     for strategy in progress.strategies:
         rows = strategy.generations
         label = f"{strategy.name} ({strategy.kind})" if strategy.kind else strategy.name
-        lines.append(f"  --- {label}: {len(rows)} generations")
+        lines.append(f"  --- {label}: {len(rows)} generations finished")
         trained = strategy.baselines.get("trained")
         controller = strategy.baselines.get("controller") or bar
+        flight = strategy.flight
+        if flight is not None:
+            reached = "-" if flight.share is None else f"{flight.share:.0%}"
+            shards = f", {flight.shards} shards" if flight.shards > 1 else ""
+            lines.append(
+                f"      in flight  {flight.what}, {reached} of "
+                f"{flight.worlds} worlds{shards}, "
+                f"{flight.rate:.0f} ticks/s, {flight.decisions} decisions "
+                f"[{flight.seconds:.0f}s]"
+            )
+        elif trained:
+            lines.append("      in flight  nothing, this strategy ended")
+        else:
+            lines.append("      in flight  nothing, between passes")
         if trained:
             verdict = "BEATS the controller"
             if controller and trained["won"] <= controller["won"]:

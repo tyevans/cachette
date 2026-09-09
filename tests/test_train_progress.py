@@ -177,3 +177,72 @@ def test_a_log_written_before_the_tick_count_still_parses() -> None:
     rows = progress.strategies[0].generations
     assert rows, "the fixture holds no generation"
     assert all(row.ticks is None for row in rows)
+
+
+# A real sharded run, read at the moment every strategy was inside generation
+# 1 and none had finished it. Four strategies score each generation in two
+# processes, so the trainer prints one heartbeat for each shard.
+SHARDED = (LOGS / "sharded-in-flight.log").read_text(encoding="utf-8")
+MID_GENERATION = "\n".join(SHARDED.splitlines()[:88]) + "\n"
+
+
+def test_the_feed_says_what_each_strategy_is_doing_now() -> None:
+    """A generation that runs must not read as a strategy that stopped.
+
+    Every strategy of this real log was about seven tenths of the way through
+    generation 1 on two processes each. The feed printed the generations that
+    had finished and nothing at all about the one in flight, so a reader saw
+    the same screen for a healthy run and a hung one.
+    """
+    rendered = progress_module.render(
+        progress_module.parse(MID_GENERATION), 0.7723, 100
+    )
+    assert rendered.count("in flight  generation 1") == 4
+    assert (
+        "68% of 1024 worlds, 2 shards, 3478 ticks/s, 463 decisions [401s]" in rendered
+    )
+    assert "1 generations finished" in rendered
+
+
+def test_a_pass_in_flight_reaches_no_derived_figure() -> None:
+    """A generation with no result must not shorten the estimate of the cost.
+
+    The pattern for a finished generation matches a heartbeat as well,
+    because it reads the body by name. A heartbeat counted as a generation
+    would report a generation that cost nothing and scored nothing, and
+    every figure below divides by that count.
+    """
+    parsed = progress_module.parse(MID_GENERATION)
+    assert parsed.generations_done == 4
+    parsed.wall_clock_seconds = 4900.0
+    money = progress_module.projection(parsed, 0.7723, 100)
+    assert money["generations_done"] == pytest.approx(4.0)
+    assert money["generations_remaining"] == pytest.approx(96.0)
+    assert money["seconds_per_generation"] == pytest.approx(1225.0)
+
+    # The pattern for a finished generation matches these heartbeats too, so
+    # the count above is right only because the marker excluded them first.
+    matched = [
+        line
+        for line in MID_GENERATION.splitlines()
+        if progress_module.GENERATION.match(line)
+    ]
+    beats = [line for line in matched if progress_module.in_flight(line)]
+    assert len(beats) == 32
+    assert len(matched) - len(beats) == parsed.generations_done
+
+
+def test_a_finished_generation_ends_the_pass_it_reported() -> None:
+    """A frozen heartbeat must not report a pass that already ended.
+
+    The whole log ends with one strategy that finished generation 1 while
+    the others were still inside it. That strategy has nothing in flight.
+    """
+    strategies = {
+        strategy.name: strategy
+        for strategy in progress_module.parse(SHARDED).strategies
+    }
+    assert strategies["wonder_rush"].flight is None
+    assert strategies["aggressive"].flight is not None
+    rendered = progress_module.render(progress_module.parse(SHARDED), 0.7723, 100)
+    assert "in flight  nothing, between passes" in rendered

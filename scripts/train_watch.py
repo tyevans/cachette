@@ -84,19 +84,46 @@ FIELD = re.compile(r"(?P<key>[a-z][a-z-]*)\s+(?P<value>-?[\d.]+|-)")
 # A heartbeat from inside a long pass, for example:
 #   conquer generation  3 working  decisions 120 live 87/144 ticks 174000
 #   rate 1893.0 t/s [92s]
+#   conquer generation  3 shard 1/2 working  decisions 120 live 87/144 ...
+#   baseline working  decisions 80 live 197/256 ticks 188700 rate 6219.9 ...
+#
+# **The word `working` is the marker, and this pattern reads it.** A finished
+# generation and a heartbeat share the same opening, so a reader that told
+# them apart by the fields it found read a heartbeat as a generation with no
+# mean and no best.
 #
 # **The pass names itself, and the screen holds no list of the passes.** The
 # controller baseline was added to this alternation after a run spent over
 # nine minutes on it in silence. Every strategy of that run looked stopped,
 # and the load average over a remote connection was the only evidence that
 # the machine was alive.
+#
+# Two parts are optional, and both appeared after this pattern was written.
+# The strategy name is absent on the shared controller baseline, which one
+# process measures for every strategy. The shard is absent on a pass that
+# one process scores whole.
 WORKING = re.compile(
-    r"^\s+(?P<name>\S+) (?P<what>generation\s+\d+|yardstick|baseline"
+    r"^\s+(?:(?P<name>\S+) )?(?P<what>generation\s+\d+|yardstick|baseline"
     r"|validation\s+\d+)"
+    r"(?: shard (?P<shard>\d+)/(?P<shards>\d+))?"
     r" working\s+decisions\s+(?P<decisions>\d+)\s+"
     r"live\s+(?P<live>\d+)/(?P<worlds>\d+)\s+"
     r"ticks\s+(?P<ticks>\d+)\s+rate\s+(?P<rate>[\d.]+) t/s\s+"
     r"\[(?P<seconds>[\d.]+)s\]"
+)
+
+# The key the shared controller baseline takes in the set of reporters. Its
+# lines name no strategy, because one process measures the number for every
+# strategy, so it needs a name of its own to be counted once.
+SHARED = "the shared controller baseline"
+
+# How many processes one strategy splits a generation over, for example:
+#   conquer scores each generation in 2 processes of 8 workers
+#
+# **This is how the screen knows a shard is missing.** Without it a pass with
+# one silent shard looks like a pass with one shard.
+SHARDING = re.compile(
+    r"^\s+(?P<name>\S+) scores each generation in (?P<shards>\d+) process"
 )
 
 # A process that waits for another process to measure the same baseline, for
@@ -134,6 +161,10 @@ HEADING = re.compile(r"^===\s+(?P<name>\S+)(?:\s+\((?P<kind>[^)]*)\))?\s+===\s*$
 
 # The throughput probe the run takes before it trains anything.
 PROBE = re.compile(r"^\s+measuring\s+(?P<processes>\d+) process")
+
+# The end of the shared controller baseline, which names no strategy. It is
+# the terminal line of the pass that the heartbeats with no name report.
+SHARED_END = re.compile(r"^\s+the controller baseline was measured\s*$")
 
 # How many rounds of heartbeats from the other strategies may pass before a
 # strategy counts as quiet. Every strategy heartbeats on the same cadence,
@@ -198,6 +229,24 @@ def wants_colour(mode: str, stream: object) -> bool:
     return bool(getattr(stream, "isatty", lambda: False)())
 
 
+# The marker that separates a pass in flight from a pass that ended. The
+# trainer prints it as its own word, after the name of the pass and before
+# the fields.
+#
+# **Read the marker, never the fields.** A finished generation and a
+# heartbeat open with the same words, and a reader that told them apart by
+# the fields it found took a heartbeat for a generation with no mean and no
+# best. The fields of this trainer move: `abs-spread` arrived between the
+# spread and the win share, and `shard 1/2` arrived between the generation
+# and the marker. The marker itself has not moved.
+IN_FLIGHT = re.compile(r"(?:^|\s)working(?:\s|$)")
+
+
+def in_flight(body: str) -> bool:
+    """Say whether this line reports work in flight rather than a result."""
+    return IN_FLIGHT.search(body) is not None
+
+
 def fields(body: str) -> dict[str, float | None]:
     """Return the named fields of a row, with a bare dash as no value."""
     found: dict[str, float | None] = {}
@@ -220,6 +269,86 @@ class Row:
 
 
 @dataclass
+class Beat:
+    """The newest heartbeat of one shard, as numbers."""
+
+    decisions: int
+    live: int
+    worlds: int
+    rate: float
+    seconds: float
+
+
+@dataclass
+class Work:
+    """One pass in flight, holding the newest heartbeat of each shard.
+
+    A strategy splits a generation over several processes. Each of them
+    scores one shard of the population and prints its own heartbeat, so one
+    pass reports several lines a round. This class combines them.
+
+    - It adds the live worlds and the worlds. The shards hold disjoint parts
+      of the population, so a sum counts each world once.
+    - It adds the decisions. Each shard counts only the decisions it took.
+    - It adds the rates. The shards run at the same time on different cores,
+      so the machine reaches the sum of them.
+    - It takes the longest elapsed time. The pass ends when its slowest
+      shard ends.
+
+    **A shard that finishes early leaves its last heartbeat frozen.** Its
+    live count is then small, which is what a finished shard should add, so
+    the combined progress stays right. Its rate is the average over the
+    whole shard, so the combined rate reads high for the rest of the pass.
+    The trainer prints no end marker for one shard, so the screen says how
+    many shards it heard from and lets the reader judge.
+    """
+
+    what: str
+    shards: dict[int, Beat] = field(default_factory=dict)
+    expected: int = 0
+
+    @property
+    def heard(self) -> int:
+        """Return how many shards of this pass have spoken."""
+        return len(self.shards)
+
+    @property
+    def decisions(self) -> int:
+        """Return the decisions every shard of this pass has taken."""
+        return sum(beat.decisions for beat in self.shards.values())
+
+    @property
+    def live(self) -> int:
+        """Return the worlds still running across every shard."""
+        return sum(beat.live for beat in self.shards.values())
+
+    @property
+    def worlds(self) -> int:
+        """Return the worlds this pass scores across every shard."""
+        return sum(beat.worlds for beat in self.shards.values())
+
+    @property
+    def rate(self) -> float:
+        """Return the ticks a second every shard of this pass reaches."""
+        return sum(beat.rate for beat in self.shards.values())
+
+    @property
+    def seconds(self) -> float:
+        """Return how long the slowest shard of this pass has run."""
+        return max((beat.seconds for beat in self.shards.values()), default=0.0)
+
+    @property
+    def share(self) -> float | None:
+        """Return the part of the pass that has finished, from 0 to 1.
+
+        A world leaves the live count when it ends, so the worlds that are
+        no longer live are the work that is done.
+        """
+        worlds = self.worlds
+        return None if worlds <= 0 else (worlds - self.live) / worlds
+
+
+@dataclass
 class Strategy:
     """What one strategy has done, and what its last word says it is doing.
 
@@ -232,12 +361,15 @@ class Strategy:
     name: str
     kind: str = ""
     done: list[Row] = field(default_factory=list)
-    last_working: dict[str, str] | None = None
+    last_working: Work | None = None
     last_waiting: dict[str, str] | None = None
     last_ended: str | None = None
     yardstick: float | None = None
     baseline_return: float | None = None
     heartbeat_mark: int = 0
+    # How many processes this strategy splits a generation over. The trainer
+    # states it once, and zero means it has not said yet.
+    sharding: int = 0
 
     @property
     def last_validation(self) -> float | None:
@@ -273,6 +405,17 @@ class Reading:
     controller: dict[str, float] | None = None
     heartbeats: int = 0
     probed: bool = False
+    # The pass that names no strategy, which is the controller baseline one
+    # process measures for all of them.
+    shared: Work | None = None
+    # Every (strategy, shard) pair that has ever printed a heartbeat. This is
+    # the divisor of the heartbeat clock, so a strategy of two shards does
+    # not read as twice as talkative as its neighbours.
+    reporters: set[tuple[str, int]] = field(default_factory=set)
+    # Lines that carry the marker of work in flight and that no pattern here
+    # could read. A trainer that names a new pass raises this count, and the
+    # screen says so rather than reporting an idle run.
+    unread: int = 0
 
 
 def read(text: str) -> Reading:
@@ -281,6 +424,11 @@ def read(text: str) -> Reading:
     **The order of the lines decides what a strategy is doing.** A heartbeat
     says a pass runs, and a terminal line for that pass says it ended. The
     later line wins, so a finished pass never counts as a working one.
+
+    **A line that carries the marker of work in flight is never a result.**
+    This function reads the marker and then chooses the pattern, so a
+    heartbeat of a pass it cannot name is counted as unread rather than
+    parsed as a generation that scored nothing.
     """
     reading = Reading()
 
@@ -308,8 +456,59 @@ def read(text: str) -> Reading:
         if PROBE.match(line):
             reading.probed = True
             continue
+        if SHARED_END.match(line):
+            # A frozen heartbeat is not a working process. The shared
+            # baseline ends here, so its last heartbeat stops counting.
+            reading.shared = None
+            continue
+        shard_count = SHARDING.match(line)
+        if shard_count:
+            named(shard_count.group("name")).sharding = int(shard_count.group("shards"))
+            continue
+        if in_flight(line):
+            work = WORKING.match(line)
+            if work is None:
+                reading.unread += 1
+                continue
+            reading.heartbeats += 1
+            number = int(work.group("shard") or 0)
+            beat = Beat(
+                decisions=int(work.group("decisions")),
+                live=int(work.group("live")),
+                worlds=int(work.group("worlds")),
+                rate=float(work.group("rate")),
+                seconds=float(work.group("seconds")),
+            )
+            what = " ".join(work.group("what").split())
+            name = work.group("name")
+            if name is None:
+                # The shared controller baseline names no strategy, so it
+                # cannot go into the table of strategies. It still holds a
+                # core busy, and a run in this pass printed nothing else for
+                # over nine minutes.
+                if reading.shared is None or reading.shared.what != what:
+                    reading.shared = Work(what=what)
+                reading.shared.shards[number] = beat
+                reading.reporters.add((SHARED, number))
+                continue
+            strategy = named(name)
+            reading.reporters.add((name, number))
+            # A new pass starts a new set of shards. Without this the shards
+            # of the last generation stay in the sum for the whole of the
+            # next one.
+            if strategy.last_working is None or strategy.last_working.what != what:
+                strategy.last_working = Work(
+                    what=what, expected=int(work.group("shards") or 0)
+                )
+            strategy.last_working.shards[number] = beat
+            if work.group("shards"):
+                strategy.last_working.expected = int(work.group("shards"))
+            strategy.last_waiting = None
+            strategy.last_ended = None
+            strategy.heartbeat_mark = reading.heartbeats
+            continue
         row = DONE.match(line)
-        if row and "working" not in row.group("body"):
+        if row:
             values = fields(row.group("body"))
             mean = values.get("mean")
             best = values.get("best")
@@ -327,15 +526,6 @@ def read(text: str) -> Reading:
                 )
             )
             ended(strategy, f"generation {row.group('generation')}")
-            continue
-        work = WORKING.match(line)
-        if work:
-            reading.heartbeats += 1
-            strategy = named(work.group("name"))
-            strategy.last_working = work.groupdict()
-            strategy.last_waiting = None
-            strategy.last_ended = None
-            strategy.heartbeat_mark = reading.heartbeats
             continue
         held = WAITING.match(line)
         if held:
@@ -373,11 +563,18 @@ def read(text: str) -> Reading:
 def rounds_behind(reading: Reading, strategy: Strategy) -> int:
     """Return how many whole rounds of heartbeats this strategy has missed.
 
-    Every strategy heartbeats on the same cadence, so the heartbeats of the
-    others are a clock that needs no wall clock. This keeps the reading of a
-    stored log fixed, whatever the hour it is read at.
+    Every shard of every strategy heartbeats on the same cadence, so the
+    heartbeats of the other shards are a clock that needs no wall clock.
+    This keeps the reading of a stored log fixed, whatever the hour it is
+    read at.
+
+    **The divisor counts shards, not strategies.** A strategy that scores a
+    generation in two processes prints two lines a round. A divisor of the
+    strategy count read one round of silence as more than two, and it called
+    every healthy strategy of a sharded run quiet.
     """
-    others = max(1, len(reading.strategies) - 1)
+    own = sum(1 for name, _ in reading.reporters if name == strategy.name)
+    others = max(1, len(reading.reporters) - own)
     return (reading.heartbeats - strategy.heartbeat_mark) // others
 
 
@@ -405,24 +602,33 @@ def phase(reading: Reading, states: dict[str, str]) -> str:
     controller baseline and the yardstick, and then trains. The phase comes
     from the passes that are running, never from a guess about the order.
     """
-    if not reading.strategies:
+    if not reading.strategies and reading.shared is None:
         return (
             "measuring the ticks a second"
             if reading.probed
             else "building the engine, the trainer has said nothing"
         )
     passes = [
-        " ".join(strategy.last_working["what"].split())
+        strategy.last_working.what
         for name, strategy in reading.strategies.items()
         if strategy.last_working and states[name] in {"working", "waiting"}
     ]
     for pass_name in ("baseline", "yardstick"):
         if any(what.startswith(pass_name) for what in passes):
             return f"measuring the controller {pass_name}"
-    training = [what for what in passes if what.startswith("generation")]
-    if training:
-        numbers = sorted(int(what.split()[-1]) for what in training)
+    # A validation pass plays the seeds that never move for the generation
+    # it names, so it is the tail of that generation and not a phase of its
+    # own. A screen that named no phase for it said "between passes" while
+    # every core on the machine was busy.
+    numbers = sorted(
+        int(what.split()[-1])
+        for what in passes
+        if what.startswith(("generation", "validation"))
+    )
+    if numbers:
         return f"training generation {numbers[0]}"
+    if reading.shared is not None:
+        return "measuring the shared controller baseline"
     if any(word == "quiet" for word in states.values()):
         return "nothing has spoken lately"
     return "between passes"
@@ -524,16 +730,36 @@ def header(
         f"   generations {total_done}{target}{left}{projected}"
     )
 
+    # **A process is one shard, not one strategy.** A strategy that scores a
+    # generation in two processes holds two cores, and a screen that counted
+    # strategies reported half the processes a full machine was running.
     beats = [
         reading.strategies[name].last_working
         for name in working
         if reading.strategies[name].last_working
     ]
-    rate = sum(float(beat["rate"]) for beat in beats if beat)
+    if reading.shared is not None:
+        beats.append(reading.shared)
+    rate = sum(work.rate for work in beats if work)
+    heard = sum(work.heard for work in beats if work)
     lines.append(
-        f"  machine   {rate:.0f} ticks/s across {len(working)} working "
-        f"{'process' if len(working) == 1 else 'processes'}"
+        f"  machine   {paint('good' if rate > 0 else 'warn', f'{rate:.0f} ticks/s')}"
+        f" across {heard} working {'shard' if heard == 1 else 'shards'}"
+        f" of {len(working)} {'strategy' if len(working) == 1 else 'strategies'}"
     )
+    if reading.shared is not None:
+        lines.append(
+            f"  shared    {paint('note', work_words(reading.shared))}, "
+            "which one process measures for every strategy"
+        )
+    if reading.unread:
+        lines.append(
+            paint(
+                "warn",
+                f"  unread    {reading.unread} lines say a pass is working and "
+                "this screen cannot read them. The trainer named a new pass.",
+            )
+        )
     if reading.controller:
         lines.append(
             paint(
@@ -544,6 +770,36 @@ def header(
             )
         )
     return lines
+
+
+def work_words(work: Work, sharding: int = 0) -> str:
+    """Return what one pass in flight is doing, in one line.
+
+    Four figures say a pass is alive rather than hung. The share of the
+    worlds that ended says how far the pass has come. The decisions and the
+    seconds both rise at every heartbeat, so a reader who sees either stand
+    still over two screens knows the pass stopped. The rate says whether
+    the machine still works at the speed it started at.
+
+    The shard count says how many processes spoke. A pass that expects two
+    and heard one is marked, because that is the shape a dead shard leaves
+    and the rest of the line looks healthy.
+    """
+    share = work.share
+    reached = "  -" if share is None else f"{share:.0%}"
+    # The trainer states the shard count for a generation only. A validation
+    # pass and a baseline pass run in one process, so the count of a
+    # generation must not mark them short.
+    expected = work.expected or (sharding if work.what.startswith("generation") else 0)
+    shards = ""
+    if expected > 1 or work.heard > 1:
+        shards = f" {work.heard}/{expected or work.heard} shards"
+        if expected and work.heard < expected:
+            shards += " SHORT"
+    return (
+        f"{work.what} {reached} of {work.worlds} worlds{shards} "
+        f"{work.rate:.0f}t/s d{work.decisions} [{work.seconds:.0f}s]"
+    )
 
 
 def now_words(strategy: Strategy, word: str) -> str:
@@ -561,11 +817,7 @@ def now_words(strategy: Strategy, word: str) -> str:
     work = strategy.last_working
     if work is None:
         return "no word yet"
-    what = " ".join(work["what"].split())
-    body = (
-        f"{what} d{work['decisions']} live {work['live']}/{work['worlds']} "
-        f"{float(work['rate']):.0f}t/s [{float(work['seconds']):.0f}s]"
-    )
+    body = work_words(work, strategy.sharding)
     return f"QUIET, last said {body}" if word == "quiet" else body
 
 
