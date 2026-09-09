@@ -202,9 +202,18 @@ the result, decide what is wrong, and give the fixes to a fresh agent. A
 long-lived agent accumulates its own wrong assumptions, and a fresh one reads
 the tree instead of its own history of it.
 
-**Take the report as a claim, not as a fact.** An agent reports honestly and
-still states things that are wrong, because it tested what it could reach. The
-orchestrator verifies before it repeats a number.[^16]
+**Trust what an agent says it did. Check what an agent worked out.** The two
+are different kinds of statement and they need different treatment.
+
+An agent that says it ran a test file and the file passed has stated a fact.
+Nothing runs again to confirm it. An orchestrator that re-runs a green suite
+spends the machine on a question that was already answered, and that spending
+is what starves the agents still working.
+
+An agent that explains why a subsystem behaves as it does has reasoned about
+something it could only partly reach. That is where a report is wrong, and it
+is generally right, so the error is quiet. Check the reasoning before acting on
+it, and check any figure the orchestrator means to repeat.[^16]
 
 ## Documentation rules
 
