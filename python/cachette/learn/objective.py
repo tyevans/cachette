@@ -40,6 +40,14 @@ term took a logarithm of a value the engine had already taken the logarithm of.
 Eight times the people then moved a population term by one part in a hundred of
 its range.[^8]
 
+**The kind entry of a term is now a check and not a label.** A compressed
+magnitude term refuses a field the engine wrote under another form. Two
+objectives of the shipped table named that kind over a share and over a group
+of mixed forms, and both took a base-two logarithm of a value the engine had
+already written against its unit. A wonder progress of one part in a hundred
+read a quarter of the range, and nothing failed, because the answer stayed
+inside the bounds.[^9]
+
 The research report prefers a share to a compressed magnitude for a reward
 term, because the derivative of a compressed magnitude falls with the
 quantity, so an early gain outweighs a late gain of the same size.[^3] A
@@ -91,6 +99,9 @@ schema-declared bounded tables the engine owns, decision D1.
 ``docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md``
 
 [^8]: Findings register, FND-701. ``docs/FINDINGS.md``
+
+[^9]: Recurring defect shapes, shape 1, two copies that agree are still two
+copies. ``.agents/rules/recurring-defects.md``
 """
 
 from __future__ import annotations
@@ -567,11 +578,17 @@ def _bind(term: Term, catalogue: SignalCatalogue, objective: str) -> _BoundTerm:
             if term.against is None
             else _signal(catalogue, term.against, objective)
         ),
-        scale=(_scale(signal, catalogue, objective) if term.kind.needs_scale else None),
+        scale=(
+            _scale(signal, catalogue, objective, term.kind)
+            if term.kind.needs_scale
+            else None
+        ),
     )
 
 
-def _scale(signal: Signal, catalogue: SignalCatalogue, objective: str) -> Scale:
+def _scale(
+    signal: Signal, catalogue: SignalCatalogue, objective: str, kind: TermKind
+) -> Scale:
     """Read the unit and the divisor the engine published for one signal.
 
     The form of the signal states the unit. It states the divisor as well
@@ -582,6 +599,20 @@ def _scale(signal: Signal, catalogue: SignalCatalogue, objective: str) -> Scale:
     default written here would be a second declaration of an engine rule, and
     a run under a schema that had moved would score a reward on the old rule
     and report nothing.
+
+    **A compressed magnitude term refuses a field the engine did not
+    compress.** The kind entry of a term states what the caller believes the
+    field is, and the schema states what the field is. When the two disagree
+    the term takes a base-two logarithm of a value the engine wrote against
+    the unit, so a share of one part in a hundred reads a quarter of the
+    range. Nothing fails, because the answer stays inside the bounds. This
+    refusal makes the kind entry a check of the belief rather than a
+    label.[^4]
+
+    References
+    ----------
+    [^4]: Recurring defect shapes, shape 1, two copies that agree are still
+    two copies. ``.agents/rules/recurring-defects.md``
     """
     form = signal.form
     published = catalogue.value_forms
@@ -600,11 +631,20 @@ def _scale(signal: Signal, catalogue: SignalCatalogue, objective: str) -> Scale:
             f"{sorted(published)}."
         )
         raise ObjectiveError(message)
-    return Scale(
-        unit=unit,
-        divisor_bits=float(divisor),
-        compressed=form is not None and form.invertible and form.uniform,
-    )
+    compressed = form is not None and form.invertible and form.uniform
+    if kind is TermKind.MAGNITUDE and not compressed:
+        held = "none" if form is None else form.name
+        message = (
+            f"the objective {objective!r} reads {signal.name!r} as a "
+            f"compressed magnitude, and the engine wrote it under the "
+            f"{held!r} form. A term over such a field would take a "
+            f"base-two logarithm of a value the engine already wrote "
+            f"against its unit, which reads a quarter of the range for a "
+            f"hundredth of the quantity. Name the {TermKind.FIXED_POINT.value!r} "
+            f"kind for a field the engine wrote against the unit."
+        )
+        raise ObjectiveError(message)
+    return Scale(unit=unit, divisor_bits=float(divisor), compressed=compressed)
 
 
 def _signal(catalogue: SignalCatalogue, name: str, objective: str) -> Signal:

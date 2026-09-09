@@ -15,17 +15,51 @@ Every weight in this file is a starting value that a researcher edits. One
 blocker holds the rules of the downstream game, so no weight here is a
 proposal about the game.
 
-The kind entry of a term says how the raw signal becomes bounded. A share
-divides by the signal named in the against entry. A compressed magnitude maps
-the signal through a base-two logarithm against a fixed cap, and it needs no
-denominator. A signed relation divides the difference of two signals by the
-sum of their magnitudes. A fixed-point term divides by the Q16.16 unit.
+The kind entry of a term says what form the engine wrote the field under, and
+the run checks that statement against the schema. A share divides by the
+signal named in the against entry. A compressed magnitude reads a field the
+engine already put through a base-two logarithm, and it divides by the unit
+the engine published. A signed relation divides the difference of two signals
+by the sum of their magnitudes. A fixed-point term divides by the Q16.16 unit,
+and it is the kind for a share, for a relation, and for any other field the
+engine wrote against that unit.
+
+**A compressed magnitude term over a field of another form is refused.** Such
+a term takes a second base-two logarithm of a value the engine already wrote
+against the unit, so a wonder progress of one part in a hundred reads a
+quarter of the range. Nothing fails at run time, because the answer stays
+inside the bounds.
 
 The measure entry says whether a term reads the level of a signal or its
 change. A level term integrated over the episode gives a dense signal under
 an evolution strategy. A change term telescopes under that optimiser, so it
 gives one number for the whole episode. Every term in this file reads a
 level.
+
+**A weight answers to the spread of an objective and never to its level.** An
+evolution strategy ranks the candidates of one generation, and the weighted
+combination divides by the sum of the absolute weights. A constant offset in
+an objective therefore moves every candidate by one amount and changes no
+rank. What decides a rank is how far the candidates of a generation separate
+on that objective. A compressed magnitude carries a large offset and a small
+spread, because the logarithm of a store total sits high and moves little, so
+a weight read against the level of such a term means a fraction of what it
+looks like.
+
+Each weight below is therefore the importance the style states, divided by
+the spread that objective showed over real episodes of the training world. A
+measurement fixed those spreads, and the commit that set them records it. A
+researcher who moves the run to another world measures again.
+
+**Read a weight beside the importance the description states, and not beside
+the other weights.** The two are different numbers. A style that means one
+objective three times another may carry a weight of one against a weight of
+six, because the second objective separates the candidates by a sixth as
+much. Each description below states the importance it means.
+
+A style with one weight has no ratio to set. The combination divides by the
+sum of the absolute weights, so the number there states nothing and a reader
+must not repair it.
 """
 
 [objective.territory]
@@ -37,11 +71,30 @@ description = "How many settlements this faction holds."
 terms = [{ signal = "settlements", kind = "magnitude" }]
 
 [objective.military]
-description = "How many units this faction keeps alive."
-terms = [{ signal = "live_units", kind = "magnitude" }]
+description = """
+How strong an army this faction fields. The engine publishes the sum of the
+attack and the armour over every unit of the faction, so this reads the
+strength and not the head count.
+
+**A worker carries no attack and no armour.** A faction of workers therefore
+reads zero here, and it can inflict no casualty on anybody, because an
+attacker whose attack does not exceed the armour of the defender contributes
+nothing. A faction gains strength when it queues the soldier type or raises a
+campaign, so this objective pays for that step and for nothing before it.
+
+**Do not point this objective back at the live unit count.** The engine holds
+no person that is not a unit, so the unit count and the people are one
+number. A style that weighted the unit count rewarded bodies under the name
+of an army, and every policy the project trained was militarily unable.
+"""
+terms = [{ signal = "military_strength", kind = "magnitude" }]
 
 [objective.population]
-description = "How many people this faction feeds."
+description = """
+How many people this faction feeds. The engine holds no person that is not a
+unit, so this reads the live units of the faction. A style that wants an army
+weights the military objective, which reads the attack and the armour instead.
+"""
 terms = [{ signal = "population", kind = "magnitude" }]
 
 [objective.wealth]
@@ -49,20 +102,40 @@ description = "What this faction holds in its stores."
 terms = [{ signal = "store_total", kind = "magnitude" }]
 
 [objective.renown]
-description = "The best renown this faction has reached, against the renown a win needs."
-terms = [{ signal = "best_renown_share", kind = "fixed_point" }]
+description = """
+The best renown of a live character of this faction, against the renown a win
+needs. The engine publishes that progress against the target it holds, so the
+objective reads the quantity the win reads and rises as the target moves under
+it. A contest raises the renown of the champion that fells a unit, so this
+objective pays for spending an army and the military objective pays for
+keeping one.
+"""
+terms = [{ signal = "renown_progress", kind = "fixed_point" }]
 
 [objective.wonder]
-description = "The work this faction has put into a wonder."
-terms = [{ signal = "wonder_progress", kind = "magnitude" }]
+description = """
+The work this faction has put into a wonder, over the work a wonder asks for.
+The engine publishes that share against the unit, so the term divides by the
+unit and takes no logarithm.
+"""
+terms = [{ signal = "wonder_progress", kind = "fixed_point" }]
 
 [objective.trade]
 description = """
-How much the trade board this faction can see offers. The board holds one
-position for each good class and each measure of it, so the term sums them.
+How much of its own trade board this faction fills. The engine publishes the
+empty rows of the board over the row limit, so the term reads that share with
+a coefficient of minus one. The objective is therefore at its lowest on an
+empty board and rises toward zero as the faction puts goods up.
+
+**This reads the board of the faction and not the market.** The engine also
+publishes a board of statistics over every seat, and no bounded term reads it:
+its positions carry a price, a spread and a depth under three different rules,
+so no aggregation over them combines one rule. A measurement over real
+episodes found the largest of those positions pinned at one number for the
+whole episode, and the mean of them near zero.
 """
 terms = [
-  { signal = "trade_board", kind = "magnitude", aggregation = "sum" },
+  { signal = "board_row_headroom", kind = "fixed_point", coefficient = -1.0 },
 ]
 
 [objective.diplomacy]
@@ -77,8 +150,13 @@ description = """
 Field an army and take ground with it. This style refuses wealth, trade and
 diplomacy, so a candidate that buys its way to a win scores nothing for the
 buying.
+
+**The army counts three times the ground.** The two weights are equal, and
+that is the measurement and not an oversight. The army strength separates the
+candidates of a generation about three times as far as the ground does, so an
+importance of three to one lands on one weight against one.
 """
-rewards = { military = 3.0, territory = 1.0 }
+rewards = { military = 1.0, territory = 1.0 }
 refuses = [
   "settlements",
   "population",
@@ -94,12 +172,17 @@ drawn = 0.0
 
 [style.defensive_expansionist]
 description = """
-Take ground, plant seats on it, and keep both. This style refuses the army
-count, so a candidate cannot score by massing units that hold nothing. It
-refuses population as well, because a style that rewards growth and ground
-together cannot be told apart from the growth style.
+Take ground, plant seats on it, and keep both. This style refuses the army,
+so a candidate cannot score by arming units that hold nothing. It refuses
+population as well, because a style that rewards growth and ground together
+cannot be told apart from the growth style.
+
+**The ground counts three halves of the seats.** A settlement total is a
+compressed magnitude of a small count, so it separates the candidates of a
+generation about a tenth as far as the ground does. The seats therefore carry
+the larger weight to reach that ratio.
 """
-rewards = { territory = 3.0, settlements = 2.0 }
+rewards = { territory = 1.0, settlements = 6.5 }
 refuses = [
   "military",
   "population",
@@ -116,10 +199,14 @@ drawn = 0.0
 [style.trade_led]
 description = """
 Put goods on the board and fill the stores from it. This style refuses
-territory and the army count, so a candidate that conquers a neighbour scores
+territory and the army, so a candidate that conquers a neighbour scores
 nothing for the conquest.
+
+**The board counts three halves of the stores.** The store total is a
+compressed magnitude, so it sits high and moves little, and it separates the
+candidates of a generation about twice as far as the board does.
 """
-rewards = { trade = 3.0, wealth = 2.0 }
+rewards = { trade = 3.1, wealth = 1.0 }
 refuses = [
   "territory",
   "settlements",
@@ -136,10 +223,14 @@ drawn = 0.0
 [style.diplomatic]
 description = """
 Raise the standing with every other faction, and gather renown. This style
-refuses territory and the army count, so a candidate cannot raise a standing
-by removing the faction that held it.
+refuses territory and the army, so a candidate cannot raise a standing by
+removing the faction that held it.
+
+**The standing counts three times the renown.** The two objectives separate
+the candidates of a generation by about the same amount, so the weights are
+close to the importance.
 """
-rewards = { diplomacy = 3.0, renown = 1.0 }
+rewards = { diplomacy = 1.5, renown = 1.0 }
 refuses = [
   "territory",
   "settlements",
@@ -158,6 +249,10 @@ description = """
 Grow the people, and nothing else. This style refuses territory, so ground is
 worth taking only for the people it feeds. That is the point of the style: it
 rewards the end and not the means.
+
+The engine holds no person that is not a unit, so this style rewards a large
+head count. It refuses the military objective, which reads the attack and the
+armour, so a candidate scores for the bodies and not for the army.
 """
 rewards = { population = 3.0 }
 refuses = [
@@ -177,7 +272,7 @@ drawn = 0.0
 [style.wealth_hoarding]
 description = """
 Fill the stores and keep them full. This style rewards one objective and
-refuses the other eight. It also pays nothing for a win, so a candidate that
+refuses every other one. It also pays nothing for a win, so a candidate that
 hoards through a loss outscores a candidate that wins with empty stores. That
 is the one style in this file that does not want to win.
 """
@@ -198,17 +293,59 @@ drawn = 0.0
 
 [style.wonder_rush]
 description = """
-Put every hour into a wonder. This style refuses the army count and the
-stores, so a candidate scores for the work and not for the strength that
-protects it.
+Put every hour into a wonder. This style refuses the army and the stores, so
+a candidate scores for the work and not for the strength that protects it.
+
+**The wonder counts three times the ground.** The wonder work separates the
+candidates of a generation about five times as far as the ground does,
+because one candidate that starts a wonder early gathers a large integral
+while the rest gather none. The ground therefore carries the larger weight to
+reach that ratio.
 """
-rewards = { wonder = 3.0, territory = 1.0 }
+rewards = { wonder = 1.0, territory = 1.6 }
 refuses = [
   "settlements",
   "military",
   "population",
   "wealth",
   "renown",
+  "trade",
+  "diplomacy",
+]
+won = 100.0
+lost = -100.0
+drawn = 0.0
+
+[style.renown_champion]
+description = """
+Raise one champion, and spend the army on the kills that make its name. A
+contest raises the renown of the champion of the faction that fells a unit,
+and a win needs the renown target the balance holds. This style therefore
+pays for trading units away, and the army strength earns a little because a
+faction with no attack fells nothing.
+
+**The lead objective reads zero for most candidates.** A measurement over
+real episodes found that few candidates of a generation raise any renown at
+all. The renown term separates those few. The army term separates the rest,
+and it reads a real spread from the first generation, because a policy that
+acts without reading the world still queues a soldier or raises a campaign
+sometimes. The style therefore breaks the tie among the candidates that reach
+no renown, and it does not wait for one of them to find the whole chain.
+
+**The renown counts three times the army.** The army strength separates the
+candidates of a generation about five times as far as the renown does, so the
+renown carries fifteen times the weight to reach that ratio. This style and
+the aggressive style want the same first move, which is a soldier or a
+campaign. They part after it: the aggressive style pays to hold the army, and
+this style pays to spend it.
+"""
+rewards = { renown = 15.0, military = 1.0 }
+refuses = [
+  "territory",
+  "settlements",
+  "population",
+  "wealth",
+  "wonder",
   "trade",
   "diplomacy",
 ]
