@@ -48,14 +48,18 @@ Four policies from one run of the play style table, on a 128 by 128 world of
 three factions at a tick limit of 6000, at observation version 7 and action
 version 2. Every one is a structured policy of 5354 trainable weights.
 
-**A score is a mean return over 128 held-out seeds under that style's own
-weighting, and a return under one weighting does not compare with a return
-under another.** The yardstick is the built-in controller measured on the same
+**A number in the return column is a mean shaped return over 128 held-out
+seeds under that style's own weighting. It is not a win rate and it is not a
+percentage.** A return under one weighting does not compare with a return
+under another, and the scale is arbitrary: the version 6 policies below score
+in the thousands on their own weightings. Read a return of 86.90 against a
+bar of 50.00 as 1.74 times the controller's shaped return, and read the
+rating table for how the policy actually played. The yardstick is the built-in controller measured on the same
 seeds under the same weighting, so the only fair comparison is a row against
 its own bar. **Each bar is read from that style's own log**, because the four
 styles write one shared log and the controller row there names no style.
 
-| File | Score | Yardstick | Beats it | Generation | Style rewards |
+| File | Mean shaped return | Controller's return | Beats it | Generation | Style rewards |
 |---|---|---|---|---|---|
 | `styles/obs7-act2-aggressive-gen7` | 86.90 | 50.00 | yes | 7 | army, ground |
 | `styles/obs7-act2-wonder-rush-gen9` | 86.35 | 10.44 | yes | 9 | wonder work |
@@ -120,7 +124,7 @@ A score is a mean return over 128 held-out seeds under that strategy's own
 weighting, against the built-in controller measured on the same seeds under
 the same weighting.
 
-| File | Score | Yardstick | Beats it | Generation | Kind |
+| File | Mean shaped return | Controller's return | Beats it | Generation | Kind |
 |---|---|---|---|---|---|
 | `place/obs6-act2-people-gen9` | 13808.4 | 11313.1 | yes | 9 | linear |
 | `place/obs6-act2-people-structured-gen3` | 13637.6 | 11313.1 | yes | 3 | structured |
@@ -183,7 +187,7 @@ a level any run held. The scores are mean returns over 128 held-out worlds,
 and a return under one objective does not compare with a return under
 another.
 
-| File | Score | Search |
+| File | Mean shaped return | Search |
 |---|---|---|
 | `ring/obs6-people-gen1` | 12051.5 | 64 candidates, 8 seeds, no hidden layer |
 | `ring/obs6-land-gen1` | 8873.8 | 64 candidates, 8 seeds, no hidden layer |
