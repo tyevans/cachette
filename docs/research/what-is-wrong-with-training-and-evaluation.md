@@ -30,7 +30,7 @@ return.[^GIT] A count belongs in a research report, because a report is fixed
 to a moment. The same count decays in a decision record.[^SCOPE]
 
 The audit read the source and it derived arithmetic from figures the project
-already holds. Six workers took measurements in parallel. **The machine was
+already holds. Six workers took measurements in parallel, and one returned: the audit of the tests, which is item 2. **The machine was
 oversubscribed while they ran**: the load average was between 24 and 31 on 16
 cores, because six audit workers and other agents shared it. Every item that
 needed a fresh engine measurement is therefore marked with what it rests on.
@@ -81,7 +81,87 @@ person watching the screen.
 
 **Confidence.** High. Each claim above is a line of source.
 
-## 2. The published number is the selection score over the seeds that did the selecting, and the honest holdout never ran
+## 2. The test suite cannot see a policy that ignores the world
+
+**What is wrong.** A worker put the recorded defect back and ran the learner
+suite. It replaced the feature encoder of all three policy modules with a
+function that returns a constant row of zeros plus the trailing bias entry, as
+an autouse fixture in a plugin held outside the repository, so that every
+policy scores from its weights alone. That is the recorded feature-layer defect
+reproduced exactly.[^F707] [^F708]
+
+The baseline run over 16 learner and evaluation test files passed 236 of 236
+items in 285 seconds. **Under the perturbation 230 of the 236 still passed.**
+So 97.5 percent of the suite cannot tell a policy that reads the world from one
+that ignores it.
+
+What the suite states is as telling as the count.
+
+- **The only test that touches the four published policies asserts that they
+  load.** It builds a real engine world and a loaded policy, then asserts that
+  the policy is not absent and that its kind is a known kind. It asks nothing
+  about what the weights do. This is the test that should have caught the first
+  recorded defect, and it held both ingredients already.
+- **Nothing anywhere asserts that a choice depends on the observation.** Every
+  learner test that calls a policy holds the observation fixed and varies the
+  weights. Not one varies the observation and asserts that the score moves. The
+  closest miss asserts that a randomly reweighted policy does not answer row
+  zero four times over, and its docstring calls that the property the trainer
+  depends on. A fixed preference order satisfies it, and it passes under the
+  perturbation.
+- **One test asserts the defect.** It asserts that the mask permits the chosen
+  row. The recorded finding is that the mask does all the work.
+- **The second recorded defect has no test surface at all.** The only property
+  any test states about the observation is that the towers cover its positions.
+  Nothing measures how many positions ever change.
+- **The fixtures are the opposite of the world on both axes that matter.** The
+  policy fixture draws every observation position independently, and it marks
+  every action row legal. The real world holds 3,546 of 4,819 positions that
+  never move, and 13 to 18 legal rows of 180. A defect that lives in the
+  constant subspace cannot exist in a fixture that holds no constant subspace.
+- **The one engine-driven league test compares a policy against a no-op.** The
+  first recorded finding measured the best constant preference order at 102.29,
+  the trained policy at 151.68 and the no-op at minus 96.56.[^F707] The gap that
+  test measures is the one gap that says nothing. Seating the best constant row
+  as a third player would separate the two hypotheses.
+- **A pin on the search step recomputes its expectation with the functions
+  under test.** If the rank shaping returned a constant, every pair difference
+  would be zero, the gradient would be zero, the expected value would reduce to
+  the unchanged centre, and the equality would hold. One neighbouring assertion
+  would fail, so that defect is not wholly invisible.
+
+The two older recorded defects show the same shape. Before the repair, every
+reward test scored one episode and asserted a single step or a single terminal
+value, and a per-step assertion cannot see that an episode sum collapses to an
+endpoint difference.[^F692] Nothing ever stated the alignment claim as a test at
+all, and the sweep that settled it lives in a commit message.[^F668]
+
+**The two cheap checks the first recorded finding asked for do not exist.** The
+share of decisions on which a policy emits its most common action, and whether
+the highest-scoring row over the unmasked rows ever changes within an
+episode.[^F707] The audit confirmed both absent, by a whole-tree search of the
+three entry points such a test would have to call.
+
+**Two tests will block the repair now in flight.** One writes an archive holding
+only the weights and the observation length, and asserts that it loads, so a
+loader that refuses a file carrying no normalizer fails it. The other asserts
+that all four published files load, so the same refusal fails four parametrized
+items, and the index test then requires the index table to move in the same
+commit.
+
+**What it costs.** Item 1 says that nothing measured play. This item says that
+nothing could have. A suite that stays green under the exact defect the project
+spent a paid instance discovering is not a gate. The project is repairing the
+feature layer now, and on this evidence it has no way to tell whether the
+repair worked.
+
+**Confidence.** High. The perturbation is a measured run and its command is
+recorded, and each claim about a test is a cited line. UNVERIFIED: the identity
+of the six items that did fail. That run's log was lost when its working
+directory was removed during teardown, and the two counts were recovered from
+the progress output. One repeat of the same command recovers the names.
+
+## 3. The published number is the selection score over the seeds that did the selecting, and the honest holdout never ran
 
 **What is wrong.** The trainer draws three seed sets, and they are disjoint by
 construction. The training pool starts at seed 1000, the validation set at
@@ -121,7 +201,7 @@ against a figure from a later run compares two different quantities.
 optimistic bias is UNVERIFIED, because it needs the spread of the validation
 passes of that run and the run logs are not in the tree.
 
-## 3. The search ran below the alignment the project had already measured, and nothing computed the figure
+## 4. The search ran below the alignment the project had already measured, and nothing computed the figure
 
 **What is wrong.** One register already holds the law that governs a step of
 this search. It says that the cosine between the step the trainer takes and
@@ -131,7 +211,7 @@ halves it.[^F668] **Nothing in the trainer, the search, the run configuration
 or the launcher computes that figure, and nothing warns when it is small.**
 
 The run used a population of 24 and it trained a structured policy of 5,354
-weights.[^LAUNCH] [^INDEX] The derivation of section 12 gives an alignment of
+weights.[^LAUNCH] [^INDEX] The derivation of section 13 gives an alignment of
 0.047 for one generation, and 0.024 after the scoring noise the register
 measured. So about 98 percent of every step of the paid run was noise.
 
@@ -145,9 +225,9 @@ without applying it. This is the cheapest arithmetic in the whole path and it
 was never done.
 
 **Confidence.** High. The law is a recorded measurement, the population and
-the weight count are recorded values, and the arithmetic is in section 12.
+the weight count are recorded values, and the arithmetic is in section 13.
 
-## 4. The step is a fixed length whatever the direction is worth, so the centre wanders further than it climbs
+## 5. The step is a fixed length whatever the direction is worth, so the centre wanders further than it climbs
 
 **What is wrong.** The search normalises the summed gradient to unit length
 and then moves the centre a fixed fraction of its own length along it. Line
@@ -159,7 +239,7 @@ This is correct given that rank shaping has already discarded the scale of the
 reward, and the docstring says so. **The consequence is that a generation that
 points 2 percent of the way toward the truth moves the centre exactly as far
 as a generation that points perfectly.** At a learning rate of 0.3 each
-generation turns the centre by 16.70 degrees. Section 12 derives the rest: over
+generation turns the centre by 16.70 degrees. Section 13 derives the rest: over
 twenty generations the directed part of that travel is 15.8 degrees and the
 undirected part is 74.7 degrees. **The centre wanders 4.7 times further than
 it climbs.**
@@ -179,7 +259,7 @@ translation of a step into a rotation of the centre assumes that a drawn
 direction is near orthogonal to the centre, which the register established for
 a space of this dimension.[^F668]
 
-## 5. Sigma is not a local perturbation, and only the small side is guarded
+## 6. Sigma is not a local perturbation, and only the small side is guarded
 
 **What is wrong.** The search draws each perturbation as a unit direction and
 scales it. For a policy kind whose choice survives a positive scaling, the
@@ -188,7 +268,7 @@ other kind the scale is sigma times the length of the centre. Both branches
 are at lines 182 and 183.[^SEARCH]
 
 The run used a sigma of 1.5.[^LAUNCH] **So one perturbation is one and a half
-centre lengths.** Section 12 derives the geometry: a candidate sits 56.3
+centre lengths.** Section 13 derives the geometry: a candidate sits 56.3
 degrees away from the centre, and the two halves of one antithetic pair are
 112.6 degrees apart. A finite difference over an arc of 113 degrees does not
 estimate a local direction. The generation is closer to a random search over
@@ -212,7 +292,7 @@ nothing detects.
 for the claim that the estimate is thereby worthless, because the audit did
 not measure the score surface at that radius.
 
-## 6. The terminal weights put a coarser quantisation on a generation than the shaped signal it must rank
+## 7. The terminal weights put a coarser quantisation on a generation than the shaped signal it must rank
 
 **What is wrong.** Every play style except one sets a win at 100.0, a loss at
 minus 100.0 and a draw at zero.[^STYLES] The engine names a winner at the
@@ -230,7 +310,7 @@ outcomes.
 
 **What it costs.** This is the scoring noise that the alignment law says halves
 the cosine of a step, and here it is worse than the law's own measurement,
-because the terminal term is discrete and large. Together with item 3 it means
+because the terminal term is discrete and large. Together with item 4 it means
 the search was ranking noise for most of every generation.
 
 **Confidence.** High for the arithmetic, which follows from the weights and
@@ -242,7 +322,7 @@ progress reader is set at an absolute spread of 1.0, which suggests the shaped
 spread is of order one to ten, but that is an inference from a threshold and
 not a measurement.[^PROG]
 
-## 7. The centre of the structured kind grows without bound, and the search says so and does nothing
+## 8. The centre of the structured kind grows without bound, and the search says so and does nothing
 
 **What is wrong.** The structured policy declares that its choice does not
 survive a positive scaling of its weights, at line 514.[^STRUCT] The search
@@ -261,7 +341,7 @@ twenty generations is modest, and the cost rises with the length of a run.
 **Confidence.** High. The code states the mechanism and the docstring states
 the consequence.
 
-## 8. The collapse watch reads one strategy of four, and its threshold is an absolute reward
+## 9. The collapse watch reads one strategy of four, and its threshold is an absolute reward
 
 **What is wrong.** The launcher ends a paid run when the search has stopped,
 so that a collapsed run does not keep billing. The check asks the progress
@@ -287,13 +367,13 @@ scale.
 **Confidence.** High. Both are single lines of source and the second carries
 its own admission.
 
-## 9. A third of the run's episodes measure rather than train, and the launcher documents them as nearly free
+## 10. A third of the run's episodes measure rather than train, and the launcher documents them as nearly free
 
 **What is wrong.** Per style the run played 20 generations of 24 candidates
 over 6 seeds, which is 2,880 training episodes. It took a validation pass
 every two generations, which is ten passes of 128 seeds, plus one 128-seed
 yardstick pass, which is 1,408 episodes. **Measurement is 32.8 percent of the
-episodes of a run.** Section 12 gives the arithmetic.
+episodes of a run.** Section 13 gives the arithmetic.
 
 The launcher states that the validation passes are nearly free, because
 validation plays one policy, and it compares about two minutes for 128 worlds
@@ -313,7 +393,7 @@ spend that third on the population instead.
 because the audit did not time a generation and a validation pass on the
 target machine.
 
-## 10. Each strategy receives a quarter of the machine, and the sizing reasoning assumes the whole of it
+## 11. Each strategy receives a quarter of the machine, and the sizing reasoning assumes the whole of it
 
 **What is wrong.** The launcher starts one trainer process for each strategy
 and divides the cores between them, at line 849, where the worker count of
@@ -338,7 +418,7 @@ configuration into a 9-generation result on a paid instance.
 attribution of the shortfall to the worker split is an inference, marked
 UNVERIFIED, because the run's own timings are not in the tree.
 
-## 11. The run-level controller figure is measured under one strategy's weighting and reported without qualification
+## 12. The run-level controller figure is measured under one strategy's weighting and reported without qualification
 
 **What is wrong.** The run report holds one entry named for the controller.
 The report writer measures it under the first named strategy's weighting, and
@@ -359,9 +439,9 @@ undocumented precedence.[^DEFECTS]
 **Confidence.** High for the source. The claim that a reader did in fact take
 the wrong figure is recorded in the commit and not measured here.
 
-## 12. The derivation
+## 13. The derivation
 
-This section holds the arithmetic of items 3, 4, 5, 7 and 9 in one place, so
+This section holds the arithmetic of items 5, 6, 7, 8 and 10 in one place, so
 that a reader can check it without repeating it.
 
 The inputs are the population, the seeds and the two search constants of the
@@ -415,10 +495,10 @@ The quantisation of the terminal term. A win pays 100 and a loss pays minus
 loss to a win moves the mean by 200 divided by 6, which is 33.3. One seed
 moving from a draw to a loss moves it by 100 divided by 6, which is 16.7.
 
-## 13. What this audit did not reach
+## 14. What this audit did not reach
 
-Six workers took the measurements that need a running engine, and the machine
-was oversubscribed while they ran. The items below are the ones this report
+Five of the six workers held the measurements that need a running engine, and
+none of them returned before the machine was needed elsewhere. The items below are the ones this report
 cannot close. **Each one is a measurement and not an argument, so the next
 agent can take it directly.**
 
@@ -426,23 +506,20 @@ agent can take it directly.**
 |---|---|
 | The share of episodes that end in a win, a loss, a draw and a tick limit, over a decent seed count | Item 6 rests on the terminal weights firing. The engine names a winner at the tick limit, so they should fire, but the share is what sets the size of the quantisation against the shaped signal |
 | The decomposition of one style's episode return into its terminal part and its shaped part | It would say whether the reported 1.74 ratio is a difference in winning or a difference in shaping, and the owner's observation says it cannot be a difference in winning |
-| The typical spread of the shaped part between the candidates of one generation | It closes item 6. If the shaped spread is under 16.7, the ranking that drives every update is decided by outcome luck |
+| The typical spread of the shaped part between the candidates of one generation | It closes item 7. If the shaped spread is under 16.7, the ranking that drives every update is decided by outcome luck |
 | Whether each weight of the play style table is on the scale its description claims, term by term[^STYLES] | The descriptions state importances and the file states importance divided by a measured spread, so the spreads are volatile figures at a second declaration site |
 | Whether the structured towers receive any gradient while the readout sits at zero | If a tower parameter moves no action score, its share of the 5,354 weights is dead weight, and the alignment law says dead weight dilutes every step |
 | The split of the 5,354 trainable weights across parameter groups | It is the input to the item above |
 | The refusal share of a fixed-row policy, and whether the top row of a published file is even accepted | A policy the engine mostly refuses is close to a no-op whatever it chooses |
 | The per-block table of observation positions that ever change, separating an unwritten channel from a legitimately constant one | An earlier report audited the write sites and its own preface says later passes wrote much of the dead width it measured, so the current split is unknown[^POLICY] |
-| Which learner test stays green when a policy is made to ignore its observation, when the varying part of the observation is zeroed, and when the rank shaping is made constant | The testing rule says putting the defect back is the only proof that a test reaches a case, and this report can name no test that would have caught the four recorded defects[^TESTING] |
+| The names of the six learner items that fail when every policy is made to ignore its observation | Item 2 measured that 230 of 236 stay green. The six that fail are the only gate the suite holds against that defect, so knowing which they are says what to build on[^TESTING] |
+| Whether any test fails when the varying part of the observation is zeroed, and when the rank shaping is made constant | Two further perturbations were written and neither ran. A reading of the source says one neighbouring assertion catches the second and nothing else does |
 
-**The last row is the most important thing this report does not hold.** Two
-checks are cheap and neither exists: the share of decisions on which a policy
-emits its most common action, and whether the highest-scoring row over the
-unmasked rows ever changes within an episode.[^F707] This audit confirms that
-neither exists in the test tree. It did not reach the wider question of which
-existing test should have caught each recorded defect, and that question
-matters as much as the defects.
+**Every row above is a measurement and not an argument**, so the next agent
+takes it directly and none of them needs this audit repeated. The rows that
+close an item say which item they close.
 
-## 14. Checked, and found sound
+## 15. Checked, and found sound
 
 This section exists so that the next reader does not audit these again.
 
@@ -493,6 +570,25 @@ episode return, so every shaped weight of the earlier run was really a
 terminal reward.[^F692] The reward module now offers a level weight beside the
 change weight, states the difference in its own prose, and refuses a weighting
 that reads one field as both.[^REWARD]
+
+**Several learner tests are the right shape, and the audit credits them.** One
+file states four claims and pairs each with a test that puts the old behaviour
+back through one name and asserts that the property then breaks, and it asserts
+that its fixture reaches the case before the tests that need it run. Two
+structured policy tests are built as subclasses that reintroduce the exact
+forbidden rule, which is a proven failure mode. Three reward tests state the
+repaired properties over episode sums rather than over single steps. One league
+test proves that its neighbour is not vacuous, by running the same data under a
+schedule that does not rotate. Another holds one rule at two sites with a
+parametrized check that fails when the copies disagree, which is the right
+answer to the first defect shape.[^DEFECTS] A session guard refuses an import of
+the source tree.
+
+**The progress reader is a correct parser of its own log.** Eighteen tests read
+fixture text and assert on the rendering, and they construct no policy and play
+no game. That is the right scope for a parser. It is named here only because the
+feed is what a dispatcher watched for nine checkpoints, and item 1 is that
+nothing asked whether the number the feed renders means the policy plays.
 
 ## References
 
