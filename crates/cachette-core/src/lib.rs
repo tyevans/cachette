@@ -49,6 +49,7 @@ pub mod obs_ring_stack;
 pub mod obs_token;
 pub mod observation;
 pub mod padded;
+pub mod parallel;
 pub mod plan;
 pub mod position;
 pub mod presence;

@@ -1073,10 +1073,9 @@ impl Holding {
             claim_threshold: self.lease_rules.claim_threshold(),
         };
         let decide_span = stage::open(Stage::HoldingDecide);
-        std::thread::scope(|scope| {
-            let mut handles = Vec::new();
-            for (chunk, slot) in candidates.chunks(chunk_len).zip(slots.entries_mut()) {
-                handles.push(scope.spawn(move || {
+        crate::parallel::fan_out_each(candidates.chunks(chunk_len).zip(slots.entries_mut()).map(
+            move |(chunk, slot)| {
+                move || {
                     let mut changes = Vec::new();
                     for tile in chunk {
                         let decided = decide(grid, terrain, cities, lease, *tile);
@@ -1091,14 +1090,9 @@ impl Holding {
                         }
                     }
                     *slot = changes;
-                }));
-            }
-            for handle in handles {
-                // A thread here reads shared memory and writes its own slot,
-                // so it has no failure of its own.
-                handle.join().expect("a decide thread cannot fail");
-            }
-        });
+                }
+            },
+        ));
         drop(decide_span);
 
         // The change list is one pair of a tile and the value that tile
@@ -1435,18 +1429,18 @@ impl Holding {
         }
         cuts.push((held.len(), moved.len()));
 
+        let held = &held[..];
         let holders = &self.holders[..];
         let bands = cuts.len() - 1;
         let mut slots: Slots<Vec<TileIdx>> = Slots::filled(bands, Vec::new())
             .expect("the cut list always holds a first and a last entry");
-        std::thread::scope(|scope| {
-            let mut handles = Vec::new();
-            for (band, slot) in slots.entries_mut().iter_mut().enumerate() {
+        crate::parallel::fan_out_each(slots.entries_mut().iter_mut().enumerate().map(
+            move |(band, slot)| {
                 let (held_from, moved_from) = cuts[band];
                 let (held_to, moved_to) = cuts[band + 1];
                 let old = &held[held_from..held_to];
                 let changed = &moved[moved_from..moved_to];
-                handles.push(scope.spawn(move || {
+                move || {
                     let mut joined: Vec<TileIdx> = Vec::with_capacity(old.len() + changed.len());
                     let mut cursor = 0usize;
                     for tile in changed {
@@ -1463,14 +1457,9 @@ impl Holding {
                     }
                     joined.extend_from_slice(&old[cursor..]);
                     *slot = joined;
-                }));
-            }
-            for handle in handles {
-                // A band reads shared memory and writes its own buffer, so it
-                // has no failure of its own.
-                handle.join().expect("a band of the held list cannot fail");
-            }
-        });
+                }
+            },
+        ));
 
         let total: usize = slots.entries().iter().map(Vec::len).sum();
         let mut rebuilt: Vec<TileIdx> = Vec::with_capacity(total);

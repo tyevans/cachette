@@ -137,9 +137,9 @@ fn gather_intents(soldiers: &SoldierArena, threads: usize) -> Result<Vec<GatherI
     let mut slots: Slots<Vec<GatherIntent>> =
         Slots::filled(threads, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
 
-    std::thread::scope(|scope| {
-        for (chunk, slot) in live.chunks(chunk_len).zip(slots.entries_mut()) {
-            scope.spawn(move || {
+    crate::parallel::fan_out_each(live.chunks(chunk_len).zip(slots.entries_mut()).map(
+        move |(chunk, slot)| {
+            move || {
                 *slot = chunk
                     .iter()
                     .filter_map(|unit| {
@@ -154,9 +154,9 @@ fn gather_intents(soldiers: &SoldierArena, threads: usize) -> Result<Vec<GatherI
                         })
                     })
                     .collect();
-            });
-        }
-    });
+            }
+        },
+    ));
 
     Ok(slots.combine(Vec::new(), |mut joined, slot| {
         joined.extend_from_slice(slot);

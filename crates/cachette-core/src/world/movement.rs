@@ -325,9 +325,9 @@ pub(super) fn soldier_moves(
     let mut slots: Slots<Vec<(Entity, Axial)>> =
         Slots::filled(threads, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
 
-    std::thread::scope(|scope| {
-        for (chunk, slot) in live.chunks(chunk_len).zip(slots.entries_mut()) {
-            scope.spawn(move || {
+    crate::parallel::fan_out_each(live.chunks(chunk_len).zip(slots.entries_mut()).map(
+        move |(chunk, slot)| {
+            move || {
                 *slot = chunk
                     .iter()
                     .filter_map(|soldier| {
@@ -650,9 +650,9 @@ pub(super) fn soldier_moves(
                         Some((*soldier, target))
                     })
                     .collect();
-            });
-        }
-    });
+            }
+        },
+    ));
 
     Ok(slots.combine(Vec::new(), |mut joined, slot| {
         joined.extend_from_slice(slot);

@@ -720,32 +720,32 @@ pub fn draw(
         Slots::filled(threads, (DrawLedger::ZERO, Vec::new()))
             .map_err(|_| CohortError::ZeroThreads)?;
 
-    std::thread::scope(|scope| {
+    crate::parallel::fan_out_each({
         let mut base = 0usize;
-        for ((span, share_span), slot) in stores
+        stores
             .chunks_mut(chunk_len)
             .zip(shares.chunks_mut(chunk_len * COHORTS_PER_SITE))
             .zip(slots.entries_mut())
-        {
-            let start = base;
-            base += span.len();
-            let live_span = &live[start..base];
-            let generation_span = &generations[start..base];
-            let row_span = &rows[start * COHORTS_PER_SITE..base * COHORTS_PER_SITE];
-            scope.spawn(move || {
-                *slot = draw_span(
-                    tick,
-                    ration,
-                    commodity,
-                    start as u32,
-                    span,
-                    share_span,
-                    live_span,
-                    generation_span,
-                    row_span,
-                );
-            });
-        }
+            .map(move |((span, share_span), slot)| {
+                let start = base;
+                base += span.len();
+                let live_span = &live[start..base];
+                let generation_span = &generations[start..base];
+                let row_span = &rows[start * COHORTS_PER_SITE..base * COHORTS_PER_SITE];
+                move || {
+                    *slot = draw_span(
+                        tick,
+                        ration,
+                        commodity,
+                        start as u32,
+                        span,
+                        share_span,
+                        live_span,
+                        generation_span,
+                        row_span,
+                    );
+                }
+            })
     });
 
     // The ledger combine is order-free, because every term is an integer
@@ -911,13 +911,13 @@ pub fn decay(rate: Fix32, update: NeedUpdate<'_>, threads: usize) -> Result<(), 
         return Ok(());
     }
     let chunk_len = count.div_ceil(threads).max(1);
-    std::thread::scope(|scope| {
+    crate::parallel::fan_out_each({
         let mut base = 0usize;
-        for span in needs.chunks_mut(chunk_len) {
+        needs.chunks_mut(chunk_len).map(move |span| {
             let start = base;
             base += span.len();
             let live_span = &live[start..base];
-            scope.spawn(move || {
+            move || {
                 for (need, live) in span.iter_mut().zip(live_span) {
                     if *live != 1 {
                         continue;
@@ -927,8 +927,8 @@ pub fn decay(rate: Fix32, update: NeedUpdate<'_>, threads: usize) -> Result<(), 
                     let fallen = sim_math::sub(*need, rate);
                     *need = if fallen.0 < 0 { Fix32::ZERO } else { fallen };
                 }
-            });
-        }
+            }
+        })
     });
     Ok(())
 }
@@ -1096,83 +1096,84 @@ pub fn satisfy(
     let recovery = rule.recovery();
 
     let chunk_len = count.div_ceil(threads).max(1);
-    std::thread::scope(|scope| {
+    crate::parallel::fan_out_each({
         let mut base = 0usize;
-        for (need_span, deficit_span) in needs
+        needs
             .chunks_mut(chunk_len)
             .zip(deficits.chunks_mut(chunk_len))
-        {
-            let start = base;
-            base += need_span.len();
-            let live_span = &live[start..base];
-            let home_span = &homes[start..base];
-            let faction_span = &factions[start..base];
-            scope.spawn(move || {
-                for offset in 0..need_span.len() {
-                    if live_span[offset] != 1 {
-                        continue;
-                    }
-                    let home = home_span[offset];
-                    if home != NO_HOME {
-                        let row = row_index(home, faction_span[offset].0);
-                        if let (Some((whole, remainder)), Some(head)) = (
-                            served.get(row),
-                            table.rows().get(row).map(|row| row.headcount),
-                        ) {
-                            // **The place of a unit in the queue of its cohort
-                            // is its ordinal, rotated by a keyed offset.** A
-                            // rotation is a bijection on the ordinals of a
-                            // cohort, so exactly as many units fall below the
-                            // served count as the share covered. A draw taken
-                            // for each unit on its own would give each unit an
-                            // independent chance, and the number that ate
-                            // would then vary around the count the store paid
-                            // for. That was measured: a cohort whose share
-                            // covered one ration served two units on one
-                            // application and none on another.[^3]
-                            //
-                            // The offset is keyed on the cohort and the frame,
-                            // so the block of ordinals that eats slides from
-                            // one application to the next and no unit is
-                            // always first.[^4]
-                            let ordinal = ordinals[start + offset];
-                            if ordinal == NO_ORDINAL {
-                                continue;
+            .map(move |(need_span, deficit_span)| {
+                let start = base;
+                base += need_span.len();
+                let live_span = &live[start..base];
+                let home_span = &homes[start..base];
+                let faction_span = &factions[start..base];
+                move || {
+                    for offset in 0..need_span.len() {
+                        if live_span[offset] != 1 {
+                            continue;
+                        }
+                        let home = home_span[offset];
+                        if home != NO_HOME {
+                            let row = row_index(home, faction_span[offset].0);
+                            if let (Some((whole, remainder)), Some(head)) = (
+                                served.get(row),
+                                table.rows().get(row).map(|row| row.headcount),
+                            ) {
+                                // **The place of a unit in the queue of its cohort
+                                // is its ordinal, rotated by a keyed offset.** A
+                                // rotation is a bijection on the ordinals of a
+                                // cohort, so exactly as many units fall below the
+                                // served count as the share covered. A draw taken
+                                // for each unit on its own would give each unit an
+                                // independent chance, and the number that ate
+                                // would then vary around the count the store paid
+                                // for. That was measured: a cohort whose share
+                                // covered one ration served two units on one
+                                // application and none on another.[^3]
+                                //
+                                // The offset is keyed on the cohort and the frame,
+                                // so the block of ordinals that eats slides from
+                                // one application to the next and no unit is
+                                // always first.[^4]
+                                let ordinal = ordinals[start + offset];
+                                if ordinal == NO_ORDINAL {
+                                    continue;
+                                }
+                                let offset_of_frame = rng::draw_below(
+                                    key.seed,
+                                    rng::SYSTEM_CONSUMPTION,
+                                    key.tick.0,
+                                    row as u64,
+                                    DRAW_RATION_PLACE,
+                                    u64::from(head),
+                                );
+                                let place =
+                                    (u64::from(ordinal) + offset_of_frame) % u64::from(head);
+                                let gain = if place < u64::from(*whole) {
+                                    ration
+                                } else if place == u64::from(*whole) {
+                                    *remainder
+                                } else {
+                                    Fix32::ZERO
+                                };
+                                let fed = sim_math::add(need_span[offset], gain);
+                                need_span[offset] = if fed > NEED_FULL { NEED_FULL } else { fed };
                             }
-                            let offset_of_frame = rng::draw_below(
-                                key.seed,
-                                rng::SYSTEM_CONSUMPTION,
-                                key.tick.0,
-                                row as u64,
-                                DRAW_RATION_PLACE,
-                                u64::from(head),
-                            );
-                            let place = (u64::from(ordinal) + offset_of_frame) % u64::from(head);
-                            let gain = if place < u64::from(*whole) {
-                                ration
-                            } else if place == u64::from(*whole) {
-                                *remainder
-                            } else {
-                                Fix32::ZERO
-                            };
-                            let fed = sim_math::add(need_span[offset], gain);
-                            need_span[offset] = if fed > NEED_FULL { NEED_FULL } else { fed };
                         }
-                    }
-                    let short = sim_math::sub(threshold, need_span[offset]);
-                    deficit_span[offset] = if short.0 > 0 {
-                        sim_math::add(deficit_span[offset], short)
-                    } else {
-                        let eased = sim_math::sub(deficit_span[offset], recovery);
-                        if eased.0 < 0 {
-                            Fix32::ZERO
+                        let short = sim_math::sub(threshold, need_span[offset]);
+                        deficit_span[offset] = if short.0 > 0 {
+                            sim_math::add(deficit_span[offset], short)
                         } else {
-                            eased
-                        }
-                    };
+                            let eased = sim_math::sub(deficit_span[offset], recovery);
+                            if eased.0 < 0 {
+                                Fix32::ZERO
+                            } else {
+                                eased
+                            }
+                        };
+                    }
                 }
-            });
-        }
+            })
     });
     Ok(())
 }
@@ -1392,15 +1393,15 @@ pub fn mark_starved(
     }
     let word_chunk = plane.words.len().div_ceil(threads).max(1);
     let count = deficits.len();
-    std::thread::scope(|scope| {
+    crate::parallel::fan_out_each({
         let mut base = 0usize;
-        for span in plane.words.chunks_mut(word_chunk) {
+        plane.words.chunks_mut(word_chunk).map(move |span| {
             let start = (base * PLANE_BITS).min(count);
             base += span.len();
             let stop = (base * PLANE_BITS).min(count);
             let deficit_span = &deficits[start..stop];
             let live_span = &live[start..stop];
-            scope.spawn(move || {
+            move || {
                 for (offset, deficit) in deficit_span.iter().enumerate() {
                     if live_span[offset] != 1 {
                         continue;
@@ -1414,8 +1415,8 @@ pub fn mark_starved(
                         span[offset / PLANE_BITS] |= 1u64 << (offset % PLANE_BITS);
                     }
                 }
-            });
-        }
+            }
+        })
     });
     Ok(())
 }

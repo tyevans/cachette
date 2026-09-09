@@ -101,14 +101,14 @@ impl World {
         let mut slots: Slots<Vec<(Entity, u8)>> =
             Slots::filled(threads, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
 
-        std::thread::scope(|scope| {
+        crate::parallel::fan_out_each({
             let mut start = 0u32;
-            for slot in slots.entries_mut() {
+            slots.entries_mut().iter_mut().map_while(move |slot| {
                 if start >= cells {
-                    break;
+                    return None;
                 }
                 let end = start.saturating_add(chunk_len).min(cells);
-                scope.spawn(move || {
+                let span = move || {
                     let needs = soldiers.need_column();
                     let carries = soldiers.carry_column();
                     let homes = soldiers.home_column();
@@ -142,9 +142,10 @@ impl World {
                         }
                     }
                     *slot = chosen;
-                });
+                };
                 start = end;
-            }
+                Some(span)
+            })
         });
 
         let chosen = slots.combine(Vec::new(), |mut joined, slot| {

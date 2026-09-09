@@ -574,26 +574,29 @@ pub fn apply(
     let mut slots: Slots<RatePass> =
         Slots::filled(threads, RatePass::empty()).map_err(|_| RateError::ZeroThreads)?;
 
-    std::thread::scope(|scope| {
+    crate::parallel::fan_out_each({
         let mut base = 0usize;
-        for (span, slot) in stores.chunks_mut(chunk_len).zip(slots.entries_mut()) {
-            let start = base;
-            base += span.len();
-            let live_span = &live[start..base];
-            let generation_span = &generations[start..base];
-            let rate_span = &rows[start..base];
-            scope.spawn(move || {
-                *slot = apply_span(
-                    schedule,
-                    tick,
-                    start as u32,
-                    span,
-                    live_span,
-                    generation_span,
-                    rate_span,
-                );
-            });
-        }
+        stores
+            .chunks_mut(chunk_len)
+            .zip(slots.entries_mut())
+            .map(move |(span, slot)| {
+                let start = base;
+                base += span.len();
+                let live_span = &live[start..base];
+                let generation_span = &generations[start..base];
+                let rate_span = &rows[start..base];
+                move || {
+                    *slot = apply_span(
+                        schedule,
+                        tick,
+                        start as u32,
+                        span,
+                        live_span,
+                        generation_span,
+                        rate_span,
+                    );
+                }
+            })
     });
 
     // The ledger combine is order-free, because every term is an integer

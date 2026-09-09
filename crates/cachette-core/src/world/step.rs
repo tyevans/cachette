@@ -76,17 +76,17 @@ impl World {
             // The array is allocated here, on the first frame that runs, and
             // never when the world is built.
             self.values.prepare();
-            std::thread::scope(|scope| {
-                for (slot, chunk) in slots
+            crate::parallel::fan_out_each(
+                slots
                     .entries_mut()
                     .iter_mut()
                     .zip(self.values.chunks_mut(chunk_len))
-                {
-                    scope.spawn(move || {
-                        *slot = update_range(tick, seed, chunk);
-                    });
-                }
-            });
+                    .map(move |(slot, chunk)| {
+                        move || {
+                            *slot = update_range(tick, seed, chunk);
+                        }
+                    }),
+            );
         }
 
         // The count of changed tiles is a sum over the chunks. Addition of

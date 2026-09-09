@@ -720,9 +720,9 @@ pub fn release_the_dead(
         return Ok(());
     }
     let chunk_len = sites.div_ceil(threads).max(1);
-    std::thread::scope(|scope| {
-        for span in table.rows.chunks_mut(chunk_len * POSITIONS_PER_SITE) {
-            scope.spawn(move || {
+    crate::parallel::fan_out_each(table.rows.chunks_mut(chunk_len * POSITIONS_PER_SITE).map(
+        move |span| {
+            move || {
                 for entry in span {
                     let Some(held) = entry.holder() else {
                         continue;
@@ -731,9 +731,9 @@ pub fn release_the_dead(
                         entry.holder = 0;
                     }
                 }
-            });
-        }
-    });
+            }
+        },
+    ));
     Ok(())
 }
 
@@ -786,26 +786,29 @@ pub fn rebalance(
     }
     let chunk_len = sites.div_ceil(threads).max(1);
     let preferences = &table.preferences;
-    std::thread::scope(|scope| {
+    crate::parallel::fan_out_each({
         let mut base = 0usize;
-        for span in table.rows.chunks_mut(chunk_len * POSITIONS_PER_SITE) {
-            let start = base;
-            base += span.len() / POSITIONS_PER_SITE;
-            let live_span = &live[start..base];
-            let tile_span = &tiles[start..base];
-            let store_span = &stores[start..base];
-            let preference_span = &preferences[start..base];
-            scope.spawn(move || {
-                rebalance_span(
-                    span,
-                    live_span,
-                    tile_span,
-                    store_span,
-                    preference_span,
-                    terrain,
-                );
-            });
-        }
+        table
+            .rows
+            .chunks_mut(chunk_len * POSITIONS_PER_SITE)
+            .map(move |span| {
+                let start = base;
+                base += span.len() / POSITIONS_PER_SITE;
+                let live_span = &live[start..base];
+                let tile_span = &tiles[start..base];
+                let store_span = &stores[start..base];
+                let preference_span = &preferences[start..base];
+                move || {
+                    rebalance_span(
+                        span,
+                        live_span,
+                        tile_span,
+                        store_span,
+                        preference_span,
+                        terrain,
+                    );
+                }
+            })
     });
     Ok(())
 }

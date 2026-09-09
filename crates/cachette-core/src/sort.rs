@@ -258,15 +258,17 @@ pub fn order_on<const N: usize>(
     let mut runs: Slots<Vec<u32>> =
         Slots::filled(threads, Vec::new()).map_err(|_| SortError::ZeroThreads)?;
 
-    std::thread::scope(|scope| {
+    crate::parallel::fan_out_each({
         let mut base = 0u32;
-        for (chunk, run) in keys.chunks(chunk_len).zip(runs.entries_mut()) {
-            let start = base;
-            base += chunk.len() as u32;
-            scope.spawn(move || {
-                *run = sorted_run(chunk, start);
-            });
-        }
+        keys.chunks(chunk_len)
+            .zip(runs.entries_mut())
+            .map(move |(chunk, run)| {
+                let start = base;
+                base += chunk.len() as u32;
+                move || {
+                    *run = sorted_run(chunk, start);
+                }
+            })
     });
 
     // The runs are read through `combine`, which is the one place that fixes
