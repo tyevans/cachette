@@ -8,6 +8,12 @@ layout, one action layout, one world extent and one faction count. The loader
 reads the fit a file states, compares it against the world the caller names,
 and refuses a file that disagrees.[^C3]
 
+**This index holds no policy right now.** The observation reached version 7,
+and every stored policy read version 6. The section on what is gone holds what
+each one measured, and the files themselves are kept outside this directory so
+that nothing this project measured is thrown away. A reader who wants a policy
+to play must train one.
+
 **A file the loader refuses is removed rather than retired in place.** An index
 that lists a file nobody can load costs a reader the time it takes to find that
 out. Nine policies that stated observation version 3 went that way when the
@@ -18,32 +24,43 @@ measurement stays here when its file cannot.
 
 ## Watch one play
 
-Every policy here was trained on a 48 by 48 world of three factions. The
-demonstration refuses a policy that does not fit the world it plays, so name
-that world.
+The demonstration refuses a policy that does not fit the world it plays, so
+name the world the policy was trained on. A policy trained on a 48 by 48 world
+of three factions plays like this:
 
     uv run python -m cachette.demo --extent 48 --factions 3 \
-      --policy 0=checkpoints/ring/obs6-people-gen1.npz
+      --policy 0=<path to a weight file>
 
-`--policy` repeats, and `N=path` names the faction that holds it. Three
-policies play each other like this:
+`--policy` repeats, and `N=path` names the faction that holds it, so three
+policies play each other by naming three paths.
 
-    uv run python -m cachette.demo --extent 48 --factions 3 \
-      --policy 0=checkpoints/ring/obs6-people-gen1.npz \
-      --policy 1=checkpoints/ring/obs6-land-gen1.npz \
-      --policy 2=checkpoints/ring/obs6-conquer-gen1.npz
+**No path is named here on purpose.** This index named two files that had
+already been removed, and a reader following it met a directory that does not
+exist. A command that names a live file goes stale the next time the
+observation moves.
 
 ## What is here
 
-Eight policies from one run on a 48 by 48 world of three factions, at
-observation version 6 and action version 2. Every file loads against a world
-of that shape.
+Nothing. The table below the break holds every policy this project has stored,
+and why each one went.
 
-**A score is a mean return over 128 held-out seeds under that strategy's own
-weighting. A return under one weighting does not compare with a return under
-another.** The yardstick column is the built-in controller measured on the
-same seeds under the same weighting, so the only fair comparison is a row
-against its own bar.
+## What is gone
+
+### The place action table at observation version 6
+
+Eight policies from one run on a 48 by 48 world of three factions, at
+observation version 6 and action version 2. **The observation reached version
+7 on 8 September 2026 and the loader refuses all eight.** The raise was
+mandated rather than accidental: positions moved and published values changed,
+which is the case the version rule exists for.
+
+The files are kept under `archive/obs6-act2-policies/` rather than deleted,
+because the project owner asked for these weights and a version raise is not a
+reason to destroy them. They cannot be loaded by any current build.
+
+A score is a mean return over 128 held-out seeds under that strategy's own
+weighting, against the built-in controller measured on the same seeds under
+the same weighting.
 
 | File | Score | Yardstick | Beats it | Generation | Kind |
 |---|---|---|---|---|---|
@@ -56,19 +73,45 @@ against its own bar.
 | `place/obs6-act2-conquer-structured-gen7` | 1115.1 | 1417.4 | no | 7 | structured |
 | `place/obs6-act2-conquer-gen9` | 1033.2 | 1417.4 | no | 9 | linear |
 
-**Beating the yardstick is not beating the game.** The bar is one opponent,
-the built-in controller, and no policy here has ever played another policy
-during training. In a hand-played match the land policy beat the people
-policy every time, although the people policy stands further above its own
-bar. A score says how well a policy served its own weighting, and nothing
-more.
+**A rating run then measured these eight against each other and against the
+controller, and the scores above do not survive it.** The rating played every
+unordered triple of the nine players over one world each, with three cyclic
+rotations so that every player held every seat an equal number of times: 252
+games, 84 worlds, no undecided game. Seven of the eight rate below the
+controller they trained against, and every one of those gaps clears two
+standard errors.
 
-**No policy here founds a settlement.** Founding needs a settler unit, and a
-settler needs a queued unit type several decisions earlier. Nothing rewards
-the first step of that plan, so no run has discovered it. The held ground of
-every policy here comes from the cities its faction started with.
+| Player | Win share | Elo against the controller |
+|---|---|---|
+| `wealth-structured` | 0.667 | +53.1 |
+| the built-in controller | 0.583 | 0.0 |
+| `conquer-structured` | 0.357 | −146.5 |
+| `land` | 0.286 | −199.7 |
+| `wealth` | 0.286 | −199.7 |
+| `people` | 0.238 | −239.7 |
+| `people-structured` | 0.214 | −261.8 |
+| `conquer` | 0.214 | −261.8 |
+| `land-structured` | 0.155 | −326.5 |
 
-## What is gone
+**A score against a yardstick is not a measure of play.** Every row above beat
+or missed its own bar under its own weighting, and the rating says how each
+one actually played. The two orderings disagree: `people` stands furthest
+above its own bar and rates seventh of nine.
+
+`wealth-structured` is the one exception, and it is indistinguishable from the
+controller rather than better: the interval runs from −74.6 to 180.7, and the
+controller takes 0.556 of their games. It won every one of its 56 wins by the
+wonder path and none by any other, and it reached the tick limit in 0.238 of
+its games against 0.68 to 0.80 for the rest. It found a different game to play.
+
+**Two facts explain the table.** Every shaped weight of all eight strategies
+was a difference of a field since the previous decision, and a sum of
+differences collapses to the endpoints under an undiscounted episode return,
+so all eight trained against a terminal reward.[^C7] And no policy founds a
+settlement: the action row that queues a settler was legal on every decision
+of one policy's episodes and that policy took it zero times, because nothing
+rewarded it.[^C8]
+
 
 Every row below names a file this project removed, and the measurement it
 carried. A file goes when the loader refuses it, and the measurement stays
@@ -160,3 +203,5 @@ policy asks for an observation after a game ends.[^C2]
 [^C4]: Findings register, FND-666. `docs/FINDINGS.md`
 [^C5]: Findings register, FND-667. `docs/FINDINGS.md`
 [^C6]: Findings register, FND-692. `docs/FINDINGS.md`
+[^C7]: Findings register, FND-700. `docs/FINDINGS.md`
+[^C8]: Findings register, FND-698. `docs/FINDINGS.md`
