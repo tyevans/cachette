@@ -24,10 +24,12 @@ The reward means nothing until a caller supplies all of these.
   contributes nothing, which is a statement and not an omission.
 - **A weight for each of the three terminal outcomes.** A weighting with
   three zero terminal weights rewards no outcome.
-- **The unit of each weight.** A weight multiplies the raw value the schema
-  declares. The store total and the best renown are Q16.16 values as raw
-  integers, so a weight on one of them carries a factor of 65536 that a
-  weight on a tile count does not.
+- **The unit of each weight.** A change weight multiplies the raw published
+  value, and the engine compresses every count before it publishes one. Two
+  counts of very different sizes therefore cross in the same range, and a
+  weight sized for a raw integer reaches almost nothing. A level weight
+  multiplies a value the unit of the field has already bounded, so every
+  level weight carries one unit.
 
 **A weighting whose shaped weights are all zero is the terminal reward.**
 This module therefore needs no mode selection. The choice between a shaped
@@ -107,9 +109,7 @@ and pays nothing here.
 undiscounted episode return sums the reward of every decision, so a sum of
 first differences collapses to the last reading less the first. A term that
 weighs a change therefore contributes the same amount whatever the policy did
-in between, and the optimiser sees nothing.[^11] Every shaped term of this
-module is such a difference. A term that must change what the optimiser sees
-must fire once, at the end, on a quantity that is not a difference.
+in between, and the optimiser sees nothing.[^11]
 
 **Only a win pays the term.** A loss pays the loss weight and nothing else,
 whether it comes at tick 300 or at the tick limit. A term that paid the time
@@ -122,6 +122,24 @@ defect with the sign reversed: it makes a fast loss cheaper than a slow one.
 nothing, so a run under a weighting that states no early weight scores what
 it scored before this term existed. A register holds the row, and one finding
 holds the reasoning.[^12]
+
+Two shaped forms
+----------------
+
+**A caller states a change weight, a level weight, or both.** A change weight
+telescopes, so it pays one number for the whole episode. A level weight is
+paid on every decision, so the episode pays the area under the curve of the
+field. A policy that reaches a level sooner scores more, which is the signal a
+multi-step chain needs.
+
+A level divides the published value by the unit the engine published for that
+field, so every level lies inside the closed interval from minus one to one. A
+weighting states no bound of its own, because the engine owns the bound of
+each field and publishes it.[^6]
+
+**Every shaped weight of this module was a change weight, and the whole
+strategy table was one.** A run therefore trained against a terminal reward
+under weights that read as dense. One finding holds the measurement.[^13]
 
 Determinism
 -----------
@@ -163,6 +181,8 @@ decisions D1 and D2.
 [^11]: Findings register, FND-679. ``docs/FINDINGS.md``
 
 [^12]: Findings register, FND-692. ``docs/FINDINGS.md``
+
+[^13]: Findings register, FND-700. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -170,6 +190,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Final, Protocol
 
+from .objective import Scale
 from .signals import SignalCatalogue
 
 if TYPE_CHECKING:
@@ -267,8 +288,28 @@ class Weighting:
     """What each term of the reward is worth.
 
     The terms entry maps the name of an observation field to the weight of
-    its change since the previous decision. The three outcome entries give
-    what each terminal outcome is worth.
+    its change since the previous decision. The levels entry maps the name of
+    an observation field to the weight of its own value. The three outcome
+    entries give what each terminal outcome is worth.
+
+    **A term entry telescopes and a level entry does not.** An evolution
+    strategy sums the reward of every decision of the episode with no
+    discount, so a sum of changes collapses to the last reading less the
+    first. A term entry therefore pays one number for the whole episode,
+    whatever the policy did in between, and no weight on it makes the signal
+    dense. A level entry is paid on every decision, so the episode pays the
+    area under the curve of the field and a policy that reaches a level
+    sooner scores more.[^3]
+
+    A level entry reads the published value divided by the unit the engine
+    published for that field, so every level lies inside the closed interval
+    from minus one to one. **A level entry therefore states no bound of its
+    own.** The engine owns the bound of each field and publishes it in the
+    schema.[^4]
+
+    One field belongs in one entry. A field named in both would pay for its
+    level and for its change at once, and no reader of the two numbers could
+    say which weight moved the reward.
 
     The early entry is what the time left on the clock pays on a win. It is
     zero unless a caller sets it, and a zero pays nothing. A weighting that
@@ -289,13 +330,50 @@ class Weighting:
     [^1]: Blockers register, BLK-050. ``docs/BLOCKERS.md``
 
     [^2]: Findings register, FND-692. ``docs/FINDINGS.md``
+
+    [^3]: Findings register, FND-679. ``docs/FINDINGS.md``
+
+    [^4]: ADR-0154, the observation and the action of a faction are
+    schema-declared bounded tables the engine owns, decision D1.
+    ``docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md``
     """
 
     terms: Mapping[str, float | None] = field(default_factory=dict)
+    levels: Mapping[str, float | None] = field(default_factory=dict)
     won: float | None = None
     lost: float | None = None
     drawn: float | None = None
     won_early: float = 0.0
+
+    def __post_init__(self) -> None:
+        """Refuse a weighting that reads one field as a level and as a change."""
+        both = sorted(set(self.terms) & set(self.levels))
+        if both:
+            message = (
+                f"{both} name a field this weighting reads as a level and as "
+                f"a change. A field belongs in one entry, because a reader of "
+                f"the two numbers cannot say which weight moved the reward."
+            )
+            raise TermError(message)
+
+    @property
+    def telescopes(self) -> bool:
+        """Whether every shaped weight of this weighting reads a change.
+
+        Such a weighting gives no signal inside an episode under an evolution
+        strategy, because the sum of a change over the episode is the level
+        at the end minus the level at the start. A shaped weight then pays
+        one number for the whole episode, and the optimiser sees a terminal
+        reward however dense the weights look.[^1]
+
+        A weighting with no shaped weight at all is the terminal reward, and
+        it does not telescope: it states that nothing but the outcome scores.
+
+        References
+        ----------
+        [^1]: Findings register, FND-679. ``docs/FINDINGS.md``
+        """
+        return bool(self.terms) and not self.levels
 
     def terminal(self, outcome: str) -> float:
         """Return the weight of one outcome.
@@ -335,6 +413,7 @@ class Weighting:
     def unset_names(self) -> tuple[str, ...]:
         """Return the name of every weight this weighting left unset."""
         unset = [name for name, weight in self.terms.items() if weight is None]
+        unset.extend(name for name, weight in self.levels.items() if weight is None)
         unset.extend(name for name in TERMINAL_ROWS if getattr(self, name) is None)
         return tuple(unset)
 
@@ -583,10 +662,15 @@ class RewardStep:
     tick limit that had not run at this reading, and a caller reads it to see
     the early entry hold at zero while the clock moves.
 
-    The terms entry gives what each shaped term contributed, so a caller sees
+    The terms entry gives what each change term contributed, so a caller sees
     which term moved. The changes entry gives the raw change of each term
     before its weight, so a caller sees a term move while its weight holds
     the contribution at zero.
+
+    The levels entry gives what each level term contributed, and the shares
+    entry gives the bounded level each one read before its weight. The pair
+    answers the same question for a level term that the terms and the changes
+    pair answers for a change term.
 
     The outcome entry names the state of the run. The done entry is true once
     the run has ended. The alive entry is true while the faction holds a unit
@@ -606,6 +690,8 @@ class RewardStep:
     terms: Mapping[str, float]
     changes: Mapping[str, int]
     objectives: Mapping[str, float] = field(default_factory=dict)
+    levels: Mapping[str, float] = field(default_factory=dict)
+    shares: Mapping[str, float] = field(default_factory=dict)
     early: float = 0.0
     remaining_share: float = 0.0
 
@@ -631,12 +717,15 @@ class Reward:
         """Build the reward of one faction, and take the first reading.
 
         Raises ``TermError`` when a term names no single-position field of
-        the schema of this world. Raises ``UnsetWeightError`` when the
+        the schema of this world, or when a level term names a field whose
+        form the schema does not state. Raises ``UnsetWeightError`` when the
         weighting leaves a weight unset.
         """
         self._faction = faction
         self._weighting = weighting
         self._starts = _field_starts(world, tuple(weighting.terms))
+        self._level_starts = _field_starts(world, tuple(weighting.levels))
+        self._units = _field_units(world, tuple(weighting.levels))
         self._outcomes = OutcomeReader(world, faction)
         unset = weighting.unset_names()
         if unset:
@@ -679,9 +768,13 @@ class Reward:
     def reset(self, world: World) -> None:
         """Take the first reading of a run, and pay nothing for it.
 
-        A caller resets before the first decision. The reward of a decision
-        is a change since the previous reading, so the first reading is a
+        A caller resets before the first decision. A change weight reads the
+        movement since the previous reading, so the first reading is a
         baseline and not a reward.
+
+        **A level weight keeps no state, so this resets none for it.** A
+        level is a property of one reading, and the reset therefore holds
+        the baseline of the change weights alone.
         """
         self._previous = self._read(world)
         self._outcomes.reset()
@@ -690,10 +783,11 @@ class Reward:
         """Return what the decision before this reading earned.
 
         A caller steps the world and then calls this. The shaped part is the
-        weighted change of each term since the previous reading. The terminal
-        part is the weight of the outcome, and it is paid once. The early
-        part is what the time left on the clock pays on a win, and it is paid
-        once as well.
+        weighted change of each change term since the previous reading, plus
+        the weighted bounded level of each level term at this reading. The
+        terminal part is the weight of the outcome, and it is paid once. The
+        early part is what the time left on the clock pays on a win, and it
+        is paid once as well.
 
         **The observation array of one state serves every reader of it.** The
         weighted terms and the outcome both come from the array of the seat
@@ -702,8 +796,9 @@ class Reward:
         this reads no array of its own.
         """
         ended = self.done
-        reading = self._read(world, observation)
-        state = self._outcomes.read(world, observation)
+        held = self._array(world, observation)
+        reading = self._read(world, held)
+        state = self._outcomes.read(world, held)
         if ended:
             return RewardStep(
                 value=0.0,
@@ -714,6 +809,8 @@ class Reward:
                 alive=state.alive,
                 terms=dict.fromkeys(self._weighting.terms, 0.0),
                 changes=dict.fromkeys(self._weighting.terms, 0),
+                levels=dict.fromkeys(self._weighting.levels, 0.0),
+                shares=dict.fromkeys(self._weighting.levels, 0.0),
                 remaining_share=state.remaining_share,
             )
 
@@ -721,10 +818,15 @@ class Reward:
             name: reading[name] - self._previous[name] for name in self._weighting.terms
         }
         terms = {
-            name: _weight_of(self._weighting, name) * float(change)
+            name: _weight_of(self._weighting.terms, name) * float(change)
             for name, change in changes.items()
         }
-        shaped = sum(terms.values())
+        shares = self._read_levels(world, held)
+        levels = {
+            name: _weight_of(self._weighting.levels, name) * share
+            for name, share in shares.items()
+        }
+        shaped = sum(terms.values()) + sum(levels.values())
         terminal = self._weighting.terminal(state.name)
         early = self._weighting.early(state.name, state.remaining_share)
 
@@ -739,29 +841,99 @@ class Reward:
             alive=state.alive,
             terms=terms,
             changes=changes,
+            levels=levels,
+            shares=shares,
             early=early,
             remaining_share=state.remaining_share,
         )
+
+    def _array(self, world: World, observation: np.ndarray | None = None) -> np.ndarray:
+        """Return the observation array of the seat, building at most one.
+
+        **One decision builds the array of its state once.** Three readers of
+        this module read it, and a fourth reads it in the outcome reader, so
+        one build answers all of them. A caller that already holds the array
+        passes it and this builds none.[^1]
+
+        References
+        ----------
+        [^1]: Report 38, where the training time goes, section 10.2.
+        ``docs/research/reports/38-where-the-training-time-goes.md``
+        """
+        if observation is not None:
+            return observation
+        return world.faction_observation(self._faction)
 
     def _read(
         self, world: World, observation: np.ndarray | None = None
     ) -> dict[str, int]:
         """Read every position this reward needs from the observation array."""
-        values = (
-            world.faction_observation(self._faction)
-            if observation is None
-            else observation
-        )
+        values = self._array(world, observation)
         return {name: int(values[start]) for name, start in self._starts.items()}
 
+    def _read_levels(
+        self, world: World, observation: np.ndarray | None = None
+    ) -> dict[str, float]:
+        """Read the bounded level of every level term of this weighting.
 
-def _weight_of(weighting: Weighting, name: str) -> float:
+        A level divides the published value by the unit the engine published
+        for the field, so it lies inside the closed interval from minus one
+        to one. **The unit comes from the schema.** A divisor written here
+        would be a second declaration of an engine rule, and nothing would
+        fail when the engine moved and this did not.
+        """
+        if not self._level_starts:
+            return {}
+        values = self._array(world, observation)
+        return {
+            name: self._units[name].fraction(float(values[start]))
+            for name, start in self._level_starts.items()
+        }
+
+
+def _weight_of(weights: Mapping[str, float | None], name: str) -> float:
     """Return the weight of one shaped term, which the constructor set."""
-    weight = weighting.terms[name]
+    weight = weights[name]
     if weight is None:  # pragma: no cover - the constructor refuses this
         message = f"the weight of {name!r} is unset"
         raise UnsetWeightError(message)
     return float(weight)
+
+
+def _field_units(world: World, names: Sequence[str]) -> dict[str, Scale]:
+    """Return the published scale of every named field of one layout.
+
+    A level term divides by the unit the engine wrote the field against, and
+    the schema is the only declaration of that unit. A field whose form the
+    schema does not state is refused rather than given a unit of one, because
+    a level with no bound is a raw count and a raw count means different
+    things on two worlds.
+
+    References
+    ----------
+    [^1]: ADR-0154, the observation and the action of a faction are
+    schema-declared bounded tables the engine owns, decision D1.
+    ``docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md``
+    """
+    if not names:
+        return {}
+    catalogue = SignalCatalogue.of_world(world)
+    units: dict[str, Scale] = {}
+    for name in names:
+        form = catalogue.signal(name).form
+        if form is None or form.unit <= 0:
+            message = (
+                f"{name!r} carries no published unit, so nothing here knows "
+                f"what one whole reads as. A level term needs one. The "
+                f"layout publishes the forms "
+                f"{sorted(catalogue.value_forms)}."
+            )
+            raise TermError(message)
+        units[name] = Scale(
+            unit=float(form.unit),
+            compressed=form.invertible and form.uniform,
+        )
+    return units
 
 
 def _field_starts(world: World, names: Sequence[str]) -> dict[str, int]:

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-693**
+**Next number: FND-703**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18194,6 +18194,134 @@ becomes incomparable with a score measured after the change.[^F692D]
 the term. This row records the arithmetic and the reasoning, and it does not
 claim a behaviour change.
 
+### FND-700 — Every shaped weight of the strategy table telescoped, so eight strategies trained against a terminal reward
+
+**Believed.** The eight rows of the strategy table held dense rewards. Each row
+named a field and a weight, one row weighed the ground and another weighed the
+people, and the run compared what those rewards taught. One finding had already
+stated that a change term telescopes under an undiscounted episode return, and
+the project read that as a statement about one timing term.[^F700A]
+
+**True.** It was a statement about every shaped weight the reward module held.
+The module offered one shaped form, and that form was the change of a field
+since the previous decision. An evolution strategy sums the reward of every
+decision of the episode with no discount, so the shaped part of every row
+collapsed to the weight times the change of the field from the first reading to
+the last. **All eight rows therefore trained against a terminal reward.** No
+weight of any row could make the signal dense, because density was not a
+property the weights could reach.
+
+**Evidence.** A run of the ground row over a seeded world paid a shaped total of
+11951.0 for the episode. The published tile field read 0 at the first decision
+and 11951 at the last. The two numbers are equal because the sum of the changes
+is the change of the endpoints. The people row paid 15579.0 on its population
+weight, which is three times the endpoint change of 5193. A run of 40 decisions
+paid a reward on one decision and nothing on the other 39, because the field
+moved once, when the seeding seated the faction, and held after that.
+
+**The endpoints alone also score two runs of one seed the same.** One seed
+played for 40 decisions and for 150 decisions reached the same published tile
+value, and the change form scored both at 9384.0. A level form scored them at
+5.728 and at 21.478.
+
+**Follows.** The reward now takes a level weight beside its change weight. A
+level weight is paid on every decision, so the episode pays the area under the
+curve of the field, and a policy that reaches a level sooner scores more. A
+level divides the published value by the unit the engine published for the
+field, so it states no bound of its own and every level weight carries one unit.
+
+Every row of the strategy table now states level weights. **Every stored score
+of every strategy is therefore incomparable with a score measured after this
+change.**[^F700B]
+
+**One weight was wrong by five orders of magnitude, for the same reason.** The
+wealth row scaled its store weight by one part in a hundred thousand, and a
+comment said that the store total crosses as a raw Q16.16 integer. It does not.
+The engine compresses every count before it publishes one, so the store total
+and the tile count cross in the same range. The store term paid 0.4 over an
+episode against 5975.5 for the ground term of the same row, so the wealth
+strategy was a ground strategy under another name.
+
+**A check now fails when a row telescopes.** A weighting reports whether its
+shaped weights are all change weights, and one test reads that for every row.
+Nothing failed before, because a change weight is a legal weight and reads as
+dense.[^F700C]
+
+### FND-701 — A compressed magnitude term took the logarithm of a logarithm
+
+**Believed.** The objective module bounded a raw count by a base-two logarithm
+against a fixed cap of 40 bits, and it divided a fixed-point value by a unit of
+65536. The module stated both numbers itself. The project believed those two
+numbers were properties of the arithmetic of the module.
+
+**True.** Both are rules the engine owns and publishes. The schema states the
+value form of every field, and the compressed magnitude form carries the base,
+the offset, the divisor and the unit. **The divisor the engine publishes is 40
+and the unit it publishes is 65536, so the two numbers agreed and the scale of a
+stored score does not move for reading them from the schema.**
+
+The second application of the rule agreed with nothing. The engine takes the
+logarithm of a count before it publishes it, so a term that took its own
+logarithm of the published value measured the logarithm of a logarithm. Such a
+term is nearly flat.
+
+**Evidence.** With the second logarithm, a population of 1000 against a
+population of 8000 moved the population objective by 0.0095 of its range. Three
+doublings of a count must move a compressed magnitude by three parts in the
+divisor, which is 0.075. The measurement is a test that puts the second
+logarithm back and reads the two values.
+
+**Follows.** A term now reads the unit and the divisor from the value form the
+schema publishes for the field it reads. A field the engine already compressed
+divides by the published unit and takes no further logarithm, because the
+published value over the unit is the logarithm of the quantity over the divisor.
+A field of a raw quantity takes the logarithm against the published divisor. A
+layout that publishes neither refuses, and the refusal names the forms the
+layout does publish.
+
+**Every play style that names a compressed magnitude term changes scale.** Five
+of the nine objectives of the shipped style table name one.[^F701A]
+
+### FND-702 — The population field and the live unit field publish one number
+
+**Believed.** The people strategy rewarded the population of a faction, and the
+military objective of the play style table rewarded the unit count. The two were
+different rewards over different quantities, and a run that compared them
+measured what each one taught.
+
+**True.** In every episode measured, the published population and the published
+live unit count held the same value at every decision. The population field of
+one faction therefore rewards the unit count under another name, and the people
+strategy is a military strategy.
+
+**Evidence.** Three seeds of a 48 by 48 world of three factions, played by a
+random policy for 618 decisions in total, read the same value in the population
+field and in the live unit field on every one of them. Sixteen further episodes
+under a no-op policy and three random policies read the same value in both at
+the end of every episode. The population for each settlement field read the same
+value again, which follows from the settlement count holding at one in every
+episode.
+
+**This row states the measurement and not the cause.** The engine crate was out
+of scope for the work that found it, so nothing here says whether the two fields
+read one source by design or by defect. A reader who wants the cause reads the
+engine.
+
+**Follows.** The people row keeps its name, because a stored policy carries the
+name and a rename orphans every file.[^F702A] The row now says in the code that
+it rewards the unit count. A run that means to compare a growth strategy against
+a military strategy cannot use these two fields until the engine publishes a
+count of people that is not the unit count.
+
+**No trained policy has founded a settlement, and that is one reason these
+measurements read as they did.** The settlement count held at one in every
+episode measured, so the people row and the ground row both scored a faction
+that never grew past the city the seeding gave it. The strategy table now pays a
+level term for the settlement count and a smaller one for the readiness to
+found, which is the one field that separates a faction that produced a settler
+and walked it to a site from a faction that did nothing.
+
+
 ## References
 
 [^F692A]: Findings register, FND-679. `docs/FINDINGS.md`
@@ -18269,3 +18397,8 @@ claim a behaviour change.
 [^F690B]: The commit `Name each stored action row by its verb and its coordinates`. Read its message for the perturbation and the figures.
 [^F691A]: The commit `Publish the structure of the observation, not only its positions`. Read its message for the length figure and the field split.
 [^F691B]: The commit `Publish the value form of each observation field`. Read its message for the array comparison and the commands.
+[^F700A]: Findings register, FND-679. `docs/FINDINGS.md`
+[^F700B]: The stored policy index. `checkpoints/README.md`
+[^F700C]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+[^F701A]: The play style table. `python/cachette/learn/play_styles.toml`
+[^F702A]: The stored policy index. `checkpoints/README.md`
