@@ -133,6 +133,12 @@ seats fewer factions than the run asked for, and a world with a seat that
 reaches no food. Every seed after the first refusal shifted, so a run measured
 after the change plays a different set.[^C4]
 
+**A conquest score no longer compares with a score measured today.** The
+reward of the conquest strategies now pays one terminal term for the time a
+win left on the clock, and no other strategy carries it. Each conquest row
+above was measured before that term existed, so it holds a return under a
+weighting the run no longer uses. Every other row still compares.[^C6]
+
 ## How much water a world holds does not predict the game
 
 A world of the training extent holds about a third water at the median, and
@@ -153,3 +159,4 @@ policy asks for an observation after a game ends.[^C2]
 [^C3]: ADR-0193, an observation names another faction by a position relative to the reader. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
 [^C4]: Findings register, FND-666. `docs/FINDINGS.md`
 [^C5]: Findings register, FND-667. `docs/FINDINGS.md`
+[^C6]: Findings register, FND-692. `docs/FINDINGS.md`

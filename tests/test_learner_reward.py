@@ -25,6 +25,8 @@ References
 
 [^5]: Recurring Defect Shapes, shape 1, redundant declaration sites.
 ``.agents/rules/recurring-defects.md``
+
+[^6]: Findings register, FND-692. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -39,8 +41,10 @@ from cachette.learn import (
     OUTCOMES,
     SHAPED_ROWS,
     TERMINAL_ROWS,
+    TIMING_ROWS,
     UNSET_WEIGHTING,
     Reward,
+    RewardStep,
     TermError,
     UnsetWeightError,
     Weighting,
@@ -325,3 +329,141 @@ def test_the_register_holds_one_row_for_each_shaped_term() -> None:
 
 def test_the_register_holds_one_row_for_each_terminal_outcome() -> None:
     assert _register_rows("## The terminal outcomes") == list(TERMINAL_ROWS)
+
+
+# The tick limit of a whole run below. The engine compares held ground at the
+# limit and records a winner, so a run that reaches it still ends won or
+# lost.
+TIMED_LIMIT = 600
+
+# Seeds of whole games under the tick limit above, chosen by a probe. The
+# commit body holds the probe and every figure it read.
+#
+# Faction zero wins each of the first three, by domination at tick 90, by
+# domination at tick 241, and by held ground at the tick limit. It loses the
+# last two, by domination at tick 529 and by held ground at the limit.
+EARLY_WIN_SEED = 4
+LATER_WIN_SEED = 7
+LIMIT_WIN_SEED = 3
+EARLY_LOSS_SEED = 10
+LIMIT_LOSS_SEED = 2
+
+# What a win, a loss and the time left on the clock pay in the tests below.
+# Each is a fixture value and never a proposal.[^3]
+WIN_WEIGHT = 100.0
+LOSS_WEIGHT = -10.0
+EARLY_WEIGHT = 50.0
+
+
+def a_timed_weighting(early: float) -> Weighting:
+    """Return a weighting that pays the outcome and the time left, and nothing else."""
+    return Weighting(
+        terms={},
+        won=WIN_WEIGHT,
+        lost=LOSS_WEIGHT,
+        drawn=0.0,
+        won_early=early,
+    )
+
+
+def a_whole_run(seed: int, weighting: Weighting) -> RewardStep:
+    """Run one whole game under the tick limit, and give back its last reading.
+
+    The reading that ends the run is the one that pays, so this returns it
+    rather than a total. Nothing after it pays anything.
+
+    One step of the world runs one tick, and its argument is a thread count.
+    This reads after every tick, so the reading of the end stands at the tick
+    the game ended at.
+    """
+    world = a_seeded_world(seed)
+    world.set_tick_limit(TIMED_LIMIT)
+    reward = Reward(world, 0, weighting)
+    step = reward.read(world)
+    for _ in range(TIMED_LIMIT + 4):
+        if step.done:
+            break
+        world.step(1)
+        step = reward.read(world)
+    assert step.done, "the fixture must reach the end of a game"
+    return step
+
+
+def test_two_wins_at_different_end_ticks_do_not_score_the_same() -> None:
+    """A win with time left on the clock pays more than a win at the limit.
+
+    A game that runs to the tick limit is a signal of indecisive play, and
+    the three runs here end at three different ticks.[^6]
+    """
+    weighting = a_timed_weighting(EARLY_WEIGHT)
+    early = a_whole_run(EARLY_WIN_SEED, weighting)
+    later = a_whole_run(LATER_WIN_SEED, weighting)
+    limit = a_whole_run(LIMIT_WIN_SEED, weighting)
+    assert early.outcome == later.outcome == limit.outcome == "won"
+    assert early.remaining_share > later.remaining_share > limit.remaining_share
+    assert limit.remaining_share == 0.0, "a win at the limit leaves no clock"
+    assert early.value > later.value > limit.value
+    for step in (early, later, limit):
+        assert step.early == pytest.approx(EARLY_WEIGHT * step.remaining_share)
+        assert step.value == pytest.approx(WIN_WEIGHT + step.early)
+
+
+def test_an_early_weight_of_zero_scores_a_win_as_the_win_weight_alone() -> None:
+    """The test above with the weight put back to zero.
+
+    This proves that the test above measures the weight and not the fixture.
+    The three runs still end at three different ticks, and the three scores
+    are equal. A stored score measured before this term existed therefore
+    stays comparable with a score measured after it.[^6]
+    """
+    weighting = a_timed_weighting(0.0)
+    early = a_whole_run(EARLY_WIN_SEED, weighting)
+    later = a_whole_run(LATER_WIN_SEED, weighting)
+    limit = a_whole_run(LIMIT_WIN_SEED, weighting)
+    assert early.remaining_share > later.remaining_share > limit.remaining_share
+    for step in (early, later, limit):
+        assert step.early == 0.0
+        assert step.value == WIN_WEIGHT
+
+
+def test_a_loss_pays_nothing_for_the_time_it_left_on_the_clock() -> None:
+    """A loss pays the loss weight alone, early or at the limit.
+
+    A term that paid the time left on any outcome would pay a faction for
+    losing quickly. A faction that gave up early would then outscore a
+    faction that held on and lost at the limit.[^6]
+    """
+    weighting = a_timed_weighting(EARLY_WEIGHT)
+    early = a_whole_run(EARLY_LOSS_SEED, weighting)
+    limit = a_whole_run(LIMIT_LOSS_SEED, weighting)
+    assert early.outcome == limit.outcome == "lost"
+    assert early.remaining_share > limit.remaining_share
+    assert early.early == limit.early == 0.0
+    assert early.value == limit.value == LOSS_WEIGHT
+
+
+def test_a_world_with_no_tick_limit_leaves_no_time_on_a_clock() -> None:
+    """A world with no limit holds no clock, so a win in it pays no early term.
+
+    The field the share comes from reads zero in such a world, and a zero
+    there means the first tick rather than the last. A new world carries a
+    tick limit of its own, so this test clears it.
+    """
+    world = a_seeded_world(ENDING_SEED)
+    world.set_tick_limit(0)
+    assert world.tick_limit == 0
+    reward = Reward(world, 0, a_timed_weighting(EARLY_WEIGHT))
+    step = reward.read(world)
+    for _ in range(ENDING_BOUND):
+        if step.done:
+            break
+        world.step(1)
+        step = reward.read(world)
+    assert step.done, "the fixture must reach a game end"
+    assert step.outcome in ("won", "lost")
+    assert step.remaining_share == 0.0
+    assert step.early == 0.0
+
+
+def test_the_register_holds_one_row_for_each_timing_term() -> None:
+    assert _register_rows("## The terminal timing terms") == list(TIMING_ROWS)

@@ -522,6 +522,8 @@ class Env:
                 "outcome": reading.outcome,
                 "shaped": reading.shaped,
                 "terminal": reading.terminal,
+                "early": reading.early,
+                "remaining_share": reading.remaining_share,
                 "terms": dict(reading.terms),
                 "changes": dict(reading.changes),
                 "objectives": dict(reading.objectives),

@@ -65,6 +65,33 @@ limit. A finding holds the measurement.[^6]
 | `lost`, what the faction gets when a reader names another winner | The reward of a faction | unset, the project owner | BLK-050 | |
 | `drawn`, what the faction gets when the run reaches the tick limit with no winner | The reward of a faction | unset, the project owner | BLK-050 | |
 
+## The terminal timing terms
+
+A terminal timing term is paid once, when the run ends. It weighs a level and
+not a change, so it is the only kind of term an undiscounted episode return
+carries. A sum of changes over a whole episode collapses to the last reading
+less the first, so a change term contributes the same amount whatever the
+policy did in between.[^12]
+
+**A game that runs to the tick limit is a signal of indecisive play.** The
+engine compares held ground at the limit and records a winner, so such a game
+still ends won or lost. Weaker play shifts a game toward the limit, and a
+policy that does nothing at all guarantees it.
+
+**The row below pays a win alone.** A term that paid the time left on any
+outcome would pay a faction for losing quickly, so a faction that gave up
+early would outscore a faction that held on and lost narrowly at the limit. A
+finding holds the reasoning.[^13]
+
+**A weight of zero is the default of this row.** Every other weight of the
+reward refuses to run while it is unset. This one defaults, because a stored
+score measured before the row existed must stay comparable with a score
+measured after it.
+
+| Value | Read by | Set | Blocker | Derivation |
+|---|---|---|---|---|
+| `won_early`, what the time left before the tick limit pays on a win | The reward of a faction | unset, the project owner | BLK-050 | |
+
 ## The observation layout
 
 A draft record makes the width of the observation a constant, and it holds no
@@ -116,3 +143,5 @@ target platform measures it.
 [^9]: ADR-0195, the observation of a faction is a fixed-width scale-free table in an egocentric frame, decisions D1 and D9. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
 [^10]: Decisions register, DEC-282. `docs/DECISIONS.md`
 [^11]: Research report 42, what a policy should be able to see, section 9. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+[^12]: Findings register, FND-679. `docs/FINDINGS.md`
+[^13]: Findings register, FND-692. `docs/FINDINGS.md`

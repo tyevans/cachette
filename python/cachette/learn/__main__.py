@@ -203,6 +203,25 @@ WIN = 2000.0
 # [^1]: Findings register, FND-679. `docs/FINDINGS.md`
 LOSS = WIN / 10.0
 
+# What the time left on the clock pays on a win. A win with the whole tick
+# limit still to run pays this much above the win weight, and a win at the
+# tick limit pays nothing above it. The territory path decides a game at the
+# limit, so a game that runs out the clock still ends won or lost.
+#
+# **This weight makes an early win the best outcome and changes no ordering.**
+# The smallest win still pays the win weight, which is ten times what a loss
+# costs, so no win ranks below a loss. The loss weight therefore does not move
+# for this term. Both the loss weight and this weight push a policy away from
+# playing for the clock, and this one pushes on the win side alone, so neither
+# overtakes the other.[^1] [^2]
+#
+# Only the two conquest strategies carry it. Their trained policies sit still
+# and let the clock run out, which is the behaviour this term ranks last.
+#
+# [^1]: Findings register, FND-679. `docs/FINDINGS.md`
+# [^2]: Findings register, FND-692. `docs/FINDINGS.md`
+EARLY = WIN / 2.0
+
 
 STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
     # Win, and almost nothing else. The small territory term is the only
@@ -210,7 +229,13 @@ STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
     # first generations hold no signal at all.
     "conquer": (
         WORLD,
-        Weighting(terms={"held_tiles": 0.1}, won=WIN, lost=-LOSS, drawn=0.0),
+        Weighting(
+            terms={"held_tiles": 0.1},
+            won=WIN,
+            lost=-LOSS,
+            drawn=0.0,
+            won_early=EARLY,
+        ),
         "linear",
     ),
     # The same scoring as the conquest strategy, over the structured
@@ -218,7 +243,13 @@ STRATEGIES: dict[str, tuple[EnvConfig, Scoring | ObjectiveSchedule, str]] = {
     # measures what the structure is worth.
     "conquer-structured": (
         WORLD,
-        Weighting(terms={"held_tiles": 0.1}, won=WIN, lost=-LOSS, drawn=0.0),
+        Weighting(
+            terms={"held_tiles": 0.1},
+            won=WIN,
+            lost=-LOSS,
+            drawn=0.0,
+            won_early=EARLY,
+        ),
         STRUCTURED_KIND,
     ),
     # Take ground and hold it. Nothing else scores.

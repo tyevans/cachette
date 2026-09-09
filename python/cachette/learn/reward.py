@@ -88,6 +88,41 @@ terminal until the game ends. A never-seated faction and a spent faction
 therefore differ in nothing this module reports, because they differ in
 nothing the observation reports.
 
+What a decisive game is worth
+-----------------------------
+
+**A game that runs to the tick limit is a signal of indecisive play.** Four
+paths end a game. Domination, a finished wonder and a renown target all fire
+inside the run. The territory path fires at the tick limit and compares held
+ground, so an episode that runs out the clock still ends won or lost. Weaker
+play shifts a game toward the limit, and a policy that does nothing at all
+guarantees it.
+
+This module therefore pays one term for the time a win left on the clock.
+The term is the early weight times the share of the tick limit that was still
+to run when the game ended. A win at the limit leaves nothing on the clock
+and pays nothing here.
+
+**The term is terminal, and it is a level rather than a difference.** An
+undiscounted episode return sums the reward of every decision, so a sum of
+first differences collapses to the last reading less the first. A term that
+weighs a change therefore contributes the same amount whatever the policy did
+in between, and the optimiser sees nothing.[^11] Every shaped term of this
+module is such a difference. A term that must change what the optimiser sees
+must fire once, at the end, on a quantity that is not a difference.
+
+**Only a win pays the term.** A loss pays the loss weight and nothing else,
+whether it comes at tick 300 or at the tick limit. A term that paid the time
+left on any outcome would pay a faction for losing quickly, and a faction
+that gives up early would then outscore a faction that held on and lost
+narrowly at the limit. A flat penalty for reaching the limit has the same
+defect with the sign reversed: it makes a fast loss cheaper than a slow one.
+
+**The early weight is zero unless a caller sets it.** A weight of zero pays
+nothing, so a run under a weighting that states no early weight scores what
+it scored before this term existed. A register holds the row, and one finding
+holds the reasoning.[^12]
+
 Determinism
 -----------
 
@@ -124,6 +159,10 @@ decisions D1 and D2.
 [^9]: Findings register, FND-582. ``docs/FINDINGS.md``
 
 [^10]: Findings register, FND-583. ``docs/FINDINGS.md``
+
+[^11]: Findings register, FND-679. ``docs/FINDINGS.md``
+
+[^12]: Findings register, FND-692. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -131,12 +170,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Final, Protocol
 
+from .signals import SignalCatalogue
+
 if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     import numpy as np
 
     from cachette import World
+
+    from .signals import Signal
 
 # The shaped terms the register holds one row for. A caller may weigh any
 # other field of the schema that holds one position, and this tuple is what a
@@ -156,8 +199,18 @@ SHAPED_ROWS: Final[tuple[str, ...]] = (
     "wonder_track_progress",
 )
 
+# The outcome the timing term pays on. It is named once, because the term
+# and the outcome reader both act on it.
+WON: Final = "won"
+
 # The terminal outcomes the register holds one row for.
-TERMINAL_ROWS: Final[tuple[str, ...]] = ("won", "lost", "drawn")
+TERMINAL_ROWS: Final[tuple[str, ...]] = (WON, "lost", "drawn")
+
+# The terminal timing terms the register holds one row for. A timing term is
+# paid once, at the end, and it weighs a level rather than a change.
+#
+# The register mirrors this tuple as well, and one test compares the two.
+TIMING_ROWS: Final[tuple[str, ...]] = ("won_early",)
 
 # Every outcome this module reports, including the one that ends nothing.
 RUNNING: Final = "running"
@@ -169,6 +222,15 @@ OUTCOMES: Final[tuple[str, ...]] = (RUNNING, *TERMINAL_ROWS)
 # of it is a bounded value. The record of the end is a public fact the world
 # reports directly, and the ticks left before the limit fires answer the draw.
 _REMAINING_TICKS: Final = "remaining_ticks"
+
+# The field that states how far into the episode the reading stands. It is
+# the elapsed tick count over the tick limit, so it rises from zero to one
+# and the engine clamps it at one.
+#
+# The ticks left field cannot answer this. The engine writes it as a
+# compressed magnitude, and a logarithm of a tick count divided by a tick
+# limit is not a share of the clock.
+_TICK_SHARE: Final = "tick_share"
 
 # The fields that state whether the faction can act. A faction that reads
 # zero in both holds nothing that takes a decision.
@@ -208,19 +270,32 @@ class Weighting:
     its change since the previous decision. The three outcome entries give
     what each terminal outcome is worth.
 
+    The early entry is what the time left on the clock pays on a win. It is
+    zero unless a caller sets it, and a zero pays nothing. A weighting that
+    states no early weight therefore scores a run exactly as it scored the
+    run before the entry existed.[^2]
+
     A weight of ``None`` is unset. A reward refuses to run while any weight
     a caller asked for is unset, because a guessed weight is a rule of the
     downstream game that nobody has written down.[^1]
 
+    **The early entry is the one weight that defaults rather than refuses.**
+    It defaults so that every stored score stays comparable, and a default
+    of zero states a rule of the downstream game no more than an absent term
+    does.
+
     References
     ----------
     [^1]: Blockers register, BLK-050. ``docs/BLOCKERS.md``
+
+    [^2]: Findings register, FND-692. ``docs/FINDINGS.md``
     """
 
     terms: Mapping[str, float | None] = field(default_factory=dict)
     won: float | None = None
     lost: float | None = None
     drawn: float | None = None
+    won_early: float = 0.0
 
     def terminal(self, outcome: str) -> float:
         """Return the weight of one outcome.
@@ -239,6 +314,23 @@ class Weighting:
             message = f"the weight of the {outcome} outcome is unset"
             raise UnsetWeightError(message)
         return weight
+
+    def early(self, outcome: str, remaining_share: float) -> float:
+        """Return what the time left before the tick limit pays on one outcome.
+
+        The remaining share entry is the part of the tick limit that had not
+        run when the reading was taken. It is one at the first tick and zero
+        at the limit.
+
+        **Only a win pays.** A win with most of the clock left pays the whole
+        early weight. A win at the limit pays nothing, because the territory
+        path fired and the faction left no time on the clock. Every other
+        outcome pays nothing at all, so a faction gains nothing by losing
+        quickly.
+        """
+        if outcome != WON:
+            return 0.0
+        return self.won_early * remaining_share
 
     def unset_names(self) -> tuple[str, ...]:
         """Return the name of every weight this weighting left unset."""
@@ -322,11 +414,67 @@ class Outcome:
     entry is true once the run has ended. The alive entry is true while the
     faction holds a unit or a person, which is what a faction needs in order
     to act at all.
+
+    The remaining share entry is the part of the tick limit that had not run
+    when the reading was taken. It is one at the first tick and zero at the
+    limit. A world with no tick limit reads zero, because a run with no end
+    leaves no time on a clock it does not hold.
     """
 
     name: str
     done: bool
     alive: bool
+    remaining_share: float = 0.0
+
+
+class _ElapsedShare:
+    """How much of the tick limit a reading still has to run.
+
+    The engine writes the elapsed part of the episode as a bounded share of
+    the tick limit, and it publishes the bound that the share was written
+    against. This class reads the field through the signal catalogue of the
+    world and divides by the published bound, so it holds no bound of its
+    own.[^1]
+
+    A bound written here would be a second declaration of an engine rule,
+    and nothing would fail when the two disagreed.
+
+    References
+    ----------
+    [^1]: ADR-0154, the observation and the action of a faction are
+    schema-declared bounded tables the engine owns, decision D1.
+    ``docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md``
+    """
+
+    def __init__(self, signal: Signal, bound: float) -> None:
+        """Hold the field of one layout and the bound the engine published."""
+        self._signal = signal
+        self._bound = bound
+
+    @classmethod
+    def of_world(cls, world: World) -> _ElapsedShare:
+        """Read the field and its published bound from the schema of a world."""
+        signal = SignalCatalogue.of_world(world).signal(_TICK_SHARE)
+        form = signal.form
+        if form is None or form.high <= 0:  # pragma: no cover - schema contract
+            message = (
+                f"the schema states no upper bound for {_TICK_SHARE!r}, so "
+                f"nothing here knows what one whole episode reads as"
+            )
+            raise ValueError(message)
+        return cls(signal, float(form.high))
+
+    def remaining_share(self, world: World, values: np.ndarray) -> float:
+        """Return the part of the tick limit that has not run at this reading.
+
+        A world with no tick limit answers zero. The field reads zero in such
+        a world, because a run with no end holds no position inside an
+        episode, and a zero there means the first tick rather than the last.
+        """
+        if world.tick_limit <= 0:
+            return 0.0
+        elapsed = self._signal.read(values) / self._bound
+        return max(0.0, 1.0 - elapsed)
 
 
 class OutcomeReader:
@@ -348,9 +496,17 @@ class OutcomeReader:
     """
 
     def __init__(self, world: World, faction: int) -> None:
-        """Find the positions this reader needs in the layout of one world."""
+        """Find the positions this reader needs in the layout of one world.
+
+        The elapsed share comes through the signal catalogue of the world
+        rather than through a position alone. The catalogue carries the value
+        form the engine published for the field, and that form states the
+        bound the share was written against. A divisor written here would be
+        a second declaration of an engine rule.
+        """
         self._faction = faction
         self._starts = _field_starts(world, (_REMAINING_TICKS, *_ACTING_FIELDS))
+        self._elapsed = _ElapsedShare.of_world(world)
         self._outcome = RUNNING
         self._done = False
 
@@ -377,7 +533,7 @@ class OutcomeReader:
         reports the same end.
 
         The observation entry is the array of the faction at this state. The
-        reader reads three positions of it and never writes it, so a caller
+        reader reads four positions of it and never writes it, so a caller
         that already holds the array passes it and the reader builds none.
         """
         values = (
@@ -387,17 +543,28 @@ class OutcomeReader:
         )
         reading = {name: int(values[start]) for name, start in self._starts.items()}
         alive = any(reading[name] > 0 for name in _ACTING_FIELDS)
+        remaining = self._elapsed.remaining_share(world, values)
         if self._done:
-            return Outcome(name=self._outcome, done=True, alive=alive)
+            return Outcome(
+                name=self._outcome,
+                done=True,
+                alive=alive,
+                remaining_share=remaining,
+            )
         self._outcome = self._name_of(world, reading)
         self._done = self._outcome != RUNNING
-        return Outcome(name=self._outcome, done=self._done, alive=alive)
+        return Outcome(
+            name=self._outcome,
+            done=self._done,
+            alive=alive,
+            remaining_share=remaining,
+        )
 
     def _name_of(self, world: World, reading: Mapping[str, int]) -> str:
         """Name the state of the run after one reading."""
         end = world.game_end()
         if end is not None:
-            return "won" if end["winner"] == self._faction else "lost"
+            return WON if end["winner"] == self._faction else "lost"
         if world.tick_limit > 0 and reading[_REMAINING_TICKS] == 0:
             return "drawn"
         return RUNNING
@@ -408,7 +575,13 @@ class RewardStep:
     """What one decision earned.
 
     The value entry is the reward the learner receives. It is the shaped
-    entry plus the terminal entry.
+    entry plus the terminal entry plus the early entry.
+
+    The early entry is what the time left on the clock paid on a win. It is
+    zero on every other outcome, and it is zero on a win under a weighting
+    that states no early weight. The remaining share entry is the part of the
+    tick limit that had not run at this reading, and a caller reads it to see
+    the early entry hold at zero while the clock moves.
 
     The terms entry gives what each shaped term contributed, so a caller sees
     which term moved. The changes entry gives the raw change of each term
@@ -433,6 +606,8 @@ class RewardStep:
     terms: Mapping[str, float]
     changes: Mapping[str, int]
     objectives: Mapping[str, float] = field(default_factory=dict)
+    early: float = 0.0
+    remaining_share: float = 0.0
 
 
 class Reward:
@@ -516,7 +691,9 @@ class Reward:
 
         A caller steps the world and then calls this. The shaped part is the
         weighted change of each term since the previous reading. The terminal
-        part is the weight of the outcome, and it is paid once.
+        part is the weight of the outcome, and it is paid once. The early
+        part is what the time left on the clock pays on a win, and it is paid
+        once as well.
 
         **The observation array of one state serves every reader of it.** The
         weighted terms and the outcome both come from the array of the seat
@@ -537,6 +714,7 @@ class Reward:
                 alive=state.alive,
                 terms=dict.fromkeys(self._weighting.terms, 0.0),
                 changes=dict.fromkeys(self._weighting.terms, 0),
+                remaining_share=state.remaining_share,
             )
 
         changes = {
@@ -548,11 +726,12 @@ class Reward:
         }
         shaped = sum(terms.values())
         terminal = self._weighting.terminal(state.name)
+        early = self._weighting.early(state.name, state.remaining_share)
 
         self._previous = reading
 
         return RewardStep(
-            value=shaped + terminal,
+            value=shaped + terminal + early,
             shaped=shaped,
             terminal=terminal,
             outcome=state.name,
@@ -560,6 +739,8 @@ class Reward:
             alive=state.alive,
             terms=terms,
             changes=changes,
+            early=early,
+            remaining_share=state.remaining_share,
         )
 
     def _read(
