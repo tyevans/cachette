@@ -476,17 +476,40 @@ def _bind(term: Term, catalogue: SignalCatalogue, objective: str) -> _BoundTerm:
 
 
 def _signal(catalogue: SignalCatalogue, name: str, objective: str) -> Signal:
-    """Return one signal, and raise an objective error when it is absent.
+    """Return one signal, and refuse an absent one and a reserved one.
 
-    The catalogue already names the alternatives. This wraps its refusal so
-    that a caller catches one error type for every failure of an objective
-    set, and so that the message says which objective asked.
+    The catalogue already names the alternatives when a name is absent. This
+    wraps its refusal so that a caller catches one error type for every
+    failure of an objective set, and so that the message says which objective
+    asked.
+
+    **A reserved signal is refused here, and this is the one place every
+    objective passes through.** The engine declares a reserved field so that a
+    later revision can fill it, and it writes zero to every position until
+    then. A term that named one resolved, read zero on every decision of every
+    episode, and trained the policy against a constant. Nothing failed, and a
+    run on a paid instance costs the same whether the term reads a quantity or
+    a zero.[^1]
+
+    # References
+
+    [^1]: Findings register, FND-694. ``docs/FINDINGS.md``
     """
     try:
-        return catalogue.signal(name)
+        found = catalogue.signal(name)
     except KeyError as absent:
         message = f"the objective {objective!r} asks for a signal that is absent. "
         raise ObjectiveError(message + str(absent.args[0])) from absent
+    if found.reserved:
+        message = (
+            f"the objective {objective!r} reads {name!r}, and the engine "
+            f"holds that field back. It reads zero in every position, so a "
+            f"term over it scores a constant and trains nothing. The layout "
+            f"holds {len(catalogue.reserved())} such fields. Name a field the "
+            f"engine writes."
+        )
+        raise ObjectiveError(message)
+    return found
 
 
 def _clamp(value: float, lower: float, upper: float) -> float:

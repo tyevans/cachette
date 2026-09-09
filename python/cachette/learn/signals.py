@@ -86,7 +86,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Final, Protocol
 
 import numpy as np
 
@@ -127,6 +127,11 @@ class Aggregation(Enum):
         if self is Aggregation.HIGHEST:
             return float(values.max())
         return float(values.min())
+
+
+# The name the engine gives the form of a field it writes nothing to. A field
+# of this form reads zero in every position, and the zero states no quantity.
+RESERVED_FORM: Final[str] = "reserved"
 
 
 @dataclass(frozen=True)
@@ -328,6 +333,26 @@ class Signal:
         """Whether this signal recovers its quantity from a published value."""
         form = self.form
         return form is not None and form.invertible and form.uniform
+
+    @property
+    def reserved(self) -> bool:
+        """Whether the engine holds this signal back and writes zero to it.
+
+        **A reserved signal is a zero that states no quantity.** The engine
+        declares the positions so that a later revision fills them without
+        moving anything, and it writes nothing to them until that revision
+        arrives. A reader that took the zero for a reading would train against
+        a constant, and nothing would fail.[^1]
+
+        A layout that publishes no value form answers false, because a schema
+        that states no form says nothing about which fields the engine writes.
+
+        # References
+
+        [^1]: Findings register, FND-694. ``docs/FINDINGS.md``
+        """
+        form = self.form
+        return form is not None and form.name == RESERVED_FORM
 
     def _invertible_form(self) -> ValueForm:
         """Return the form of this signal, or say why it cannot be inverted."""
@@ -534,6 +559,19 @@ class SignalCatalogue:
             )
             raise KeyError(message)
         return found
+
+    def reserved(self) -> tuple[Signal, ...]:
+        """Every signal the engine holds back and writes zero to.
+
+        A caller that states an objective reads this to say what it cannot
+        ask for. The refusal itself lives where a term binds, so no caller has
+        to remember to check.[^1]
+
+        # References
+
+        [^1]: Findings register, FND-694. ``docs/FINDINGS.md``
+        """
+        return tuple(signal for signal in self._signals if signal.reserved)
 
     def scalars(self) -> tuple[Signal, ...]:
         """Every signal that holds one position, so needs no aggregation."""
