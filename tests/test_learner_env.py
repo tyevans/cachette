@@ -224,7 +224,16 @@ ENDING = EnvConfig(
 
 # Where the search for the ending worlds starts. One name, so the two tests
 # below cannot disagree about which worlds they play.
-ENDING_START = 1100
+#
+# **This base is a fixture and it decays.** The test below asserts that the
+# six episodes end at three or more different decisions, because a run whose
+# episodes end together would pass it and prove nothing. Which seeds end apart
+# is a property of the engine, so any change to what ends a game moves it. The
+# base has been moved twice for this reason: once before, and again when the
+# renown target fell and a third way to end a game began to fire. A search
+# over candidate bases finds the next one; 2000 gives lengths of 40, 57 and
+# 75.
+ENDING_START = 2000
 
 
 def test_the_vector_matches_the_singles_when_the_episodes_end_apart() -> None:

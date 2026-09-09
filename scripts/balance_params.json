@@ -19,8 +19,8 @@
       "setter": "set_renown_target",
       "kind": "threshold",
       "scale": "fix32",
-      "default_raw": 65536000,
-      "min_raw": 6553600,
+      "default_raw": 3276800,
+      "min_raw": 655360,
       "max_raw": 655360000,
       "path": "renown",
       "doc": "the renown at which the renown reader fires"
