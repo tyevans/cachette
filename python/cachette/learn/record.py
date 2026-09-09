@@ -127,6 +127,7 @@ class EpisodeRecord:
         total_reward: float,
         chosen: int,
         refused: int,
+        scoring_name: str | None = None,
     ) -> EpisodeRecord:
         """Read the record of a finished episode from its environment.
 
@@ -135,6 +136,10 @@ class EpisodeRecord:
         A tuple of names written here would be a second declaration of what
         the engine publishes, and a name that the schema stopped carrying
         would read as a missing value rather than fail.
+
+        The scoring name asks the environment for the objectives of one of
+        the further scorings it read. A name of ``None`` asks the primary
+        scoring, which is what one play under one objective wants.
         """
         return cls(
             candidate=candidate,
@@ -145,7 +150,7 @@ class EpisodeRecord:
             chosen=chosen,
             refused=refused,
             signals=env.signals.read_scalars(np.asarray(env.observation())),
-            objectives=dict(env.objectives),
+            objectives=dict(env.objectives_under(scoring_name)),
         )
 
     @property
@@ -409,11 +414,15 @@ def episode_records(
     returns: np.ndarray,
     chosen: Sequence[int],
     refused: Sequence[int],
+    scoring_name: str | None = None,
 ) -> tuple[EpisodeRecord, ...]:
     """Read one record for each world of a finished batch, in index order.
 
     The world at index ``candidate * len(seeds) + seed`` belongs to that pair,
     because the batch reports in index order and keeps it for every step.
+
+    The scoring name asks each environment for the objectives of one of the
+    further scorings it read. A name of ``None`` asks the primary scoring.
     """
     records = []
     for index, env in enumerate(envs):
@@ -426,6 +435,7 @@ def episode_records(
                 total_reward=float(returns[index]),
                 chosen=int(chosen[index]),
                 refused=int(refused[index]),
+                scoring_name=scoring_name,
             )
         )
     return tuple(records)

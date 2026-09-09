@@ -74,6 +74,17 @@ today, so the fallback cannot make a run slower than no cache at all.
 A measurement is written to a temporary file and renamed into place. Rename
 is atomic on one filesystem, so no reader ever sees half a file.
 
+# Six objectives that miss at once share one set of games
+
+A baseline return separates into two things. The episodes are the games the
+controller plays, and they come from the engine build, the world and the seed
+set. The objective weights the readings of those games into one number.
+
+A pass that misses on several objectives therefore plays one batch and scores
+it once for each objective. It never plays the same games twice. Two
+objectives that state the same weighting share one measurement as well: the
+first of them measures and writes, and the second reads what the first wrote.
+
 # References
 
 [^1]: The engine build key. ``scripts/build-key.sh``
@@ -91,7 +102,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from .env import EnvConfig
     from .policy import Policy
@@ -372,6 +383,123 @@ def _describe(scoring: Scoring) -> dict[str, Any] | None:
         return None
 
 
+def available_workers() -> int:
+    """Return how many engine workers this machine can give one pass.
+
+    The answer comes from the machine and never from a constant. A constant
+    written here would hold a pass to a tenth of a rented machine of sixty
+    four cores, and nothing would fail.
+
+    The affinity set answers first, because a container or a batch scheduler
+    may give a process fewer cores than the machine holds. A platform that
+    reports no affinity set falls back to the core count.
+    """
+    if hasattr(os, "sched_getaffinity"):
+        return max(1, len(os.sched_getaffinity(0)))
+    return max(1, os.cpu_count() or 1)
+
+
+def controller_baselines(
+    config: EnvConfig,
+    scorings: Mapping[str, Scoring],
+    policy: Policy,
+    seeds: Sequence[int],
+    workers: int,
+    schema_version: int,
+    label: str,
+    cache: BaselineCache | None = None,
+) -> dict[str, tuple[dict[str, float], str]]:
+    """Return the controller baseline of each objective, and where each came from.
+
+    The result holds one entry for each name the caller gave, under that name.
+    Each entry holds the summary and the word ``cached`` or ``measured``, so a
+    reader of a log knows which pass paid for the figure.
+
+    **One set of episodes answers for every objective.** The episodes are the
+    games the seat plays, and they come from the world, the seed set and the
+    engine build. The objective weights the readings of those games. A pass
+    that missed on four objectives therefore plays one batch and scores it
+    four times, rather than playing the same games four times over.
+
+    Two objectives that state the same weighting share one measurement. The
+    first of them measures, and the second reads what the first wrote, which
+    is the behaviour a run had before this pass existed.
+
+    The label names the pass in the progress line. A measurement prints that
+    line while it runs, so a dashboard can tell a working pass from a stopped
+    one.
+
+    **The world must be the one that gives the seat to the built-in
+    controller.** A world that the learner holds plays the policy, and the
+    policy is not part of the key, so a stored number would answer for a
+    policy that never played. This refuses such a world rather than storing a
+    number nobody can trust.
+    """
+    if config.controlled:
+        message = (
+            "the controller baseline plays a world whose seat the built-in "
+            "controller holds, and this world gives the seat to the learner"
+        )
+        raise ValueError(message)
+    if not scorings:
+        message = "a baseline pass measures at least one objective"
+        raise ValueError(message)
+
+    held = cache if cache is not None else BaselineCache.of_environment()
+    inputs = {
+        name: held.inputs(config, scoring, seeds, schema_version)
+        for name, scoring in scorings.items()
+    }
+    groups = _groups(scorings)
+
+    results: dict[str, tuple[dict[str, float], str]] = {}
+    measuring: dict[str, Scoring] = {}
+    owned: set[str] = set()
+    for first, members in groups.items():
+        request = inputs[first]
+        stored = None if request is None else held.read(request)
+        if stored is None and request is not None:
+            if held.measuring(request):
+                owned.add(first)
+            else:
+                # Another process holds the right to measure this number.
+                # **A waiter never waits for ever.** It gives up when the
+                # deadline passes or when the lock is older than the
+                # deadline, and this pass then measures the number itself.
+                # The worst case is what the project paid before the cache
+                # existed, so the fallback cannot make a run slower.
+                stored = held.wait(request, _waiting(label, first))
+        if stored is not None:
+            for name in members:
+                results[name] = (stored, "cached")
+            continue
+        measuring[first] = scorings[first]
+
+    if measuring:
+        from .rollout import run_objectives
+        from .train import summarise
+
+        try:
+            played = run_objectives(
+                config, measuring, [policy], list(seeds), workers, label
+            )
+            for first in measuring:
+                summary = summarise([played[first]])
+                request = inputs[first]
+                if first in owned and request is not None:
+                    held.write(request, summary)
+                results[first] = (summary, "measured")
+                for name in groups[first][1:]:
+                    results[name] = _answered(held, inputs[name], summary)
+        finally:
+            for first in owned:
+                request = inputs[first]
+                if request is not None:
+                    held.release(request)
+
+    return {name: results[name] for name in scorings}
+
+
 def controller_baseline(
     config: EnvConfig,
     scoring: Scoring,
@@ -382,7 +510,7 @@ def controller_baseline(
     label: str,
     cache: BaselineCache | None = None,
 ) -> tuple[dict[str, float], str]:
-    """Return the controller baseline, and say where the number came from.
+    """Return the controller baseline of one objective, and where it came from.
 
     The second entry of the result is ``cached`` for a number a previous pass
     measured, and ``measured`` for one this call measured. A caller prints it,
@@ -393,54 +521,82 @@ def controller_baseline(
     dashboard can tell a working pass from a stopped one. A cached answer
     prints nothing, because it takes no time.
 
-    **The world must be the one that gives the seat to the built-in
-    controller.** A world that the learner holds plays the policy, and the
-    policy is not part of the key, so the stored number would answer for a
-    policy that never played. This refuses such a world rather than storing a
-    number nobody can trust.
+    **This asks for one objective through the pass that asks for several.** A
+    second path for one objective would be one rule stored twice, and the
+    caller that wanted six numbers would drift away from the caller that
+    wanted one. The label names the one objective there, so a waiting line
+    still says which number the pass waits for.
     """
-    if config.controlled:
-        message = (
-            "the controller baseline plays a world whose seat the built-in "
-            "controller holds, and this world gives the seat to the learner"
+    found = controller_baselines(
+        config, {label: scoring}, policy, seeds, workers, schema_version, label, cache
+    )
+    return found[label]
+
+
+def _groups(scorings: Mapping[str, Scoring]) -> dict[str, list[str]]:
+    """Group the names that state the same objective, keyed on the first name.
+
+    Two objectives that describe themselves the same way give the same
+    reading of the same episodes, so one measurement answers for both. The
+    cache key holds the same description, so this grouping agrees with the
+    cache by construction rather than by a second rule.
+
+    An objective that cannot state itself as data gets a group of its own,
+    because nothing here can say that two of them are the same.
+
+    **The result keeps the order the caller gave.** The order of a combined
+    result therefore comes from a key the caller stated, and never from which
+    world or worker finished first.
+    """
+    grouped: dict[object, str] = {}
+    members: dict[str, list[str]] = {}
+    for name, scoring in scorings.items():
+        described = _describe(scoring)
+        key: object = (
+            (False, name)
+            if described is None
+            else (True, json.dumps(described, sort_keys=True))
         )
-        raise ValueError(message)
-    from .train import evaluate
+        first = grouped.get(key)
+        if first is None:
+            grouped[key] = name
+            members[name] = [name]
+        else:
+            members[first].append(name)
+    return members
 
-    def measure() -> dict[str, float]:
-        return evaluate(config, scoring, policy, list(seeds), workers, label=label)
 
-    held = cache if cache is not None else BaselineCache.of_environment()
-    inputs = held.inputs(config, scoring, seeds, schema_version)
-    if inputs is None:
-        return measure(), "measured"
+def _waiting(label: str, name: str) -> Callable[[float], None]:
+    """Return the line a waiting pass prints while it waits.
 
-    found = held.read(inputs)
-    if found is not None:
-        return found, "cached"
+    A dashboard tells a working process from a stopped one by the age of its
+    last line, so a wait that can run for half an hour must give it one.
+    """
 
-    if not held.measuring(inputs):
+    def say(waited: float) -> None:
+        print(
+            f"  {label} waiting {waited:.0f}s for another process to measure {name}",
+            flush=True,
+        )
 
-        def say(waited: float) -> None:
-            print(
-                f"  {label} waiting {waited:.0f}s for another process to "
-                f"measure the same number",
-                flush=True,
-            )
+    return say
 
-        waited = held.wait(inputs, say)
-        if waited is not None:
-            return waited, "cached"
-        # The other process gave up, died, or is slower than the deadline.
-        # Measuring here costs one duplicated pass, which is what the
-        # project pays today, and it cannot hang.
-        return measure(), "measured"
 
-    try:
-        summary = measure()
-        held.write(inputs, summary)
-    finally:
-        held.release(inputs)
+def _answered(
+    held: BaselineCache,
+    request: dict[str, Any] | None,
+    summary: dict[str, float],
+) -> tuple[dict[str, float], str]:
+    """Say where the answer for one objective came from, and give it.
+
+    A name whose number this pass wrote reads it back from the file, so it
+    reports ``cached`` in the way a later process would. A name the cache
+    cannot store reports ``measured``, because nothing stored it.
+    """
+    if request is not None:
+        found = held.read(request)
+        if found is not None:
+            return found, "cached"
     return summary, "measured"
 
 
@@ -448,7 +604,9 @@ __all__ = [
     "DEFAULT_CACHE",
     "WAIT_SECONDS",
     "BaselineCache",
+    "available_workers",
     "controller_baseline",
+    "controller_baselines",
     "engine_key",
     "key_of",
 ]
