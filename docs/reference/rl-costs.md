@@ -29,9 +29,11 @@ and names the blocker.[^4]
 
 ## The shaped terms
 
-A shaped term weighs the change of one quantity since the previous decision.
-Each name below names one field of the observation array of a faction, and the
-schema of the world declares where that field sits.[^5]
+A shaped term weighs one quantity in one of two forms. A level term weighs the
+reading of that quantity at each decision. A change term weighs the change of
+it since the previous decision. Each name below names one field of the
+observation array of a faction, and the schema of the world declares where that
+field sits.[^5]
 
 **A weight multiplies the bounded value the schema declares.** Every position
 of the observation array is a Q16.16 value between minus one and one, so 65536
@@ -62,6 +64,12 @@ less the first. A change weight therefore pays one number for a whole episode.
 A level weight is paid on every decision, and it divides the published value by
 the unit the engine published for that field. The rows above answer for either
 form, and one finding holds the measurement.[^14]
+
+**Every shaped weight the strategy table of the trainer states is a level
+weight.** Each weight of that table read a change once, so the whole table
+trained against a terminal reward under weights that read as dense.[^24] A row
+above therefore answers for the level form in every run the project plays
+today.
 
 ## The terminal outcomes
 
@@ -113,27 +121,32 @@ measured after it.
 A draft record makes the width of the observation a constant, and it holds no
 figure of its own.[^9] The width is a function of the rows below, so a change to
 one of them changes the width and retires every policy trained before it. A
-decision register holds the open choice of what each row should be, and a
-research report derives a recommendation for each.[^10] [^11]
+decision register holds the open choice, and a research report derives a
+recommendation for each row.[^10] [^11] The project took the recommendation of
+the report for the first build, and the choice the register still holds is
+whether to price each block against a corpus of episodes.
 
-**Every row below is unset.** No builder produces the array the record
-describes, so no value is in force. A pass that writes a first value into a row
-states the derivation and marks the value provisional.
+**Every row below is set, and the builder of the engine produces the array.**
+The builder writes an egocentric ring stack, an entity token block, a frontier
+block and the scalar fields, and the schema of a world declares where each one
+sits.[^5] **Every value below is provisional.** Each one comes from the
+recommendation of the report and not from a measurement of what a position is
+worth. A pass that prices a block replaces the value it prices.
 
 | Value | Read by | Set | Blocker | Derivation |
 |---|---|---|---|---|
-| Ring count of the spatial stack | The observation builder | unset, the record that adopts a layout revision | — | |
-| Sector count of a ring, for each ring | The observation builder | unset, the record that adopts a layout revision | — | |
-| Channel count of a spatial cell | The observation builder | unset, the record that adopts a layout revision | — | |
-| Distance band of each ring, in tiles | The observation builder | unset, the record that adopts a layout revision | — | |
-| Token count of each token set | The observation builder | unset, the record that adopts a layout revision | — | |
-| Channel count of a token, for each token set | The observation builder | unset, the record that adopts a layout revision | — | |
-| Bit cap of a compressed magnitude | The observation builder | unset, the record that adopts a layout revision | — | |
-| Class count of the goods taxonomy | The observation builder | unset, the record that adopts a layout revision | — | |
-| Class count of the unit type taxonomy | The observation builder | unset, the record that adopts a layout revision | — | |
-| Reserved position count | The observation builder | unset, the record that adopts a layout revision | — | |
-| Layout revision integer | The policy fit of the control plane | unset, the record that adopts a layout revision | — | |
-| Window length of every change position, in ticks | The observation builder | unset, the record that adopts a layout revision | — | |
+| Ring count of the spatial stack | The observation builder | 14, provisional | — | The ring index of a tile is the bit length of its hex distance from the centre, so the count is one more than the bit length of the greatest distance of the largest world the project supports. Declared as `RING_COUNT` over a cap of 13[^19] |
+| Sector count of a ring, for each ring | The observation builder | 1 at ring 0, 6 at ring 1, 12 at every ring above, provisional | — | Ring 0 holds the centre tile, which has no direction. Ring 1 covers the six tiles at distance one, so a twelfth sector there would hold no tile in any world. The sector rule of the frame states this, and the cell list reads the rule[^19] |
+| Channel count of a spatial cell | The observation builder | 25, provisional | — | Declared as `RING_STACK_CHANNELS`, beside the channel name list that is the one declaration of the order[^19] |
+| Distance band of each ring, in tiles | The observation builder | Ring 0 covers distance 0. A ring above 0 covers the band from two to the power of one less than its index, up to one less than two to the power of its index. Provisional | — | The band follows the bit length rule of the ring index, and it states no figure of its own[^19] |
+| Token count of each token set | The observation builder | 8 settlements, 6 rivals, 8 threat clusters, 8 candidate sites, provisional | — | The token counts of the entity token block. A faction below sixth on threat does not drive a decision, and the order statistics of the layout cover the whole field[^20] |
+| Channel count of a token, for each token set | The observation builder | 24 settlement, 24 rival, 20 threat cluster, 16 candidate site, provisional | — | The channel name list of each set is the one declaration of it, and one constant sums the four products[^20] |
+| Bit cap of a compressed magnitude | The observation builder | 40 bits, provisional | — | The largest quantity the observation can carry is a fixed-point store total summed over the unit ceiling of the world. Declared as `MAGNITUDE_CAP_BITS`[^22] |
+| Class count of the goods taxonomy | The observation builder | 8, provisional | — | Declared as `GOOD_CLASS_COUNT`. The taxonomy is fixed, so a new good does not change the width. The engine holds one commodity, so a class it holds no commodity for reads zero[^21] |
+| Class count of the unit type taxonomy | The observation builder | 8, provisional | — | Declared as `UNIT_CLASS_COUNT`, which reads the row count of the unit type table rather than states a number of its own[^21] |
+| Reserved position count | The observation builder | 13, provisional | — | Declared as `LAYOUT_RESERVE`. A revision that claims a position takes it from here and holds the length, so no position moves. Four revisions have claimed positions, and the commit message of each states what it took[^21] |
+| Layout revision integer | The policy fit of the control plane | 7 | — | Declared as `OBSERVATION_VERSION`. It rises when a position moves or a published value changes, and each rise retires every stored policy[^21] |
+| Window length of every change position, in ticks | The observation builder | No tick window. The `window_ticks` position stays reserved | — | The engine carries a window of events and no window of readings. The event history keeps a short memory and a long memory of every kind, at shifts of 4 and 8 bits. One counter cannot separate a spike from a trend, and one position cannot state both lengths[^23] |
 
 ## The world a training run plays
 
@@ -268,7 +281,7 @@ provisional. A repeat run of the probe replaces them.
 
 | Value | Read by | Set | Blocker | Derivation |
 |---|---|---|---|---|
-| Tick limit of a training run, at every extent from 48 to 256 | A training run | 6000, provisional, the world scale probe | — | The lowest round limit at which four fifths of the games of every measured extent and arm resolve, at renown target 1000 |
+| Tick limit of a training run, at every extent from 48 to 256 | A training run | 2500 by default, and any limit a caller names. The probe recommends 6000, provisional | — | The trainer default is 2500. The recommendation is the lowest round limit at which four fifths of the games of every measured extent and arm resolve, at renown target 1000 |
 | Extent of a training run | A training run | 48 by 48 by default, and any extent a caller names | — | The trainer default. The probe recommends a larger one |
 | Faction count of a training run | A training run | 3 by default, and any count a caller names | — | The trainer default |
 
@@ -311,5 +324,11 @@ target platform measures it.
 [^14]: Findings register, FND-700. `docs/FINDINGS.md`
 [^15]: The world scale probe. `scripts/world_scale.py`
 [^16]: Findings register, FND-693. `docs/FINDINGS.md`
-[^17]: Findings register, FND-695. `docs/FINDINGS.md`
+[^17]: Findings register, FND-705. `docs/FINDINGS.md`
 [^18]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+[^19]: The ring frame of the observation. `crates/cachette-core/src/obs_ring.rs`
+[^20]: The entity token block of the observation. `crates/cachette-core/src/obs_token.rs`
+[^21]: The observation of a faction. `crates/cachette-core/src/faction_observation.rs`
+[^22]: The simulation arithmetic, the compressed magnitude. `crates/cachette-core/src/sim_math.rs`
+[^23]: The event history. `crates/cachette-core/src/event_memory.rs`
+[^24]: The strategy table of the trainer. `python/cachette/learn/__main__.py`

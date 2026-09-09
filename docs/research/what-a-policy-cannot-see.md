@@ -9,6 +9,28 @@ agents held the machine and one took throughput measurements. The load average
 was 2.6 over one minute when the audit started. Every count below therefore
 comes from reading a write site, and not from an array a world produced.
 
+## 0. What this report measured, and what has changed since
+
+**Every count below measures one moment.** The moment is the tip of the main
+branch on 8 September 2026. A count belongs in a research report, because a
+report is fixed to a moment. The same count decays in a decision record.[^35]
+
+**Later work has written much of the dead width this report measured.** Do not
+read a count of section 2 or of section 6 as the current state of the
+observation. The table below names what has moved. A register holds the live
+statement in each case.
+
+| What this report measured | What has changed since |
+|---|---|
+| 42 fields carry the reserved value form, and a further 1,407 positions read zero under a real form | Later passes wrote many of them. The engine now asserts that a field its writer leaves alone declares the reserved form, so a real form over an unwritten position is a build failure. A register holds the case[^36] |
+| The rival token set writes 5 of its 24 channels | It now writes 14. The gather pass passes the per-seat power vectors it already held, so the ratios cost no new pass |
+| The layout reserve holds the positions that a later revision claims | The reserve has fallen as later revisions claimed positions for fields that carry a value. No position moved, so the width and the version held |
+| The renown target is 1000 whole units | The project owner set the target to 50 on 8 September 2026, after a rating run measured the renown path ending none of its games. A register holds the value and the reasoning[^37] |
+
+**The ranking of section 5 survives these changes and its figures do not.**
+Read the ranking for the shape of each defect. Read the registers for the
+current figures.
+
 ## 1. What the array holds
 
 The layout declares 93 fields and 4,819 positions.[^1] The audit derived the
@@ -18,13 +40,13 @@ the project already carries.
 | Block | Positions |
 |-------|-----------|
 | Egocentric ring stack | 3,775 |
-| Entity tokens | 618 |
+| Entity tokens | 624 |
 | Frontier by sector | 32 |
-| Every scalar field | 394 |
+| Every scalar field | 388 |
 | Total | 4,819 |
 
 The ring stack holds 25 channels over 151 cells. The token block holds four
-sets: 8 settlements over 24 channels, 6 rivals over 23 channels, 8 threat
+sets: 8 settlements over 24 channels, 6 rivals over 24 channels, 8 threat
 clusters over 20 channels, and 8 candidate sites over 16 channels.
 
 ## 2. The headline: the reserved fields are the honest part, and they are small
@@ -33,7 +55,7 @@ clusters over 20 channels, and 8 candidate sites over 16 channels.
 positions**, which is 2.5 percent of the width. A reserved field declares
 bounds of zero and zero, so a reader can find it.[^2]
 
-**A further 1,401 positions read zero forever and declare a real value form.**
+**A further 1,407 positions read zero forever and declare a real value form.**
 That is 29 percent of the width, and it is eleven times the reserved count. One
 more position holds the constant one.
 
@@ -42,12 +64,12 @@ more position holds the constant one.
 | Reserved fields | 121 | Yes |
 | Ring channels dead in every cell | 453 | No |
 | Ring channels dead beyond ring 3 | 600 | No |
-| Token channels never written | 268 | No |
+| Token channels never written | 274 | No |
 | Good-class positions above class 0 | 71 | No |
 | Objective weight positions above the fifth | 7 | No |
 | Upgrade legality above the last category | 1 | No |
 | Frontier reach headroom | 1 | No |
-| Inert total | 1,522 | |
+| Inert total | 1,528 | |
 
 **The reserved count is not the measure of the problem, and it never was.** It
 is the measure of the part somebody wrote down. The answer to "how much more of
@@ -129,14 +151,14 @@ world too small to reach ring 4 the loss does not arise, and the training world
 of this project may be one of those. The audit could not settle that without
 running the engine.
 
-### 2.4 The rival token set publishes 5 channels of 23
+### 2.4 The rival token set publishes 5 channels of 24
 
 The rival token writer sets five channels: `validity`, `settlement_ratio`,
 `relation_to_rival`, `relation_from_rival` and `rival_settlement_distance`.[^10]
-Eighteen channels are never written, over six tokens, which is 108 dead
-positions of 138.
+Nineteen channels are never written, over six tokens, which is 114 dead
+positions of 144.
 
-**Seven of the eighteen are already computed in the same function that fails to
+**Seven of the nineteen are already computed in the same function that fails to
 write them.** The reading struct holds a per-seat held tile count, a per-seat
 unit count, a per-seat finished upgrade count, a per-seat best renown, a
 per-seat wonder work total, the war test of each rival, and one observation
@@ -149,8 +171,9 @@ Eight more are honest gaps for a stated reason: `strength_ratio`,
 `store_ratio`, `tile_gain_ratio`, `reach_area_ratio`, `trade_ratio`,
 `trade_volume_share`, `power_share_trend` and
 `rival_settlement_distance_trend`. The scalar block reserves the same quantities
-with reasons, and those reasons hold here.[^5] Three remain open:
-`population_ratio`, `shared_border_share` and `unit_mix_distance`.
+with reasons, and those reasons hold here.[^5] Four remain open:
+`population_ratio`, `shared_border_share`, `unit_mix_distance` and
+`relation_to_leader`.
 
 The other three token sets are less severe. The settlement set writes 14 of 24,
 so 80 positions are dead. The threat set writes 11 of 20, so 72 are dead. The
@@ -502,8 +525,16 @@ Both come from readers the engine already has.
 
 ### 4.4 Renown: the observation is not the problem
 
+**The condition this section ends on has since been met, so read the section as
+the reason for that change and not as the state of the engine.** The project
+owner set the renown target to 50 whole units on 8 September 2026. A champion
+therefore reaches the target after 200 units fall to its faction, and the
+published progress moves by one fiftieth of its range for each four kills. A
+register holds the value and the reasoning.[^37] Every figure below reads the
+target of 1000 that the engine held when the audit ran.
+
 The reader fires when the highest live renown of a faction reaches the renown
-target.[^30] The target is 1000.[^31]
+target.[^30] The target was 1000.[^31]
 
 Renown has one source in the engine. A felled unit gives `renown_per_fell` to
 the champion of the faction that felled it, and the champion is the live
@@ -515,9 +546,10 @@ amount sits on one mortal character.** If that character dies, the faction's
 best renown falls to its next best live character, and the published progress
 falls with it.
 
-`renown_progress` divides the best renown by 1000. After forty kills it reads
-0.01. **A policy reads a value that is flat and near zero for the whole game.**
-There is no gradient in it to climb, and the gradient that exists is not a
+`renown_progress` divides the best renown by the renown target that the balance
+of the world holds, which was 1000. After forty kills it read 0.01. **A policy
+then read a value that is flat and near zero for the whole game.**
+There was no gradient in it to climb, and the gradient that existed was not a
 gradient of anything the policy controls: it is a by-product of felling, which
 the war path already rewards.
 
@@ -540,15 +572,15 @@ Fix in this order.
 2. **Publish the campaign objective.** The built-in controller reads an unfogged
    nearest-enemy-settlement target and a policy reads nothing like it. Four
    positions, and the pass already runs.
-3. **Mark the 1,401 undeclared dead positions.** Three actions, in one change.
-   Reserve the three hardcoded ring channels. Reserve the eighteen unwritten
+3. **Mark the 1,407 undeclared dead positions.** Three actions, in one change.
+   Reserve the three hardcoded ring channels. Reserve the nineteen unwritten
    rival channels and the rest of the unwritten token channels. Either fill the
    good-class positions or cut the taxonomy to the commodity count. **The point
    is not to fill them. The point is that a reader can find them.** A dead
    position with a real form is worse than a dead field, because nothing marks
    it and a reward term reads it as truth.
 4. **Write the seven rival token channels the reading struct already holds.**
-   108 dead positions of 138 in that set, and seven of the eighteen cost no new
+   114 dead positions of 144 in that set, and seven of the nineteen cost no new
    work.
 5. **Rename or reserve `strength_balance`.** It publishes a unit count under a
    strength name, in a set that reserves three strength channels beside it.
@@ -561,8 +593,9 @@ Fix in this order.
 8. **The influence margin, the per-settlement wonder progress, and the
    per-settlement population.** Real gaps, moderate value, and the last two use
    channels the layout already declares.
-9. **Nothing on the renown path.** Its problem is 4,000 kills and one mortal
-   character, and no field fixes that.
+9. **Nothing on the renown path.** Its problem was 4,000 kills and one mortal
+   character, and no field fixes that. A lower target has since answered the
+   first half of it.
 
 **Two categories are smaller than feared, and the report says so.** The audit
 found no second instance of a field that publishes another field's quantity
@@ -570,15 +603,16 @@ under a different name, so the population case looks isolated. And the reserved
 fields are largely reserved for good reasons: a window that does not exist, a
 strength rule that no record states, a store that no fog admits. The 121
 reserved positions are the part of this layout that behaved correctly. **The
-problem is the 1,401 positions that did not declare themselves at all.**
+problem is the 1,407 positions that did not declare themselves at all.**
 
 ## 6. A finding for the register
 
-The audit took **FND-695**. Lift the text below into the register unchanged.
-Do not treat the number as reserved until the register holds it.
+**The register holds this finding as FND-696, and the register text is the live
+statement of it.** The number FND-695 went to another finding, because two
+passes reached the register at once. The proposal below is the text this audit
+wrote, and it is kept as the record of what the audit asked for.[^36]
 
-> **FND-695. The reserved count measured the marked dead width, not the dead
-> width.**
+> **The reserved count measured the marked dead width, not the dead width.**
 >
 > **What the project believed.** The observation of a faction held 42 reserved
 > fields, and those fields were the inert part of the layout. A reserved field
@@ -586,19 +620,19 @@ Do not treat the number as reserved until the register holds it.
 > reads zero forever.
 >
 > **What is true.** The 42 reserved fields hold 121 positions, which is 2.5
-> percent of the 4,819 positions. A further 1,401 positions read zero in every
+> percent of the 4,819 positions. A further 1,407 positions read zero in every
 > state and declare a real value form. The largest groups are three ring stack
 > channels hardcoded to zero across all 151 cells, which is 453 positions; five
 > ring stack channels that the far pass never accumulates, which is 600
-> positions in the 120 cells beyond ring 3; and 268 token channels that no
-> writer sets, of which 108 sit in the rival set of 138.
+> positions in the 120 cells beyond ring 3; and 274 token channels that no
+> writer sets, of which 114 sit in the rival set of 144.
 >
 > **The evidence.** The ring channel table gives `memory_age`, `own_strength`
 > and `rival_strength` the expression `Fix32::ZERO`. The far accumulation pass
 > adds nine totals to a cell and the near pass adds fourteen, so `water_share`,
 > `resource_share`, `ground_water_density`, `hazard_share` and
 > `height_deviation` read zero in every far cell. The rival token writer sets
-> five of 23 channels. `COMMODITY_COUNT` is one and the work commodity table
+> five of 24 channels. `COMMODITY_COUNT` is one and the work commodity table
 > maps every resource kind onto commodity zero, so seven of eight good classes
 > read zero in five fields and in the trade board.
 >
@@ -646,3 +680,6 @@ Do not treat the number as reserved until the register holds it.
 [^32]: The character pass of the world, the renown award. `crates/cachette-core/src/world/character.rs`
 [^33]: The contest module, the renown of one felled unit. `crates/cachette-core/src/contest.rs`
 [^34]: Blockers register, BLK-150. `docs/BLOCKERS.md`
+[^35]: Decision Record Scope, section 4.3. `.agents/rules/adr-scope.md`
+[^36]: Findings register, FND-696. `docs/FINDINGS.md`
+[^37]: Balance register, the renown target. `docs/reference/balance.md`

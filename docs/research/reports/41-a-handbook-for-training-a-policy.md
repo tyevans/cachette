@@ -22,6 +22,30 @@ recommendation the same day. Section 4.4 holds the correction and section 9.1
 holds it as precedent. **The suspect returns to the observation and the action
 table, which the companion report named first.**
 
+## What has changed since this report
+
+**This report is a handbook fixed to the moment section 0 names, and nothing
+below was edited afterwards.** Two of its inputs have moved.
+
+**The project deleted the kind that holds a frozen random projection in its
+first layer.** Section 6 states that the current policy is that kind, and two
+rows of its tier table price a shape of it. The trainer now builds two kinds.
+One is `linear`, over the whole array. The other is `structured`, which shares
+a weight across the sector axis and trains every layer.[^49] The loader
+refuses a stored file that names the deleted kind, and it names the kind in
+the refusal.[^50] Read the alignment law of section 6 for its method. Do not
+read a hidden width as an operating point that a run can ask for.
+
+**The observation is no longer the array this report reads.** The engine
+publishes an egocentric ring frame with an entity token block, and it reached
+layout version 7 on 8 September 2026. Every observation length and every
+parameter count below measures the earlier array. A register holds the
+parameters of the layout the engine builds now.[^52]
+
+**The renown target fell from 1000 whole units to 50.** Section 1 reads the
+target at 1000 and derives 4000 enemy units from it. A champion now reaches
+the target after 200. A register holds the value and the reasoning.[^51]
+
 ## 0 Provenance, and what this report could not verify
 
 The author read the engine, read the control plane, read one completed training
@@ -2043,3 +2067,7 @@ work is, and sections 6 and 7 say what to change in each.
 [^46]: Mania, Guy and Recht, Simple random search provides a competitive approach to reinforcement learning, 2018. https://arxiv.org/abs/1803.07055
 [^47]: Findings register, FND-646. `docs/FINDINGS.md`
 [^48]: The training launcher and its teardown trap. `scripts/graviton-train.sh`
+[^49]: The strategy table of the trainer. `python/cachette/learn/__main__.py`
+[^50]: The stored policy reader of the control plane. `python/cachette/learn/policy.py`
+[^51]: Balance register, the renown target. `docs/reference/balance.md`
+[^52]: Reinforcement learning parameters register, the observation layout. `docs/reference/rl-costs.md`
