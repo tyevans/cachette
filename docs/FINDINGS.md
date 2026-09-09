@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-709**
+**Next number: FND-710**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19002,3 +19002,56 @@ diagnosis was reached three times before the feature layer was measured
 once.** The register already holds the rule: test what a value depends on
 rather than that it repeats.[^F703A] A feature vector is a value, and nothing
 had ever asked what it depends on.
+
+### FND-709 — The learner suite passes with the encoder blinded, so 97.5 percent of it cannot see a policy that ignores the world
+
+**Believed.** The learner had a suite of its own, and the reward, the policy
+shapes, the search step, the shards and the checkpoints each had test files.
+Two recorded defects had shipped past that suite, and each was read as a gap
+in coverage that the repair then closed.
+
+**True.** The gap is not in the coverage. **It is in what every test holds
+fixed.**
+
+A worker replaced the feature encoder of all three policy modules with a
+function that returns a constant row, which reproduces the recorded
+feature-layer defect exactly, and ran the learner suite under it. The baseline
+passed 236 of 236 items. **Under the blinded encoder 230 of the 236 still
+passed.** So the suite tells a policy that reads the world from one that
+ignores it in six items of 236.
+
+What the suite states is more telling than the count.
+
+Nothing anywhere varies an observation and asserts that a score moves. Every
+learner test that calls a policy holds the observation fixed and varies the
+weights. The closest test asserts that a randomly reweighted policy does not
+answer row zero four times over, and its docstring calls that the property the
+trainer depends on. A fixed preference order satisfies it.
+
+The only test that touches a published policy asserts that the file loads and
+that its kind is known. It builds a real engine world and a loaded policy, and
+it asks nothing about what the weights do. It held both ingredients of the
+decisive measurement already.
+
+**One test asserts the defect.** It asserts that the mask permits the chosen
+row, and the recorded finding is that the mask does all the work.
+
+**The fixtures are the opposite of the world on both axes that decide this.**
+The policy fixture draws every observation position independently and marks
+every action row legal. The world holds 3,546 of 4,819 positions that never
+move, and 13 to 18 legal rows of 180. A defect that lives in the constant
+subspace cannot exist in a fixture that holds no constant subspace.
+
+**Follows.** A suite earns no confidence from passing. It earns confidence
+from failing when the defect is present, and this project's own testing rule
+already says to put the defect back and watch the test stay green. The rule
+was written for one fixture at a time. **Apply it to the suite as a whole:**
+blind the encoder, and require that a named set of tests goes red. A test that
+asserts the suite is sensitive to blinding is the only guard that survives the
+next repair.
+
+**The shape is older than this instance.** Before the shaping repair, every
+reward test scored one episode and asserted one step or one terminal value,
+and a per-step assertion cannot see an episode sum collapse to a difference of
+its endpoints. The alignment law was never stated as a test at all, and the
+sweep that settled it lives in a commit message.

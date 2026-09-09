@@ -108,11 +108,20 @@ DECISION_INTERVAL = 10
 # The tick limit of one episode. The engine compares held ground at the
 # limit and records a winner, so an episode that reaches the limit still
 # ends won or lost.
-TICK_LIMIT = 2500
+#
+# **This is the world a run trains in, and it is declared here only.** The
+# launcher asks the trainer for it and holds no copy, because a launcher that
+# held a copy measured a world nobody trained in. A test that wants a cheaper
+# world replaces these fields rather than reading a second constant.
+TICK_LIMIT = 6000
 
 # The extent of the world every strategy plays, in columns and in rows. The
 # world is square, and a run states one number for both sides.
-WORLD_EXTENT = 48
+#
+# A measurement of four extents chose 128. Eight of sixteen episodes at 48
+# ended with the seat holding no settlement at all, and none did at 256, and
+# a larger world resolves sooner rather than later.
+WORLD_EXTENT = 128
 
 # How many factions play one game, counting the learner seat.
 FACTION_COUNT = 3
