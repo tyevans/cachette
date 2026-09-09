@@ -11,12 +11,16 @@ downstream game, and one blocker holds that question open.[^1]
 # The horizon must reach the end of the game
 
 The engine ends a game by domination, by a wonder, by renown, or by a
-comparison of held ground at the tick limit. A measurement of twenty-four
-worlds at extent 48 with three factions found that a game against the
-built-in controller resolves anywhere from about two hundred ticks to the
-tick limit, with a middle near two thousand.[^2] A horizon shorter than that
-truncates the episode, and a truncated episode reports no outcome. A policy
-therefore cannot be paid for a win it never reached.
+comparison of held ground at the tick limit. A measurement over held-out
+seeds ran the population script against the built-in controller and read the
+end tick of each game.[^2] **The endings fall in two clusters.** Most games
+resolve early, and the rest run to the tick limit with nothing in between.
+The register holds the figures, because a figure in a docstring decays and a
+register row does not.[^3]
+
+A horizon shorter than the tick limit truncates the episode, and a truncated
+episode reports no outcome. A policy therefore cannot be paid for a win it
+never reached.
 
 The horizon of this run covers the tick limit exactly, so every episode ends
 with a win or a loss.
@@ -48,8 +52,9 @@ first two and loses to the third has learned to act, not to play.
 # References
 
 [^1]: Blockers register, BLK-050. ``docs/BLOCKERS.md``
-[^2]: Reinforcement learning parameters, the measured run.
-``docs/reference/rl-costs.md``
+[^2]: The instrumental population script, which measures the end tick of each
+game. ``scripts/instrumental_population.py``
+[^3]: Findings register, FND-689. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations

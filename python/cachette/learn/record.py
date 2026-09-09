@@ -6,7 +6,7 @@ candidate did on one seed. A population record holds every episode of one
 batch. A generation record holds what a generation scored and what the search
 made of it.
 
-Three gaps in the earlier reporting are the reason each field is here.
+Four gaps in the earlier reporting are the reason each field is here.
 
 # A paired comparison needs the outcome of each seed
 
@@ -28,15 +28,25 @@ that answer away. A policy whose actions the engine mostly refuses is close to
 a no-op whatever it chooses, and no figure of the run said so. An episode
 record therefore counts what the policy chose and what the engine refused.
 
+# The tick of the end is not a signal
+
+How long a game ran is the strongest single answer a run reports about the
+game itself. The engine publishes no observation field that carries it, so a
+record read the signals under the name ``tick`` and took a default of zero.
+Every episode the project recorded carried a zero in that column, and nothing
+failed. An episode record therefore holds the end tick as a field of its own,
+read from the world.[^2]
+
 # References
 
 [^1]: Findings register, FND-670. ``docs/FINDINGS.md``
+[^2]: Findings register, FND-689. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
@@ -45,12 +55,55 @@ from .reward import OUTCOMES, RUNNING
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Mapping, Sequence
 
+    from cachette._core import GameEnd
+
     from .env import Env
 
 
 # What a column of an objective is called in a report row. One prefix keeps
 # an objective apart from a signal of the engine of the same name.
 OBJECTIVE_PREFIX = "objective."
+
+
+class EndedWorld(Protocol):
+    """What this module needs of a world: its clock and its end record."""
+
+    @property
+    def tick(self) -> int:
+        """Give back the tick the world stands at."""
+
+    def game_end(self) -> GameEnd | None:
+        """Give back how the game ended, or nothing while it runs."""
+
+
+def end_tick_of(world: EndedWorld) -> int:
+    """Return the tick the game of one finished episode ended at.
+
+    **The end record is the source when the world holds one, and the clock of
+    the world is the source when it does not.** The two answer different
+    endings, and neither answers both.
+
+    A win reader fires inside the interval that one decision runs, so the
+    clock stands past the end by up to that interval. The end record holds
+    the tick the reader fired at, which is the tick the game ended at. An
+    episode that runs to the tick limit also holds an end record, because the
+    engine compares held ground at the limit and records a winner there.
+
+    An episode that the horizon truncated holds no end record. The clock is
+    then the only statement of how far the episode ran.
+
+    **This function names no signal.** The engine publishes no observation
+    field called ``tick``, so a reading of the signals under that name is a
+    missing name and never a tick.[^1]
+
+    References
+    ----------
+    [^1]: Findings register, FND-689. ``docs/FINDINGS.md``
+    """
+    end = world.game_end()
+    if end is None:
+        return int(world.tick)
+    return int(end["tick"])
 
 
 def outcome_columns(outcome: str) -> dict[str, float]:
@@ -106,6 +159,14 @@ class EpisodeRecord:
     that won by taking ground from one that won by fighting. The entry is
     empty for a run scored by a weighting over single fields, which holds no
     objective vector.
+
+    The end tick entry is the tick the game ended at. It is a fact of the
+    world and never a signal, because the engine publishes no observation
+    field that carries it.[^1]
+
+    References
+    ----------
+    [^1]: Findings register, FND-689. ``docs/FINDINGS.md``
     """
 
     candidate: int
@@ -115,6 +176,7 @@ class EpisodeRecord:
     decisions: int
     chosen: int
     refused: int
+    end_tick: int
     signals: Mapping[str, float] = field(default_factory=dict)
     objectives: Mapping[str, float] = field(default_factory=dict)
 
@@ -140,6 +202,10 @@ class EpisodeRecord:
         The scoring name asks the environment for the objectives of one of
         the further scorings it read. A name of ``None`` asks the primary
         scoring, which is what one play under one objective wants.
+
+        The end tick comes from the world of the episode, through the one
+        reader this module holds for it. **It does not come from the
+        signals.** The engine publishes no signal that carries it.
         """
         return cls(
             candidate=candidate,
@@ -149,6 +215,7 @@ class EpisodeRecord:
             decisions=env.decisions,
             chosen=chosen,
             refused=refused,
+            end_tick=end_tick_of(env.world),
             signals=env.signals.read_scalars(np.asarray(env.observation())),
             objectives=dict(env.objectives_under(scoring_name)),
         )
@@ -174,14 +241,22 @@ class EpisodeRecord:
         """Return the reading of this episode, as one flat row of numbers.
 
         The row holds every one-position signal, one column for each outcome,
-        and the tick of the end under the name a report uses. **The engine
-        spells the tick of the end ``tick`` and a report spells it
-        ``end_tick``**, and both names are in the row so that no caller has to
-        translate between them.
+        one column for each objective, and the tick the game ended at under
+        the name ``end_tick``.
+
+        **The end tick is a fact of the world and never a signal.** This
+        column read the signals under the name ``tick`` with a default of
+        zero, and the engine publishes no signal of that name. Every episode
+        the project recorded therefore carried a zero here, and nothing
+        failed.[^1]
+
+        References
+        ----------
+        [^1]: Findings register, FND-689. ``docs/FINDINGS.md``
         """
         row = {name: float(value) for name, value in self.signals.items()}
         row.update(outcome_columns(self.outcome))
-        row["end_tick"] = float(self.signals.get("tick", 0.0))
+        row["end_tick"] = float(self.end_tick)
         row.update(objective_columns(self.objectives))
         return row
 
@@ -195,6 +270,7 @@ class EpisodeRecord:
             "decisions": self.decisions,
             "chosen": self.chosen,
             "refused": self.refused,
+            "end_tick": self.end_tick,
             "signals": dict(self.signals),
             "objectives": dict(self.objectives),
         }
@@ -443,9 +519,11 @@ def episode_records(
 
 __all__ = [
     "OBJECTIVE_PREFIX",
+    "EndedWorld",
     "EpisodeRecord",
     "GenerationRecord",
     "PopulationRecord",
+    "end_tick_of",
     "episode_records",
     "mean_objectives",
     "objective_columns",

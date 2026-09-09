@@ -14,12 +14,18 @@ compared the three, and they disagreed in two ways that cost a measurement
 each.
 
 The trainer reports the tick of the end under the name ``end_tick`` while a
-reward must ask for ``tick``, so a caller that carried a reported name into a
-weighting got an error, and a caller that carried a weighed name into a
-reading got silence. The silence is the worse of the two: a measurement of
-which quantity predicts winning read a missing name as zero for every
+reward must ask for a field of the schema, so a caller that carried a reported
+name into a weighting got an error, and a caller that carried a weighed name
+into a reading got silence. The silence is the worse of the two: a measurement
+of which quantity predicts winning read a missing name as zero for every
 candidate, scored the resulting tie as a coin, and reported that the tick of
 the end predicts nothing when it had never been read.[^2]
+
+**The engine publishes no signal that carries the tick of the end.** The
+project believed it published one called ``tick``, and a record read that name
+out of the signals with a default of zero. The name is absent from every
+schema, so the column held zero for every episode the project recorded. A
+caller reads the end tick from the world and never from this catalogue.[^4]
 
 This module is the one declaration. A caller asks it what the engine
 publishes, and reads a value through it.
@@ -50,6 +56,7 @@ schema-declared bounded tables the engine owns, decision D1.
 ``docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md``
 [^2]: Findings register, FND-669. ``docs/FINDINGS.md``
 [^3]: Findings register, FND-670. ``docs/FINDINGS.md``
+[^4]: Findings register, FND-689. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations

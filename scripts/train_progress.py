@@ -394,7 +394,7 @@ def render(
         controller = strategy.baselines.get("controller") or bar
         if trained:
             verdict = "BEATS the controller"
-            if controller and trained["won"] <= controller.get("won", 0.0):
+            if controller and trained["won"] <= controller["won"]:
                 verdict = "loses to the controller"
             lines.append(
                 f"      held out   wins {trained['won']:.3f} "

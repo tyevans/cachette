@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-689**
+**Next number: FND-690**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18000,8 +18000,79 @@ search shape earns its alignment only when the parameters it trains span the
 rules the policy must state. Do not reach for a fixed random bottleneck again
 in order to make a trainable count small.
 
+### FND-689 — The recorded end tick of an episode read zero for every episode
+
+**Believed.** A record of one episode reported how long its game ran, in a
+column called `end_tick`. The column was the strongest single answer a run
+gave about the game itself, and a measurement of which quantity predicts
+winning ranked it beside every field the engine publishes.
+
+**True.** The column read zero. A record took the tick of the end out of the
+signals of the engine, under the name `tick`, with a default of zero. **The
+engine publishes no signal of that name.** The read therefore returned its
+default on every episode, and nothing failed.
+
+The column was correct when it was written. The observation layout held a
+field called `tick` at that time, and an earlier version of the record indexed
+it directly, which would have raised. One commit replaced that hard index with
+a lookup that defaults. A later commit replaced the whole observation layout
+and removed the field, and it left `tick_share` and `remaining_ticks` in its
+place. The sweep of the layout revision did not reach the record, and the
+default is the reason nothing said so.[^F689A] [^F689B]
+
+**Evidence.** The schema of the engine names every field of the observation,
+and no field is called `tick`. A run of one episode over a small world ended
+by domination at tick 251 and reported `end_tick` as zero. A second episode of
+the same world shape ran to the tick limit and reported zero as well. The
+commit holds each figure and the search command.[^F689C]
+
+**Follows.** An episode record now holds the end tick as a field of its own,
+and one reader supplies it. **The end record of the game is the source when
+the world holds one, and the clock of the world is the source when it does
+not.** The two answer different endings. A win reader fires inside the
+interval that one decision runs, so the clock stands past the end of a game
+that ended early. The measured case above ended at tick 251 with the clock at
+255, so the two sources differ by more than rounding.
+
+**Which earlier measurements are suspect.** The `end_tick` rows of report 40
+and report 41 were measured before the layout revision, so they read a real
+field and they stand.[^F689D] [^F689E] Every reading of the column taken after
+the revision is a zero. That covers the run reports of the trainer and the
+baseline rows of the dashboard, which report the mean of the column. The
+measurement of the end tick over held-out seeds is sound, because the script
+that took it read the world and never the signals.[^F689F]
+
+**One consequence is worse than a zero column.** The proxy measurement divides
+every field by the end tick to report a rate beside a total. A zero column
+makes that a division by zero, so any rate column produced after the layout
+revision carries no information at all. The script refuses a field the reading
+does not report, and that guard does not see a field the reading reports as
+zero.[^F689G]
+
+**A second claim rested on the same column, and it cited a row that does not
+exist.** The trainer stated that a game against the built-in controller
+resolves from about two hundred ticks to the tick limit, with a middle near two
+thousand, and it cited the reinforcement learning cost table for the figure.
+That table holds no such row. A measurement over 24 held-out seeds puts the
+median at 954 ticks, with 231, 514, 954 and 2500. **The shape is two clusters
+and not a range.** An early cluster sits below 1200 ticks, and nothing lies
+between that cluster and the tick limit. The commit holds the command that
+measured it.[^F689C] [^F689F]
+
+**Read a lookup with a default as a defect until the default is justified.**
+The signal catalogue exists so that a caller that names a missing signal gets
+an error. A `get` with a default on the raw mapping defeats it, and a rename
+then passes silently.
+
 ## References
 
+[^F689A]: The commit `Split the trainer into a search, a play and a record`, which replaced the hard index with a lookup that defaults.
+[^F689B]: The commit `Replace the observation layout with the scale-free blocks of report 42`, which removed the field the lookup named.
+[^F689C]: The commit `Read the end tick of an episode from the world, not a signal`. Read its message for the figures and the search command.
+[^F689D]: Report 40, what a well-trained policy needs, the proxy table. `docs/research/reports/40-what-a-well-trained-policy-needs.md`
+[^F689E]: Report 41, a handbook for training a policy, section 4.4. `docs/research/reports/41-a-handbook-for-training-a-policy.md`
+[^F689F]: The instrumental population script, which reads the end tick from the world. `scripts/instrumental_population.py`
+[^F689G]: The proxy quality script, which divides each field by the end tick. `scripts/proxy_quality.py`
 [^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
 [^F670A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D2. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F670B]: The commit `Record what the observation width follows, and how its own ground flickers`. Read its message for the figures.
