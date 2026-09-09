@@ -15,13 +15,16 @@
 //! razes and both write a log that this pass reads. It runs on the calling
 //! thread, and it reads each log in the order the log holds.[^2]
 //!
-//! # Why two passes deposit early
+//! # Why three passes deposit early
 //!
-//! Two kinds cannot be read from a log at the end of the step. The starvation
-//! log names a unit and no faction, and the unit is gone by the time this
-//! pass runs. The gather log names a unit that a later meeting of the same
-//! step may have ended. Both passes therefore deposit their arrivals where the
-//! faction is still known, and this pass folds them with the rest.
+//! Three passes cannot leave their kinds to a log at the end of the step. The
+//! starvation log names a unit and no faction, and the unit is gone by the
+//! time this pass runs. The gather log names a unit that a later meeting of
+//! the same step may have ended. The conversion log is cleared by the pass
+//! that fills it, at the start of the next step, so a conversion that a
+//! control plane asked for between two steps would never reach this pass.
+//! Each of the three therefore deposits its arrivals where the faction is
+//! still known, and this pass folds them with the rest.
 //!
 //! # References
 //!

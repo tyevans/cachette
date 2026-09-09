@@ -23,6 +23,7 @@ writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
 **Next number: FND-703**
+**Next number: FND-703**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18282,121 +18283,25 @@ layout does publish.
 **Every play style that names a compressed magnitude term changes scale.** Five
 of the nine objectives of the shipped style table name one.[^F701A]
 
-### FND-702 — The population field and the live unit field publish one number
+### FND-702 — Superseded by FND-695, which holds the same fact and its cause
 
-**Believed.** The people strategy rewarded the population of a faction, and the
-military objective of the play style table rewarded the unit count. The two were
-different rewards over different quantities, and a run that compared them
-measured what each one taught.
+**This row recorded that the published population field and the published live
+unit field hold one value.** Two workers measured that fact on the same day
+from different directions, and each wrote a row for it. FND-695 states the same
+fact, and it also states the cause: a settlement counts its residents as the
+units whose home column names it, so the resident total of a faction is its
+homed units, and that equals its live units whenever every unit is homed. A
+blocker carries the open question.
 
-**True.** In every episode measured, the published population and the published
-live unit count held the same value at every decision. The population field of
-one faction therefore rewards the unit count under another name, and the people
-strategy is a military strategy.
+**Read FND-695.** This row is kept so the number stays spent and no later work
+takes it, and it is emptied so the register holds one statement of the fact
+rather than two.
 
-**Evidence.** Three seeds of a 48 by 48 world of three factions, played by a
-random policy for 618 decisions in total, read the same value in the population
-field and in the live unit field on every one of them. Sixteen further episodes
-under a no-op policy and three random policies read the same value in both at
-the end of every episode. The population for each settlement field read the same
-value again, which follows from the settlement count holding at one in every
-episode.
-
-**This row states the measurement and not the cause.** The engine crate was out
-of scope for the work that found it, so nothing here says whether the two fields
-read one source by design or by defect. A reader who wants the cause reads the
-engine.
-
-**Follows.** The people row keeps its name, because a stored policy carries the
-name and a rename orphans every file.[^F702A] The row now says in the code that
-it rewards the unit count. A run that means to compare a growth strategy against
-a military strategy cannot use these two fields until the engine publishes a
-count of people that is not the unit count.
-
-**No trained policy has founded a settlement, and that is one reason these
-measurements read as they did.** The settlement count held at one in every
-episode measured, so the people row and the ground row both scored a faction
-that never grew past the city the seeding gave it. The strategy table now pays a
-level term for the settlement count and a smaller one for the readiness to
-found, which is the one field that separates a faction that produced a settler
-and walked it to a site from a faction that did nothing.
-
-
-## References
-
-[^F692A]: Findings register, FND-679. `docs/FINDINGS.md`
-[^F692B]: Findings register, FND-676. `docs/FINDINGS.md`
-[^F692C]: Findings register, FND-689. `docs/FINDINGS.md`
-[^F692D]: The stored policy index. `checkpoints/README.md`
-[^F689A]: The commit `Split the trainer into a search, a play and a record`, which replaced the hard index with a lookup that defaults.
-[^F689B]: The commit `Replace the observation layout with the scale-free blocks of report 42`, which removed the field the lookup named.
-[^F689C]: The commit `Read the end tick of an episode from the world, not a signal`. Read its message for the figures and the search command.
-[^F689D]: Report 40, what a well-trained policy needs, the proxy table. `docs/research/reports/40-what-a-well-trained-policy-needs.md`
-[^F689E]: Report 41, a handbook for training a policy, section 4.4. `docs/research/reports/41-a-handbook-for-training-a-policy.md`
-[^F689F]: The instrumental population script, which reads the end tick from the world. `scripts/instrumental_population.py`
-[^F689G]: The proxy quality script, which divides each field by the end tick. `scripts/proxy_quality.py`
-[^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
-[^F670A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D2. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-[^F670B]: The commit `Record what the observation width follows, and how its own ground flickers`. Read its message for the figures.
-[^F676A]: The commit `Record that a difference reward telescopes, and what the array does not carry`. Read its message for the measurement.
-[^F676B]: Report 42, what a policy should be able to see, section 10.4. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
-[^F677A]: The commit `Merge the tool that draws what a policy sees`. Read its message for the figures.
-[^F679A]: Findings register, FND-676. `docs/FINDINGS.md`
-[^F679B]: The commit `Record that the outcome weights prefer a draw to an attempt at a win`. Read its message for the weights and the arithmetic.
-[^F668A]: The commit `Measure what sets how well one generation points the right way`. Read its message for the figures.
-[^F667A]: The commit `Measure what water does to a training world, and free two colliding numbers`. Read its message for the figures.
-[^F667B]: Findings register, FND-666. `docs/FINDINGS.md`
-[^F643A]: ADR-0192, a window of controller commands is one label distribution over the action table, decision D2. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
-[^F643B]: Findings register, FND-634. `docs/FINDINGS.md`
-[^F638B]: Backlog item 0525, build the stage workers of a world once. `docs/backlog/proposed/0525-build-the-stage-workers-of-a-world-once.md`
-[^F641A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-[^F641B]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
-[^F641E]: ADR-0192, a window of controller commands is one label distribution over the action table, decisions D2 and D4. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
-[^F644A]: The observation reader of the binding. `crates/cachette-py/src/lib.rs`
-[^F644B]: The policy pilot of the demonstration. `python/cachette/demo/pilot.py`
-[^F644C]: Backlog item 0528, let a stored policy play a demonstration to the end of a game. `docs/backlog/complete/0528-let-a-stored-policy-play-a-demonstration-to-the-end-of-a-game.md`
-[^F648A]: Findings register, FND-644. `docs/FINDINGS.md`
-[^F648B]: The test that drives each verb and reads afterwards. `crates/cachette-core/tests/a_step_leaves_the_world_readable.rs`
-[^F648C]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decisions D3 and D4. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
-[^F648D]: The refusal of a faction reader. `crates/cachette-core/src/faction_view.rs`
-[^F648E]: Findings register, FND-646. `docs/FINDINGS.md`
-[^F647A]: The seated league of the control plane, the seat-matched plan. `python/cachette/learn/league.py`
-[^F647B]: The observation test of the engine. `crates/cachette-core/tests/a_faction_reads_one_flat_array.rs`
-[^F647C]: ADR-0193, a faction's observation names another faction by a position relative to the reader, decision D1. `docs/adrs/draft/adr-0193-an-observation-names-another-faction-by-a-position-relative-to-the-reader.md`
-[^F647D]: The policy fit of the control plane. `python/cachette/learn/policy.py`
-[^F664A]: Findings register, FND-029. `docs/FINDINGS.md`
-[^F664B]: Report 39, what one tick of the training world costs. `docs/research/reports/39-what-one-tick-of-the-training-world-costs.md`
-[^F664D]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-[^F664E]: The test that the step derives the destination field after the controller. `crates/cachette-core/tests/the_step_derives_the_destination_field_after_the_controller.rs`
-[^F665A]: Report 39, the second defect, section 4.4. `docs/research/reports/39-what-one-tick-of-the-training-world-costs.md`
-[^F666A]: The degenerate world test of the learner. `tests/test_learner_degenerate.py`
-[^F666B]: Findings register, FND-544. `docs/FINDINGS.md`
-[^F672A]: Findings register, FND-648. `docs/FINDINGS.md`
-[^F672B]: ADR-0055, a site derives its effective rate from the world at each application, the consequences. `docs/adrs/draft/adr-0055-a-site-derives-its-effective-rate-from-the-world.md`
-[^F673A]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
-[^F674A]: The census table of the engine. `crates/cachette-core/src/world/census.rs`
-[^F675A]: ADR-0062, production and upkeep are rates attached to a site, the consequences. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
-[^F682A]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
-[^F682B]: Testing rules, a fixture supplies the input, section 2a. `.agents/rules/testing.md`
-[^F682C]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
-[^F680B]: Findings register, FND-664. `docs/FINDINGS.md`
-[^F680C]: The commit `Derive the destination field only when a seed set changed`. Read its message for the figures, the frame counts and the commands.
-[^F681B]: The commit `Derive an approach field only when its arguments changed`. Read its message for the figures, the tests and the commands.
-[^F683A]: The commit `Give the holding city walk a stage of its own`. Read its message for the file table and the entry counts.
-[^F683B]: Findings register, FND-305. `docs/FINDINGS.md`
-[^F683C]: The commit `Let a campaign name the cell of the frame it marches in`. Read its message for the table lengths and the fixture.
-[^F683D]: ADR-0199, a verb names a place by a cell of the egocentric frame the observation publishes. `docs/adrs/draft/adr-0199-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
-[^F683E]: Report 40, what a well-trained policy needs, section 6.1. `docs/research/reports/40-what-a-well-trained-policy-needs.md`
-[^F687A]: The structured scaling tests of the search. `tests/test_learner_search.py`
-[^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
-[^F688A]: Findings register, FND-668. `docs/FINDINGS.md`
-[^F688B]: The stored policy index. `checkpoints/README.md`
-[^F688C]: The commit `Remove what the deleted frozen projection policy left behind`. Read its message for the counts, the alignment figures and the commands.
-[^F668B]: Findings register, FND-688. `docs/FINDINGS.md`
-[^F690A]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
-[^F690B]: The commit `Name each stored action row by its verb and its coordinates`. Read its message for the perturbation and the figures.
-[^F691A]: The commit `Publish the structure of the observation, not only its positions`. Read its message for the length figure and the field split.
-[^F691B]: The commit `Publish the value form of each observation field`. Read its message for the array comparison and the commands.
+**The register grew the shape it exists to catch.** One fact in two places,
+with nothing that fails when the copies disagree. The copies agreed here, which
+is why nothing looked wrong. Two workers on one tree will find one defect
+twice, so a worker that writes a finding must read the tail of the register
+first.
 
 ### FND-693 — The launcher held two answers for which strategies a run trains, and a paid instance died on both
 
@@ -18486,3 +18391,84 @@ still unmeasured.
 [^F700C]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 [^F701A]: The play style table. `python/cachette/learn/play_styles.toml`
 [^F702A]: The stored policy index. `checkpoints/README.md`
+### FND-696 — A declared observation field that reads a constant zero cannot be told from a real zero, and forty-two of them were declared
+
+**Believed.** A reserved field of the observation is a safe placeholder. It
+holds its positions so that a later revision fills them without moving
+anything, it declares its bounds as zero and zero, and a reader that meets one
+knows the engine answers nothing there.
+
+**True.** The engine says so and no reader of the control plane asked. The
+schema publishes the value form of each field, so the reserved form is
+readable from Python, and nothing in the reward path, the objective path or the
+play style table looked at it. A term that named a reserved field resolved, read
+zero on every decision, and scored a constant for as long as the run lasted.
+
+**Evidence.** The field list declared 42 reserved fields of 141. The ten that a
+conflict objective would name were among them: the tiles taken, the tiles lost,
+the settlements lost, the tiles burnt, the units a hazard took, the military
+strength, the change in it, the strength for each unit, the units beside a
+rival and the decisions taken. No policy trained by this project could read its
+own military strength or whether its units stood beside a rival.
+
+The nine objectives of the play style table each named a live field, so no
+measurement was lost to this. That is luck and not a mechanism: nothing
+compared the name in the table against the form the engine published for it.
+
+**Follows.** Three things, and the third is the one that lasts.
+
+A reserved field is now written where the meaning was already settled, from the
+decayed event history that the step advances. The military strength is defined
+provisionally against an open blocker rather than left at zero, because a
+definition that is wrong is revisable and a silent zero is not.[^F696A]
+
+A field whose meaning is not settled keeps the reserved form and its doc says
+which of the two reasons applies: the engine keeps no aggregate that answers
+it, or the value needs a reading of a past frame that nothing stores.
+
+**A term that names a reserved field is now refused where it binds.** The
+objective set resolves every signal against the catalogue, and that is the one
+place every play style and every schedule passes through. A test walks the play
+style table and the strategy table and fails on a reserved form, and the test
+was proved able to fail by pointing a term at one.
+
+**A reserved field is a zero that lies, and a bounded field that nothing writes
+is the same defect wearing a form.** The engine now asserts that every field
+its writer leaves alone declares the reserved form, so a field cannot be given
+a real form and left unwritten.
+
+[^F696A]: Blockers register, BLK-158. `docs/BLOCKERS.md`
+
+### FND-695 — Three observation fields publish one number, because the engine holds no person apart from a unit
+
+**Believed.** The observation publishes the people a faction feeds, the units
+it keeps alive, and the people of each settlement. The three names promise
+three quantities, and a play style rewards population growth through the first
+of them.
+
+**True.** The three are one quantity in the ordinary case. A settlement counts
+its residents as the units whose home column names it.[^F695A] The resident
+total of a faction is therefore the units of the faction that are homed, the
+live unit count is the units of the faction, and the two agree whenever every
+unit is homed. The residents for each settlement divides the first by the
+settlement count, and a faction of one settlement divides by one.
+
+**No reader is wrong.** Each field computes what its doc says. The engine holds
+no person that is not a unit, so the three docs describe one thing.
+
+**Evidence.** A measurement over three seeds and 618 decisions read the three
+fields as identical at every decision, and sixteen further episodes across a
+no-op policy and three random policies agreed. The reader of a settlement
+resident count sums the cohort rows of the site, and the cohort table derives
+every row from the home column of the unit arena.
+
+**What follows.** A strategy that weighs the resident count and the live unit
+count weighs one quantity twice. A play style that means to train growth apart
+from an army cannot express that against this engine.
+
+**The fix is a decision and not a patch**, so a blocker holds it rather than a
+field doc inventing a person.[^F695B] The three field docs now say plainly what
+they count and when they agree.
+
+[^F695A]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D2. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
+[^F695B]: Blockers register, BLK-159. `docs/BLOCKERS.md`

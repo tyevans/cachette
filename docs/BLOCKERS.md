@@ -25,11 +25,101 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-158**
+**Next number: BLK-160**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
 ## Open
+
+### BLK-159 — Does this engine hold people apart from units, and what is a settlement population?
+
+**Blocks.** Any objective, any reward term and any report that means to
+separate the growth of a people from the growth of an army. A play style that
+trains population growth trains the unit count today, under another name.
+
+**Owner.** Whoever next works on the growth of a settlement.
+
+**Status.** Open.
+
+**What is not known.** Whether a person is a thing this engine holds. It holds
+units, and it holds a home column that names the settlement of each unit. The
+residents of a settlement are the units whose home names it, and no other
+quantity of the world answers to the word population.
+
+**What follows from that today.** Three fields of the observation publish one
+number for a faction of one settlement whose units are all homed. The resident
+count sums the units homed at the settlements of the faction. The live unit
+count counts the units of the faction. The residents for each settlement
+divides the first by a settlement count of one. The three agree because the
+quantities agree, and not because a reader is wrong.[^BLK159A]
+
+**Why this is a blocker and not a defect to fix now.** A separate person would
+be a new thing in the world with its own storage, its own growth rule, its own
+carrying cost and its own place in the state hash. A patch that invented one
+would be an architectural decision taken in a field doc. The question is what
+the game wants: an army drawn from a people, or a people that is the army.
+
+**What a resolution needs.** A statement of whether a settlement holds people
+that are not units. If it does, a record states where they live, what grows
+them, and what a unit costs in them. If it does not, the observation drops one
+of the three fields rather than publishing one quantity three times, and the
+field that goes is a layout revision.
+
+**What follows for a reader.** Do not read the resident count as a people
+count. Do not weigh it and the live unit count as two terms of one objective,
+because that weighs one quantity twice.
+
+[^BLK159A]: Findings register, FND-695. `docs/FINDINGS.md`
+
+### BLK-158 — How does the attack column and the armour column of a unit type combine into a military strength?
+
+**Blocks.** Any reward term, any observation statistic and any report that
+ranks one army against another. The observation publishes a military strength
+and a strength for each unit under a provisional definition, so the work is
+not stopped. It is the definition that is open.
+
+**Owner.** Whoever next works on the resolution of a meeting between two
+factions.
+
+**Status.** Open.
+
+**What is not known.** The unit type table holds an attack column and an
+armour column. No record states how the two combine into one quantity that
+ranks two armies. The resolution of a meeting reads the two columns
+separately: an attacker reaches a defender when its attack exceeds the armour
+of the defender, and the harm it delivers is its attack. That rule gives no
+scalar strength, because a strength that ranks armies must hold for a field of
+mixed types and the penetration rule is a comparison between two types.
+
+**What is published now.** The strength is the sum over the live units of a
+faction of the attack plus the armour of the type of each one, in the
+fixed-point scale those columns carry. The sum is monotone in both columns, so
+it cannot rank a stronger army below a weaker one on either axis, and it is an
+exact integer sum that combines in any order.
+
+The engine held that sum before the observation published it. The unit type
+table answers the strength of one type, and the world folds it over the
+per-type headcount of a faction. The observation reads that one reader, so a
+revision of the definition reaches the array without a second edit.
+
+**Why a value is published rather than a zero.** The field read zero in every
+position before this, and a policy that read it could not tell that the zero
+was not a quantity. A reward term written against it would have trained
+against a constant for as long as the run lasted, and nothing would have
+failed. A definition that is wrong is visible and revisable; a silent zero is
+neither.[^BLK158A]
+
+**What a resolution needs.** A statement of what a strength is for. Two
+candidates are on the table. A sum of the two columns treats a point of armour
+as worth a point of attack, and the resolution rule does not. A product treats
+a unit of no attack as worth nothing, and a wall of armour holds ground. A
+third shape reads the penetration rule and states the strength of a field
+against a named opposing field, which is not a scalar of one faction at all.
+
+**What follows for a reader.** Read the field as provisional. Do not quote a
+strength figure as a measured property of the game.
+
+[^BLK158A]: Findings register, FND-694. `docs/FINDINGS.md`
 
 ### BLK-157 — Which pixels are the top of the ground, when the two renderers disagree?
 
