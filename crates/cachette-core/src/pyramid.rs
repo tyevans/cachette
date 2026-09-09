@@ -421,10 +421,7 @@ impl CellSummary {
     /// [^2]: ADR-0024, every summary field is declared extensive or intensive, decision D5. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
     #[must_use]
     pub fn height_spread(self) -> Option<Fix32> {
-        let mean = mean_of(self.height_total, self.tiles)?;
-        let square = mean_of(self.height_square_total, self.tiles)?;
-        let spread = square.0.saturating_sub(sim_math::mul(mean, mean).0);
-        Some(Fix32(spread.max(0)))
+        spread_of(self.height_total, self.height_square_total, self.tiles)
     }
 
     /// Returns the tiles that the ground gave a deposit of any kind.
@@ -522,6 +519,30 @@ impl CellSummary {
 /// # References
 ///
 /// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+/// Returns the spread of a quantity from its total and its square total.
+///
+/// The value is the mean of the squares less the square of the mean. Both
+/// terms come from extensive totals, so the reading is exact integer
+/// arithmetic and it needs no second pass over the tiles.
+///
+/// A count of zero returns no value. A truncated term can put the difference
+/// below zero by one unit of the last place, and the reading clamps it to
+/// zero, because a spread is never negative.
+///
+/// **This is the one statement of the spread of a quantity.** The observation
+/// reads it for a cell of the egocentric ring frame, which accumulates the
+/// same two totals over the tiles of the frame rather than over a block.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+pub(crate) fn spread_of(total: Accum, square_total: Accum, count: i64) -> Option<Fix32> {
+    let mean = mean_of(total, count)?;
+    let square = mean_of(square_total, count)?;
+    let spread = square.0.saturating_sub(sim_math::mul(mean, mean).0);
+    Some(Fix32(spread.max(0)))
+}
+
 fn mean_of(total: Accum, count: i64) -> Option<Fix32> {
     if count == 0 {
         return None;

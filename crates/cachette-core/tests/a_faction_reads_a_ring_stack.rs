@@ -18,13 +18,18 @@
 //! [^2]: Testing Rules, section 5. `.agents/rules/testing.md`
 //! [^3]: Testing Rules, section 2a. `.agents/rules/testing.md`
 
+use cachette_core::holding::ReachRules;
 use cachette_core::obs_frontier::FRONTIER_SLOTS;
-use cachette_core::obs_ring::{cell_of_delta, ring_of_cell, RING_STACK_CELLS, RING_STACK_CHANNELS};
+use cachette_core::obs_ring::{
+    cell_of_delta, ring_of_cell, FIRST_FAR_RING, RING_STACK_CELLS, RING_STACK_CHANNELS,
+};
 use cachette_core::obs_ring_stack::{
-    AREA_CHANNEL, OWN_HELD_CHANNEL, OWN_SETTLEMENT_CHANNEL, RING_STACK_SLOTS,
+    AREA_CHANNEL, OWN_HELD_CHANNEL, OWN_SETTLEMENT_CHANNEL, RING_STACK_CHANNEL_NAMES,
+    RING_STACK_SLOTS,
 };
 use cachette_core::obs_token::TOKEN_SLOTS;
-use cachette_core::{Axial, Entity, FactionId, SightRules, World, WorldConfig};
+use cachette_core::unit_type::SOLDIER;
+use cachette_core::{Axial, Entity, FactionId, SightRules, TileKind, World, WorldConfig};
 
 /// The faction that reads in every fixture below.
 const READER: FactionId = FactionId(0);
@@ -428,5 +433,347 @@ fn the_area_channel_separates_a_small_world_from_a_large_one() {
     assert!(
         large_stack.channel(far, AREA_CHANNEL) > 0,
         "ring 9 lies inside a 2048 by 2048 world"
+    );
+}
+
+/// The sight radius that lets one unit observe the ground around it.
+///
+/// The dead-channel fixture below needs a faction that watches ground far
+/// from its city, so its units see further than the cost fixture allows.
+const WIDE_SIGHT: u32 = 6;
+
+/// The hex distance from the city at which the fixture places a far unit.
+///
+/// Ring 4 starts at distance 8, so this distance lands in the far band on
+/// every world the fixture builds.
+const FAR_STEP: i32 = 24;
+
+/// The channels whose source is the ground or a unit.
+///
+/// **Each one must read a value in the near band and in the far band.** The
+/// near pass reads level 0 tiles and covers rings 0 to 3. The far pass reads
+/// the summary of a block and covers rings 4 and above. A channel that only
+/// one of the two fills reads zero in the other while the gate channel still
+/// says the cell lies inside the world, and a reader then takes that zero for
+/// a real absence.[^1]
+///
+/// # References
+///
+/// [^1]: What a policy cannot see, section 2.3. `docs/research/what-a-policy-cannot-see.md`
+const GROUND_CHANNELS: [&str; 17] = [
+    "area_inside_world",
+    "observed_share",
+    "seen_now_share",
+    "open_share",
+    "water_share",
+    "mean_height",
+    "height_spread",
+    "food_density",
+    "ground_water_density",
+    "value_density",
+    "resource_share",
+    "hazard_share",
+    "unclaimed_open_share",
+    "own_unit_density",
+    "rival_unit_density",
+    "own_strength_density",
+    "rival_strength_density",
+];
+
+/// The channels whose source is a structure of a faction.
+///
+/// A faction holds the ground inside the reach of its cities, and the frame
+/// centres on that ground. Its own settlements and its own held ground are
+/// therefore near by construction, and a fixture cannot promise one of them
+/// in the far band without a second empire. The memory age is a clock for
+/// each block, and the near band of this fixture lies inside blocks the
+/// reader watches, so its age is zero there.
+///
+/// Each channel here must read a value somewhere in the stack.
+const STRUCTURE_CHANNELS: [&str; 6] = [
+    "memory_age",
+    "own_held_share",
+    "own_reach_share",
+    "own_settlements",
+    "rival_held_share",
+    "rival_settlements",
+];
+
+/// The channels this fixture supplies no source for, and why.
+///
+/// A finished upgrade needs a build order and the ticks that finish it, and
+/// this fixture runs too few ticks to finish one. The upgrade pass walks the
+/// upgrade sites of the world and maps each one to the cell it stands in, in
+/// the same way the settlement pass does, so no band bounds it. The
+/// settlement channels beside it are proven below.
+const UNSUPPLIED_CHANNELS: [&str; 2] = ["own_upgrades", "rival_upgrades"];
+
+/// Returns a world in which every quantity the ring stack reports exists.
+///
+/// **A channel can read zero because the world is dull rather than because
+/// the writer is missing.** The fixture therefore states each distribution it
+/// needs and fails when the world does not give it.[^1]
+///
+/// The world holds one city of the reader, a unit of the reader far from that
+/// city, a rival unit beside each of the two, a fire beside each of the two,
+/// and one block that the reader saw once and no longer watches.
+///
+/// **Every unit of it is a soldier, and the reach of a city is short.** The
+/// worker row of the unit type table carries no attack and no armour, so a
+/// world of workers holds no strength at all. A city whose reach covers
+/// everything its units watch leaves no unclaimed open ground.
+///
+/// # References
+///
+/// [^1]: Testing Rules, section 2a. `.agents/rules/testing.md`
+fn a_world_that_supplies_every_quantity() -> World {
+    let mut world = a_still_world(160, 160, 0x00c0_ffee_0123_4567);
+    world.set_sight_rules(SightRules::new(WIDE_SIGHT, 1, 16, 0));
+    world.set_reach_rules(ReachRules::new(2, 1, 2));
+    let city = shore_near(&world, Axial::new(80, 80), 24);
+    a_unit_at(&mut world, city, READER);
+    world
+        .found_settlement(city, READER)
+        .expect("the fixture founds a settlement on ground that admits one");
+    let beside_city = ground_near(&world, Axial::new(city.q + 1, city.r), 3);
+    let garrison = a_unit_at(&mut world, beside_city, READER);
+    world.step(1).expect("the step runs");
+
+    let walked = ground_near(&world, Axial::new(city.q - FAR_STEP, city.r), 6);
+    let walker = a_unit_at(&mut world, walked, READER);
+    world.step(1).expect("the step runs");
+    assert!(
+        world.despawn_soldier(walker),
+        "the fixture must remove the unit that leaves the memory behind"
+    );
+    world.step(1).expect("the step runs");
+    world.step(1).expect("the step runs");
+    assert!(
+        world.faction_has_seen(READER, walked) && !world.faction_sees_now(READER, walked),
+        "the fixture must leave one far place remembered and unwatched"
+    );
+
+    let scouted = shore_near(&world, Axial::new(city.q + FAR_STEP, city.r), 8);
+    let scout = a_unit_at(&mut world, scouted, READER);
+    let beside_scout = ground_near(&world, Axial::new(scouted.q + 2, scouted.r), 3);
+    let far_rival = a_unit_at(&mut world, beside_scout, STRANGER);
+    let facing_city = ground_near(&world, Axial::new(city.q + 4, city.r), 3);
+    let near_rival = a_unit_at(&mut world, facing_city, STRANGER);
+    world
+        .found_settlement(beside_scout, STRANGER)
+        .expect("the fixture founds a rival settlement on ground that admits one");
+    for unit in [garrison, scout, far_rival, near_rival] {
+        assert!(
+            world.set_unit_type(unit, SOLDIER),
+            "the fixture must give each unit a type that carries a strength"
+        );
+    }
+    world.step(1).expect("the step runs");
+
+    burn_ground_near(&mut world, city);
+    burn_ground_near(&mut world, scouted);
+    world
+}
+
+/// Returns a place near an address that admits a unit and that water
+/// adjoins.
+///
+/// **The water share of a cell is zero on a world with no water in it**, and
+/// a fixture that reads zero there measures its own terrain rather than the
+/// writer.[^1] The search is a spiral over the rings around the address, and
+/// it takes the first place that admits a unit and holds water within three
+/// steps.
+///
+/// # References
+///
+/// [^1]: Testing Rules, section 2a. `.agents/rules/testing.md`
+fn shore_near(world: &World, wanted: Axial, bound: i32) -> Axial {
+    for ring in 0..=bound {
+        for column in -ring..=ring {
+            for row in -ring..=ring {
+                if column.abs().max(row.abs()) != ring {
+                    continue;
+                }
+                let candidate = Axial::new(wanted.q + column, wanted.r + row);
+                if world.admits_a_unit(candidate) && water_within(world, candidate, 3) {
+                    return candidate;
+                }
+            }
+        }
+    }
+    panic!("the fixture found no shore near {wanted:?}");
+}
+
+/// Reports whether water stands within a number of steps of one place.
+fn water_within(world: &World, place: Axial, reach: i32) -> bool {
+    for column in -reach..=reach {
+        for row in -reach..=reach {
+            let here = Axial::new(place.q + column, place.r + row);
+            if world.tile_kind(here) == Some(TileKind::Water) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Sets one tile alight, on ground the reader watches near an address.
+///
+/// The terrain comes from the seed, so the ground beside the address may
+/// carry no fuel. The search is a spiral over the rings around the address,
+/// and it takes the first tile that catches and that the reader watches.
+fn burn_ground_near(world: &mut World, wanted: Axial) {
+    for ring in 0..=4i32 {
+        for column in -ring..=ring {
+            for row in -ring..=ring {
+                if column.abs().max(row.abs()) != ring {
+                    continue;
+                }
+                let candidate = Axial::new(wanted.q + column, wanted.r + row);
+                if !world.faction_sees_now(READER, candidate) {
+                    continue;
+                }
+                let Some(tile) = world.grid().index_of(candidate) else {
+                    continue;
+                };
+                if world.ignite(tile) {
+                    return;
+                }
+            }
+        }
+    }
+    panic!("the fixture found no ground that catches near {wanted:?}");
+}
+
+/// Returns the number of the channel of one name.
+fn channel_of(name: &str) -> u32 {
+    let position = RING_STACK_CHANNEL_NAMES
+        .iter()
+        .position(|held| *held == name)
+        .unwrap_or_else(|| panic!("the channel table holds no channel called {name:?}"));
+    position as u32 + 1
+}
+
+/// Returns the largest value one channel reads over a band of the frame.
+fn largest_in_band(
+    stack: &cachette_core::obs_ring_stack::RingStack,
+    channel: u32,
+    far: bool,
+) -> i64 {
+    (0..RING_STACK_CELLS)
+        .filter(|cell| (ring_of_cell(*cell) >= FIRST_FAR_RING) == far)
+        .map(|cell| stack.channel(cell, channel).abs())
+        .max()
+        .unwrap_or(0)
+}
+
+/// Every channel of the table belongs to one of the three lists above.
+///
+/// This is what keeps the two tests below from going stale. A channel added
+/// to the table and to no list fails here, so nobody can add a channel and
+/// leave it unwatched.
+#[test]
+fn every_channel_of_the_table_states_where_it_must_read_a_value() {
+    let mut listed: Vec<&str> = GROUND_CHANNELS
+        .iter()
+        .chain(STRUCTURE_CHANNELS.iter())
+        .chain(UNSUPPLIED_CHANNELS.iter())
+        .copied()
+        .collect();
+    let mut declared: Vec<&str> = RING_STACK_CHANNEL_NAMES.to_vec();
+    listed.sort_unstable();
+    declared.sort_unstable();
+    assert_eq!(
+        listed, declared,
+        "each channel of the table belongs to exactly one of the three lists"
+    );
+    assert_eq!(
+        listed.len(),
+        RING_STACK_CHANNELS as usize,
+        "the lists hold one entry for each channel"
+    );
+}
+
+/// No channel of the stack reads zero in every cell of a live world.
+///
+/// A channel of the literal zero declares a real bound and publishes a
+/// constant, and the check that finds a reserved field cannot see it. A
+/// reward term reads such a position as truth.[^1]
+///
+/// # References
+///
+/// [^1]: What a policy cannot see, section 2.2. `docs/research/what-a-policy-cannot-see.md`
+#[test]
+fn no_channel_of_the_stack_reads_zero_in_every_cell() {
+    let world = a_world_that_supplies_every_quantity();
+    let stack = stack_of(&world, READER);
+    for name in GROUND_CHANNELS.iter().chain(STRUCTURE_CHANNELS.iter()) {
+        let channel = channel_of(name);
+        let largest = (0..RING_STACK_CELLS)
+            .map(|cell| stack.channel(cell, channel).abs())
+            .max()
+            .unwrap_or(0);
+        assert!(
+            largest > 0,
+            "the channel {name:?} reads zero in all {RING_STACK_CELLS} cells, \
+             and it declares a real bound"
+        );
+    }
+}
+
+/// Every channel that follows the ground reads a value beyond ring 3.
+///
+/// The near pass reads tiles and the far pass reads block summaries. A
+/// channel that only the near pass fills is dark in 120 of the 151 cells,
+/// and the gate channel cannot say so. The gate answers for a whole cell,
+/// and the failure sits one level below it, at one channel of that cell.[^1]
+///
+/// # References
+///
+/// [^1]: What a policy cannot see, section 2.3. `docs/research/what-a-policy-cannot-see.md`
+#[test]
+fn every_ground_channel_reads_a_value_in_the_near_band_and_the_far_band() {
+    let world = a_world_that_supplies_every_quantity();
+    let stack = stack_of(&world, READER);
+    let far_inside = (0..RING_STACK_CELLS)
+        .filter(|cell| ring_of_cell(*cell) >= FIRST_FAR_RING)
+        .filter(|cell| stack.channel(*cell, AREA_CHANNEL) > 0)
+        .count();
+    assert!(
+        far_inside > 0,
+        "the fixture must build a world whose frame reaches ring 4, \
+         or the far band assertion never meets the case"
+    );
+
+    for name in &GROUND_CHANNELS {
+        let channel = channel_of(name);
+        assert!(
+            largest_in_band(&stack, channel, false) > 0,
+            "the channel {name:?} reads zero in every cell of rings 0 to 3"
+        );
+        assert!(
+            largest_in_band(&stack, channel, true) > 0,
+            "the channel {name:?} reads zero in every cell of ring 4 and above, \
+             and {far_inside} of those cells lie inside the world"
+        );
+    }
+}
+
+/// The frame of the training world reaches the far band.
+///
+/// The five channels that the far pass once left dark cost nothing on a world
+/// too small to reach ring 4. A 48 by 48 world is the one the training runs
+/// use, so this states what it measures rather than assuming it.
+#[test]
+fn the_frame_of_a_small_world_reaches_the_far_band() {
+    let (world, _) = a_world_with_a_city(48, 48, 0x0bad_c0de_1111_2222, Axial::new(24, 24));
+    let stack = stack_of(&world, READER);
+    let far_inside = (0..RING_STACK_CELLS)
+        .filter(|cell| ring_of_cell(*cell) >= FIRST_FAR_RING)
+        .filter(|cell| stack.channel(*cell, AREA_CHANNEL) > 0)
+        .count();
+    assert!(
+        far_inside > 0,
+        "a 48 by 48 world reaches no cell of ring 4, so the far band costs nothing"
     );
 }
