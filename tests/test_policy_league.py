@@ -43,10 +43,14 @@ import json
 import sys
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pytest
+
+if TYPE_CHECKING:
+    from cachette.learn.env import Env
+    from cachette.learn.policy import LinearPolicy
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -477,18 +481,86 @@ def test_a_strategy_table_of_two_worlds_is_refused() -> None:
     assert league.one_world({"a": (small, None, "linear")}) == small
 
 
+PREFERENCE_SEED = 91
+"""The seed the fixed preference order of the engine-driven test draws from."""
+
+PREFERENCE_LIFT = 4.0
+"""How far the build rows sit above every other row of that order.
+
+The register measured that all four published policies preferred one build
+row at every decision, so the order this test seats holds the same shape.[^1]
+
+References
+----------
+[^1]: Findings register, FND-707. ``docs/FINDINGS.md``
+"""
+
+BUILD_VERB = "build"
+"""The verb whose rows the fixed preference order puts first.
+
+The test names the verb and the engine names the rows, so no row index is
+declared here.
+"""
+
+
+def a_fixed_preference_order(probe: Env) -> LinearPolicy:
+    """Return a policy that scores the action rows in one order, always.
+
+    Every weight over the observation is zero, and the trailing bias weight
+    carries the order. The score of a row is therefore the same number at
+    every decision, whatever the world holds. **This is the shape the register
+    measured in all four published policies.**[^1]
+
+    The build rows sit above the rest, because that is the family the register
+    found the strongest constant in. This is one order of that family and it
+    is not the maximum over the family, which no test can reach.
+
+    References
+    ----------
+    [^1]: Findings register, FND-707. ``docs/FINDINGS.md``
+    """
+    from cachette.learn.policy import LinearPolicy
+
+    weights = np.zeros((probe.action_length, probe.observation_length + 1))
+    order = np.random.default_rng(PREFERENCE_SEED).standard_normal(probe.action_length)
+    block = probe.action_table.named(BUILD_VERB)
+    assert block is not None, f"the action table names no {BUILD_VERB!r} verb"
+    order[block.first : block.first + block.rows] += PREFERENCE_LIFT
+    weights[:, -1] = order
+    return LinearPolicy(weights)
+
+
 @pytest.mark.slow
-def test_the_controller_rates_above_a_policy_that_does_nothing() -> None:
+def test_the_controller_rates_above_a_fixed_preference_order_and_a_no_op() -> None:
     """The whole tool, driven from the engine, over a known ordering.
 
-    The built-in controller plays two policies that take the no-op at every
-    decision. **The ordering is known before the games run**, so a rating that
-    does not find it is wrong rather than surprising.
+    The built-in controller plays a policy that takes the no-op at every
+    decision, and a policy that holds one fixed preference order over the
+    action rows. **The ordering is known before the games run**, so a rating
+    that does not find it is wrong rather than surprising.
+
+    **A no-op alone is the one opponent that says nothing.** The register
+    measured the strongest constant preference order at 102.29 and the no-op
+    at minus 96.56 under one weighting, so a policy that reads nothing already
+    stands far above a passive seat.[^1] A tool that separated a trained
+    policy from a no-op would separate a preference order from a no-op just as
+    well. Seating both opponents makes the controller gap a gap against a seat
+    that acts.
+
+    **The test states no ordering between the two opponents.** The register
+    measured its figures on a larger world and a longer game. At this extent
+    and this tick limit the no-op won as many games as the preference order,
+    and the commit that seated the preference order holds the counts. The
+    ordering this test asserts is the controller above each opponent.
 
     The world is small and the tick limit is short, because the test pays for
     every tick. The world count is eight, which is what the difference needs
     in order to clear two standard errors. A run over one world ordered
     nobody, and the seat won every game of it.
+
+    References
+    ----------
+    [^1]: Findings register, FND-707. ``docs/FINDINGS.md``
     """
     from cachette.learn.env import Env, EnvConfig, viable_seeds
     from cachette.learn.policy import LinearPolicy
@@ -506,8 +578,8 @@ def test_the_controller_rates_above_a_policy_that_does_nothing() -> None:
     probe = Env(config, scoring)
     idle = LinearPolicy.zeros(probe.action_length, probe.observation_length)
     players = [
-        league.Player(name="idle-one", policy=idle),
-        league.Player(name="idle-two", policy=idle),
+        league.Player(name="idle", policy=idle),
+        league.Player(name="preference", policy=a_fixed_preference_order(probe)),
         league.Player(name=league.CONTROLLER, policy=None),
     ]
     anchor = len(players) - 1
@@ -521,15 +593,14 @@ def test_the_controller_rates_above_a_policy_that_does_nothing() -> None:
 
     ratings, _spread, raw = league.rate(results, players, anchor, draws=300)
     by_name = {row.player: row for row in ratings}
-    assert by_name[league.CONTROLLER].wins > by_name["idle-one"].wins
-    assert by_name[league.CONTROLLER].wins > by_name["idle-two"].wins
-    assert by_name[league.CONTROLLER].elo > by_name["idle-one"].elo
-    assert by_name[league.CONTROLLER].elo > by_name["idle-two"].elo
+    for opponent in ("idle", "preference"):
+        assert by_name[league.CONTROLLER].wins > by_name[opponent].wins
+        assert by_name[league.CONTROLLER].elo > by_name[opponent].elo
 
     ordered = league.ordered_pairs(ratings, league.difference_errors(raw))
-    assert ordered, "the controller must clear the error bar over a no-op"
+    assert ordered, "the controller must clear the error bar over both opponents"
     assert all(high == league.CONTROLLER for high, _low, _gap, _error in ordered)
-    assert {low for _high, low, _gap, _error in ordered} == {"idle-one", "idle-two"}
+    assert {low for _high, low, _gap, _error in ordered} == {"idle", "preference"}
 
     found = league.endings(results, players)
     assert all(row.games == len(seatings) * SEATS // len(players) for row in found)

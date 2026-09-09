@@ -37,7 +37,6 @@ from cachette.learn.search import (
     EvolutionStrategy,
     Optimiser,
     choice_survives_scaling,
-    rank_shape,
     unit,
 )
 from cachette.learn.signals import SignalCatalogue
@@ -45,6 +44,37 @@ from cachette.learn.structured import StructuredPolicy
 
 ACTIONS = 6
 FEATURES = 5
+
+SPREAD_SCORES = np.array([5.0, 1.0, 4.0, 2.0, 3.0, 0.0])
+"""The scores of the generation that the pins below act on.
+
+Six scores are three pairs, and no two of them are equal, so the ranking
+carries a direction.
+"""
+
+SPREAD_RANKS = np.array([5, 1, 4, 2, 3, 0]) / (SPREAD_SCORES.size - 1) - 0.5
+"""The centred ranks of those scores, stated as data.
+
+**Nothing computes this with the function under test.** The integers are the
+ascending position of each score, and the division centres them on zero. A
+rank shaping that returned a constant would satisfy an expectation it computed
+for itself, because every pair difference of a constant is zero and the
+gradient would then be zero as well.[^1]
+
+References
+----------
+[^1]: Findings register, FND-709. ``docs/FINDINGS.md``
+"""
+
+
+def normalised(vector: np.ndarray) -> np.ndarray:
+    """Return the vector at unit length, without the function under test.
+
+    The pins below assert an exact equality against an expression the tests
+    build. An expression built from the search would hold whatever the search
+    now does, so the tests state the arithmetic instead.
+    """
+    return vector / float(np.linalg.norm(vector))
 
 
 def a_search(seed: int = 7, sigma: float = 0.5, rate: float = 0.3) -> Optimiser:
@@ -131,15 +161,19 @@ def test_a_generation_of_equal_scores_moves_no_centre() -> None:
 
 
 def test_a_generation_with_a_spread_moves_the_centre_and_says_why() -> None:
-    """The caller logs the spread, the scores and the ranks it acted on."""
+    """The caller logs the spread, the scores and the ranks it acted on.
+
+    The ranks come from a stated array and not from the shaping function, so a
+    shaping that returned a constant fails here.
+    """
     search = a_search()
     centre = a_centre(search)
-    scores = np.array([5.0, 1.0, 4.0, 2.0, 3.0, 0.0])
+    scores = SPREAD_SCORES
     update = search.update(centre, 0, scores)
     assert update.informative
     assert update.spread == pytest.approx(5.0)
     assert np.array_equal(update.scores, scores)
-    assert np.array_equal(update.ranks, rank_shape(scores))
+    assert np.array_equal(update.ranks, SPREAD_RANKS)
     assert not np.allclose(update.centre, centre)
     assert float(np.linalg.norm(update.centre)) == pytest.approx(1.0)
 
@@ -350,21 +384,34 @@ def test_the_search_still_holds_a_linear_centre_at_unit_length() -> None:
 def test_the_linear_step_is_the_expression_it_always_was() -> None:
     """Pin the linear trajectory to the arithmetic it ran before this change.
 
-    The test recomputes the old expression by hand and asserts an exact
-    equality. **An approximate equality would pass a step that moved in the
-    last bits**, and a run that moved in the last bits no longer compares
-    against a stored score.
+    The test builds the old expression from stated ranks and from its own
+    normalisation, and it asserts an exact equality. **An approximate equality
+    would pass a step that moved in the last bits**, and a run that moved in
+    the last bits no longer compares against a stored score.
+
+    **The expectation reaches neither the shaping nor the normalisation of the
+    search.** This pin once called both of them, so a shaping that returned a
+    constant satisfied it: every pair difference would be zero, the gradient
+    would be zero, and the expected centre would reduce to the centre that
+    went in.[^1]
+
+    The perturbation still comes from the search, because a draw from a
+    generator is not an expression a test can restate. A test beside this one
+    pins that draw on its own.
+
+    References
+    ----------
+    [^1]: Findings register, FND-709. ``docs/FINDINGS.md``
     """
     search = a_strategy(seed=7, sigma=0.5, rate=0.3)
     centre = a_centre(search)
-    scores = np.array([5.0, 1.0, 4.0, 2.0, 3.0, 0.0])
     noise = search.noise(centre, 0)
-    ranks = rank_shape(scores)
     gradient = np.zeros_like(centre)
     for index in range(3):
-        gradient += (ranks[2 * index] - ranks[2 * index + 1]) * noise[index]
-    expected = unit(centre + 0.3 * unit(gradient))
-    assert np.array_equal(search.update(centre, 0, scores).centre, expected)
+        step = SPREAD_RANKS[2 * index] - SPREAD_RANKS[2 * index + 1]
+        gradient += step * noise[index]
+    expected = normalised(centre + 0.3 * normalised(gradient))
+    assert np.array_equal(search.update(centre, 0, SPREAD_SCORES).centre, expected)
 
 
 def test_the_linear_perturbation_is_sigma_and_not_a_scaled_sigma() -> None:

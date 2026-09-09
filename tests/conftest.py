@@ -5,9 +5,15 @@ An installed package is what a user gets, so a test against it is a test
 of the product. A test against the source tree can pass while the wheel is
 broken.
 
+This file also hands a learner test the shapes it draws its input from. The
+lengths come from the engine schema, and the distribution comes from what the
+world was measured to hold. A module beside this one builds them.[^1]
+
 References
 ----------
 Testing policy. ``docs/TESTING.md``
+
+[^1]: The learner shapes. ``tests/learner_shapes.py``
 """
 
 from __future__ import annotations
@@ -15,6 +21,14 @@ from __future__ import annotations
 import pathlib
 
 import pytest
+
+from learner_shapes import (
+    EngineShapes,
+    WorldShapedInputs,
+    engine_shapes_of,
+    engine_world,
+    world_shaped_stack,
+)
 
 
 def pytest_sessionstart(session: pytest.Session) -> None:
@@ -52,3 +66,17 @@ def _import_paths() -> list[str]:
 def seed() -> int:
     """Return the seed that every test uses unless it needs its own."""
     return 0x0123456789ABCDEF
+
+
+@pytest.fixture(scope="session")
+def engine_shapes() -> EngineShapes:
+    """Build one world and return the two lengths it publishes."""
+    return engine_shapes_of(engine_world())
+
+
+@pytest.fixture
+def world_shaped_inputs(engine_shapes: EngineShapes) -> WorldShapedInputs:
+    """Return world-shaped stacks over the lengths the engine publishes."""
+    return world_shaped_stack(
+        engine_shapes.action_length, engine_shapes.observation_length
+    )

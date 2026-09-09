@@ -137,6 +137,10 @@ ignore_missing_imports = true
 # The tests import the installed package. The source directory is never on
 # the path. See docs/TESTING.md.
 testpaths = ["tests"]
+# The test directory is on the path, so a test imports a shared helper module
+# beside it. The import mode does not put that directory on the path by
+# itself, and a helper the tests share is not a source path of the package.
+pythonpath = ["tests"]
 addopts = "--import-mode=importlib --strict-markers -q"
 markers = [
     "slow: a test that a fast gate does not run",
