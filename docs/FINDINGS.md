@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-680**
+**Next number: FND-684**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -17665,8 +17665,118 @@ that means the loss must cost less than half of what the win pays. A symmetric
 pair of outcome weights is the defect, and it is arithmetic rather than
 learning.
 
+### FND-680 — A derived field was rebuilt at the barrier of a frame whose inputs had not moved
+
+**Believed.** A derived structure rebuilds at the frame barrier, so one rebuild
+at the barrier is the right amount of work.[^F295A] An earlier finding cut four
+derivations of the destination field in one frame to one, and it did not ask
+whether the remaining one was needed.[^F680B]
+
+**True.** One derivation in a frame is still one too many when nothing the
+field reads moved in that frame. The field is a pure function of the seed set
+of each plane, the crossing of each plane and the ground. The ground never
+changes, and the built-in controller re-sends the same objective on most
+frames, so most frames already hold the answer.[^F680C]
+
+**Evidence.** The derivation cost about a third of the frame, and a send
+changed a seed set on about a tenth of the frames of the measured run. The send
+verb now marks the field only when the set it stores differs from the set the
+plane held, and the step derives only what a mark names. The frame is about a
+third cheaper and the state hash does not move.[^F680C]
+
+**What follows.** Ask what changed since the last derivation. A count of
+derivations in a frame is a weaker question than the inputs of one, and cutting
+the count to one answers the weaker question. The guard sits beside the field
+and compares every argument, so no counter declares the same fact a second
+time.[^F487B]
+
+### FND-681 — Two approach derivations were believed to be functions of the terrain and the site set, and one of them is not
+
+**Believed.** The home approach field and the stock approach field are the same
+kind of pass. Each walks the tiles of every seeded block, and each derives from
+the terrain and the set of sites. One guard would therefore serve both.
+
+**True.** Only the home field is that function. Its seed walk reads the terrain
+and the settlement columns, so its seed set repeats unless a frame founds a
+site, razes one or takes one. The stock seed walk reads the soldier arena for
+the occupied blocks, and then reads the tile stock, which is the generated
+stock less the depletion ledger.[^F182B] A unit position changes every frame,
+and the depletion changes on every gather and every recovery.
+
+**Evidence.** A new stage divided the stock rebuild into the seed walk and the
+derivation, and it showed the seed walk at about 65 percent of that stage
+before the change. The home derivation fell from over a millisecond for each
+frame to under a microsecond under its guard. The stock rebuild kept its walk,
+and the two stages together fell by about a third after the kind loop moved
+inside the tile loop.[^F681B]
+
+**What follows.** The two fields cannot share one guard, and each needs its
+own. Guarding the stock derivation alone would have left most of the cost in
+place, because the walk that feeds the guard is the larger half. Read the inputs
+of a derivation before you group it with another that looks like it.
+
+### FND-682 — The terrain is immutable for the life of a world, so no upgrade reaches an approach field
+
+**Believed.** The ground that the approach derivations treat as passable
+follows what stands on it. A finished road or a burnt forest changes what a
+unit may cross, so a guard that compares the terrain must be able to fire
+during a run.
+
+**True.** The terrain never changes. It is a `Copy` type that holds a seed and
+a grid, the seeding pass builds it once, and nothing reassigns it.[^F682A] The
+two approach derivations ask the terrain for the ground of a tile and never ask
+the upgrade map, so no finished upgrade and no fire changes what they treat as
+passable. The decision record already states that the ground is a pure function
+of the seed and the address, and that a field a system writes is not
+terrain.[^F682B]
+
+**Evidence.** The engine holds one construction site for the terrain, in the
+seeding pass, and no assignment to the field anywhere.[^F682A] Two separate
+reviews reached this independently, one from the write sites and one from the
+type.
+
+**What follows.** The terrain term of each guard is a comparison that cannot
+fire. Keep it, because a complete argument set holds no exception for a reader
+to remember.
+
+**Record the forward risk plainly.** If movement admission ever reads an
+effective passability that an upgrade modifies, these fields will disagree with
+it and no test will fail. The disagreement is silent, because both answers are
+deterministic and the fields never ask the upgrade map.
+
+### FND-683 — One stage name over two walks reported a per-entry cost of two unrelated operations
+
+**Believed.** The stage list declares one entry for each frame for the holding
+candidate stage, and the frame opens that stage once.
+
+**True.** The holding rewrite opened it twice, around two different walks. One
+walk gathers the live cities from the settlement arena and the upgrade sites.
+The other walks the grid around each city for the tiles the rewrite can change.
+The declared count and the observed count are one fact in two places, and
+nothing compared them until the stage cost check ran.[^F683A]
+
+**Evidence.** The check failed with a declared count of one against two opens.
+Two earlier commits report the same failure on their own head and each states
+that it is not theirs.[^F680C] [^F681B]
+
+**What follows.** The fix split the stage and did not raise the declared count.
+One label over two walks averages two unrelated operations, so a raised count
+would have turned the check green and left the profile meaningless. The city
+walk now names a stage of its own, and the candidate stage keeps its name and
+its meaning.[^F683A]
+
+This is the redundant declaration shape, and the register holds an earlier
+instance in the same apparatus.[^F683B] [^F487B]
+
 ## References
 
+[^F680B]: Findings register, FND-664. `docs/FINDINGS.md`
+[^F680C]: The commit `Derive the destination field only when a seed set changed`. Read its message for the figures, the frame counts and the commands.
+[^F681B]: The commit `Derive an approach field only when its arguments changed`. Read its message for the figures, the tests and the commands.
+[^F682A]: The terrain type of the engine, and the seeding pass that builds it. `crates/cachette-core/src/terrain.rs`
+[^F682B]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1 and the consequences. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`
+[^F683A]: The commit `Give the holding city walk a stage of its own`. Read its message for the file table and the entry counts.
+[^F683B]: Findings register, FND-305. `docs/FINDINGS.md`
 [^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
 [^F670A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D2. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F670B]: The commit `Record what the observation width follows, and how its own ground flickers`. Read its message for the figures.
