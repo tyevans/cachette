@@ -1,4 +1,4 @@
-# ADR-0194: A generation is scored in shards and combined in candidate order
+# ADR-0194: A generation is scored one episode at a time, and combined in candidate order
 
 ## Context
 
@@ -15,15 +15,22 @@ it.** A worker count therefore stops buying throughput well below the core
 count of the target server, and a measurement on the target states the size of
 the effect.[^2]
 
-The project already runs one process for each strategy. That gives parallel
-experiments. It does not make one experiment faster, so a run that trains one
-strategy uses a fraction of the machine.
+More threads inside one world step do not help either. A measurement of the
+engine alone found one thread faster than sixteen at every extent this project
+trains on.[^5] **So there is no engine parallelism to give up inside a
+worker**, and the machine fills with processes rather than with threads.
 
 A worker process does not need the weight vector of a candidate. The trainer
 builds a candidate as the centre plus or minus one perturbation, and it draws
 the perturbation from a generator keyed on the run seed and the generation
-number. A process that holds the centre, the generation number and the range of
-candidates it owns rebuilds those candidates exactly.
+number. A process that holds the centre, the generation number and the
+candidate index it owns rebuilds that candidate exactly.
+
+**The episodes of one generation differ greatly in length.** A game ends when
+one faction wins or when the tick limit stops it, and the audit of a paid run
+found the ends spread over more than a factor of two. A process that owns a
+block of the population therefore waits on its own longest game while its
+cores idle.
 
 **Determinism is the property this project cannot recover.** The engine gives
 one answer at any thread count, and no result may take its order from which
@@ -34,24 +41,23 @@ depend on the load of the machine, and no run could be repeated.
 
 ## Decision
 
-**A generation may be scored in several worker processes. The combination is
-ordered by the candidate index, and the answer does not depend on how the work
-was split.**
+**One task is one episode. A pool of worker processes takes the tasks from one
+queue, and the combination is ordered by the candidate index.**
 
-### D1. A shard count changes the spread of the work and nothing else
+### D1. The worker count changes the spread of the work and nothing else
 
-A run states how many worker processes score one generation. For one centre,
-one generation number, one seed set and one population, the weights the run
-reaches are identical at every shard count, position for position.
+For one centre, one generation number, one seed set and one population, the
+weights the run reaches are identical at every worker count, position for
+position.
 
-A reviewer finds a violation when a run at one shard count and a run at another
-reach different weights from one seed.
+A reviewer finds a violation when a run at one worker count and a run at
+another reach different weights from one seed.
 
-### D2. A worker rebuilds its candidates from the seed, and never receives them
+### D2. A worker rebuilds its candidate from the seed, and never receives it
 
-A worker receives the centre, the generation number and the range of pairs it
-owns. It draws the perturbations of the whole generation from the run seed and
-the generation number, and it takes the rows of its own range. No candidate
+A worker receives the centre, the generation number and the candidate it owns.
+It draws the perturbations of the whole generation from the run seed and the
+generation number, and it takes the row of its own candidate. No candidate
 policy crosses to a worker.
 
 The draw is a function of the run seed and the generation number alone. A
@@ -64,34 +70,46 @@ each layer of a policy by the same fraction of what that layer holds. The
 centre reaches the worker, so the worker derives the same scaling the trainer
 derives and no second input joins the draw.
 
-### D3. The combination sorts on the candidate index
+### D3. The combination sorts on the strategy, the candidate and the seed
 
-Each shard reports the candidate index it started at. The combination sorts on
-that index and joins the score arrays in that order. **Nothing reads the order
-in which the shards answered.**
+Each result reports the strategy it played for, the candidate index it started
+at, and the position of its seed in the set of the generation. The combination
+sorts on those three and builds the score array in that order. **Nothing reads
+the order in which the workers answered.**
+
+An episode is a pure function of the policy and the seed. That is what makes a
+queue admissible: the worker that takes an episode, and the moment it takes it,
+reach no part of the answer.
 
 A reviewer finds a violation when a combined array is built from an iteration
-over futures as they complete, or from any order other than the candidate
-index.
+over futures as they complete, or from any order other than that key.
 
-### D4. A shard that fails ends the generation
+### D4. An episode that fails ends the generation
 
-The combination refuses a set of shards that does not cover every candidate of
-the population exactly once, and it names the candidate that is missing. A
+The combination refuses a set of results that does not cover every candidate of
+the population on every seed exactly once, and it names what is missing. A
 worker that raises carries its failure to the caller, and the run ends.
 
 A partial generation must never be scored. A run that trained on a subset of
 its population would report a generation that it did not play, and no register
 would hold the difference.
 
-### D5. The caller states the process count and the worker count
+### D5. One number names the pool, and it takes the core count by default
 
-The caller states how many processes score a generation, and how many engine
-workers each process gives its batch. **Neither is derived from the core count
-of the machine.** The worker count is a per process count.
+The caller names the worker processes of the queue, and nothing else. A caller
+that names none takes the cores of the machine.
 
-A value derived behind the caller would be a second declaration site for a
-number the caller already states, and the two would disagree silently.[^4]
+**This reverses an earlier decision of this record**, which had the caller name
+a process count and a per process worker count, neither derived from the
+machine. That shape let a run name a split that the trainer could not honour,
+and let a run override the cores of a pass that no queue splits. A number that
+nobody can state wrongly is worth more here than a number that is stated once.
+
+The engine runs one thread for the world of one episode, whatever else a
+configuration says, because one episode holds one world.
+
+An argument that no longer means anything ends the run and names what replaced
+it. A flag that is accepted and ignored is worse than a flag that is gone.
 
 ### D6. A worker process runs one matrix thread
 
@@ -99,44 +117,64 @@ The mechanism that starts the worker processes holds each matrix library to one
 thread. A library that reads no such setting starts one thread for each core,
 in every process, and those threads take the cores the engine needs.
 
+### D7. One queue holds every strategy, and no barrier joins two of them
+
+A run trains several strategies at once, and every one of them submits its
+episodes into the one queue. A generation of one strategy waits for the
+generation before it, and it waits for no episode of another strategy.
+
+A reviewer finds a violation when the run waits for every strategy at a
+generation boundary. That wait would leave the machine idle for as long as the
+slowest strategy of the generation, which is the cost this decision removes.
+
 ## The alternatives this rejects
+
+**Give each worker process a block of the population.** This is what the
+project did. A block ends when its own slowest episode ends, so every block
+waits on its longest game, and the block count cannot pass the number of
+antithetic pairs. A run that asks for more processes than the population holds
+pairs then leaves processes with no work at all.
 
 **Send each candidate's weights to the worker.** This is the obvious shape and
 it is rejected for cost, not for correctness. A population of many candidates
 over a wide policy sends a large array on every generation, and it grows with
 the width of the policy. The seed sends two integers instead.
 
-**Combine the returns as the shards answer.** This is faster to write, and it
+**Combine the returns as the workers answer.** This is faster to write, and it
 makes the weights of a run a function of the load of the machine. The
 determinism record forbids it.[^3]
 
-**Let one process open more engine workers.** This is what the project did.
-The serial section between two decisions belongs to one interpreter, so more
-workers inside one process do not fill the machine.
+**Let one process open more engine workers.** The serial section between two
+decisions belongs to one interpreter, so more workers inside one process do not
+fill the machine.
 
-**Derive the process count from the core count.** This removes one argument
-from the caller and adds a second declaration of a number the caller already
-gives. It is the defect shape this project names first.[^4]
+**Keep a knob for the pool size and a knob for the threads of a worker.** Each
+one names a choice that the measurements have already made. A knob that cannot
+be right invites the misconfiguration this record exists to remove.[^4]
 
 ## Consequences
 
-A single strategy can use a whole machine, so an experiment that trains one
-policy is no longer held to the throughput of one interpreter.
+The parallelism of a generation is bounded by its episode count rather than by
+its pair count, which is half the population.
 
-A shard boundary must fall between two groups of candidates that share a world.
-A league run seats several candidates in one world, so a boundary inside such a
-group would build a world with a seat that no process filled.
+A league run seats several candidates in one world. Such a group is the one
+task that holds more than one episode, because a task that held part of a group
+would build a world with a seat that no worker filled.
 
-The project now cannot combine a generation by any key except the candidate
-index, and it cannot accept a generation whose shards do not cover the
-population.
+The project now cannot combine a generation by any key except the strategy, the
+candidate and the seed, and it cannot accept a generation that does not cover
+the population.
+
+One process now trains every strategy of a run. The run writes the log of each
+strategy under its own name, because a reader opens one strategy by name.
 
 A run pays the cost of starting a worker process, and each worker builds its
-own probe world. The pool holds the processes for the whole run, so a
-generation pays that cost once.
+own probe world. The pool holds the processes for the whole run, so a run pays
+that cost once.
 
-The validation pass and the yardstick pass still run in one process. Each plays
-one policy on a few seeds, so the whole machine is not the constraint there.
+The validation pass and the yardstick pass still step one batch of worlds in
+the process of their own strategy. Each plays one policy on a set of seeds, and
+the queue does not split them.
 
 ## References
 
@@ -147,3 +185,4 @@ D1. `docs/adrs/accepted/adr-0155-a-batch-of-worlds-steps-in-one-call-in-index-or
 [^3]: ADR-0001, one binary gives one answer at any thread count, decision D2.
 `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^4]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+[^5]: Findings register, FND-714. `docs/FINDINGS.md`
