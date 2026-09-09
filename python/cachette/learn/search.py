@@ -56,7 +56,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
-from .policy import LinearPolicy
+from .policy import FeatureNormalizer, LinearPolicy
 from .structured import STRUCTURED_KIND, StructuredPolicy
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
@@ -264,13 +264,20 @@ def carries_information(spread: float) -> bool:
     return spread > 0.0
 
 
-def shell_policy(kind: str, probe: Env) -> Trainable:
+def shell_policy(
+    kind: str, probe: Env, normalizer: FeatureNormalizer | None = None
+) -> Trainable:
     """Build the untrained policy of one kind, sized from the world.
 
     **The trainer and a worker process both build this, and they must build
     the same thing.** A worker rebuilds its candidates from the centre, so it
     needs the shell the centre was taken from. Every fixed part of a shell
     comes from one fixed seed, so two processes build one shell.
+
+    **The normalizer is an argument and never a derivation here.** It comes
+    from a reference sample of played episodes, and a worker process must
+    read the one the trainer derived rather than one of its own. A shell that
+    holds none reads the plain squash.
 
     The lengths come from the engine schemas through the probe environment.
     This module states none of its own.
@@ -285,8 +292,10 @@ def shell_policy(kind: str, probe: Env) -> Trainable:
     width went with it.
     """
     if kind == STRUCTURED_KIND:
-        return StructuredPolicy.of_catalogue(probe.action_length, probe.signals)
-    return LinearPolicy.zeros(probe.action_length, probe.observation_length)
+        return StructuredPolicy.of_catalogue(
+            probe.action_length, probe.signals, normalizer=normalizer
+        )
+    return LinearPolicy.zeros(probe.action_length, probe.observation_length, normalizer)
 
 
 @dataclass(frozen=True)

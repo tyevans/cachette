@@ -61,7 +61,8 @@ import numpy as np
 
 from .config import TrainConfig
 from .env import Env, EnvConfig, viable_seeds
-from .policy import LinearPolicy, Policy, PolicyFit, load_policy
+from .normalize import reference_normalizer
+from .policy import FeatureNormalizer, LinearPolicy, Policy, PolicyFit, load_policy
 from .presets import ObjectiveSchedule
 from .record import EpisodeRecord, GenerationRecord, PopulationRecord
 from .reward import Scoring, Weighting
@@ -129,6 +130,10 @@ class Checkpoint:
 
     The best path is what a reader loads to play or to measure. The latest
     path is the resume point, and the run writes it after every generation.
+
+    The normalizer entry is the feature transform of the run. It goes into
+    the fit of every file this writes, and a resumed run refuses a checkpoint
+    that was written under another one.
     """
 
     name: str
@@ -136,6 +141,7 @@ class Checkpoint:
     env_config: EnvConfig
     probe: Env
     kind: str
+    normalizer: FeatureNormalizer | None = None
 
     @property
     def best_path(self) -> Path:
@@ -198,7 +204,7 @@ class Checkpoint:
                 # and the engine owns every number in it.** A reader refuses
                 # a file whose fit is not the fit of the world it is asked
                 # to play, so a policy never plays a world it never saw.
-                **PolicyFit.of_env(self.probe).as_meta(),
+                **PolicyFit.of_env(self.probe, self.normalizer).as_meta(),
                 "seat": self.env_config.seat,
                 "tick_limit": self.env_config.tick_limit,
                 "horizon": self.env_config.horizon,
@@ -219,6 +225,18 @@ class Checkpoint:
         another extent can hold the same layout length while meaning
         something else by every position of it.
 
+        It refuses a checkpoint written under another feature normalizer for
+        the same reason. Every weight of the centre scores a standardized
+        feature, so a centre read under another standardization means
+        something else at every position.
+
+        **A checkpoint written before the normalizer existed states none, and
+        this does not refuse it.** A file that states none loads so that a
+        policy published before the normalizer still plays, and a resume takes
+        the same door. Such a centre is then read under the transform of this
+        run rather than under the one it was trained through. Start a fresh
+        run rather than resuming one of those.
+
         **A resumed run reports when it rebuilt the readout rather than
         loading it.** A change to one verb of the action table moves the rows
         of every verb above it, and the reader carries each row onto the row
@@ -238,7 +256,9 @@ class Checkpoint:
         ``docs/adrs/draft/adr-0200-a-stored-policy-names-each-action-row-by-verb-and-coordinates.md``
         """
         stored, meta = load_policy(
-            self.latest_path, PolicyFit.of_env(self.probe), layout_of(shell)
+            self.latest_path,
+            PolicyFit.of_env(self.probe, self.normalizer),
+            layout_of(shell),
         )
         policy = shell.rebuild(np.asarray(stored.flat()))
         first_generation = 0
@@ -381,17 +401,29 @@ def train(
     keeps the centre that scored highest on the validation seeds, and two
     scores taken under two objectives cannot be compared. The pass therefore
     takes the first scoring of the schedule and holds it.
+
+    **The run derives one feature normalizer and holds it.** It plays a fixed
+    reference sample of episodes before the first generation, and every
+    candidate of every generation reads the result. A file this run writes
+    carries the two arrays, so a reader plays the policy through the transform
+    the weights were trained under.
     """
     fixed = first_scoring(scoring)
     probe = Env(env_config, fixed)
+    # **The run derives the normalizer once, before the first generation.**
+    # Every candidate of every generation reads this one, in this process and
+    # in a worker process, because two candidates that read two feature
+    # transforms are not comparable and the rank over them says nothing.
+    normalizer = reference_normalizer(env_config, fixed)
     checkpoint = Checkpoint(
         name=name,
         out_dir=out_dir,
         env_config=env_config,
         probe=probe,
         kind=kind,
+        normalizer=normalizer,
     )
-    shell = shell_policy(kind, probe)
+    shell = shell_policy(kind, probe, normalizer)
     optimiser: Optimiser = EvolutionStrategy(
         shell=shell,
         pairs=train_config.pairs,
@@ -470,6 +502,7 @@ def train(
                 pool,
                 kind,
                 label,
+                normalizer,
             )
             update = optimiser.update(centre, generation, played.ranked)
             policy = optimiser.rebuild(update.centre)
@@ -565,12 +598,13 @@ def play_generation(
     pool: ShardPool | None,
     kind: str,
     label: str,
+    normalizer: FeatureNormalizer | None = None,
 ) -> Generation:
     """Score one generation, in this process or across the worker pool.
 
     **A worker process builds its own candidates from the centre and the
-    generation number.** Only the centre crosses to it, so this process builds
-    the population only when it plays the population itself.
+    generation number.** The centre and the normalizer cross to it, so this
+    process builds the population only when it plays the population itself.
 
     A sharded generation scores one batch under one objective. A run that
     varies the objective by seed position therefore fails here rather than
@@ -595,6 +629,7 @@ def play_generation(
         pool,
         kind,
         label,
+        normalizer,
     )
 
 

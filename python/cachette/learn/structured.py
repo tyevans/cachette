@@ -95,7 +95,7 @@ import numpy as np
 
 from .layout import ObservationLayout, RingBlock, TokenBlock
 from .picture import RingStack
-from .policy import PolicyFitError, encode, encode_many
+from .policy import FeatureNormalizer, PolicyFitError, encode, encode_many
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Mapping, Sequence
@@ -499,6 +499,11 @@ class StructuredPolicy:
     The policy holds the layout it reads. A stored weight file holds the same
     layout, and the reader refuses a file whose layout differs, because the
     length alone does not separate two layouts.
+
+    The policy also holds the feature normalizer its towers read through. A
+    tower reads a standardized feature, so the normalizer is part of what the
+    weights mean, and it travels into the weight file beside them. A policy
+    that holds none reads the plain squash.
     """
 
     # **A positive scaling of the weights moves the choice.** Every tower ends
@@ -522,8 +527,9 @@ class StructuredPolicy:
         tokens: Sequence[TokenTower],
         trunk: np.ndarray,
         readout: np.ndarray,
+        normalizer: FeatureNormalizer | None = None,
     ) -> None:
-        """Take the layout, the widths, the three towers and the two matrices."""
+        """Take the layout, the widths, the towers, the matrices and the normalizer."""
         self.layout = layout
         self.shape = shape
         self.scalars = scalars
@@ -531,6 +537,7 @@ class StructuredPolicy:
         self.tokens = tuple(tokens)
         self.trunk = np.asarray(trunk, dtype=np.float64)
         self.readout = np.asarray(readout, dtype=np.float64)
+        self.normalizer = normalizer
 
     @classmethod
     def zeros(
@@ -539,6 +546,7 @@ class StructuredPolicy:
         layout: ObservationLayout,
         shape: StructuredShape | None = None,
         seed: int = SHELL_SEED,
+        normalizer: FeatureNormalizer | None = None,
     ) -> StructuredPolicy:
         """Build the policy a fresh run starts from.
 
@@ -561,7 +569,7 @@ class StructuredPolicy:
             width + 1
         )
         readout = np.zeros((action_length, chosen.trunk_width + 1))
-        return cls(layout, chosen, scalars, ring, towers, trunk, readout)
+        return cls(layout, chosen, scalars, ring, towers, trunk, readout, normalizer)
 
     @classmethod
     def of_catalogue(
@@ -569,6 +577,7 @@ class StructuredPolicy:
         action_length: int,
         catalogue: SignalCatalogue,
         shape: StructuredShape | None = None,
+        normalizer: FeatureNormalizer | None = None,
     ) -> StructuredPolicy:
         """Build the policy a fresh run starts from, reading the schema.
 
@@ -576,7 +585,7 @@ class StructuredPolicy:
         token set, and the message names the entries to add.
         """
         layout = ObservationLayout.of_catalogue(catalogue)
-        return cls.zeros(action_length, layout, shape)
+        return cls.zeros(action_length, layout, shape, normalizer=normalizer)
 
     @property
     def action_length(self) -> int:
@@ -641,7 +650,12 @@ class StructuredPolicy:
         return np.concatenate([array.reshape(-1) for array in arrays])
 
     def rebuild(self, flat: npt.NDArray[np.float64]) -> StructuredPolicy:
-        """Return a policy of this layout and these widths with the given weights."""
+        """Return a policy of this layout and these widths with the given weights.
+
+        **The normalizer travels with the rebuilt policy.** The search
+        rebuilds every candidate of every generation through the shell, so a
+        normalizer that stopped here would reach no candidate the run scored.
+        """
         parts = _split(np.asarray(flat, dtype=np.float64), self._shapes())
         walked = 0
         scalars = self.scalars.with_arrays(
@@ -663,6 +677,7 @@ class StructuredPolicy:
             towers,
             parts[walked],
             parts[walked + 1],
+            self.normalizer,
         )
 
     def with_readout(self, readout: np.ndarray) -> StructuredPolicy:
@@ -686,6 +701,7 @@ class StructuredPolicy:
             self.tokens,
             self.trunk,
             readout,
+            self.normalizer,
         )
 
     def features(self, encoded: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
@@ -703,13 +719,13 @@ class StructuredPolicy:
 
     def choose(self, observation: np.ndarray, mask: np.ndarray) -> int:
         """Return the action integer of the highest-scoring legal row."""
-        scores = self.scores(encode(observation)[None, :])[0]
+        scores = self.scores(encode(observation, self.normalizer)[None, :])[0]
         scores = np.where(mask > 0, scores, -np.inf)
         return int(np.argmax(scores))
 
     def choose_many(self, observations: np.ndarray, masks: np.ndarray) -> list[int]:
         """Return one action for each row of a stack of observations."""
-        scores = self.scores(encode_many(observations))
+        scores = self.scores(encode_many(observations, self.normalizer))
         scores = np.where(masks > 0, scores, -np.inf)
         return [int(value) for value in np.argmax(scores, axis=1)]
 
@@ -723,6 +739,10 @@ class StructuredPolicy:
         **Every key of this policy carries a prefix.** The fit of the world
         names a length and a version of its own, and a key that collided with
         one of those would put two declarations of one number in one file.
+
+        **The normalizer goes in beside the weights.** Every tower reads a
+        standardized feature, so a file without its normalizer states nothing
+        a reader can play.
         """
         path.parent.mkdir(parents=True, exist_ok=True)
         stored: dict[str, np.ndarray] = {
@@ -749,6 +769,8 @@ class StructuredPolicy:
             ),
             "kind": np.asarray(STRUCTURED_KIND),
         }
+        if self.normalizer is not None:
+            stored.update(self.normalizer.as_arrays())
         for index, block in enumerate(self.layout.tokens):
             stored[f"layout_token_positions_{index}"] = block.gather()
         # numpy declares ``allow_pickle`` beside its own keyword arguments, so
@@ -768,6 +790,10 @@ class StructuredPolicy:
         observation length and the action row count a second time. This
         compares the two rather than choosing a winner, so a file whose
         copies disagree fails here.
+
+        A file that states no normalizer rebuilds a policy that reads the
+        plain squash, so a policy published before the normalizer existed
+        still runs.
         """
         names = [str(name) for name in stored["layout_token_names"]]
         blocks = []
@@ -793,7 +819,9 @@ class StructuredPolicy:
         actions = architecture[-1]
         _agree(stored, "observation_length", length)
         _agree(stored, "action_length", actions)
-        shell = cls.zeros(actions, layout, shape)
+        shell = cls.zeros(
+            actions, layout, shape, normalizer=FeatureNormalizer.read(stored)
+        )
         return shell.rebuild(np.asarray(stored["flat"], dtype=np.float64))
 
     def check_layout(self, wanted: ObservationLayout, path: Path | None = None) -> None:

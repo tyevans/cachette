@@ -13,6 +13,28 @@ over the raw array would be driven by one field. The encoder therefore takes
 the signed logarithm of each position, which keeps the sign and the order and
 throws away the scale.
 
+# The squash alone leaves a constant subspace, and a search finds it first
+
+A squashed position is not centred. Most positions of the observation never
+change over a run, so a weight over one of them can only add a fixed offset
+to the score of an action row. A measurement over a reference sample found
+that the constant part of the feature body carried several times the length
+of the part that varies within an episode, and that every policy trained
+under the plain squash chose almost one single action row. The commit that
+added the normalizer holds the counts, because a count belongs to one moment
+of the tree.
+
+An evolution strategy finds that constant part first. A per-row offset pays
+the same amount at every decision of every episode, while a state-dependent
+weight has to correlate with a small wobble through the reward noise of a
+whole episode. The legality mask then supplies what looks like situational
+play.
+
+**A stored normalizer removes the constant part.** The encoder subtracts a
+per-position centre and divides by a per-position scale, and both come from
+one fixed reference sample of the world. A position that never changes reads
+exactly zero after the subtraction, so its weight reaches no score at all.
+
 # The mask decides before the weights do
 
 The policy scores every row of the action table, then it removes the rows the
@@ -30,6 +52,7 @@ schema-declared bounded tables, decision D5.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
@@ -51,22 +74,253 @@ if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
 FEATURE_SCALE = 20.0
 
 
-def encode(observation: np.ndarray) -> np.ndarray:
+# The smallest divisor a normalizer uses, declared once. Section 3 of the
+# ``FeatureNormalizer`` docstring holds why it is this number.
+FEATURE_SCALE_FLOOR = 0.10
+
+# The keys a weight file stores the normalizer under. Both carry the
+# ``normalizer_`` prefix, so neither collides with a key of the fit, of the
+# action table or of the structured layout.
+NORMALIZER_KEYS = ("normalizer_centre", "normalizer_scale")
+
+# How many hexadecimal characters a normalizer digest holds. The digest names
+# one derivation in a refusal message, and nothing reads it back as data.
+DIGEST_WIDTH = 12
+
+
+def squash(values: np.ndarray) -> np.ndarray:
+    """Take the signed logarithm of every entry, scaled into roughly one unit.
+
+    This is the transform the whole package reads the observation through, and
+    **it is declared here once**. The encoder of one row, the encoder of a
+    stack and the derivation of a normalizer all call it, so no caller applies
+    a second copy of it.
+    """
+    held = np.asarray(values, dtype=np.float64)
+    return np.sign(held) * np.log1p(np.abs(held)) / FEATURE_SCALE
+
+
+@dataclass(frozen=True, eq=False)
+class FeatureNormalizer:
+    """The per-position centre and scale that standardize the squashed features.
+
+    # 1. What it does
+
+    The encoder squashes the observation, then this subtracts the centre and
+    divides by the scale. **The trailing bias entry of one is never centred
+    and never scaled**, because it is the one feature that is a constant on
+    purpose.
+
+    # 2. The centre applies to every position
+
+    Nothing is dropped. A measurement over the reference sample found no
+    plateau in the count of positions that ever move: the count climbed with
+    every seed added, so a position that stayed still over the sample may move
+    on the next world. Dropping a position is therefore unsafe.
+
+    Centring one is safe, and it is the part that removes the constant
+    subspace. **A position that never changes reads exactly zero after the
+    subtraction**, so its weight becomes inert rather than a per-row bias.
+
+    # 3. The scale takes a floor
+
+    The scale of a position is its standard deviation over the reference
+    sample, or the floor when the deviation is under it.
+
+    The floor exists because a per-position scale divides the residual mean
+    shift as well as the spread. A small floor therefore amplifies the offset
+    that the centring just removed, and the amplified offset returns as the
+    per-row bias this transform exists to remove.
+
+    The floor caps that amplification at ten times, and it holds most of the
+    positions that move at unit variance. **The measured optimum is flat over
+    a wide band around it**, so the value is not delicate. The commit that
+    added this type holds the measurement and the band.
+
+    # 4. A stored policy is meaningless without its normalizer
+
+    A weight file writes both arrays beside the weights. A reader refuses a
+    file whose normalizer is not the normalizer of the world it is asked to
+    play, and it names the digest of each side.
+
+    **A file that stores no normalizer gives a policy that holds none, and a
+    policy that holds none reads the plain squash.** That is what the identity
+    of this type computes, so a policy published before this type existed
+    still runs.
+    """
+
+    centre: np.ndarray
+    scale: np.ndarray
+
+    def __post_init__(self) -> None:
+        """Hold both arrays as one flat ``float64`` each, and refuse a bad one."""
+        object.__setattr__(self, "centre", np.asarray(self.centre, dtype=np.float64))
+        object.__setattr__(self, "scale", np.asarray(self.scale, dtype=np.float64))
+        if self.centre.ndim != 1 or self.scale.ndim != 1:
+            message = (
+                "a normalizer holds one centre and one scale for each position, "
+                f"so each array has one axis, and these hold {self.centre.ndim} "
+                f"and {self.scale.ndim}"
+            )
+            raise PolicyFitError(message)
+        if self.centre.shape != self.scale.shape:
+            message = (
+                f"a normalizer holds {self.centre.size} centres and "
+                f"{self.scale.size} scales. The two are one for each position, "
+                "so they hold the same count."
+            )
+            raise PolicyFitError(message)
+        if self.scale.size and float(self.scale.min()) <= 0.0:
+            message = (
+                "a normalizer divides by its scale, so every scale is above "
+                f"zero, and the smallest here is {float(self.scale.min())}"
+            )
+            raise PolicyFitError(message)
+
+    @classmethod
+    def identity(cls, length: int) -> FeatureNormalizer:
+        """Return the normalizer that changes nothing.
+
+        The centre is zero and the scale is one, so the standardized features
+        are the squashed features. A policy that holds no normalizer computes
+        the same thing, and a caller that wants to state the transform rather
+        than leave it absent asks for this.
+        """
+        return cls(np.zeros(int(length)), np.ones(int(length)))
+
+    @classmethod
+    def of_observations(cls, observations: np.ndarray) -> FeatureNormalizer:
+        """Derive the normalizer from a stack of raw observation rows.
+
+        The rows are the reference sample. This squashes them, takes the mean
+        of each position as the centre, and takes the standard deviation of
+        each position under the floor as the scale.
+        """
+        rows = np.asarray(observations)
+        if rows.ndim != 2 or rows.shape[0] < 1:
+            message = (
+                "a normalizer comes from a stack of observation rows, so the "
+                f"sample has two axes and at least one row, and this holds "
+                f"shape {rows.shape}"
+            )
+            raise PolicyFitError(message)
+        squashed = squash(rows)
+        return cls(
+            squashed.mean(axis=0), np.maximum(squashed.std(axis=0), FEATURE_SCALE_FLOOR)
+        )
+
+    @property
+    def length(self) -> int:
+        """How many observation positions this standardizes."""
+        return int(self.centre.size)
+
+    @property
+    def is_identity(self) -> bool:
+        """Say whether this changes nothing at all."""
+        return bool(
+            np.array_equal(self.centre, np.zeros(self.length))
+            and np.array_equal(self.scale, np.ones(self.length))
+        )
+
+    def apply(self, squashed: np.ndarray) -> np.ndarray:
+        """Standardize the squashed body of one row or of a stack of rows.
+
+        The argument holds no bias entry. The caller appends that after this,
+        because the bias is never centred and never scaled.
+        """
+        held = np.asarray(squashed, dtype=np.float64)
+        if held.shape[-1] != self.length:
+            message = (
+                f"this normalizer standardizes {self.length} positions and was "
+                f"given {held.shape[-1]}. A normalizer is a function of one "
+                "world, so train a policy against this world."
+            )
+            raise PolicyFitError(message)
+        return np.asarray((held - self.centre) / self.scale, dtype=np.float64)
+
+    def digest(self) -> str:
+        """Return a short digest of both arrays, for a refusal message.
+
+        The digest comes from the arrays every time a caller asks for it.
+        **Nothing stores it**, because a stored digest beside the arrays it
+        describes is a second declaration of one thing, and nothing would fail
+        when the two disagreed.[^1]
+
+        References
+        ----------
+        [^1]: Recurring defect shapes, shape 1.
+        ``.agents/rules/recurring-defects.md``
+        """
+        held = hashlib.sha256()
+        held.update(np.ascontiguousarray(self.centre).tobytes())
+        held.update(np.ascontiguousarray(self.scale).tobytes())
+        return held.hexdigest()[:DIGEST_WIDTH]
+
+    def describe(self) -> str:
+        """Return one line that names the length and the digest."""
+        kind = "identity" if self.is_identity else self.digest()
+        return f"{self.length} positions, {kind}"
+
+    def as_arrays(self) -> dict[str, np.ndarray]:
+        """Return the entries a weight file stores this under."""
+        return {"normalizer_centre": self.centre, "normalizer_scale": self.scale}
+
+    @classmethod
+    def read(cls, stored: Mapping[str, np.ndarray]) -> FeatureNormalizer | None:
+        """Return the normalizer a weight file holds, or nothing when it holds none.
+
+        Raises ``PolicyFitError`` when a file names one of the two arrays and
+        not the other. A normalizer is written in one piece, so such a file is
+        not consistent with itself.
+        """
+        present = [key for key in NORMALIZER_KEYS if key in stored]
+        if not present:
+            return None
+        if len(present) != len(NORMALIZER_KEYS):
+            missing = [key for key in NORMALIZER_KEYS if key not in stored]
+            message = (
+                "the stored policy states part of a feature normalizer. It "
+                f"names {', '.join(present)} and it does not name "
+                f"{', '.join(missing)}. A normalizer is written in one piece, "
+                "so this file is not consistent with itself."
+            )
+            raise PolicyFitError(message)
+        return cls(
+            np.asarray(stored["normalizer_centre"], dtype=np.float64).reshape(-1),
+            np.asarray(stored["normalizer_scale"], dtype=np.float64).reshape(-1),
+        )
+
+
+def encode(
+    observation: np.ndarray, normalizer: FeatureNormalizer | None = None
+) -> np.ndarray:
     """Turn one observation array into the feature vector of the policy.
 
     The result holds one entry for each position of the observation, and one
     trailing entry of one for the bias.
+
+    A normalizer standardizes the body and leaves the bias entry alone. A
+    caller that passes none gets the plain squash, which is what the identity
+    normalizer computes.
     """
-    values = observation.astype(np.float64)
-    squashed = np.sign(values) * np.log1p(np.abs(values)) / FEATURE_SCALE
+    squashed = squash(observation)
+    if normalizer is not None:
+        squashed = normalizer.apply(squashed)
     return np.concatenate([squashed, np.ones(1)])
 
 
-def encode_many(observations: np.ndarray) -> np.ndarray:
-    """Encode a stack of observations, one for each row."""
-    values = observations.astype(np.float64)
-    squashed = np.sign(values) * np.log1p(np.abs(values)) / FEATURE_SCALE
-    ones = np.ones((values.shape[0], 1))
+def encode_many(
+    observations: np.ndarray, normalizer: FeatureNormalizer | None = None
+) -> np.ndarray:
+    """Encode a stack of observations, one for each row.
+
+    A normalizer standardizes the body of every row and leaves the bias entry
+    of every row alone.
+    """
+    squashed = squash(observations)
+    if normalizer is not None:
+        squashed = normalizer.apply(squashed)
+    ones = np.ones((squashed.shape[0], 1))
     return np.concatenate([squashed, ones], axis=1)
 
 
@@ -619,6 +873,13 @@ class PolicyFit:
     world are always the same table and a fit that a test writes by hand
     states none. The check reads the table separately.
 
+    **The feature normalizer is the same shape of entry as the table.** It is
+    a function of the world and of the observation version, and no integer of
+    the fit separates two of them, so the fit carries it and the check
+    compares the digests. A side that states none falls back to what the
+    integers say, which is what a file written before the normalizer existed
+    can be read by.
+
     References
     ----------
     [^1]: ADR-0154, the observation and the action of a faction are
@@ -641,6 +902,7 @@ class PolicyFit:
     height: int
     faction_count: int
     action_table: ActionTable | None = field(default=None, compare=False)
+    normalizer: FeatureNormalizer | None = field(default=None, compare=False)
 
     # The keys a weight file stores the fit under. The names are the ones
     # the trainer already wrote, so a file written before this type existed
@@ -661,8 +923,16 @@ class PolicyFit:
     ACTION_KEYS = ("action_version", "action_length")
 
     @classmethod
-    def of_env(cls, env: EnvLike) -> PolicyFit:
-        """Return the fit of the world one environment builds."""
+    def of_env(
+        cls, env: EnvLike, normalizer: FeatureNormalizer | None = None
+    ) -> PolicyFit:
+        """Return the fit of the world one environment builds.
+
+        **The normalizer is an argument and never a derivation here.** It
+        comes from a reference sample of played episodes, and a fit is built
+        many times in one run. A caller derives it once and passes the same
+        one every time.
+        """
         config = env.config
         return cls(
             observation_version=int(env.observation_version),
@@ -673,10 +943,13 @@ class PolicyFit:
             height=int(config.height),
             faction_count=int(config.faction_count),
             action_table=env.action_table,
+            normalizer=normalizer,
         )
 
     @classmethod
-    def of_world(cls, world: WorldLike) -> PolicyFit:
+    def of_world(
+        cls, world: WorldLike, normalizer: FeatureNormalizer | None = None
+    ) -> PolicyFit:
         """Return the fit of one world, read from the schemas it publishes.
 
         A caller that holds a world and no environment reads the fit here.
@@ -698,10 +971,15 @@ class PolicyFit:
             height=int(world.height),
             faction_count=int(world.faction_count),
             action_table=ActionTable.of_schema(action),
+            normalizer=normalizer,
         )
 
     @classmethod
-    def read(cls, meta: Mapping[str, object]) -> PolicyFit | None:
+    def read(
+        cls,
+        meta: Mapping[str, object],
+        normalizer: FeatureNormalizer | None = None,
+    ) -> PolicyFit | None:
         """Return the fit a weight file states, or nothing when it states none.
 
         A file written before this package stored a fit names some of the
@@ -710,6 +988,10 @@ class PolicyFit:
 
         A file that also states an action table reads it back here, and a
         file that states none reads back a fit whose table is nothing.
+
+        **The normalizer is an argument and not an entry of the reported
+        keys.** It is two arrays and the reported keys are what a caller
+        prints, so the reader of the file passes it in.
 
         Raises ``PolicyFitError`` when the row count of the stated table is
         not the row count the fit states. **The file declares that number
@@ -735,7 +1017,7 @@ class PolicyFit:
                 "file is not consistent with itself."
             )
             raise PolicyFitError(message)
-        return cls(**values, action_table=table)
+        return cls(**values, action_table=table, normalizer=normalizer)
 
     def as_meta(self) -> dict[str, object]:
         """Return the fit as the entries a weight file stores.
@@ -776,6 +1058,11 @@ class PolicyFit:
         moved. The rebuild says which rows changed meaning, and it raises for
         those.[^1]
 
+        **A normalizer that differs is a refusal.** Every weight of the file
+        scores a standardized feature, so a file played under another
+        standardization scores a different quantity at every position. The
+        message names the digest of each side.
+
         Raises ``PolicyFitError`` naming both sides, so a reader sees which
         entry differs without opening the file.
 
@@ -793,6 +1080,7 @@ class PolicyFit:
             for key in keys
             if getattr(self, key) != getattr(wanted, key)
         ]
+        differ.extend(self._normalizer_difference(wanted))
         if not differ:
             return
         where = f" at {path}" if path is not None else ""
@@ -805,6 +1093,31 @@ class PolicyFit:
             "world it was trained against."
         )
         raise PolicyFitError(message)
+
+    def _normalizer_difference(self, wanted: PolicyFit) -> list[str]:
+        """Say how the two normalizers differ, or say nothing when they agree.
+
+        **The comparison happens only when both sides state a normalizer.** A
+        file written before the normalizer existed states none, and the reader
+        accepts such a file and plays it through the plain squash. A world
+        that states none asks for whatever the file holds, which is what a
+        reader that only reports a file needs.
+
+        The digest names each side. Two arrays of a few thousand entries do
+        not belong in a message, and a digest separates two derivations.
+        """
+        held = self.normalizer
+        asked = wanted.normalizer
+        if held is None or asked is None:
+            return []
+        if np.array_equal(held.centre, asked.centre) and np.array_equal(
+            held.scale, asked.scale
+        ):
+            return []
+        return [
+            f"normalizer: the file says {held.describe()} "
+            f"and the world says {asked.describe()}"
+        ]
 
 
 class EnvLike(Protocol):
@@ -905,19 +1218,34 @@ class LinearPolicy:
     # The search reads this and holds the centre of this kind at unit length.
     CHOICE_SURVIVES_SCALING = True
 
-    def __init__(self, weights: np.ndarray) -> None:
-        """Take the weight matrix. Its shape is (actions, features)."""
+    def __init__(
+        self, weights: np.ndarray, normalizer: FeatureNormalizer | None = None
+    ) -> None:
+        """Take the weight matrix and the normalizer it reads features through.
+
+        The shape of the matrix is (actions, features).
+
+        A policy that holds no normalizer reads the plain squash. That is what
+        a file written before the normalizer existed loads as, and it is what
+        a caller who scores a hand-written matrix asks for.
+        """
         self.weights = np.asarray(weights, dtype=np.float64)
+        self.normalizer = normalizer
 
     @classmethod
-    def zeros(cls, action_length: int, observation_length: int) -> LinearPolicy:
+    def zeros(
+        cls,
+        action_length: int,
+        observation_length: int,
+        normalizer: FeatureNormalizer | None = None,
+    ) -> LinearPolicy:
         """Build the untrained policy. Every score is zero.
 
         A zero policy takes the first legal row of the table at every
         decision, which is the no-op. It is the baseline every trained model
         is measured against.
         """
-        return cls(np.zeros((action_length, observation_length + 1)))
+        return cls(np.zeros((action_length, observation_length + 1)), normalizer)
 
     @property
     def shape(self) -> tuple[int, int]:
@@ -927,13 +1255,13 @@ class LinearPolicy:
 
     def choose(self, observation: np.ndarray, mask: np.ndarray) -> int:
         """Return the action integer of the highest-scoring legal row."""
-        scores = self.weights @ encode(observation)
+        scores = self.weights @ encode(observation, self.normalizer)
         scores = np.where(mask > 0, scores, -np.inf)
         return int(np.argmax(scores))
 
     def choose_many(self, observations: np.ndarray, masks: np.ndarray) -> list[int]:
         """Return one action for each row of a stack of observations."""
-        scores = encode_many(observations) @ self.weights.T
+        scores = encode_many(observations, self.normalizer) @ self.weights.T
         scores = np.where(masks > 0, scores, -np.inf)
         return [int(value) for value in np.argmax(scores, axis=1)]
 
@@ -942,8 +1270,13 @@ class LinearPolicy:
         return self.weights.reshape(-1)
 
     def rebuild(self, flat: np.ndarray) -> LinearPolicy:
-        """Return a policy of this shape with the given weights."""
-        return LinearPolicy(flat.reshape(self.weights.shape))
+        """Return a policy of this shape with the given weights.
+
+        **The normalizer travels with the rebuilt policy.** The search
+        rebuilds every candidate of every generation through the shell, so a
+        normalizer that stopped here would reach no candidate the run scored.
+        """
+        return LinearPolicy(flat.reshape(self.weights.shape), self.normalizer)
 
     def save(self, path: Path, meta: Mapping[str, object]) -> None:
         """Write the weights and what they were trained against.
@@ -953,6 +1286,11 @@ class LinearPolicy:
         this file in a later table**, because a row is named by its verb and
         its candidate coordinates and not by its index.[^1]
 
+        **The normalizer goes into the file beside the weights.** A weight of
+        this file scores a standardized feature, and nothing outside the file
+        says which standardization that was, so a file without its normalizer
+        states nothing a reader can play.
+
         References
         ----------
         [^1]: ADR-0200, a stored policy names each row of the action table by
@@ -960,21 +1298,29 @@ class LinearPolicy:
         ``docs/adrs/draft/adr-0200-a-stored-policy-names-each-action-row-by-verb-and-coordinates.md``
         """
         path.parent.mkdir(parents=True, exist_ok=True)
+        normalizer = self.normalizer.as_arrays() if self.normalizer is not None else {}
         # numpy declares ``allow_pickle`` as a keyword before its own
         # ``**kwds``, so a mapping keyed on ``str`` can never unpack cleanly.
         np.savez(
             path,
             weights=self.weights,
             kind=np.array("linear"),
+            **normalizer,  # type: ignore[arg-type]
             **{key: np.array(value) for key, value in meta.items()},  # type: ignore[arg-type]
         )
 
     @classmethod
     def load(cls, path: Path) -> tuple[LinearPolicy, dict[str, object]]:
-        """Read a weight file, and return the policy and what it names."""
+        """Read a weight file, and return the policy and what it names.
+
+        A file that states no normalizer gives a policy that reads the plain
+        squash, so a policy published before the normalizer existed still
+        runs.
+        """
         stored = np.load(path, allow_pickle=False)
-        meta = {key: stored[key].tolist() for key in stored.files if key != "weights"}
-        return cls(stored["weights"]), meta
+        skip = {"weights", *NORMALIZER_KEYS}
+        meta = {key: stored[key].tolist() for key in stored.files if key not in skip}
+        return cls(stored["weights"], FeatureNormalizer.read(stored)), meta
 
 
 def load_policy(
@@ -1009,6 +1355,13 @@ def load_policy(
     raised an error about a missing archive entry, which named the storage
     and not the cause.[^1]
 
+    **A file that states no normalizer still runs.** The published style
+    files were written before the normalizer existed, so they hold no centre
+    and no scale. The policy this reader gives back for one of them holds
+    none, and a policy that holds none reads the plain squash, which is what
+    the identity of the normalizer computes. Nothing refuses such a file,
+    because the fit compares two normalizers only when both sides state one.
+
     **The readout is rebuilt row by row when the file and the world state
     two different action tables.** A row keeps its weight when its verb and
     its candidate coordinates survive, and a row an argument added takes the
@@ -1026,16 +1379,20 @@ def load_policy(
     """
     stored = np.load(path, allow_pickle=False)
     kind = str(stored["kind"]) if "kind" in stored.files else "linear"
-    skip = {"weights", "kind", "flat", "architecture"}
+    skip = {"weights", "kind", "flat", "architecture", *NORMALIZER_KEYS}
     meta = {
         key: stored[key].tolist()
         for key in stored.files
         if key not in skip and not key.startswith("layout_")
     }
     meta["kind"] = kind
+    # The two normalizer arrays stay out of the reported entries. They run to
+    # a few thousand numbers each, and every caller of this reader prints or
+    # stores what it gets back.
+    normalizer = FeatureNormalizer.read(stored)
     rebuild: ActionRebuild | None = None
     if wanted is not None:
-        held = PolicyFit.read(meta)
+        held = PolicyFit.read(meta, normalizer)
         if held is None:
             message = (
                 f"the stored policy at {path} states no fit, so nothing can "
@@ -1072,7 +1429,7 @@ def load_policy(
     weights = np.asarray(stored["weights"], dtype=np.float64)
     if rebuild is not None:
         weights = rebuild.apply(weights)
-    return LinearPolicy(weights), meta
+    return LinearPolicy(weights, normalizer), meta
 
 
 class RandomPolicy:
