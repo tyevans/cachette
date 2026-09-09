@@ -43,16 +43,23 @@
 //!
 //! # The channels this block cannot fill
 //!
-//! The engine holds no military strength quantity, no per-settlement
-//! population, no per-settlement age, no per-settlement upgrade count and no
-//! last-seen tick. Every channel that needs one of those reads zero, and the
-//! function that writes each token names the channels it reserves. The block
+//! The engine holds no per-settlement population, no per-settlement age, no
+//! per-settlement upgrade count, no last-seen tick and no window history.
+//! Every channel that needs one of those reads zero, and the function that
+//! writes each token names the channels it reserves and why. The block
 //! publishes no number that no reader defines.
+//!
+//! **A channel that reads zero states its reason at the writer, and a
+//! channel that carries a value states the quantity it carries.** A dead
+//! position that declares a real value form is worse than a declared
+//! reserve, because the schema publishes real bounds for it and a reward
+//! term reads it as truth.[^3]
 //!
 //! # References
 //!
 //! [^1]: Report 42, what a policy should be able to see, sections 6.4 and 9.9. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
 //! [^2]: Findings register, FND-647. `docs/FINDINGS.md`
+//! [^3]: The audit of the observation, section 2. `docs/research/what-a-policy-cannot-see.md`
 
 use crate::faction_view::FactionViewError;
 use crate::hex::{Axial, Grid};
@@ -63,7 +70,7 @@ use crate::obs_ring::{
 };
 use crate::obs_ring_stack::{same_name, RingStack};
 use crate::sim_math;
-use crate::types::{Entity, FactionId, Fix32};
+use crate::types::{Accum, Entity, FactionId, Fix32};
 use crate::world::World;
 
 /// The name a schema gives to the space a token set lays its tokens out in.
@@ -118,8 +125,11 @@ pub const SETTLEMENT_CHANNEL_NAMES: &[&str] = &[
 /// The channels of one rival token, in the order the token stores them.
 ///
 /// The first twelve channels after the validity flag are the relative ratio
-/// of one power quantity against the own value of it. The fog admits an
-/// estimate of the settlement ratio alone, so the other eleven read zero.
+/// of one power quantity against the own value of it. Seven of the twelve
+/// carry a value: the settlements, the held ground, the units, the military
+/// strength, the finished upgrades, the best renown and the wonder work. The
+/// writer of the token states what each of the other five needs and does not
+/// have.
 pub const RIVAL_CHANNEL_NAMES: &[&str] = &[
     "validity",
     "settlement_ratio",
@@ -408,6 +418,8 @@ struct Disc {
     unclaimed_passable: i64,
     own_units: i64,
     rival_units: i64,
+    own_strength: i64,
+    rival_strength: i64,
     own_upgrades: i64,
     hazard_tiles: i64,
     resource_tiles: i64,
@@ -423,6 +435,41 @@ struct SettlementEntry {
     address: Axial,
     store: i64,
     tile: u32,
+}
+
+/// The power quantities of every faction, by faction number, that a rival
+/// token compares against the value of the reader.
+///
+/// **The gather pass of the observation owns these vectors, and this block
+/// reads them.** Each holds the value of one faction under the fog rule of
+/// that quantity: the own value is exact, and a rival value is what the
+/// reader has observed. The scalar block publishes order statistics over the
+/// same vectors, so a token ratio and a scalar statistic cannot disagree. A
+/// second derivation here would state each fog rule twice.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+/// [^2]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D8. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+#[derive(Clone, Copy, Debug)]
+pub struct RivalPowers<'a> {
+    /// The tiles each faction holds.
+    pub held_tiles: &'a [i64],
+    /// The live units each faction holds.
+    pub units: &'a [i64],
+    /// The military strength each faction holds.
+    pub strength: &'a [i64],
+    /// The finished upgrades each faction holds.
+    pub upgrades: &'a [i64],
+    /// The best renown of a live character of each faction.
+    pub renown: &'a [i64],
+    /// The work toward a wonder on the ground of each faction.
+    pub wonder: &'a [i64],
+    /// The faction that leads on held tiles, by faction number.
+    pub leader: usize,
+    /// The ground the reader sees this frame over the ground it has ever
+    /// seen, which is the confidence of every fogged value above.
+    pub confidence: Fix32,
 }
 
 /// One rival that the selection kept, with the quantity it ranked on.
@@ -454,11 +501,16 @@ impl World {
     ///
     /// Returns an error when the number names no faction of this world, and
     /// when the derived unit structure does not describe the units.
+    ///
+    /// The power vectors come from the same pass, because a rival token
+    /// compares one power quantity of the subject against the value of the
+    /// reader, and the fog rule of each quantity has one statement.
     pub fn faction_entity_tokens(
         &self,
         faction: FactionId,
         stack: &RingStack,
         frontier: &Frontier,
+        powers: &RivalPowers,
     ) -> Result<EntityTokens, FactionViewError> {
         if self.standing(faction).is_none() {
             return Err(FactionViewError::NoSuchFaction(faction));
@@ -485,7 +537,7 @@ impl World {
         }
         for slot in 0..RIVAL_TOKENS as usize {
             let channels = match rivals.get(slot) {
-                Some(entry) => self.rival_token(faction, *entry, &settlements),
+                Some(entry) => self.rival_token(faction, *entry, &settlements, powers),
                 None => [Fix32::ZERO; RIVAL_CHANNELS as usize],
             };
             write_token(&mut written, TokenSet::Rivals, slot, &channels);
@@ -704,6 +756,12 @@ impl World {
     /// Every quantity is fogged, except the own held ground and the own
     /// upgrades. A faction is not fogged from its own ground.[^1]
     ///
+    /// **The strength of the disc reads the units the counts read.** The
+    /// strength of one unit is the strength column of its type, and the type
+    /// table is the one statement of that rule. The pass adds the two sums
+    /// in the same walk as the two counts, so a count and a sum of this disc
+    /// cannot describe different units.
+    ///
     /// # References
     ///
     /// [^1]: Findings register, FND-671. `docs/FINDINGS.md`
@@ -765,9 +823,20 @@ impl World {
                 }
                 if let Ok(units) = self.soldiers_on(address) {
                     for unit in units {
+                        let strength = self.soldiers().unit_type(*unit).map_or(Accum(0), |kind| {
+                            Accum(i64::from(self.unit_types().strength(kind).0))
+                        });
                         match self.soldiers().faction(*unit) {
-                            Some(owner) if owner == faction => disc.own_units += 1,
-                            Some(_) => disc.rival_units += 1,
+                            Some(owner) if owner == faction => {
+                                disc.own_units += 1;
+                                disc.own_strength =
+                                    sim_math::combine(Accum(disc.own_strength), strength).0;
+                            }
+                            Some(_) => {
+                                disc.rival_units += 1;
+                                disc.rival_strength =
+                                    sim_math::combine(Accum(disc.rival_strength), strength).0;
+                            }
                             None => {}
                         }
                     }
@@ -883,44 +952,110 @@ impl World {
     /// Writes the channels of one rival token.
     ///
     /// The design gives twelve relative ratios, one for each power quantity.
-    /// The fog admits an estimate of two of them, which are the settlements
-    /// the reader can see and the ground the reader can see the rival hold.
-    /// The other ten read zero, because publishing an unfogged total would
-    /// let the reader read a quantity it has not observed.
+    /// This writes six of them, and each is the signed relation of the value
+    /// of the rival against the value of the reader: the settlements the
+    /// reader sees, the ground it sees the rival hold, the units, the
+    /// military strength, the finished upgrades and the wonder work. The
+    /// renown ratio follows the same rule. **The gather pass owns every one
+    /// of those vectors and states the fog rule of each**, so this function
+    /// names no fog rule of its own.
     ///
-    /// The war flag, the shared border length, the trade volume, the power
-    /// trend, the observation confidence, the unit mix distance and the
-    /// relation to the leader read zero. The engine holds no war state, no
-    /// per-rival border length, no per-rival trade volume and no window
-    /// history. The confidence would need the total the reader does not
-    /// know, which is how many settlements the rival holds in all.
+    /// **The strength ratio is an estimate, and the confidence channel is
+    /// beside it.** The own strength is exact and a rival strength is the
+    /// strength of the units the reader sees, so the ratio understates a
+    /// rival whose army stands out of sight. The layout admits an estimate
+    /// with a confidence position for exactly this case.[^1]
+    ///
+    /// The war flag reads the relation plane, which carries no fog rule in
+    /// this engine, as the two relation channels beside it do.
+    ///
+    /// **Ten channels read zero, and each has a reason.** The store ratio
+    /// needs a rival store, and no fog admits one. The tile gain ratio, the
+    /// power share trend and the settlement distance trend need a window,
+    /// and the engine holds no window. The reach area ratio needs the city
+    /// reach of a rival, and the settlement scan reads a reach for the
+    /// reader alone. The trade ratio and the trade volume share need a
+    /// per-rival trade volume, which nothing accumulates. The population
+    /// ratio needs the residents of a rival, and the fog admits the
+    /// settlement count of a rival and not its people. The shared border
+    /// share needs a border length for each rival, and the ground scan
+    /// counts one contested border over every rival together. The unit mix
+    /// distance needs the type histogram of a rival, and the fogged unit
+    /// walk keeps a histogram for the reader alone.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D8. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
     fn rival_token(
         &self,
         faction: FactionId,
         entry: RivalEntry,
         own: &[SettlementEntry],
+        powers: &RivalPowers,
     ) -> [Fix32; RIVAL_CHANNELS as usize] {
         let grid = self.grid();
+        let seat = usize::from(faction.0);
+        let subject = usize::from(entry.faction.0);
         let mut channels = [Fix32::ZERO; RIVAL_CHANNELS as usize];
         channels[const { channel_index(RIVAL_CHANNEL_NAMES, "validity") }] = Fix32::ONE;
         channels[const { channel_index(RIVAL_CHANNEL_NAMES, "settlement_ratio") }] =
             sim_math::signed_relation(entry.seen_settlements, own.len() as i64);
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "held_tile_ratio") }] =
+            power_ratio(powers.held_tiles, subject, seat);
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "unit_ratio") }] =
+            power_ratio(powers.units, subject, seat);
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "strength_ratio") }] =
+            power_ratio(powers.strength, subject, seat);
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "upgrade_ratio") }] =
+            power_ratio(powers.upgrades, subject, seat);
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "renown_ratio") }] =
+            power_ratio(powers.renown, subject, seat);
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "wonder_ratio") }] =
+            power_ratio(powers.wonder, subject, seat);
         channels[const { channel_index(RIVAL_CHANNEL_NAMES, "relation_to_rival") }] =
             Fix32(self.relation(faction, entry.faction).unwrap_or(0));
         channels[const { channel_index(RIVAL_CHANNEL_NAMES, "relation_from_rival") }] =
             Fix32(self.relation(entry.faction, faction).unwrap_or(0));
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "war") }] =
+            flag(self.at_war(faction, entry.faction));
         channels[const { channel_index(RIVAL_CHANNEL_NAMES, "rival_settlement_distance") }] =
             distance_share(grid, entry.nearest);
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "observation_confidence") }] =
+            powers.confidence;
+        channels[const { channel_index(RIVAL_CHANNEL_NAMES, "relation_to_leader") }] = Fix32(
+            self.relation(entry.faction, FactionId(powers.leader as u16))
+                .unwrap_or(0),
+        );
         channels
     }
-
     /// Writes the channels of one threat cluster token.
     ///
-    /// The strength, the strength share, the largest unit type class, the
-    /// closing rate, the sighting staleness, the owner reach flag, the owner
-    /// power share, the owner relation and the own strength read zero. The
-    /// engine holds no military strength, no last-seen tick and no window
+    /// **The three strength channels and the balance read the strength of
+    /// the units of the disc.** The strength of one unit is the strength
+    /// column of its type, and the unit type table is the one statement of
+    /// that rule. The strength channel holds the rival strength of the disc,
+    /// the own strength channel holds the own strength of it, and the
+    /// balance is the signed relation of the two.
+    ///
+    /// **The balance published a unit count under a strength name**, beside
+    /// three strength channels that read zero. A reader that wanted a
+    /// strength comparison found one channel that answered and three that
+    /// did not, and the one that answered counted units.[^1] The unit count
+    /// of the cluster is its own channel and it stays.
+    ///
+    /// The strength share reads zero. It would divide the strength of this
+    /// disc by the whole rival strength the reader has seen, and the ground
+    /// scan and this disc admit different tiles, so the quotient could pass
+    /// one and the bound would then hide it.
+    ///
+    /// The largest unit type class, the closing rate, the sighting
+    /// staleness, the owner reach flag, the owner power share and the owner
+    /// relation read zero. The engine holds no last-seen tick and no window
     /// history, and a summary cell names no owning faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: The audit of the observation, section 2.5. `docs/research/what-a-policy-cannot-see.md`
     fn threat_token(
         &self,
         faction: FactionId,
@@ -952,15 +1087,19 @@ impl World {
             sim_math::bounded_share(disc.hazard_tiles, entry.observed.max(disc.observed));
         channels[const { channel_index(THREAT_CHANNEL_NAMES, "passable_share") }] =
             sim_math::bounded_share(disc.passable, disc.observed);
+        channels[const { channel_index(THREAT_CHANNEL_NAMES, "strength") }] =
+            sim_math::compressed_magnitude(disc.rival_strength);
+        channels[const { channel_index(THREAT_CHANNEL_NAMES, "own_strength") }] =
+            sim_math::compressed_magnitude(disc.own_strength);
         channels[const { channel_index(THREAT_CHANNEL_NAMES, "strength_balance") }] =
-            sim_math::signed_relation(disc.own_units, disc.rival_units);
+            sim_math::signed_relation(disc.own_strength, disc.rival_strength);
         channels
     }
 
     /// Writes the channels of one candidate site token.
     ///
-    /// The rival strength channel reads zero, because the engine holds no
-    /// military strength quantity.
+    /// The rival strength channel holds the strength of the rival units of
+    /// the disc, which is the sum the disc walk takes beside the unit count.
     fn site_token(
         &self,
         faction: FactionId,
@@ -1003,6 +1142,8 @@ impl World {
             );
         channels[const { channel_index(SITE_CHANNEL_NAMES, "hazard_share") }] =
             sim_math::bounded_share(disc.hazard_tiles, disc.observed);
+        channels[const { channel_index(SITE_CHANNEL_NAMES, "rival_strength") }] =
+            sim_math::compressed_magnitude(disc.rival_strength);
         channels[const { channel_index(SITE_CHANNEL_NAMES, "site_score") }] =
             sim_math::compressed_magnitude(site.score);
         channels
@@ -1034,7 +1175,7 @@ fn nearest_of(own: &[SettlementEntry], from: Axial) -> u32 {
 ///
 /// A distance of the widest value the type holds means that no subject
 /// exists, and it reads as one.
-fn distance_share(grid: Grid, distance: u32) -> Fix32 {
+pub(crate) fn distance_share(grid: Grid, distance: u32) -> Fix32 {
     let widest = i64::from(grid.width()) + i64::from(grid.height()) - 2;
     if distance == u32::MAX {
         return Fix32::ONE;
@@ -1054,6 +1195,19 @@ fn sector_pair(delta: Axial) -> (Fix32, Fix32) {
     (
         sim_math::phase_triangle(sector, period),
         sim_math::phase_triangle(sector + period / 4, period),
+    )
+}
+
+/// Returns one power quantity of a token subject against the value of the
+/// reader, as a signed relation.
+///
+/// A faction number outside the vector reads zero, and a signed relation of
+/// two zeros is zero, so a subject the vector does not hold reads no
+/// advantage either way.
+fn power_ratio(values: &[i64], subject: usize, seat: usize) -> Fix32 {
+    sim_math::signed_relation(
+        values.get(subject).copied().unwrap_or(0),
+        values.get(seat).copied().unwrap_or(0),
     )
 }
 

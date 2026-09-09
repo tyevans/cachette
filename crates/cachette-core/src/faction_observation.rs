@@ -161,7 +161,7 @@ use crate::obs_frontier::Frontier;
 use crate::obs_ring::ring_cell_counts;
 use crate::obs_ring_stack::RingStack;
 use crate::obs_ring_stack::RING_SPACE;
-use crate::obs_token::{EntityTokens, TokenSet, TOKEN_SPACE};
+use crate::obs_token::{distance_share, EntityTokens, RivalPowers, TokenSet, TOKEN_SPACE};
 use crate::position::WORK_COMMODITY;
 use crate::resource::ResourceKind;
 use crate::sim_math;
@@ -268,11 +268,12 @@ pub const OBJECTIVE_WEIGHT_COUNT: u32 = 12;
 /// length.** A field added anywhere else moves the start of every field after
 /// it, and that refuses every stored weight file.
 ///
-/// Three revisions claimed thirteen positions between them. The event history
-/// gained two kinds, which widened five fields of the memory block by ten
-/// positions. The domination path gained two counts at the end of the layout.
-/// The founding chain gained the settler count.
-pub const LAYOUT_RESERVE: u32 = 16;
+/// Four revisions claimed positions from it. The event history gained two
+/// kinds, which widened five fields of the memory block. The domination path
+/// gained two counts at the end of the layout. The founding chain gained the
+/// settler count. The campaign path gained the objective it would march on.
+/// The commit message of each states what it took.
+pub const LAYOUT_RESERVE: u32 = 13;
 
 /// How a reader reads every position of one field.
 ///
@@ -733,8 +734,27 @@ declare_observation_fields! {
     /// per-faction state the engine does not carry.
     MeanStaleness => "mean_staleness", 1, Reserved;
     /// The held tiles under a hazard over the held tiles the faction sees.
+    ///
+    /// **A hazard is a ground condition that harms.** Fire is the one such
+    /// condition this engine holds: it takes units, and the memory block
+    /// counts the units it took. Wet ground is not a hazard. A gatherer takes
+    /// more from wet ground, so wet ground is a benefit, and this field
+    /// counted it as a harm.[^1] [^2]
+    ///
+    /// The fire share of the held ground publishes the same count over the
+    /// same denominator, because fire is the whole of the hazard today. **The
+    /// two positions separate on the day the engine gains a second harm**,
+    /// and this one is the aggregate.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0143, wet ground yields more to a gatherer, decision D1. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
+    /// [^2]: The audit of the observation, section 2.8. `docs/research/what-a-policy-cannot-see.md`
     HeldUnderHazardShare => "held_under_hazard_share", 1, Share;
     /// The settlements under a hazard over the settlement count.
+    ///
+    /// A settlement counts when the tile it stands on burns. The rule of the
+    /// hazard is the one stated at the field above.
     SettlementsUnderHazardShare => "settlements_under_hazard_share", 1, Share;
     /// The tiles of the world.
     WorldTiles => "world_tiles", 1, Magnitude;
@@ -798,13 +818,41 @@ declare_observation_fields! {
     /// no second and longer cycle.
     WorldCyclePhase => "world_cycle_phase", 2, Reserved;
 
-    /// Block C. The seats the faction holds over the seated factions.
+    /// Block C. The seats of live factions the faction holds, over the seats
+    /// the domination reader asks for.
+    ///
+    /// **The denominator is the requirement of the reader that ends the
+    /// game, and that requirement shrinks.** The seat clause asks the
+    /// candidate for the seat of every faction that is still in the game, its
+    /// own seat included, and a faction that has left the game takes its seat
+    /// out of the ask. A share over the seated factions therefore tops out
+    /// below one at the moment the reader fires, and a policy that climbed it
+    /// would climb toward a value it cannot reach.[^1] [^2]
+    ///
+    /// This position reads one exactly when the seat clause holds.
+    ///
+    /// **The unit clause of the same reader stays unpublished, and the fog is
+    /// the reason.** That clause ends the game for a faction that holds a
+    /// unit while every rival holds none, and a share of it would state the
+    /// unit count of a rival the reader has never observed. The layout
+    /// publishes the units the reader has seen and no other unit count, and a
+    /// second, unfogged count of the same quantity would contradict it.[^3]
+    /// A reader that wants the annihilation branch reads the unit order
+    /// statistics, which are weaker on purpose.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
+    /// [^2]: ADR-0181, a faction that holds no site and no unit leaves the game, decision D5. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
+    /// [^3]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
     DominationProgress => "domination_progress", 1, Share;
-    /// The seats of the leading faction over the seated factions.
+    /// The seats of live factions the leading faction holds, over the same
+    /// requirement.
     DominationLeader => "domination_leader", 1, Share;
-    /// The seats of the faction against the seats of the strongest rival.
+    /// The seats of live factions the faction holds, against the count of the
+    /// strongest rival.
     DominationGap => "domination_gap", 1, Relation;
-    /// The rivals the faction leads on seats, over the rival count.
+    /// The rivals the faction leads on those seats, over the rival count.
     DominationRank => "domination_rank", 1, Share;
     /// **Reserved.** The estimated ticks to a domination win, for the faction
     /// and for the leader.
@@ -1188,6 +1236,40 @@ declare_observation_fields! {
     /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     /// [^2]: The reserve. [`LAYOUT_RESERVE`]
     Settlers => "settlers", 1, Magnitude;
+    /// The hex distance from the seat of the faction to the campaign
+    /// objective, over the widest distance the world holds.
+    ///
+    /// **The objective is the settlement the campaign verb would march on,
+    /// and the faction reads it through its own fog.** The engine resolves
+    /// one objective for each faction: an own settlement on ground a faction
+    /// at war holds is a relief, and failing that the nearest settlement of a
+    /// faction at war is a take. The nearest wins and a relief comes
+    /// first.[^1]
+    ///
+    /// **This position reads the fogged reader, and not the search the
+    /// built-in controller reads.** That search walks the whole board, and a
+    /// faction may not read a settlement it has never observed.[^2] A faction
+    /// that has seen no enemy settlement therefore reads zero here and zero
+    /// in the flag below, whatever the board holds.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D2. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    /// [^2]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
+    CampaignObjectiveDistance => "campaign_objective_distance", 1, Share;
+    /// One when the faction has an observed campaign objective now.
+    ///
+    /// A flag is a share that holds zero or one. The distance above means
+    /// nothing while this position reads zero, in the way every distance of
+    /// this layout carries a flag beside it.
+    CampaignObjectiveFlag => "campaign_objective_flag", 1, Share;
+    /// One when the campaign objective is a relief of the reader's own
+    /// settlement.
+    ///
+    /// A relief and a take ask for different action: a relief defends ground
+    /// the faction already holds, and a take crosses a border. The engine
+    /// ranks the two, and this position names which one the rank chose.
+    CampaignObjectiveRelief => "campaign_objective_relief", 1, Share;
 
     /// **Reserved.** The positions the layout holds back for a later signal.
     LayoutReserve => "layout_reserve", LAYOUT_RESERVE, Reserved;
@@ -1837,9 +1919,7 @@ impl World {
             scan.own_reach = scan
                 .own_reach
                 .max(i64::from(self.city_reach(site).unwrap_or(0)));
-            if matches!(self.tile_is_burning(address), Some(true))
-                || matches!(self.ground_is_wet(address), Some(true))
-            {
+            if matches!(self.tile_is_burning(address), Some(true)) {
                 scan.own_hazard_settlements += 1;
             }
             for commodity in 0..COMMODITY_COUNT {
@@ -1944,29 +2024,108 @@ impl World {
         self.tile_holder(address).and_then(Holder::faction) == Some(faction)
     }
 
-    /// Returns the seats each faction holds, by faction number.
+    /// Returns who holds the seats, in one walk over the seats.
     ///
-    /// A seat is the tile of the first founding of a faction, and the
-    /// domination reader compares the count against the seat count. **A seat
-    /// holder carries no fog rule**, because the reader ends the game on it.
-    fn seats_held_by_each(&self, seats: usize) -> Vec<i64> {
-        let mut held = vec![0i64; seats];
+    /// A seat is the tile of the first founding of a faction. **A seat holder
+    /// carries no fog rule**, because the reader that ends the game reads the
+    /// same column.
+    ///
+    /// **The walk answers two questions at once, so the layout states the
+    /// seat rule once.** The whole count feeds the rival seat counts, which
+    /// hold a seat whose faction has left the game. The live count feeds the
+    /// domination track, whose denominator is the ask of the reader.
+    fn seat_holding(&self, seats: usize) -> SeatHolding {
+        let mut holding = SeatHolding {
+            held: vec![0i64; seats],
+            live_held: vec![0i64; seats],
+            live_seats: 0,
+        };
         for seat in 0..seats {
-            let Some(tile) = self.seat(FactionId(seat as u16)) else {
+            let subject = FactionId(seat as u16);
+            let Some(tile) = self.seat(subject) else {
                 continue;
             };
+            let live = !self.is_eliminated(subject);
+            if live {
+                holding.live_seats += 1;
+            }
             let Some(address) = self.grid().address_of(tile) else {
                 continue;
             };
             let Some(holder) = self.tile_holder(address).and_then(Holder::faction) else {
                 continue;
             };
-            if let Some(place) = held.get_mut(usize::from(holder.0)) {
+            let at = usize::from(holder.0);
+            if let Some(place) = holding.held.get_mut(at) {
                 *place += 1;
             }
+            if live {
+                if let Some(place) = holding.live_held.get_mut(at) {
+                    *place += 1;
+                }
+            }
         }
-        held
+        holding
     }
+
+    /// Returns the campaign objective of one faction, as the fog admits it.
+    ///
+    /// **The engine holds one reader of this, and it is the reader the
+    /// legality answer of the campaign verb reads.** That reader admits a
+    /// settlement the faction has seen, ranks a relief before a take, and
+    /// takes the nearest from the seat of the faction. A second walk here
+    /// would state the same rank rule twice.[^1] [^2]
+    ///
+    /// The first entry of that answer is the objective over the whole frame,
+    /// and this reads it. A relief is an objective whose settlement belongs
+    /// to the reader.
+    ///
+    /// The walk is over the settlement arena and over the cells of the frame,
+    /// so its cost follows the settlement count and a fixed cell count. It
+    /// walks no tile and no unit.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0199, a verb names a place by a cell of the egocentric frame the observation publishes, decision D3. `docs/adrs/draft/adr-0199-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    fn observed_march_target(&self, faction: FactionId) -> Option<MarchTarget> {
+        let tile = self
+            .observed_campaign_objectives(faction)
+            .first()
+            .copied()
+            .flatten()?;
+        let address = self.grid().address_of(tile)?;
+        let seat = self
+            .seat(faction)
+            .and_then(|at| self.grid().address_of(at))?;
+        let owner = self
+            .settlement_on(address)
+            .and_then(|site| self.settlement_faction(site));
+        Some(MarchTarget {
+            distance: seat.distance(address),
+            relief: owner == Some(faction),
+        })
+    }
+}
+
+/// Who holds the seats of the world, from one walk over them.
+struct SeatHolding {
+    /// The seats each faction holds, by faction number, whether the faction
+    /// that started on a seat is still in the game or not.
+    held: Vec<i64>,
+    /// The seats of factions that are still in the game, by the faction
+    /// number of the holder.
+    live_held: Vec<i64>,
+    /// The seats the domination reader asks a candidate to hold.
+    live_seats: i64,
+}
+
+/// The campaign objective one faction has observed.
+struct MarchTarget {
+    /// The hex distance from the seat of the faction to the objective.
+    distance: u32,
+    /// Whether the objective is a settlement of the faction itself.
+    relief: bool,
 }
 
 /// Returns the good class of one resource kind.
@@ -2358,6 +2517,7 @@ struct Reading {
     weights: Vec<i64>,
     rival_seats_held: i64,
     rival_seats: i64,
+    march: Option<MarchTarget>,
     domination: Track,
     wonder: Track,
     renown: Track,
@@ -2414,7 +2574,7 @@ impl World {
             .into_iter()
             .map(|pair| pair.1)
             .collect::<Vec<i64>>();
-        let seats_held = self.seats_held_by_each(seats);
+        let seat_holding = self.seat_holding(seats);
         let own_seat_held = i64::from(self.faction_holds_its_own_seat(faction));
 
         let world = self.pyramid().total();
@@ -2425,15 +2585,25 @@ impl World {
         let renown_target = i64::from(self.balance().renown_target());
         let world_passable = world.open_tiles();
 
-        let ring_stack = self.faction_ring_stack(faction)?;
-        let frontier = self.faction_frontier(faction, &ring_stack)?;
-        let tokens = self.faction_entity_tokens(faction, &ring_stack, &frontier)?;
-
         let power_held = PowerVector {
             values: held.clone(),
             confidence,
         };
         let leader = power_held.leader();
+        let powers = RivalPowers {
+            held_tiles: &held,
+            units: &units,
+            strength: &strengths,
+            upgrades: &upgrade.finished_seen,
+            renown: &character.best_renown,
+            wonder: &wonder_work,
+            leader,
+            confidence,
+        };
+
+        let ring_stack = self.faction_ring_stack(faction)?;
+        let frontier = self.faction_frontier(faction, &ring_stack)?;
+        let tokens = self.faction_entity_tokens(faction, &ring_stack, &frontier, &powers)?;
         let legal = self.legal_actions(faction).unwrap_or_default();
         let weights = self.faction_weights(faction).map_or_else(Vec::new, |set| {
             [set.war, set.trade, set.build, set.renown, set.settle]
@@ -2472,13 +2642,15 @@ impl World {
             board_rows,
             board_free: board_rows - board_used,
             weights,
-            rival_seats_held: seats_held
+            rival_seats_held: seat_holding
+                .held
                 .get(seat)
                 .copied()
                 .unwrap_or(0)
                 .saturating_sub(own_seat_held),
             rival_seats: (seats as i64 - 1).max(0),
-            domination: Track::of(&seats_held, seat, seats as i64),
+            march: self.observed_march_target(faction),
+            domination: Track::of(&seat_holding.live_held, seat, seat_holding.live_seats),
             wonder: Track::of(&wonder_work, seat, requirement),
             renown: Track::of(&character.best_renown, seat, renown_target),
             ground_track: Track::of(&held, seat, world_passable),
@@ -2531,6 +2703,18 @@ fn magnitude(value: i64) -> i64 {
 /// Widens a signed relation into the width the array holds.
 fn relation(a: i64, b: i64) -> i64 {
     i64::from(sim_math::signed_relation(a, b).0)
+}
+
+/// Widens a flag into the width the array holds.
+///
+/// A flag is a share that holds zero or one, and no position of this layout
+/// holds any other kind of flag.
+fn flag(set: bool) -> i64 {
+    if set {
+        i64::from(Fix32::ONE.0)
+    } else {
+        0
+    }
 }
 
 /// Widens one quadrature of a cyclic phase into the width the array holds.
@@ -2722,10 +2906,7 @@ impl World {
                     span[0] = share(ground.observed_passable, ground.observed_tiles);
                 }
                 ObsField::HeldUnderHazardShare => {
-                    span[0] = share(
-                        ground.own_held_fire + ground.own_held_water,
-                        ground.own_held_seen_now,
-                    );
+                    span[0] = share(ground.own_held_fire, ground.own_held_seen_now);
                 }
                 ObsField::SettlementsUnderHazardShare => {
                     span[0] = share(site.own_hazard_settlements, site.own_settlements);
@@ -2831,6 +3012,17 @@ impl World {
                 }
                 ObsField::RivalSeatsHeld => span[0] = magnitude(read.rival_seats_held),
                 ObsField::RivalSeats => span[0] = magnitude(read.rival_seats),
+                ObsField::CampaignObjectiveDistance => {
+                    span[0] = read.march.as_ref().map_or(0, |march| {
+                        i64::from(distance_share(self.grid(), march.distance).0)
+                    });
+                }
+                ObsField::CampaignObjectiveFlag => {
+                    span[0] = flag(read.march.is_some());
+                }
+                ObsField::CampaignObjectiveRelief => {
+                    span[0] = flag(read.march.as_ref().is_some_and(|march| march.relief));
+                }
                 ObsField::ObjectiveWeight => {
                     fill(span, |element| {
                         read.weights.get(element).copied().unwrap_or(0)

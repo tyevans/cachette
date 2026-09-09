@@ -520,7 +520,7 @@ impl World {
     /// [^2]: ADR-0199, a verb names a place by a cell of the egocentric frame the observation publishes, decisions D1 and D2. `docs/adrs/draft/adr-0199-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
     /// [^3]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
     /// [^4]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
-    fn observed_campaign_objectives(&self, faction: FactionId) -> Vec<Option<TileIdx>> {
+    pub(crate) fn observed_campaign_objectives(&self, faction: FactionId) -> Vec<Option<TileIdx>> {
         let none = || vec![None; PLACE_COUNT as usize];
         let count = self.config.faction_count.max(1);
         let Some(seat) = self

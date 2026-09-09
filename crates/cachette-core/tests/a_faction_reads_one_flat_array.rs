@@ -1072,7 +1072,7 @@ fn the_array_publishes_the_settlers_of_the_faction() {
 /// the number of positions left, because the number changes with the next
 /// claim and the shape does not.
 #[test]
-fn the_settler_count_sits_directly_above_the_reserve() {
+fn the_newest_claim_sits_directly_above_the_reserve() {
     let fields = ObsField::ALL;
     let last = fields.last().copied().expect("the layout holds a field");
     assert_eq!(
@@ -1083,8 +1083,12 @@ fn the_settler_count_sits_directly_above_the_reserve() {
     let above = fields[fields.len() - 2];
     assert_eq!(
         above,
-        ObsField::Settlers,
-        "the settler count is the newest claim on the reserve"
+        ObsField::CampaignObjectiveRelief,
+        "the campaign objective is the newest claim on the reserve"
+    );
+    assert!(
+        !above.value_kind().is_reserved(),
+        "a claim on the reserve reads a value, so it is no longer reserved"
     );
     assert!(
         !ObsField::Settlers.value_kind().is_reserved(),
