@@ -199,13 +199,16 @@ population="${population:-24}"
 probe_seeds="$(printf '%s' "$train_args" | sed -n 's/.*--seeds \([0-9]*\).*/\1/p')"
 probe_seeds="${probe_seeds:-6}"
 probe_worlds=$((population * probe_seeds))
-if printf '%s' "$train_args" | grep -q -- '--only'; then
-    strategies="$(printf '%s' "$train_args" \
-        | sed -n 's/.*--only \([^ ]*\).*/\1/p' | tr ',' '\n' | grep -c .)"
-else
-    strategies="$(grep -c '^    "[a-z-]*": ($' "$root/python/cachette/learn/__main__.py" \
-        2>/dev/null || echo 5)"
-fi
+# **The trainer answers how many strategies it would train.** It reads
+# `--only` and it reads the play styles, and a style run holds a table the
+# built-in weightings do not. A count taken any other way here is a second
+# declaration of the list, and this script held two of them: one that counted
+# the rows of the trainer's source with a regular expression, and one that
+# read the table before the styles replaced it. Both were wrong for a style
+# run, and the run failed after it paid for the instance.
+strategies="$(cd "$root" && uv run python -m cachette.learn \
+    --print-strategies $train_args 2>/dev/null | wc -w)"
+[ "${strategies:-0}" -ge 1 ] || strategies=1
 total_generations=$((generations * strategies))
 
 # **The trainer does not write its weights after every generation.** It
@@ -805,19 +808,20 @@ export CACHETTE_ENGINE_KEY="${CACHETTE_ENGINE_KEY:-}"
 # The strategy names come from the trainer, so this script declares no list
 # of its own. A second list here would go stale the first time a strategy is
 # added, and nothing would fail.
-names="$(uv run python -c \
-    'from cachette.learn.__main__ import STRATEGIES; print(" ".join(STRATEGIES))')"
-
 # **A run that names its strategies trains those and no others.** The loop
 # below gives each process its own `--only`, and the arguments of the run are
 # appended after it, so a second `--only` there would win and every process
 # would train the same strategy at a fraction of the cores. The names are
 # taken here instead, and the argument is removed from what each process
 # receives.
-chosen="$(printf '%s' "$TRAIN_ARGS" | sed -n 's/.*--only \([^ ]*\).*/\1/p' | tr ',' ' ')"
-if [ -n "$chosen" ]; then
-    names="$chosen"
-fi
+#
+# The trainer answers the names, for the whole argument set of this run. It
+# reads `--only`, and it reads the play styles that replace the table. **This
+# script read the table at import instead, which is the table before the
+# styles replace it.** A style run then launched one process for each built-in
+# weighting, every one of them failed on the first name it looked up, and the
+# instance was paid for and torn down without a generation.
+names="$(uv run python -m cachette.learn --print-strategies $TRAIN_ARGS)"
 TRAIN_ARGS="$(printf '%s' "$TRAIN_ARGS" | sed 's/--only [^ ]*//')"
 count="$(printf '%s' "$names" | wc -w)"
 each="$((cores / count))"

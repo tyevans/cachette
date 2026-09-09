@@ -551,7 +551,7 @@ impl World {
     ///
     /// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D4. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
     /// [^2]: Findings register, FND-671. `docs/FINDINGS.md`
-    /// [^3]: ADR-0150, a faction holds the ground inside the reach of its cities, decision D3. `docs/adrs/accepted/adr-0150-a-faction-holds-the-ground-inside-the-reach-of-its-cities.md`
+    /// [^3]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D3. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
     fn accumulate_holding(
         &self,
         faction: FactionId,

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-693**
+**Next number: FND-694**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18269,3 +18269,44 @@ claim a behaviour change.
 [^F690B]: The commit `Name each stored action row by its verb and its coordinates`. Read its message for the perturbation and the figures.
 [^F691A]: The commit `Publish the structure of the observation, not only its positions`. Read its message for the length figure and the field split.
 [^F691B]: The commit `Publish the value form of each observation field`. Read its message for the array comparison and the commands.
+
+### FND-693 — The launcher held two answers for which strategies a run trains, and a paid instance died on both
+
+**Believed.** The launcher of a training run declared no list of strategies.
+Its own comment said so: the names come from the trainer, and a second list
+there would go stale the first time a strategy is added, with nothing to fail.
+
+**True.** It held two. One counted the rows of the trainer's source with a
+regular expression, to estimate how many generations the run would take. One
+imported the strategy table at module scope, to decide how many trainer
+processes to launch and what to name each.
+
+Both are correct for a run that trains the built-in weightings. **Neither can
+answer for a run that names a play style.** A style run replaces the strategy
+table, and it replaces it inside the trainer's own entry point after the
+arguments are read. An import at module scope therefore reads the table as it
+stands before the styles reach it. A run that named four styles launched one
+process for each of the eight built-in weightings, and every one of them
+raised a lookup error on the first name it read.
+
+A variation other than the fixed one makes the gap plain. The trainer then
+holds one strategy whose name joins every style with a hyphen, so no caller
+can derive the names from the argument at all.
+
+**Evidence.** A run on a 64 core instance built the wheel, measured 3996.5
+ticks a second, launched eight processes, and every process exited in one or
+two seconds. The launcher read each failure as too fast to be worth a retry,
+and the instance was torn down without one generation. The console named the
+eight built-in strategies and the arguments named four styles.
+
+**Follows.** The trainer answers the names, through one flag that runs the
+same setup path a run runs and prints what it would train. The launcher asks
+for the names and for the count through that flag, so both of its answers are
+gone. A test asserts that the launcher holds neither of them again, and it
+reads the launcher rather than the trainer, because the launcher is where a
+second answer appears.
+
+**The comment was the warning.** A comment that states a file holds no second
+copy of something is evidence that somebody worried about it. It is not
+evidence that the copy is absent. This one was two lines above one of the two
+copies it denied.

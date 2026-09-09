@@ -63,7 +63,7 @@ const DECISION_INTERVAL: u64 = 5;
 ///
 /// # References
 ///
-/// [^1]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/accepted/adr-0041-a-crate-split-enforces-the-boundary-at-compile-time.md`
+/// [^1]: ADR-0041, a crate split enforces the boundary at compile time. `docs/adrs/draft/adr-0041-a-crate-split-enforces-the-boundary-at-compile-time.md`
 #[cfg(not(miri))]
 const DECISIONS: u64 = 24;
 

@@ -521,6 +521,16 @@ def main() -> int:
     )
     parser.add_argument("--only", type=str, default="")
     parser.add_argument(
+        "--print-strategies",
+        action="store_true",
+        help=(
+            "print the names this run would train, one line separated "
+            "by spaces, and exit without training. A launcher asks for "
+            "the names through this flag, so no launcher holds a list "
+            "of its own"
+        ),
+    )
+    parser.add_argument(
         "--styles",
         type=str,
         default="",
@@ -614,6 +624,10 @@ def main() -> int:
         )
 
     names = [name for name in arguments.only.split(",") if name] or list(STRATEGIES)
+
+    if arguments.print_strategies:
+        print(" ".join(names))
+        return 0
     learner_seats = tuple(
         int(seat) for seat in arguments.league.split(",") if seat.strip()
     )
