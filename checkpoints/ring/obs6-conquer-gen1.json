@@ -1,0 +1,22 @@
+{
+  "file": "obs6-conquer-gen1.npz",
+  "run": "cachette-train-20260908-234010-538324",
+  "strategy": "conquer",
+  "generation": 1,
+  "validation_score": 870.4453125,
+  "validation_seeds": 128,
+  "note": "generation 1 of a run that asked for 40. The run was stopped after two generations, so this is an early centre and not a level the run held",
+  "observation_version": 6,
+  "observation_version_fitted": 5,
+  "retagged": "the file was fitted under observation version 5 and states 6. The bump was descriptive: the schema gained structural entries and split one token field into four, and no position moved. The observation of one fixed world is identical under both versions, array against array",
+  "action_version": 1,
+  "observation_length": 4819,
+  "action_length": 29,
+  "decision_interval": 10,
+  "policy_kind": "linear",
+  "hidden": 0,
+  "width": 48,
+  "height": 48,
+  "faction_count": 3,
+  "sha256": "83ff07edbd1e466f34209c6c3429101f7bce15606880b618d0056d37743222f6"
+}

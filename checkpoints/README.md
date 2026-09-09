@@ -32,6 +32,32 @@ policies play each other like this:
 
 ## What is here
 
+**The ring policies are the current layout. The dense policies are not.** Every
+file here loads, and the two groups were fitted against two different rewards,
+so a score from one group does not compare with a score from the other.
+
+### The ring observation, one run of two generations
+
+| Policy | Score | Generation | Search |
+|---|---|---|---|
+| `ring/obs6-people-gen1` | 12051.5 | 1 | 64 candidates, 8 seeds, no hidden layer |
+| `ring/obs6-land-net-gen1` | 9197.3 | 1 | 64 candidates, 8 seeds, a hidden layer of 24 |
+| `ring/obs6-land-gen1` | 8873.8 | 1 | 64 candidates, 8 seeds, no hidden layer |
+| `ring/obs6-wealth-gen1` | 4233.9 | 1 | 64 candidates, 8 seeds, no hidden layer |
+| `ring/obs6-conquer-net-gen1` | 978.2 | 1 | 64 candidates, 8 seeds, a hidden layer of 24 |
+| `ring/obs6-conquer-gen1` | 870.4 | 1 | 64 candidates, 8 seeds, no hidden layer |
+
+**Each row is generation 1 of a run that asked for 40.** The run was stopped
+after two generations. A row is an early centre of a search and it is not a
+level that any run held. Read none of them as a standard of play.
+
+**A ring score is positive and a dense score is negative, and the sign is the
+reward and not the play.** A loss now costs a tenth of what a win pays, where
+it used to cost the same. The terms of each play style also read new field
+names. Nothing about the two groups is comparable.
+
+### The dense observation, superseded
+
 | Policy | Score | Generation | Search |
 |---|---|---|---|
 | `dense/obs4-land-dense-mlp-gen99` | -1043.7 | 99 | 256 candidates, 1 seed, a hidden layer of 24 |
@@ -41,6 +67,25 @@ policies play each other like this:
 
 The first row supersedes the third: the same run and the same strategy, 80
 generations later.
+
+**These four state observation version 4 and the engine writes 6, so the loader
+refuses all four.** They are kept as a record of what the dense observation
+reached. Nothing can play them.
+
+## A ring file states a version it was not fitted under
+
+Each ring file was fitted under observation version 5 and states version 6. The
+manifest beside it records both numbers and the reason.
+
+The bump added no quantity and moved no position. The schema gained entries
+that describe the shape of the spatial part, and the one token field became
+four fields over the same positions. The observation of one fixed world is
+identical under both versions, position for position, and the four token fields
+begin where the one field began and hold the same count between them.
+
+**A retag is correct only against that evidence.** Nine files that stated
+version 3 were removed rather than retagged, because the layout had genuinely
+changed and the weights described quantities that had moved.
 
 ## Read the score for what it is
 
