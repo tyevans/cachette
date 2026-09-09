@@ -158,6 +158,54 @@ implementation was checked against each governing record decision by decision,
 the registers were updated, and every gate passes. The full rule holds the
 detail.[^8]
 
+## Dispatching work to agents
+
+An orchestrator gives work to agents and integrates what they return. It writes
+little code itself.
+
+**Ask each agent for the whole change.** A brief that asks for a slice returns a
+slice, and the rest costs another agent. Ask it to do the following, in order.
+
+1. Make every change the task needs.
+2. Write the tests, including one that is proven able to fail.
+3. Re-read its own diff critically, as a self-review, and revise what it finds.
+4. Run the formatter and the linter for what it touched.
+5. Commit.
+6. Hand back the file table, the assumptions it made, the whole-tree search it
+   ran for each name it changed, and what it left alone on purpose.
+
+State step 5. An agent has reported finished with every file loose in its
+worktree, and that work is lost when nobody looks.
+
+**An agent must not run the gates.** No whole test suite, no lint of the whole
+tree, no determinism test, no golden state hash. The orchestrator runs them
+once, against a settled tree. Several agents running gates at once starve the
+machine, and that contention has cut a training run to a fourteenth of its
+rate.
+
+Keep one build and one format check for a change to the Rust core, because a
+tree that does not compile is not worth reading. Add the test build as well: a
+plain build does not typecheck a test module, and a refactor has broken every
+unit test of a crate while building clean.
+
+**Give each agent its own worktree.** Two agents in one checkout resolve the
+same merge into each other's commits. That has left a commit whose message
+describes work that is not in its diff, and a commit message is the one
+document this project holds that never decays.[^15]
+
+**Name the files another agent owns, and ask for a report rather than a fix
+there.** A diagnosis the orchestrator can route is worth more than a patch it
+cannot merge.
+
+**Spin an agent down when it hands back.** Never send it a list of fixes. Read
+the result, decide what is wrong, and give the fixes to a fresh agent. A
+long-lived agent accumulates its own wrong assumptions, and a fresh one reads
+the tree instead of its own history of it.
+
+**Take the report as a claim, not as a fact.** An agent reports honestly and
+still states things that are wrong, because it tested what it could reach. The
+orchestrator verifies before it repeats a number.[^16]
+
 ## Documentation rules
 
 All prose in this repository follows Simplified Technical English
@@ -210,3 +258,5 @@ says which stays open.
 [^12]: Blockers register. `docs/BLOCKERS.md`
 [^13]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^14]: Target platform costs. `docs/reference/graviton-costs.md`
+[^15]: Commit Message Rules. `.agents/rules/commits.md`
+[^16]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
