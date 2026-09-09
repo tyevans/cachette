@@ -1,0 +1,20 @@
+{
+  "file": "obs6-act2-people-structured-gen3.npz",
+  "run": "cachette-train-20260909-025009-1591498",
+  "strategy": "people-structured",
+  "generation": 3,
+  "validation_score": 13637.615234375,
+  "validation_seeds": 128,
+  "controller_yardstick": 11313.1,
+  "above_yardstick": true,
+  "observation_version": 6,
+  "action_version": 2,
+  "observation_length": 4819,
+  "action_length": 180,
+  "policy_kind": "structured",
+  "decision_interval": 10,
+  "width": 48,
+  "height": 48,
+  "faction_count": 3,
+  "sha256": "74c6e2bb49837a21b40f46b630a1f5634157c760cc03d2bdc696f8d0fbf9c521"
+}

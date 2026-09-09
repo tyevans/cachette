@@ -35,14 +35,38 @@ policies play each other like this:
 
 ## What is here
 
-**Nothing. Every stored policy has been removed, and the index states what
-each one reached.**
+Eight policies from one run on a 48 by 48 world of three factions, at
+observation version 6 and action version 2. Every file loads against a world
+of that shape.
 
-A weight file is a function of one observation layout and one action layout.
-The engine now writes observation version 6 and action version 2, and no file
-this project ever wrote states both. An index that lists a file nobody can
-load costs a reader the time it takes to find that out, so the files go and
-their measurements stay.
+**A score is a mean return over 128 held-out seeds under that strategy's own
+weighting. A return under one weighting does not compare with a return under
+another.** The yardstick column is the built-in controller measured on the
+same seeds under the same weighting, so the only fair comparison is a row
+against its own bar.
+
+| File | Score | Yardstick | Beats it | Generation | Kind |
+|---|---|---|---|---|---|
+| `place/obs6-act2-people-gen9` | 13808.4 | 11313.1 | yes | 9 | linear |
+| `place/obs6-act2-people-structured-gen3` | 13637.6 | 11313.1 | yes | 3 | structured |
+| `place/obs6-act2-land-gen7` | 11582.2 | 9940.8 | yes | 7 | linear |
+| `place/obs6-act2-land-structured-gen5` | 9912.0 | 9940.8 | no | 5 | structured |
+| `place/obs6-act2-wealth-gen5` | 5028.0 | 5205.8 | no | 5 | linear |
+| `place/obs6-act2-wealth-structured-gen5` | 4724.3 | 5205.8 | no | 5 | structured |
+| `place/obs6-act2-conquer-structured-gen7` | 1115.1 | 1417.4 | no | 7 | structured |
+| `place/obs6-act2-conquer-gen9` | 1033.2 | 1417.4 | no | 9 | linear |
+
+**Beating the yardstick is not beating the game.** The bar is one opponent,
+the built-in controller, and no policy here has ever played another policy
+during training. In a hand-played match the land policy beat the people
+policy every time, although the people policy stands further above its own
+bar. A score says how well a policy served its own weighting, and nothing
+more.
+
+**No policy here founds a settlement.** Founding needs a settler unit, and a
+settler needs a queued unit type several decisions earlier. Nothing rewards
+the first step of that plan, so no run has discovered it. The held ground of
+every policy here comes from the cities its faction started with.
 
 ## What is gone
 

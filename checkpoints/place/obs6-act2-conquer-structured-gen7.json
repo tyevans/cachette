@@ -1,0 +1,20 @@
+{
+  "file": "obs6-act2-conquer-structured-gen7.npz",
+  "run": "cachette-train-20260909-025009-1591498",
+  "strategy": "conquer-structured",
+  "generation": 7,
+  "validation_score": 1115.115625,
+  "validation_seeds": 128,
+  "controller_yardstick": 1417.4,
+  "above_yardstick": false,
+  "observation_version": 6,
+  "action_version": 2,
+  "observation_length": 4819,
+  "action_length": 180,
+  "policy_kind": "structured",
+  "decision_interval": 10,
+  "width": 48,
+  "height": 48,
+  "faction_count": 3,
+  "sha256": "ca5688f506afc1c9ad9270564cd1d6be420822b4d393b375e2cbf4fcc985d503"
+}

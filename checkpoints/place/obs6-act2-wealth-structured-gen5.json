@@ -1,0 +1,20 @@
+{
+  "file": "obs6-act2-wealth-structured-gen5.npz",
+  "run": "cachette-train-20260909-025009-1591498",
+  "strategy": "wealth-structured",
+  "generation": 5,
+  "validation_score": 4724.257095781249,
+  "validation_seeds": 128,
+  "controller_yardstick": 5205.8,
+  "above_yardstick": false,
+  "observation_version": 6,
+  "action_version": 2,
+  "observation_length": 4819,
+  "action_length": 180,
+  "policy_kind": "structured",
+  "decision_interval": 10,
+  "width": 48,
+  "height": 48,
+  "faction_count": 3,
+  "sha256": "20d185a48770ec0335b9e68fdfc568fb686f50b9a2a68f582df7d508fd94a604"
+}

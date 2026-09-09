@@ -1,0 +1,20 @@
+{
+  "file": "obs6-act2-people-gen9.npz",
+  "run": "cachette-train-20260909-025009-1591498",
+  "strategy": "people",
+  "generation": 9,
+  "validation_score": 13808.416015625,
+  "validation_seeds": 128,
+  "controller_yardstick": 11313.1,
+  "above_yardstick": true,
+  "observation_version": 6,
+  "action_version": 2,
+  "observation_length": 4819,
+  "action_length": 180,
+  "policy_kind": "linear",
+  "decision_interval": 10,
+  "width": 48,
+  "height": 48,
+  "faction_count": 3,
+  "sha256": "1ccf673c1b6eb504bb65fedda8c08d7b5a62aa5dfdfb78dea5d8bc919cc671ac"
+}

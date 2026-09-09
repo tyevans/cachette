@@ -1,0 +1,20 @@
+{
+  "file": "obs6-act2-conquer-gen9.npz",
+  "run": "cachette-train-20260909-025009-1591498",
+  "strategy": "conquer",
+  "generation": 9,
+  "validation_score": 1033.1976562500001,
+  "validation_seeds": 128,
+  "controller_yardstick": 1417.4,
+  "above_yardstick": false,
+  "observation_version": 6,
+  "action_version": 2,
+  "observation_length": 4819,
+  "action_length": 180,
+  "policy_kind": "linear",
+  "decision_interval": 10,
+  "width": 48,
+  "height": 48,
+  "faction_count": 3,
+  "sha256": "ee3c04697d69c197990cf8731aba2f5aac9337d073d04fff3d39fb216e82433d"
+}

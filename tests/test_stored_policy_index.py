@@ -24,6 +24,7 @@ References
 from __future__ import annotations
 
 import re
+import json
 from pathlib import Path
 
 import numpy as np
@@ -49,6 +50,13 @@ FACTIONS = 3
 ROW = re.compile(r"^\|\s*`([a-z0-9]+/[a-z0-9-]+)`\s*\|", re.MULTILINE)
 
 GONE_HEADING = "## What is gone"
+
+KINDS = ("linear", "structured")
+"""The kinds a builder knows.
+
+A stored file naming another kind cannot be played, and the index promises
+that every file it lists loads.
+"""
 
 
 def stored_files() -> list[Path]:
@@ -88,7 +96,13 @@ def test_every_stored_policy_loads_against_the_world_the_index_names(
     """
     policy, meta = load_policy(path, PolicyFit.of_world(a_world()))
     assert policy is not None
-    assert meta["kind"] == "linear", f"{path.name} names the kind {meta['kind']!r}"
+    kind = str(meta["kind"])
+    assert kind in KINDS, f"{path.name} names the kind {kind!r}, which no builder knows"
+    beside = json.loads(path.with_suffix(".json").read_text(encoding="utf-8"))
+    assert beside["policy_kind"] == kind, (
+        f"{path.name} holds the kind {kind!r} and its manifest says "
+        f"{beside['policy_kind']!r}"
+    )
 
 
 def test_the_index_lists_every_file_on_disk_and_no_other() -> None:

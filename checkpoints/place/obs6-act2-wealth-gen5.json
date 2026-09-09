@@ -1,0 +1,20 @@
+{
+  "file": "obs6-act2-wealth-gen5.npz",
+  "run": "cachette-train-20260909-025009-1591498",
+  "strategy": "wealth",
+  "generation": 5,
+  "validation_score": 5028.034466718749,
+  "validation_seeds": 128,
+  "controller_yardstick": 5205.8,
+  "above_yardstick": false,
+  "observation_version": 6,
+  "action_version": 2,
+  "observation_length": 4819,
+  "action_length": 180,
+  "policy_kind": "linear",
+  "decision_interval": 10,
+  "width": 48,
+  "height": 48,
+  "faction_count": 3,
+  "sha256": "13fbb9a46be697f878bdf936928f109072d3ad068113ed707ca7a73ad1054bde"
+}
