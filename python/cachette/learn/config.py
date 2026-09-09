@@ -38,9 +38,11 @@ class TrainConfig:
     every antithetic pair to the ends of the order, and the search moves a
     lesser fraction for a generation whose candidates agreed less.[^2]
 
-    The worker count is a per process count, whatever the shard count is. A
-    run of five processes with it at twelve asks for sixty workers on the
-    machine.
+    The worker count is how many engine threads one batch of worlds steps
+    with. **It reaches the passes that a queue does not split**, which are
+    the validation pass, the held-out pass and the reference sample. A worker
+    process of the queue plays one episode of one world, so it holds the
+    engine to one thread whatever this field says.
 
     References
     ----------
@@ -58,12 +60,14 @@ class TrainConfig:
     sigma: float = 0.5
     learning_rate: float = 0.3
     workers: int = 4
-    # How many worker processes score one generation. One process scores the
-    # whole generation in the process that asked for it, and starts nothing.
-    # **The caller states this. Nothing derives it from the core count**, and
-    # a second declaration site that silently disagreed with the worker count
-    # is the defect shape this project names first.
-    shards: int = 1
+    # How many worker processes hold the queue of one run. One process scores
+    # every generation in the process that asked for it, and starts nothing.
+    #
+    # **One task is one episode, so this names the machine and not the shape
+    # of the work.** A run gives it the cores it rents. The command line takes
+    # the core count by default, because a number that nobody chooses is the
+    # number that cannot be wrong.
+    pool: int = 1
     seed: int = 0
     # The seats a candidate may take. An empty list puts one candidate in one
     # world, in the seat the environment names, and every other seat keeps the

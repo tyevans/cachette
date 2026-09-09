@@ -79,8 +79,8 @@ learning rate times the agreement.
 
 # References
 
-[^1]: ADR-0194, a generation is scored in shards and combined in candidate
-order, decision D2.
+[^1]: ADR-0194, a generation is scored one episode at a time, and
+combined in candidate order, decision D2.
 ``docs/adrs/draft/adr-0194-a-generation-is-scored-in-shards.md``
 [^2]: Findings register, FND-713. ``docs/FINDINGS.md``
 [^3]: Findings register, FND-711. ``docs/FINDINGS.md``

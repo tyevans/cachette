@@ -65,8 +65,9 @@ is one action integer.
 
 # References
 
-[^1]: ADR-0194, a generation is scored in shards and combined in candidate
-order. ``docs/adrs/draft/adr-0194-a-generation-is-scored-in-shards.md``
+[^1]: ADR-0194, a generation is scored one episode at a time, and combined in
+candidate order.
+``docs/adrs/draft/adr-0194-a-generation-is-scored-in-shards.md``
 
 [^2]: What is wrong with training and evaluation, items 1 and 2.
 ``docs/research/what-is-wrong-with-training-and-evaluation.md``
@@ -656,8 +657,16 @@ def train(
     validate_every: int = 3,
     holdout: list[int] | None = None,
     holdout_every: int = 5,
+    shard_pool: ShardPool | None = None,
 ) -> TrainResult:
     """Train one policy, and return what each generation scored.
+
+    The shard pool entry is an open pool of worker processes that this
+    strategy queues its episodes into. **A caller that trains several
+    strategies passes one pool for all of them**, so a strategy between two
+    generations leaves no core idle while another strategy holds work. A
+    caller that passes none opens a pool of the size the configuration names,
+    or scores the generation in this process when that size is one.
 
     The kind entry names the policy the run trains. A linear policy scores
     each action row from a weighted sum of the features. A structured policy
@@ -753,19 +762,26 @@ def train(
     degenerate: list[int] = []
     started = time.time()
 
-    # **The pool decides whether a generation is sharded, and the shard count
+    # **The pool decides whether a generation is queued, and the pool size
     # decides whether there is a pool.** One process opens nothing and scores
     # the generation here, which is the path every earlier run took.
+    #
+    # A caller that trains several strategies passes one open pool, and every
+    # strategy then queues its episodes into it. This function opens a pool
+    # of its own only when it holds the whole run, and it closes only what it
+    # opened.
     #
     # The pool stays open for the whole run, so a generation pays no process
     # start cost, and the matrix thread variables it sets hold for as long as
     # a worker might start.
     opened: AbstractContextManager[ShardPool | None]
-    if train_config.shards > 1:
-        opened = ShardPool(train_config.shards)
+    if shard_pool is not None:
+        opened = nullcontext(shard_pool)
+    elif train_config.pool > 1:
+        opened = ShardPool(train_config.pool)
         print(
-            f"  {name} scores each generation in {train_config.shards} processes "
-            f"of {train_config.workers} workers",
+            f"  {name} queues each generation over {train_config.pool} "
+            "worker processes, one episode in each task",
             flush=True,
         )
     else:
@@ -790,6 +806,7 @@ def train(
                 kind,
                 label,
                 normalizer,
+                name,
             )
             update = optimiser.update(centre, generation, played.ranked)
             policy = optimiser.rebuild(update.centre)
@@ -940,6 +957,7 @@ def play_generation(
     kind: str,
     label: str,
     normalizer: FeatureNormalizer | None = None,
+    strategy: str = "",
 ) -> Generation:
     """Score one generation, in this process or across the worker pool.
 
@@ -947,9 +965,13 @@ def play_generation(
     generation number.** The centre and the normalizer cross to it, so this
     process builds the population only when it plays the population itself.
 
-    A sharded generation scores one batch under one objective. A run that
+    A queued generation scores one batch under one objective. A run that
     varies the objective by seed position therefore fails here rather than
-    scoring the shards under the first entry of its schedule.
+    scoring the episodes under the first entry of its schedule.
+
+    The strategy entry names what the episodes play for. One queue holds the
+    episodes of every strategy of a run, so each task carries its name and
+    the combination refuses a result that another strategy drew.
     """
     if pool is None:
         return score_generation(
@@ -971,6 +993,7 @@ def play_generation(
         kind,
         label,
         normalizer,
+        strategy,
     )
 
 

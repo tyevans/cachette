@@ -544,9 +544,10 @@ plan="$(cd "$root" && uv run python -m cachette.learn \
 Nothing was created. A run whose size nobody knows is worse than no run."
 plan_field() { printf '%s\n' "$plan" | awk -F'\t' -v k="$1" '$1==k{print $2}'; }
 strategies="$(plan_field strategies)"
-workers_each="$(plan_field workers_each)"
+queued_episodes="$(plan_field queued_episodes)"
+episodes_each_worker="$(plan_field episodes_each_worker)"
 total_generations="$(plan_field generations_total)"
-probe_worlds="$(plan_field generation_worlds)"
+probe_worlds="$(plan_field generation_episodes)"
 validate_every="$(plan_field validate_every)"
 holdout_every="$(plan_field holdout_every)"
 measurement_share="$(plan_field measurement_share)"
@@ -604,8 +605,9 @@ cat >&2 <<PLAN
   trainer       $train_args
   world         $world_preview
   generations   $total_generations across $strategies strategies
-  each strategy $workers_each of the $cores cores, because one process trains one
-                strategy and they all run at once
+  one queue     $queued_episodes episodes for each generation of the run, which is
+                $episodes_each_worker for each of the $cores cores. One process trains every
+                strategy and one worker plays one episode
   episodes      $total_episodes for one strategy, of which $measurement_episodes measure
                 rather than train, which is a share of $measurement_share
   estimate      $estimated_minutes minutes against a cap of $MAX_MINUTES, and this is a
@@ -1025,65 +1027,77 @@ fi
 # **A failure here must not end the run.** The cache is an optimisation, and
 # each trainer measures the number itself when the cache does not hold it.
 # Ending the run over a missing optimisation would cost the whole run.
+#
+# **A later argument wins, so the pool of this pass comes after the arguments
+# of the run.** The trainer parses the whole line and takes the last value of
+# each flag. This pass named its core count before `$TRAIN_ARGS`, under a flag
+# that a run could pass as well, so a run that named a worker count of its own
+# overrode it and the pass that may hold the whole machine played a handful of
+# worlds at a time. A pass that no queue splits now takes the cores this
+# script gives it, and nothing else can name them.
 mark baseline
 uv run python -u -m cachette.learn --baseline-only \
     --only "$(printf '%s' "$names" | tr ' ' ',')" \
-    --out runs/learn/baseline --workers "$cores" $TRAIN_ARGS 2>&1 \
+    --out runs/learn/baseline $TRAIN_ARGS --pool "$cores" 2>&1 \
     | tee -a runs/learn/train.log || true
 
 # ------------------------------------------------------------- the training
+#
+# **One process trains every strategy, and one queue holds their episodes.**
+# The script started one process for each strategy and gave each of them a
+# share of the cores. A strategy between two generations, or waiting on its
+# last episode, then left its share of the machine idle while another strategy
+# had work to queue. One process holds one pool of one worker for each core,
+# every strategy submits into it, and no barrier joins two strategies.
+#
+# The trainer writes the log of each strategy under its own name, which is the
+# file the dashboard reads, and it appends every line to the combined log as
+# well.
 mark running
-
-# Each process writes its own log, and appends to the one the follower reads.
-# A line of the log is short and each process writes whole lines, so the
-# combined file stays readable.
-for name in $names; do
-    (
-        # **Every strategy records how it ended, whether it worked or not.**
-        # Without this, a strategy that dies leaves no line, the others
-        # finish, and the run reports done while a fifth of it is missing.
-        # The status comes from the trainer and not from the tee after it.
-        set +e
-        # **A strategy that dies takes its share of the machine with it.** Two
-        # runs have lost a strategy to a fault in native code, once with a
-        # segmentation fault and once with a bus error, and each left a machine
-        # of sixty four cores at half load for hours while it kept billing.
-        # The trainer writes a resume point every generation, so a restart
-        # costs one generation and never the run.
-        attempt=1
-        extra=""
-        while :; do
-            started="$(date +%s)"
-            uv run python -u -m cachette.learn --only "$name" \
-                --out "runs/learn/$name" --workers "$each" $TRAIN_ARGS $extra 2>&1 \
-                | tee -a runs/learn/train.log >> "runs/learn/$name.log"
-            code="${PIPESTATUS[0]}"
-            ran=$(( $(date +%s) - started ))
-            printf '%s attempt %s exited %s after %ss\n' \
-                "$name" "$attempt" "$code" "$ran" >> runs/learn/status
-            [ "$code" -eq 0 ] && break
-            [ "$attempt" -ge 5 ] && break
-            # **A strategy that dies at once dies for a reason a restart cannot
-            # fix.** A bad argument or a missing module fails in seconds, and
-            # retrying it only fills the log. A fault in a long run is the case
-            # a restart is for, so only a run that lasted a while earns one.
-            if [ "$ran" -lt 120 ]; then
-                printf '%s failed in %ss, which is too fast to be a fault worth retrying\n' \
-                    "$name" "$ran" >> runs/learn/status
-                break
-            fi
-            attempt=$(( attempt + 1 ))
-            # The resume point carries the centre, so the restart continues the
-            # search instead of starting it again.
-            extra="--resume"
-            printf '  %s restarting from its resume point, attempt %s\n' \
-                "$name" "$attempt" | tee -a runs/learn/train.log >> "runs/learn/$name.log"
-            sleep 15
-        done
-    ) &
-done
-wait
-printf '=== how each strategy ended ===\n'
+all_names="$(printf '%s' "$names" | tr ' ' ',')"
+(
+    # **The run records how it ended, whether it worked or not.** Without
+    # this, a run that dies leaves no line and reports done. The status comes
+    # from the trainer and not from the tee after it.
+    set +e
+    # **A run that dies takes the whole machine with it.** Two runs have lost
+    # a strategy to a fault in native code, once with a segmentation fault and
+    # once with a bus error, and each left a machine of sixty four cores at
+    # half load for hours while it kept billing. The trainer writes a resume
+    # point for each strategy every generation, so a restart costs one
+    # generation of each strategy and never the run.
+    attempt=1
+    extra=""
+    while :; do
+        started="$(date +%s)"
+        uv run python -u -m cachette.learn --only "$all_names" \
+            --out runs/learn $TRAIN_ARGS $extra --pool "$cores" 2>&1 \
+            | tee -a runs/learn/train.log
+        code="${PIPESTATUS[0]}"
+        ran=$(( $(date +%s) - started ))
+        printf 'run attempt %s exited %s after %ss\n' \
+            "$attempt" "$code" "$ran" >> runs/learn/status
+        [ "$code" -eq 0 ] && break
+        [ "$attempt" -ge 5 ] && break
+        # **A run that dies at once dies for a reason a restart cannot fix.**
+        # A bad argument or a missing module fails in seconds, and retrying it
+        # only fills the log. A fault in a long run is the case a restart is
+        # for, so only a run that lasted a while earns one.
+        if [ "$ran" -lt 120 ]; then
+            printf 'the run failed in %ss, which is too fast to be a fault worth retrying\n' \
+                "$ran" >> runs/learn/status
+            break
+        fi
+        attempt=$(( attempt + 1 ))
+        # The resume point carries the centre of each strategy, so the restart
+        # continues every search instead of starting it again.
+        extra="--resume"
+        printf '  restarting from the resume points, attempt %s\n' \
+            "$attempt" | tee -a runs/learn/train.log
+        sleep 15
+    done
+)
+printf '=== how the run ended ===\n'
 cat runs/learn/status 2>/dev/null
 # The run failed if any strategy ended on a failure. A marker that says done
 # over a dead strategy is worse than no marker.

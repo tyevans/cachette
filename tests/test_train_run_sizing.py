@@ -27,10 +27,12 @@ from pathlib import Path
 import pytest
 
 from cachette.learn.sizing import (
+    EPISODE_LENGTH_SPREAD,
     Episodes,
     RunShape,
     episodes,
     generations_inside,
+    plan_notes,
     plan_of,
     seconds_for,
     workers_for_each_strategy,
@@ -298,3 +300,150 @@ def test_the_episode_counts_answer_a_shorter_run() -> None:
     assert isinstance(part, Episodes)
     assert part.training < whole.training
     assert part.training == 9 * 24 * 6
+
+
+def test_the_plan_reports_the_episodes_for_each_worker() -> None:
+    """One task is one episode, so the queue depth is the figure that sizes.
+
+    The paid run holds four strategies of twenty-four candidates over six
+    seeds. One queue holds every strategy, so a generation of the run is
+    four times one hundred and forty-four episodes, and a machine of
+    sixty-four cores plays nine of them for each core.
+    """
+    plan = plan_of(PAID_RUN, 64, 0.0)
+
+    assert plan.generation_episodes == 24 * 6
+    assert plan.queued_episodes == 4 * 24 * 6
+    assert plan.episodes_for_each_worker == pytest.approx(9.0)
+    assert plan.run_episodes_for_each_worker > plan.episodes_for_each_worker
+    assert plan.episode_tail_share == pytest.approx(1.0 / 9.0)
+
+
+def test_the_episodes_for_each_worker_read_the_whole_run() -> None:
+    """Every episode of every strategy passes through the one queue.
+
+    The figure for one generation counts the training episodes alone. The
+    figure for the run counts the measurement passes as well, which are more
+    than a third of the paid run.
+    """
+    plan = plan_of(PAID_RUN, 64, 0.0)
+    played = episodes(PAID_RUN)
+
+    assert plan.run_episodes_for_each_worker == pytest.approx(played.total * 4 / 64)
+
+
+def test_the_plan_warns_when_the_tail_of_one_episode_dominates() -> None:
+    """The threshold is the measured spread of the episode lengths.
+
+    An episode of the audited world runs between 1,271 and 3,311 ticks, so
+    the longest is about 2.61 times the shortest. A worker that plays fewer
+    episodes than that ratio empties its queue and idles while another worker
+    finishes the longest episode.
+
+    The two core counts below sit either side of that ratio for a generation
+    of forty-eight episodes: 48 over 18 is 2.67 and 48 over 19 is 2.53.
+    """
+    starved = RunShape(**{**vars(PAID_RUN), "seeds": 2, "strategies": 1})
+
+    assert EPISODE_LENGTH_SPREAD == pytest.approx(3311 / 1271)
+    assert not plan_of(starved, 18, 0.0).tail_dominates
+    assert plan_of(starved, 19, 0.0).tail_dominates
+    assert plan_notes(plan_of(starved, 19, 0.0))[0].startswith("one queue holds")
+    assert not any(
+        note.startswith("one queue holds")
+        for note in plan_notes(plan_of(starved, 18, 0.0))
+    )
+
+
+def test_the_plan_the_launcher_prints_holds_the_queue_figures() -> None:
+    """A launcher reads the rows by name, so the names must be there."""
+    fields = _plan(
+        "--generations",
+        "20",
+        "--population",
+        "24",
+        "--seeds",
+        "6",
+        "--holdout",
+        "256",
+        "--validation",
+        "128",
+        "--validate-every",
+        "2",
+        "--only",
+        "conquer",
+        "--cores",
+        "64",
+        "--wall-minutes",
+        "0",
+    )
+
+    assert fields["generation_episodes"] == str(24 * 6)
+    assert fields["queued_episodes"] == str(24 * 6)
+    assert fields["episodes_each_worker"] == "2.25"
+    assert fields["episode_tail_dominates"] == "yes"
+    assert fields["episode_tail_spread"] == f"{EPISODE_LENGTH_SPREAD:.2f}"
+
+
+def test_a_retired_argument_refuses_the_run_and_names_what_replaced_it() -> None:
+    """A flag that is accepted and ignored is worse than a flag that is gone.
+
+    Two knobs named a split that no longer happens. The shard count cut the
+    population into one block for each process, and the block count could not
+    pass the pair count, so a run that asked for sixteen shards of a
+    population of twenty-four silently received twelve. The worker count
+    multiplied the engine threads of each of those processes, and a run that
+    named one silently overrode the cores of the pass that fills the baseline
+    cache.
+
+    A launcher that still passes either one must fail before it rents a
+    machine, and the message must name the pool.
+    """
+    for retired in ("--shards", "--workers", "--baseline-workers"):
+        finished = subprocess.run(
+            [sys.executable, "-m", "cachette.learn", retired, "8", "--print-plan"],
+            capture_output=True,
+            text=True,
+            check=False,
+            cwd=ROOT,
+        )
+
+        assert finished.returncode != 0, f"{retired} was accepted"
+        assert "retired" in finished.stderr
+        assert "--pool" in finished.stderr
+
+
+def test_the_launcher_names_the_pool_after_the_arguments_of_the_run() -> None:
+    """One flag names the machine, and the arguments of a run cannot override it.
+
+    The trainer takes the last value of a repeated flag, and the launcher
+    appends the arguments of the run after its own. The pass that fills the
+    baseline cache named its core count before those arguments, under a flag
+    a run could pass as well, so a run that named a worker count of its own
+    overrode it and that pass played a handful of worlds at a time.
+
+    Both passes now name the pool after the arguments of the run, and neither
+    names a worker count at all.
+    """
+    script = LAUNCHER.read_text(encoding="utf-8")
+    starts = (script.index("--baseline-only"), script.index('--only "$all_names"'))
+
+    for start in starts:
+        command = script[start : script.index("| tee", start)]
+        assert "$TRAIN_ARGS" in command
+        assert command.index("$TRAIN_ARGS") < command.index("--pool")
+        assert '--pool "$cores"' in command
+        assert "--workers" not in command
+
+
+def test_the_launcher_trains_every_strategy_in_one_process() -> None:
+    """One queue holds the episodes of every strategy of a run.
+
+    The launcher started one process for each strategy and gave each of them
+    a share of the cores. A strategy between two generations then left its
+    share of the machine idle while another strategy had work to queue.
+    """
+    script = LAUNCHER.read_text(encoding="utf-8")
+
+    assert "for name in $names; do" not in script
+    assert '--only "$all_names"' in script

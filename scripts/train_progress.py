@@ -117,11 +117,17 @@ IN_FLIGHT = re.compile(r"(?:^|\s)working(?:\s|$)")
 # scores. The strategy name and the shard are both optional. One process
 # measures the shared controller baseline for every strategy and names none
 # of them, and a pass that one process scores whole reports no shard.
+#
+# **The first count is the decisions of a batch or the episodes of a queue.**
+# A pass this process plays steps every world of a batch together, so it
+# counts decisions. A generation of a training run holds one episode in each
+# task of a queue, so it counts the episodes that finished. Both are a count
+# of work done since the pass started, and the reader treats them alike.
 WORKING = re.compile(
     r"^\s+(?:(?P<name>\S+) )?(?P<what>generation\s+\d+|yardstick|baseline"
     r"|validation\s+\d+|holdout\s+\d+)"
     r"(?: shard (?P<shard>\d+)/(?P<shards>\d+))?"
-    r" working\s+decisions\s+(?P<decisions>\d+)\s+"
+    r" working\s+(?:decisions|episodes)\s+(?P<decisions>\d+)\s+"
     r"live\s+(?P<live>\d+)/(?P<worlds>\d+)\s+"
     r"ticks\s+(?P<ticks>\d+)\s+rate\s+(?P<rate>[\d.]+) t/s\s+"
     r"\[(?P<seconds>[\d.]+)s\]"

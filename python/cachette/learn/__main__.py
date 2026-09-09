@@ -82,12 +82,16 @@ game. ``scripts/instrumental_population.py``
 from __future__ import annotations
 
 import argparse
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import ExitStack
 from dataclasses import asdict, replace
 from pathlib import Path
 
 from .baseline import available_workers, controller_baseline, controller_baselines
 from .env import Env, EnvConfig, viable_seeds
+from .journal import ThreadJournal, strategy_log, strategy_logs
 from .policy import (
     LinearPolicy,
     Policy,
@@ -97,12 +101,15 @@ from .policy import (
 )
 from .presets import ObjectiveSchedule, load_library, schedule_of
 from .reward import Scoring, Weighting
+from .shard import ShardPool
 from .sizing import (
     TICKS_A_SECOND_FOR_EACH_WORKER,
     Plan,
     RunShape,
     plan_lines,
+    plan_notes,
     plan_of,
+    workers_for_each_strategy,
 )
 from .structured import STRUCTURED_KIND, StructuredPolicy
 from .train import TrainConfig, evaluate, first_scoring, train, write_report
@@ -641,6 +648,37 @@ def fill_baseline_cache(
     return 0
 
 
+class Retired(argparse.Action):
+    """Refuse an argument that no longer means anything, and name its heir.
+
+    **A flag that is accepted and ignored is worse than a flag that is
+    gone.** A run passes it, reads it back in the log, and believes it
+    reached something. This ends the run instead, with the name of what
+    replaced it, so a launcher that still passes the old flag fails on the
+    first line rather than after it rents a machine.
+    """
+
+    def __init__(self, option_strings: list[str], dest: str, **fields: object) -> None:
+        """Declare an argument that takes no value and always fails.
+
+        The value count is zero, so the run fails on the flag itself and
+        never on the number beside it.
+        """
+        fields["nargs"] = 0
+        super().__init__(option_strings, dest, **fields)  # type: ignore[arg-type]
+
+    def __call__(
+        self,
+        parser: argparse.ArgumentParser,
+        namespace: argparse.Namespace,
+        values: object,
+        option_string: str | None = None,
+    ) -> None:
+        """End the run, and say what replaced this argument."""
+        del namespace, values
+        parser.error(f"{option_string} is retired: {self.help}")
+
+
 def main() -> int:
     """Train each named strategy, measure it against the baselines, report."""
     parser = argparse.ArgumentParser(description="Train the learner seat.")
@@ -649,41 +687,36 @@ def main() -> int:
     parser.add_argument("--population", type=int, default=24)
     parser.add_argument("--seeds", type=int, default=6)
     parser.add_argument(
-        "--workers",
-        type=int,
-        default=16,
-        help=(
-            "how many engine workers one process gives its batch. This is a "
-            "per process count, so a run of five shards with twelve workers "
-            "asks for sixty workers on the machine"
-        ),
-    )
-    # **The pass that fills the baseline cache runs alone, so it takes the
-    # whole machine.** Every trainer of the run waits for it, and it took the
-    # per process worker count of a trainer instead. That held the pass over
-    # the whole held-out seed set to a tenth of a rented machine of sixty
-    # four cores, and nothing failed. Zero asks the machine what it has.
-    parser.add_argument(
-        "--baseline-workers",
+        "--pool",
         type=int,
         default=0,
         help=(
-            "how many engine workers the pass that fills the baseline cache "
-            "gives its batch. Zero takes every core the machine offers, "
-            "because that pass runs alone and every trainer waits for it"
+            "how many worker processes hold the queue of this run. One task "
+            "is one episode and every strategy submits into the one queue, "
+            "so this names the machine. Zero takes every core the machine "
+            "offers, which is the value a run wants"
         ),
     )
-    parser.add_argument(
-        "--shards",
-        type=int,
-        default=1,
-        help=(
-            "how many worker processes score one generation. One process "
-            "scores it here and starts nothing. The candidates are split "
-            "across the processes and the scores are combined in candidate "
-            "order, so the weights do not depend on this number"
+    # **A knob that cannot be right must not exist.** Two of them named a
+    # split that no longer happens. The shard count cut the population into
+    # one block for each process, and the block count could not pass the pair
+    # count, so a run that asked for sixteen shards of a population of
+    # twenty-four silently received twelve. The worker count multiplied the
+    # engine threads of every one of those processes, and a run that passed
+    # one silently overrode the cores of the pass that fills the baseline
+    # cache.
+    #
+    # A flag that is accepted and ignored is worse than a flag that is gone,
+    # so each of these names what replaced it and refuses the run.
+    for retired, instead in (
+        ("--shards", "one task is one episode, so name the pool with --pool"),
+        ("--workers", "a worker plays one episode in one thread, so use --pool"),
+        (
+            "--baseline-workers",
+            "the pass that fills the baseline cache takes the machine, so use --pool",
         ),
-    )
+    ):
+        parser.add_argument(retired, action=Retired, help=instead)
     # **The holdout decides whether a run achieved anything, so its size
     # sets what the run can claim.** A win share is a proportion, and the
     # error of a proportion near one third over n worlds is the square root
@@ -970,8 +1003,26 @@ def main() -> int:
         print(world_lines(WORLD))
         return 0
     if arguments.print_plan:
-        print(plan_lines(run_plan(arguments, names)))
+        # **The rows are the interface a launcher reads, and a note is for a
+        # person.** A note carries no tab, so a reader that takes a field by
+        # name never meets one.
+        plan = run_plan(arguments, names)
+        print(plan_lines(plan))
+        for note in plan_notes(plan):
+            print(f"# note {note}")
         return 0
+    # **One number sizes the whole run.** The queue holds one worker process
+    # for each core, and the passes that no queue splits step one batch of
+    # worlds with one engine thread for each core. A run that names nothing
+    # asks the machine what it has, so the number nobody chooses is the
+    # number that cannot be wrong.
+    pool_size = arguments.pool or available_workers()
+    # **A pass that no queue splits steps one batch of many worlds**, and the
+    # strategies of a run play those passes at the same time. Each of them
+    # therefore takes the cores divided by the strategy count, which is what
+    # the plan of the run counts on. A pass that runs alone takes the whole
+    # machine, and the baseline pass is the one that does.
+    batch_workers = workers_for_each_strategy(pool_size, len(names))
     learner_seats = tuple(
         int(seat) for seat in arguments.league.split(",") if seat.strip()
     )
@@ -982,7 +1033,7 @@ def main() -> int:
     out = arguments.out
     out.mkdir(parents=True, exist_ok=True)
     if arguments.behaviour:
-        return report_behaviour(names, out, arguments.holdout, arguments.workers)
+        return report_behaviour(names, out, arguments.holdout, pool_size)
 
     # The training pool and the holdout share no seed, so a reported figure
     # comes from a world the policy never trained on.
@@ -997,7 +1048,7 @@ def main() -> int:
         return fill_baseline_cache(
             names,
             holdout,
-            arguments.baseline_workers or available_workers(),
+            pool_size,
             Env(WORLD, first_scoring(STRATEGIES[names[0]][1])),
         )
 
@@ -1025,8 +1076,7 @@ def main() -> int:
         "sigma": arguments.sigma,
         "learning_rate": arguments.learning_rate,
         "learner_seats": list(learner_seats),
-        "workers": arguments.workers,
-        "shards": arguments.shards,
+        "pool": pool_size,
         "relative_scoring": bool(learner_seats) and not arguments.absolute_scoring,
         "world": asdict(WORLD),
         "strategies": {},
@@ -1066,7 +1116,7 @@ def main() -> int:
         controller_scoring,
         no_op("linear"),
         holdout,
-        arguments.workers,
+        pool_size,
         probe.observation_version,
         f"{names[0]} baseline",
     )
@@ -1085,91 +1135,160 @@ def main() -> int:
     print(f"  the controller baseline was {source}", flush=True)
     write_report(out / "report.json", report)
 
-    for index, name in enumerate(names):
-        env_config, scoring, kind = STRATEGIES[name]
-        print(f"\n=== {name} ({kind}) ===", flush=True)
-        train_config = TrainConfig(
-            generations=arguments.generations,
-            population=arguments.population,
-            seeds_per_generation=arguments.seeds,
-            sigma=arguments.sigma,
-            learning_rate=arguments.learning_rate,
-            workers=arguments.workers,
-            shards=arguments.shards,
-            seed=index,
-            learner_seats=learner_seats,
-            relative=not arguments.absolute_scoring,
-            validate_candidate=arguments.validate_candidate,
-        )
-        result = train(
-            name,
-            env_config,
-            scoring,
-            train_config,
-            out,
-            pool,
-            kind=kind,
-            resume=arguments.resume,
-            validation=validation,
-            validate_every=validate_every,
-            holdout=holdout,
-            holdout_every=arguments.holdout_every,
-        )
-        trained, _ = load_policy(Path(result["weights"]))
-        untrained = no_op(kind)
-        # **The holdout measurement holds one objective for the whole
-        # strategy.** A schedule moves the objective between generations, and
-        # two numbers taken under two objectives cannot be compared. The pass
-        # therefore takes the first scoring, which is what the run started
-        # under and what the validation pass held.
-        fixed = first_scoring(scoring)
-        measured = {
-            "trained": evaluate(env_config, fixed, trained, holdout, arguments.workers),
-            "untrained": evaluate(
-                env_config, fixed, untrained, holdout, arguments.workers
-            ),
-            "random": evaluate(
+    # **One queue holds the episodes of every strategy of a run.** A strategy
+    # that is between two generations, or waiting on its last episode, would
+    # otherwise leave its share of the machine idle while another strategy
+    # had work to queue. Every strategy of this process submits into one
+    # pool of worker processes.
+    #
+    # **The dependency is inside a strategy, and no barrier crosses two of
+    # them.** Generation N+1 of one strategy needs every episode of its own
+    # generation N, and it needs no episode of another strategy. So a
+    # strategy that finishes first queues its next generation while another
+    # is still finishing, and the queue empties only when no strategy holds
+    # work.
+    #
+    # Each strategy runs in a thread of this process and waits on the results
+    # of its own episodes. The episodes run in the worker processes, so a
+    # thread here holds the interpreter only while it reads a result.
+    #
+    # The report is one document for the whole run, so the lock holds while a
+    # strategy writes into it.
+    lock = threading.Lock()
+
+    def train_strategy(
+        index: int,
+        name: str,
+        shard_pool: ShardPool | None,
+        journal: ThreadJournal | None,
+    ) -> None:
+        """Train one strategy, measure it on the held-out seeds, report it.
+
+        The journal entry sends the lines of this thread to the log file of
+        this strategy, as well as to the standard output. A caller that
+        trains one strategy passes none, because the log of the process is
+        already the log of the strategy.
+        """
+        with strategy_log(journal, out / f"{name}.log"):
+            env_config, scoring, kind = STRATEGIES[name]
+            print(f"\n=== {name} ({kind}) ===", flush=True)
+            train_config = TrainConfig(
+                generations=arguments.generations,
+                population=arguments.population,
+                seeds_per_generation=arguments.seeds,
+                sigma=arguments.sigma,
+                learning_rate=arguments.learning_rate,
+                workers=batch_workers,
+                pool=pool_size,
+                seed=index,
+                learner_seats=learner_seats,
+                relative=not arguments.absolute_scoring,
+                validate_candidate=arguments.validate_candidate,
+            )
+            result = train(
+                name,
                 env_config,
-                fixed,
-                RandomPolicy(seed=index),
-                holdout,
-                arguments.workers,
-                repeats=3,
-            ),
-            "controller": controller_baseline(
-                CONTROLLER_WORLD,
-                fixed,
-                untrained,
-                holdout,
-                arguments.workers,
-                probe.observation_version,
-                f"{name} baseline",
-            )[0],
-        }
-        result["holdout"] = measured
-        report["strategies"][name] = result  # type: ignore[index]
-        # **A generation that carried no information hides inside a mean and a
-        # best.** Every candidate scored the same number, so the mean equals
-        # the best, and that reads like a population which agreed. The trainer
-        # names each one as it happens, and this line names them again beside
-        # the held-out figures, where a reader who reads only the end of a
-        # strategy still meets them.
-        wasted = result["degenerate_generations"]
-        if wasted:
+                scoring,
+                train_config,
+                out,
+                pool,
+                kind=kind,
+                resume=arguments.resume,
+                validation=validation,
+                validate_every=validate_every,
+                holdout=holdout,
+                holdout_every=arguments.holdout_every,
+                shard_pool=shard_pool,
+            )
+            trained, _ = load_policy(Path(result["weights"]))
+            untrained = no_op(kind)
+            # **The holdout measurement holds one objective for the whole
+            # strategy.** A schedule moves the objective between generations, and
+            # two numbers taken under two objectives cannot be compared. The pass
+            # therefore takes the first scoring, which is what the run started
+            # under and what the validation pass held.
+            fixed = first_scoring(scoring)
+            measured = {
+                "trained": evaluate(env_config, fixed, trained, holdout, batch_workers),
+                "untrained": evaluate(
+                    env_config, fixed, untrained, holdout, batch_workers
+                ),
+                "random": evaluate(
+                    env_config,
+                    fixed,
+                    RandomPolicy(seed=index),
+                    holdout,
+                    batch_workers,
+                    repeats=3,
+                ),
+                "controller": controller_baseline(
+                    CONTROLLER_WORLD,
+                    fixed,
+                    untrained,
+                    holdout,
+                    batch_workers,
+                    probe.observation_version,
+                    f"{name} baseline",
+                )[0],
+            }
+            result["holdout"] = measured
+            with lock:
+                report["strategies"][name] = result  # type: ignore[index]
+            # **A generation that carried no information hides inside a mean and a
+            # best.** Every candidate scored the same number, so the mean equals
+            # the best, and that reads like a population which agreed. The trainer
+            # names each one as it happens, and this line names them again beside
+            # the held-out figures, where a reader who reads only the end of a
+            # strategy still meets them.
+            wasted = result["degenerate_generations"]
+            if wasted:
+                print(
+                    f"  {len(wasted)} of {arguments.generations} generations carried "
+                    f"no information and moved no centre: {wasted}",
+                    flush=True,
+                )
+            for label in ("trained", "untrained", "random", "controller"):
+                row = measured[label]
+                print(
+                    f"  {label:11s} return {row['return']:10.1f} "
+                    f"tiles {row['held_tiles']:7.1f} won {row['won']:5.2f} "
+                    f"lost {row['lost']:5.2f}",
+                    flush=True,
+                )
+            with lock:
+                write_report(out / "report.json", report)
+
+    # **A pool of one process is no pool.** A machine of one core scores each
+    # generation in this process, which is the path every run took before the
+    # queue existed, and the strategies then run one after another.
+    pool_processes = max(1, pool_size)
+    with ExitStack() as stack:
+        shard_pool = (
+            stack.enter_context(ShardPool(pool_processes))
+            if pool_processes > 1
+            else None
+        )
+        if shard_pool is not None:
             print(
-                f"  {len(wasted)} of {arguments.generations} generations carried "
-                f"no information and moved no centre: {wasted}",
+                f"  {len(names)} strategies queue their episodes over "
+                f"{pool_processes} worker processes, one episode in each task",
                 flush=True,
             )
-        for label in ("trained", "untrained", "random", "controller"):
-            row = measured[label]
-            print(
-                f"  {label:11s} return {row['return']:10.1f} "
-                f"tiles {row['held_tiles']:7.1f} won {row['won']:5.2f} "
-                f"lost {row['lost']:5.2f}",
-                flush=True,
-            )
-        write_report(out / "report.json", report)
+        if shard_pool is None or len(names) == 1:
+            for index, name in enumerate(names):
+                train_strategy(index, name, shard_pool, None)
+        else:
+            journal = stack.enter_context(strategy_logs())
+            with ThreadPoolExecutor(max_workers=len(names)) as threads:
+                running = [
+                    threads.submit(train_strategy, index, name, shard_pool, journal)
+                    for index, name in enumerate(names)
+                ]
+                # **A strategy that raises must end the run.** A thread that
+                # died would otherwise leave its rows out of the report while
+                # the run said that it finished.
+                for future in running:
+                    future.result()
 
     report["seconds"] = round(time.time() - started, 1)
     write_report(out / "report.json", report)

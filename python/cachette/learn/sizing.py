@@ -14,13 +14,17 @@ of that run needs two answers before the machine exists.
 This module answers both from the arguments alone, so a launcher prints the
 answer before it creates anything.
 
-# One process holds a share of the machine
+# One strategy holds a share of the machine
 
-A run starts one trainer process for each strategy and divides the cores
-between them, so a run of four strategies on sixty-four cores gives each
-strategy sixteen workers. **The reasoning that sized a run assumed the whole
-machine.** Every estimate here therefore takes the workers one strategy
-receives and never the cores of the instance.
+One process trains every strategy of a run, and one queue of worker processes
+holds their episodes. The strategies submit into that queue at the same time,
+so each of them receives about the cores divided by the strategy count: a run
+of four strategies on sixty-four cores works out at sixteen for each.
+
+**The reasoning that sized a run assumed the whole machine for one strategy.**
+Every estimate of time here therefore takes the share one strategy receives
+and never the cores of the instance. The queue figures take the cores, because
+one queue feeds every core from the episodes of every strategy.
 
 # The estimate is a floor, and it is derived
 
@@ -83,6 +87,22 @@ from dataclasses import dataclass
 # throughput passes it in rather than writing a second one, and the launcher
 # reprints the estimate against the rate its throughput probe measures.
 TICKS_A_SECOND_FOR_EACH_WORKER = 1231.0 / 12.0
+
+# The shortest and the longest episode of the audited training world, in
+# ticks. Both come from the audit of one paid run, which recorded the end tick
+# of every episode of a generation.
+#
+# **The spread is what decides whether a queue keeps a machine busy.** One
+# task is one episode, so a worker takes the next episode when it finishes
+# one, and the only wait left is the last episode of a generation. A worker
+# that plays few episodes cannot cover that wait with the rest of its queue.
+EPISODE_TICKS_SHORTEST = 1271
+EPISODE_TICKS_LONGEST = 3311
+
+# How many times longer the longest episode of a generation runs than the
+# shortest. **This is the one declaration of the spread**, and the threshold
+# below derives from it rather than from a chosen number.
+EPISODE_LENGTH_SPREAD = EPISODE_TICKS_LONGEST / EPISODE_TICKS_SHORTEST
 
 # How many times the held-out pass plays the random policy at the end of a
 # strategy. The engine is deterministic, so only a policy that draws at random
@@ -216,11 +236,16 @@ def episodes(shape: RunShape, generations: int | None = None) -> Episodes:
 
 
 def workers_for_each_strategy(cores: int, strategies: int) -> int:
-    """Return the engine workers one trainer process receives.
+    """Return the share of the machine one strategy receives.
 
-    A run starts one process for each strategy and divides the cores between
-    them. **A strategy therefore never holds the machine.** Every estimate of
-    a generation reads this and never the core count of the instance.
+    Every strategy of a run trains at the same time, and they submit their
+    episodes into one queue. **A strategy therefore never holds the machine.**
+    Every estimate of the time a generation takes reads this and never the
+    core count of the instance.
+
+    A pass that a queue does not split steps one batch of worlds with this
+    many engine threads, for the same reason: the strategies play those
+    passes at the same time.
     """
     if strategies <= 0:
         return max(1, cores)
@@ -282,6 +307,75 @@ class Plan:
         """Say whether the run finishes every generation inside the cap."""
         return self.cap_seconds <= 0.0 or self.seconds <= self.cap_seconds
 
+    @property
+    def generation_episodes(self) -> int:
+        """How many episodes one generation of one strategy plays.
+
+        A candidate plays one world for each seed, and one world is one
+        episode. One task is one episode, so this is also the task count of
+        one generation, and it reads no worker count.
+        """
+        return self.shape.population * self.shape.seeds
+
+    @property
+    def queued_episodes(self) -> int:
+        """How many episodes one generation of every strategy plays.
+
+        **One queue holds the episodes of every strategy of a run.** A
+        strategy needs the generation before its own and needs no episode of
+        another strategy, so the strategies do not wait for each other and
+        the queue holds this many episodes while every one of them is working.
+        """
+        return self.generation_episodes * max(1, self.shape.strategies)
+
+    @property
+    def episodes_for_each_worker(self) -> float:
+        """How many episodes of one generation one worker plays.
+
+        This reads the cores of the machine, because one queue feeds them
+        all. A machine that divides evenly between the strategies reaches the
+        same figure from one strategy over the workers it holds.
+        """
+        return self.queued_episodes / max(1, self.cores)
+
+    @property
+    def run_episodes_for_each_worker(self) -> float:
+        """How many episodes of the whole run one worker plays.
+
+        This counts the measurement passes as well as the training
+        generations, so it is what one core plays over the life of the
+        machine. **A measurement pass does not pass through the queue.** It
+        steps one batch of worlds in the process of its own strategy, and it
+        holds the machine for as long as it runs whatever the queue holds.
+        """
+        played = episodes(self.shape)
+        return played.total * max(1, self.shape.strategies) / max(1, self.cores)
+
+    @property
+    def episode_tail_share(self) -> float:
+        """The share of a generation that the last episode can hold open.
+
+        A worker plays its episodes one after another, so the wait at the end
+        of a generation is at most one episode out of the episodes a worker
+        plays. That is this share.
+        """
+        depth = self.episodes_for_each_worker
+        return 1.0 if depth <= 0.0 else min(1.0, 1.0 / depth)
+
+    @property
+    def tail_dominates(self) -> bool:
+        """Say whether the tail of one episode dominates a generation.
+
+        **The threshold is the measured spread of the episode lengths and not
+        a chosen number.** An episode of the audited world runs between 1,271
+        and 3,311 ticks, so the longest is 2.6 times the shortest. A worker
+        that plays fewer episodes than that ratio cannot cover a worker that
+        drew the longest episode: it empties its own queue and idles while
+        that one episode finishes. A worker that plays more than the ratio
+        covers it with the episodes it has left.
+        """
+        return self.episodes_for_each_worker < EPISODE_LENGTH_SPREAD
+
 
 def plan_of(
     shape: RunShape,
@@ -322,7 +416,13 @@ def plan_lines(plan: Plan) -> str:
         ("workers_each", str(plan.workers)),
         ("population", str(shape.population)),
         ("seeds", str(shape.seeds)),
-        ("generation_worlds", str(shape.population * shape.seeds)),
+        ("generation_episodes", str(plan.generation_episodes)),
+        ("queued_episodes", str(plan.queued_episodes)),
+        ("episodes_each_worker", f"{plan.episodes_for_each_worker:.2f}"),
+        ("run_episodes_each_worker", f"{plan.run_episodes_for_each_worker:.2f}"),
+        ("episode_tail_share", f"{plan.episode_tail_share:.3f}"),
+        ("episode_tail_spread", f"{EPISODE_LENGTH_SPREAD:.2f}"),
+        ("episode_tail_dominates", "yes" if plan.tail_dominates else "no"),
         ("validation_seeds", str(shape.validation)),
         ("validate_every", str(shape.validate_every)),
         ("holdout_seeds", str(shape.holdout)),
@@ -345,3 +445,35 @@ def plan_lines(plan: Plan) -> str:
         ("fits", "yes" if plan.fits else "no"),
     ]
     return "\n".join(f"{name}\t{value}" for name, value in rows)
+
+
+def plan_notes(plan: Plan) -> list[str]:
+    """Return the sentences a reader of the plan must not miss.
+
+    A row of the plan states a number and a launcher reads it by name. A note
+    states what a number means for this configuration, in the log a person
+    reads while the machine bills.
+
+    **This holds no judgement of its own.** Each note reads a field of the
+    plan, so a note cannot say something the rows deny.
+    """
+    notes: list[str] = []
+    if plan.tail_dominates:
+        notes.append(
+            f"one queue holds {plan.queued_episodes} episodes for each "
+            f"generation of the run, which is "
+            f"{plan.episodes_for_each_worker:.1f} for each of the {plan.cores} "
+            f"cores. The longest episode of a generation runs "
+            f"{EPISODE_LENGTH_SPREAD:.1f} times as long as the shortest, so a "
+            f"worker with fewer episodes than that cannot cover the last one, "
+            f"and the tail of one episode holds "
+            f"{plan.episode_tail_share * 100.0:.0f} percent of a generation "
+            f"open. Raise the population, the seeds or the strategies, or "
+            f"rent fewer cores."
+        )
+    if not plan.fits:
+        notes.append(
+            f"the wall clock cap ends this run at generation "
+            f"{plan.generations_reached} of {plan.shape.generations}"
+        )
+    return notes
