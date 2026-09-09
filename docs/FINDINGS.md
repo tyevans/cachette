@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-708**
+**Next number: FND-709**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18941,3 +18941,64 @@ test cannot tell correct from consistently wrong, and that the repair is to
 test what a value depends on rather than that it repeats.[^F703A] A validated
 return is the same shape of gate. It was watched for nine checkpoints and it
 never once asked what the policy did.
+
+### FND-708 — Three quarters of every policy weight sat over a feature that never changes, so the search learned a bias
+
+**Believed.** FND-707 established that no published policy reads the
+observation, and it explained the stop as a local optimum: the gradient toward
+a constant is large and available, and the gradient toward conditional
+behaviour asks many weights to agree for a smaller gain. That reading is
+correct and it names no mechanism. It leaves the repair open, and the obvious
+repairs are all at the search: a larger population, a smaller policy, a league
+that punishes a fixed plan.
+
+**True.** The mechanism is at the feature layer, and it is arithmetic.
+
+The encoder squashes each position of the observation and appends one entry of
+value one for the bias. Measured over 720 decisions across 12 seeds of a
+128 by 128 world with three factions, with the seat driven by uniformly drawn
+legal actions:
+
+| quantity | value |
+|---|---|
+| positions that ever change | 1,273 of 4,819 |
+| L2 norm of the constant part of the feature body | 10.66 |
+| L2 norm of the within-episode varying part | 3.25 |
+| the explicit bias entry | 1.00 |
+
+**A weight over a feature that never changes is a bias.** It adds a fixed
+offset to the score of one action row and it can do nothing else. So 3,546 of
+the 4,819 positions are bias positions, the policy holds one such weight for
+each of its 180 action rows, and the constant subspace outweighs the
+state-dependent subspace by 3.3 to one in norm.
+
+**Why the search takes it.** A per-row offset pays the same on every decision
+of every episode of every seed, so its correlation with the return is high and
+it survives the noise of a whole episode. The state-dependent part is a third
+the size, reaches under a fifth of the positions, and asks a perturbation to
+correlate with a small wobble. The constant is not merely the easier direction.
+It is the direction with the better signal to noise by construction, and an
+evolution strategy is a signal-to-noise machine.
+
+**A repair that measurement refused.** Dropping the dead positions is the
+larger prize, because it would cut the trainable count more than fivefold and
+the alignment of one generation goes as the square root of the pair count over
+the trainable count. It is not safe. The count of positions that ever move
+climbs from 537 at one seed to 1,265 at twelve and it does not settle, so a
+position that is silent for twelve seeds may carry a rare and decisive event on
+the thirteenth. **Centring is safe where dropping is not**, because centring
+removes the offset from every position and keeps every position readable.
+
+**Follows.** Subtract a per-position centre and divide by a per-position scale,
+both derived once from a fixed reference sample and stored with the weights. A
+policy file states nothing without its normalizer, so the fit must refuse a
+mismatch in the way it refuses a mismatched layout.
+
+**What this says about the run that produced it.** The four published policies
+were trained against a search space in which most directions could not express
+a response to the world. The spend bought a correct answer to the wrong
+question, and no amount of population would have changed it. **A search
+diagnosis was reached three times before the feature layer was measured
+once.** The register already holds the rule: test what a value depends on
+rather than that it repeats.[^F703A] A feature vector is a value, and nothing
+had ever asked what it depends on.
