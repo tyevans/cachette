@@ -56,19 +56,28 @@ from dataclasses import dataclass
 
 # The ticks a second this model gives one engine worker.
 #
-# **The rate depends on the extent and this figure states none.** A sixty-four
-# core machine of the target platform reaches eighteen to twenty-one thousand
-# simulated ticks a second across the whole machine on the runs this project
-# has trained, which is about 281 for each core and nearly three times the
-# figure here. The figure here nonetheless predicted the shortfall of the run
-# that delivered nine generations of twenty, and the faster one does not, so
-# the extents of the two measurements differ. A development box measured 756
-# ticks a second at extent 48 against 439 at extent 128, a factor of 1.72, and
-# the audited run was the first at the larger extent.
+# **The rate depends on the extent, and the register row behind this figure
+# states none.** That row is a first-week measurement and it is stale.
 #
-# Keep the conservative figure until a rate is measured at a stated extent.
-# The estimate is a floor, and a floor that refuses a run that would finish
-# costs one prompt, where a floor that admits a run that cannot costs the run.
+# A sixty-four core machine of the target platform reaches eighteen to
+# twenty-one thousand simulated ticks a second across the whole machine **at
+# extent 48**, which is about 281 for each core. A development box measured
+# 756 ticks a second at extent 48 against 439 at extent 128, so the ratio
+# between the two extents is 1.72 and the figure for extent 128 is about 163
+# for each core. Both are above the figure here.
+#
+# **So the rate is not what made a run of twenty generations deliver nine.**
+# This model is conservative on the rate and conservative on the episode
+# length as well, because it bounds an episode at the tick limit while an
+# episode of the audited world ended between tick 1271 and 3311. Two
+# conservative inputs gave an optimistic answer, so the shortfall came from
+# elsewhere: four processes of sixteen workers oversubscribe sixty-four cores
+# once the trainer processes are counted, and a measurement share of 0.567
+# went uncharged.
+#
+# A caller that knows its extent passes the rate for that extent. The
+# throughput probe of the launcher measures the real one a minute into a run
+# and the estimate is reprinted against it.
 #
 # **This is the one declaration of the rate.** A caller that measured its own
 # throughput passes it in rather than writing a second one, and the launcher
