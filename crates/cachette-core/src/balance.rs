@@ -25,16 +25,23 @@ use crate::types::Fix32;
 
 /// The renown at which the renown reader fires, as a raw Q16.16 value.
 ///
-/// A provisional value of 1000 whole units, under the blocker that asks what
+/// A provisional value of 50 whole units, under the blocker that asks what
 /// raises renown.[^1] [^2] **This is the default of a world that nobody
 /// configures.** A caller changes it, and a world that nobody configures
 /// holds this.
+///
+/// **The renown path fired in none of 252 measured games.** One source raises
+/// renown, and it gives a quarter of a point for each unit the faction fells,
+/// to one champion while that champion lives. A target of 1000 therefore asks
+/// one character to outlive 4000 deaths, and the progress a policy reads sat
+/// flat near zero for a whole game. A target of 50 asks for 200, which is a
+/// feat a champion can reach and a policy can steer toward.
 ///
 /// # References
 ///
 /// [^1]: Balance register, the renown target. `docs/reference/balance.md`
 /// [^2]: Blockers register, BLK-150. `docs/BLOCKERS.md`
-pub const RENOWN_TARGET: i32 = 1000 << 16;
+pub const RENOWN_TARGET: i32 = 50 << 16;
 
 /// The win-path balance values of one world.
 ///
