@@ -19171,3 +19171,71 @@ answered a different question than play.
 **What stays unverified.** This measures the inputs to a ranking, not where
 the ranking points. Whether the recommended pair trains better is unmeasured,
 and one centre of one style under one kind supplied every figure above.
+
+### FND-712 — The search moves every policy weight the same distance, so the initial scale of a layer decides how far the search can revise it
+
+**Believed.** Two things about the structured policy, and both were wrong.
+
+**The first.** The readout starts at zero and every tower starts at a draw, and
+the module states that the first generation therefore moves the readout alone,
+and that the towers start to move once the readout is not zero.
+
+**The second.** A reading of the trainable count gave 4,024 of the 5,354
+weights to the readout.
+
+**True.** The readout holds 2,340 weights, which is 43.7 percent. The figure of
+4,024 is the readout and the dense scalar layer together, and the refined
+backlog item that states it states it correctly. The two geometric towers hold
+598 weights, which is 11.2 percent of the policy.
+
+**The step of a generation is spread over the weights in proportion to their
+count, and the scores change nothing about that split.** Measured over ten
+generations of a real run of the structured kind, at extent 64 with a tick
+limit of 2,500, a population of 12 and three worlds a candidate:
+
+| block | weights | share of the squared step length | share of the weights | root mean square displacement per weight |
+|---|---|---|---|---|
+| scalar tower | 1,684 | 0.3154 | 0.3145 | 0.0389 |
+| ring tower | 246 | 0.0458 | 0.0459 | 0.0389 |
+| token towers | 352 | 0.0651 | 0.0657 | 0.0388 |
+| trunk | 732 | 0.1334 | 0.1367 | 0.0385 |
+| readout | 2,340 | 0.4403 | 0.4371 | 0.0391 |
+
+The two share columns agree to within three parts in a thousand at every row.
+The search draws an isotropic perturbation over the whole flat vector, scales
+it to unit length, and takes the unit direction of the ranked sum. **Nothing in
+that path asks which block a coordinate belongs to.**
+
+**So the initial scale per weight, and not the search, decides how far a layer
+travels relative to itself.** Each layer is drawn against its own fan-in, which
+runs from 0.048 per weight in the scalar tower to 0.350 in the ring tower. Over
+ten generations the scalar tower travelled 2.58 of its own initial length and
+the ring tower travelled 0.35 of its own. Fan-in scaling is the right rule for
+a gradient method and this search is not one.
+
+**The zero readout start delays nothing.** Two runs paired on the seed pool and
+the search seed, one starting the readout at zero and one at a small draw, moved
+their towers by the same amount to two decimal places. Over 374 real decisions,
+the tower half of a first-generation perturbation changed no choice at all while
+the readout sat at zero, as the arithmetic requires, and it changed 29 to 66
+percent of the choices of a candidate whose readout was also perturbed. **The
+ranking of the first generation therefore already sees what the towers do.**
+
+**Freezing the towers cost nothing that twelve held-out worlds could measure.**
+A run that perturbed the readout alone, with the step scaled so the readout
+receives the travel the full run gives it, matched the full run on win share
+over five held-out passes and led it by 58 points of shaped return. That gap is
+well inside the error of twelve worlds, so the result is a null and not a gain.
+
+**Follows.** Set the initial scale of each layer against the step the search
+gives it, rather than against the layer's fan-in. Correct the module claim about
+the readout start. Do not defend the structured shape on a trainable count of
+5,354 until a run finds a return on the 3,014 weights outside the readout: the
+square root law gives a cosine of 0.0335 over 5,354 weights at six pairs and
+0.0506 over the readout alone.[^F688A]
+
+**What stays unverified.** Every score figure comes from a reduced world, ten
+generations, a population of 12 and one weighting. The share and displacement
+figures follow from the arithmetic of the search and do not depend on the world.
+No run varied the initial scale, which is the measurement this finding
+recommends.
