@@ -59,6 +59,11 @@ stream advanced by each generation would give a resumed run different
 perturbations from the run it continues, and it would give a worker different
 perturbations from the trainer.
 
+The search scales that draw by the layers of the centre, so that it revises
+each layer of a policy by the same fraction of what that layer holds. The
+centre reaches the worker, so the worker derives the same scaling the trainer
+derives and no second input joins the draw.
+
 ### D3. The combination sorts on the candidate index
 
 Each shard reports the candidate index it started at. The combination sorts on

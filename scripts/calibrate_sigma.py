@@ -40,6 +40,12 @@ length, and it leaves every other centre where it is. Sigma is a fraction of
 the centre in both cases. A measurement that normalised every centre would
 answer a question nobody asks for a policy whose ``tanh`` layers move under a
 scaling.
+
+**The directions come from the search as well.** The search scales the
+perturbation of each layer by the scale of that layer, so a direction drawn
+here from a plain isotropic normal would be a second statement of how a
+perturbation is drawn. It would report a choice-change rate for a
+neighbourhood the trainer never visits.
 """
 
 from __future__ import annotations
@@ -52,7 +58,7 @@ import numpy as np
 from cachette.learn.env import EnvConfig, VectorEnv, viable_seeds
 from cachette.learn.policy import load_policy
 from cachette.learn.reward import Weighting
-from cachette.learn.search import perturbation_scale, unit
+from cachette.learn.search import generation_noise, perturbation_scale, unit
 
 # The sizes to report. The range spans a perturbation that does nothing and one
 # that replaces the policy, so a reader sees where the useful band sits rather
@@ -62,6 +68,11 @@ SIZES = (0.1, 0.25, 0.5, 1.0, 1.5, 2.0, 4.0)
 # How many random directions to average over at each size. A single direction
 # is one sample of a quantity with real variance.
 DIRECTIONS = 8
+
+# The run seed the directions are drawn under. The search keys a draw on a run
+# seed and a generation, so this tool states one seed and reads one generation
+# for each size.
+DIRECTION_SEED = 0
 
 # A weighting that lets the environment run. **It states no rule of the
 # downstream game.** This tool reads choices and never reads the reward, so the
@@ -137,13 +148,11 @@ def main() -> int:
         )
     print()
     print("  sigma   choices changed")
-    rng = np.random.default_rng(0)
-    for size in SIZES:
+    for generation, size in enumerate(SIZES):
         changed = []
-        for _ in range(DIRECTIONS):
-            direction = rng.standard_normal(centre.size)
-            direction /= np.linalg.norm(direction)
-            step = perturbation_scale(policy, centre, size)
+        noise = generation_noise(DIRECTION_SEED, generation, DIRECTIONS, policy, centre)
+        step = perturbation_scale(policy, centre, size)
+        for direction in noise:
             moved = policy.rebuild(centre + step * direction)
             changed.append(
                 float(np.mean(np.array(moved.choose_many(observations, masks)) != base))

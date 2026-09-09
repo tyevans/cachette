@@ -36,6 +36,30 @@ scaling and a bias term does not scale with the weights beside it. The search
 then leaves that centre where it is, and it takes the fraction from the length
 of the centre.
 
+# A perturbation is the same fraction of every layer, and not of the whole
+
+A policy of one layer is a flat vector and nothing more. A policy of many
+layers holds each of them at its own scale, because each is drawn against its
+own fan-in, and that scale spans a factor of seven in the structured kind.
+
+An isotropic perturbation over the flat vector moves every weight the same
+distance, whatever layer it sits in. The initial scale of a layer then decides
+how far the search can revise it: a layer drawn small for each weight is
+rewritten, and a layer drawn large for each weight barely turns. A measurement
+found the two geometric towers at the large end, and those towers are the part
+of the design the structured shape exists for.[^2]
+
+The search therefore scales the perturbation of each layer by the scale of
+that layer. **Sigma keeps the meaning it had.** The whole perturbation still
+has the length sigma names, and sigma is now the fraction of each layer rather
+than the fraction of the flat vector alone.
+
+**A figure measured against the old draw does not transfer.** One measurement
+picked the radius this module runs by reading the spread the candidate scores
+reached at four radii, and it read them under an isotropic draw.[^3] The length
+of a perturbation is what it was, and the neighbourhood the population covers
+is not. Measure the spread again before anyone reads that table as current.
+
 # A tie states no order, and the candidate index is not a neutral order
 
 The rank of a tied score is the mean of the positions the tied scores occupy.
@@ -58,6 +82,8 @@ learning rate times the agreement.
 [^1]: ADR-0194, a generation is scored in shards and combined in candidate
 order, decision D2.
 ``docs/adrs/draft/adr-0194-a-generation-is-scored-in-shards.md``
+[^2]: Findings register, FND-713. ``docs/FINDINGS.md``
+[^3]: Findings register, FND-711. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -74,8 +100,9 @@ from .structured import STRUCTURED_KIND, StructuredPolicy
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from .env import Env
 
-# A policy the search can perturb. Every kind answers ``flat`` and
-# ``rebuild``, so the search never asks which kind it holds.
+# A policy the search can perturb. Every kind answers ``flat``, ``rebuild``
+# and ``shapes``, so the search never asks which kind it holds. The shapes
+# state where each layer of the flat vector sits.
 Trainable = LinearPolicy | StructuredPolicy
 
 NORM_CEILING_OVER_SHELL = 2.0
@@ -210,7 +237,113 @@ def perturbation_scale(policy: Trainable, centre: np.ndarray, sigma: float) -> f
     return sigma * centre_scale(centre)
 
 
-def generation_noise(seed: int, generation: int, pairs: int, size: int) -> np.ndarray:
+def layer_sizes(policy: Trainable) -> tuple[int, ...]:
+    """How many weights each layer holds, in the order the flat vector holds them.
+
+    **The boundaries come from the policy and never from this module.** The
+    policy states the shape of every trainable array, in the order it lays
+    them out, and that statement is the one the policy itself reads to cut a
+    flat vector back into arrays. A second statement here would agree on the
+    day it was written, and nothing would fail on the day a layer moved.
+
+    The order is the order of the arrays and never the order of a mapping, so
+    two processes that hold one shell answer this identically.
+    """
+    return tuple(int(np.prod(shape)) for shape in policy.shapes)
+
+
+def layer_scale(block: np.ndarray, fallback: float) -> float:
+    """Return the scale of one layer, as its root mean square for each weight.
+
+    **The scale is the one the layer holds now and not the one it started
+    at.** A layer that grew holds more of what the run learned, and the search
+    revises it by the same fraction of what it now is. That rule is the rule
+    this module already applies to the whole centre, at the granularity of one
+    layer: a perturbation stays the same fraction of what it moves. An initial
+    scale would state a second quantity, taken from a shell, that no later
+    generation reads.
+
+    **A layer of zeros states no scale of its own, so it takes the
+    fallback.** The readout of the untrained structured policy is such a
+    layer, and so is every bias array. A perturbation proportional to a zero
+    scale is zero, the layer stays zero, and the zero is then a fixed point
+    the search can never leave.
+    """
+    length = float(np.linalg.norm(block))
+    if length == 0.0:
+        return fallback
+    return length / math.sqrt(block.size)
+
+
+def layer_weighting(policy: Trainable, centre: np.ndarray) -> np.ndarray:
+    """Return the multiplier each coordinate of a perturbation carries.
+
+    The search draws a perturbation isotropically and multiplies it by this,
+    so a layer takes a step in proportion to its own scale rather than in
+    proportion to its weight count. **That is the property the search
+    lacked.** A measurement found each layer taking the share of the squared
+    step length that its weight count predicts, to three parts in a thousand,
+    and it found every weight of the policy moving the same distance. The
+    initial scale of a layer then decided how far the search could revise it,
+    and that scale spans a factor of seven.[^1]
+
+    Fan-in initialisation is not the defect, and this changes nothing about
+    it. A layer drawn against its fan-in holds the activations of a ``tanh``
+    in range, and one initial scale over every layer would push the early
+    layers off their curves. The quantity to equalise is the fraction of
+    itself that the search can revise a layer by, and that is what this
+    equalises.
+
+    A layer of zeros takes the root mean square for each weight of the whole
+    centre. **The absolute scale of the readout carries no behaviour**: it is
+    the last layer, so multiplying it scales every action score by one factor
+    and the highest legal row stays the highest. What matters in the readout
+    is the direction, and the direction is what the fallback lets the search
+    find.
+
+    **A layer that starts small stays small beside the layers around it.**
+    Every layer grows by the same fraction under this rule, so the ratio
+    between two layers holds over a run. That is what the rule is for, and it
+    is a cost for a bias array that starts at zero: such an array reaches the
+    scale of the weights it is added to more slowly than an isotropic step
+    would take it there. The bias arrays of this policy hold a few weights
+    each, and no measurement covers the trade.
+
+    The result is divided by its largest entry. The caller normalises each
+    perturbation to unit length, so any overall factor here is removed there.
+    **The divisor exists so that a policy of one layer takes exactly one.**
+    Such a kind then multiplies its draw by 1.0 and keeps the perturbation it
+    drew before this rule existed, bit for bit.
+
+    Raises ``ValueError`` when the layers do not cover the centre. That is the
+    layout of the policy disagreeing with the vector the search holds, and a
+    silent answer there would weight the wrong coordinates.
+
+    References
+    ----------
+    [^1]: Findings register, FND-713. ``docs/FINDINGS.md``
+    """
+    sizes = layer_sizes(policy)
+    covered = int(sum(sizes))
+    if covered != centre.size:
+        message = (
+            f"the policy lays its weights out in layers of {covered} and the "
+            f"search holds a centre of {centre.size}"
+        )
+        raise ValueError(message)
+    fallback = centre_scale(centre) / math.sqrt(centre.size)
+    scales = np.empty(len(sizes), dtype=np.float64)
+    walked = 0
+    for index, size in enumerate(sizes):
+        scales[index] = layer_scale(centre[walked : walked + size], fallback)
+        walked += size
+    weighting = np.repeat(scales, sizes)
+    return np.asarray(weighting / weighting.max())
+
+
+def generation_noise(
+    seed: int, generation: int, pairs: int, policy: Trainable, centre: np.ndarray
+) -> np.ndarray:
     """Draw the perturbation of every pair of one generation.
 
     **The noise of a generation is a function of the generation.** A single
@@ -224,10 +357,17 @@ def generation_noise(seed: int, generation: int, pairs: int, size: int) -> np.nd
     reach.** A raw normal vector of many entries has a length near the square
     root of that count, so a fixed sigma would mean one thing for a linear
     policy and another for a network.
+
+    **The draw is isotropic, and the layers weight it afterwards.** The policy
+    and the centre reach this function rather than a length, so no caller can
+    draw a perturbation that ignores the layers. The generator reads the run
+    seed and the generation alone, so the weighting changes where a
+    perturbation points and never which numbers the generator produced.
     """
     rng = np.random.default_rng([seed, generation])
-    noise = rng.standard_normal((pairs, size))
-    return noise / np.linalg.norm(noise, axis=1, keepdims=True)
+    weighting = layer_weighting(policy, centre)
+    noise = rng.standard_normal((pairs, weighting.size)) * weighting
+    return np.asarray(noise / np.linalg.norm(noise, axis=1, keepdims=True))
 
 
 def pair_candidates(
@@ -641,7 +781,7 @@ class EvolutionStrategy:
 
     def noise(self, centre: np.ndarray, generation: int) -> np.ndarray:
         """Draw the perturbations of one generation, one row for each pair."""
-        return generation_noise(self.seed, generation, self.pairs, centre.size)
+        return generation_noise(self.seed, generation, self.pairs, self.shell, centre)
 
     def propose(self, centre: np.ndarray, generation: int) -> list[Trainable]:
         """Build the whole population of one generation, in candidate order."""
@@ -823,6 +963,9 @@ __all__ = [
     "generation_agreement",
     "generation_noise",
     "generations_before_a_climb_beats_a_wander",
+    "layer_scale",
+    "layer_sizes",
+    "layer_weighting",
     "noise_agreement_sum",
     "pair_candidates",
     "pair_weights",

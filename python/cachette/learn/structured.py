@@ -562,8 +562,17 @@ class StructuredPolicy:
         earlier layer holds a draw from one fixed seed, because a layer of
         zeros would never leave the origin.
 
-        The first generation therefore moves the readout alone, and the towers
-        start to move once the readout is not zero.
+        **The zero readout delays no layer.** A measurement paired two runs,
+        one from this start and one from a small readout draw, and their towers
+        moved by the same amount. A candidate carries a perturbation in every
+        layer at once, so the readout part of it moves the scores and the
+        tower part of the same perturbation then moves them again. The ranking
+        of the first generation therefore already reads what the towers
+        do.[^1]
+
+        References
+        ----------
+        [^1]: Findings register, FND-713. ``docs/FINDINGS.md``
         """
         chosen = shape or StructuredShape()
         rng = np.random.default_rng(seed)
@@ -633,8 +642,21 @@ class StructuredPolicy:
         """How many weights the whole policy trains."""
         return self.counts()["total"]
 
-    def _shapes(self) -> tuple[tuple[int, ...], ...]:
-        """Give the shape of every trainable array, in the order of the vector."""
+    @property
+    def shapes(self) -> tuple[tuple[int, ...], ...]:
+        """The shape of each trainable array, in the order the vector holds them.
+
+        **This is the one statement of where each layer sits in the flat
+        vector.** The reader that cuts a flat vector back into arrays reads
+        it, and so does the search that scales a perturbation by the layer it
+        lands in. A second statement of the same boundaries would agree on the
+        day it was written, and nothing would fail on the day the two stopped
+        agreeing.
+
+        Every tower answers the same question about its own arrays, so the
+        order here is the order of the towers and never the order of a
+        mapping.
+        """
         shapes: list[tuple[int, ...]] = [*self.scalars.shapes, *self.ring.shapes]
         for tower in self.tokens:
             shapes.extend(tower.shapes)
@@ -662,7 +684,7 @@ class StructuredPolicy:
         rebuilds every candidate of every generation through the shell, so a
         normalizer that stopped here would reach no candidate the run scored.
         """
-        parts = _split(np.asarray(flat, dtype=np.float64), self._shapes())
+        parts = _split(np.asarray(flat, dtype=np.float64), self.shapes)
         walked = 0
         scalars = self.scalars.with_arrays(
             parts[walked : walked + len(self.scalars.shapes)]
