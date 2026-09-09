@@ -170,45 +170,41 @@ impl PresenceRelation {
             let factions = arena.faction_column();
             let holders = holding.holders();
 
-            std::thread::scope(|scope| {
-                let mut handles = Vec::new();
+            crate::parallel::fan_out_each({
                 let chunks = live
                     .chunks(chunk_len)
                     .zip(tiles.chunks(chunk_len))
                     .zip(factions.chunks(chunk_len));
-                for (((live, tiles), factions), slot) in chunks.zip(slots.entries_mut()) {
-                    handles.push(scope.spawn(move || {
-                        let mut rows = [FactionMask::EMPTY; PRESENCE_ROWS];
-                        for (index, mark) in live.iter().enumerate() {
-                            if *mark == 0 {
-                                continue;
+                chunks
+                    .zip(slots.entries_mut())
+                    .map(move |(((live, tiles), factions), slot)| {
+                        move || {
+                            let mut rows = [FactionMask::EMPTY; PRESENCE_ROWS];
+                            for (index, mark) in live.iter().enumerate() {
+                                if *mark == 0 {
+                                    continue;
+                                }
+                                let guest = factions[index];
+                                let tile = tiles[index].0 as usize;
+                                let Some(holder) = holders.get(tile).copied() else {
+                                    continue;
+                                };
+                                let Some(host) = holder.faction() else {
+                                    continue;
+                                };
+                                // A unit on ground its own faction holds is not
+                                // a guest, so the diagonal stays empty.
+                                if host == guest {
+                                    continue;
+                                }
+                                let Some(row) = rows.get_mut(host.0 as usize) else {
+                                    continue;
+                                };
+                                *row = row.union(FactionMask::of(guest));
                             }
-                            let guest = factions[index];
-                            let tile = tiles[index].0 as usize;
-                            let Some(holder) = holders.get(tile).copied() else {
-                                continue;
-                            };
-                            let Some(host) = holder.faction() else {
-                                continue;
-                            };
-                            // A unit on ground its own faction holds is not
-                            // a guest, so the diagonal stays empty.
-                            if host == guest {
-                                continue;
-                            }
-                            let Some(row) = rows.get_mut(host.0 as usize) else {
-                                continue;
-                            };
-                            *row = row.union(FactionMask::of(guest));
+                            *slot = rows;
                         }
-                        *slot = rows;
-                    }));
-                }
-                for handle in handles {
-                    // A thread here reads shared columns and writes its own
-                    // slot. It cannot fail.
-                    handle.join().expect("a presence fold thread cannot fail");
-                }
+                    })
             });
 
             // The join reads the slots in slot order. The union is

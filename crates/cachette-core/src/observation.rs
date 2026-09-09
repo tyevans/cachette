@@ -1079,20 +1079,14 @@ impl Observation {
         let layout = self.layout;
         let grid = self.grid;
         let rules = self.rules;
-        std::thread::scope(|scope| {
-            let mut handles = Vec::new();
-            for (range, slot) in bounds.iter().zip(slots.entries_mut()) {
+        crate::parallel::fan_out_each(bounds.iter().zip(slots.entries_mut()).map(
+            move |(range, slot)| {
                 let run = &stamps[range.0..range.1];
-                handles.push(scope.spawn(move || {
+                move || {
                     *slot = rebuild_run(run, layout, grid, terrain, rules);
-                }));
-            }
-            for handle in handles {
-                handle
-                    .join()
-                    .expect("an observation worker reads shared columns and writes its own slot");
-            }
-        });
+                }
+            },
+        ));
         // The join reads the slots in slot order, and each slot holds one
         // contiguous ascending run of blocks, so the joined list ascends.
         slots.combine(

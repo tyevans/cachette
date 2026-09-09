@@ -42,6 +42,10 @@ stage-cost = []
 # `census-holding` counts what the holding apply does on each frame. It is a
 # measurement switch and it compiles to nothing when it is off.
 census-holding = []
+# `probe-spawn-count` is a test-only switch. It counts the threads that the
+# parallel fan-out creates, so a test can prove that a stage of one chunk
+# creates none. It compiles to nothing when it is off.
+probe-spawn-count = []
 
 [dev-dependencies]
 bytemuck.workspace = true
@@ -84,3 +88,9 @@ test = false
 name = "training_tick"
 harness = false
 test = false
+
+# The test reads the thread creation count of the parallel fan-out. The count
+# is behind a feature, so the test needs that feature to hold anything.
+[[test]]
+name = "parallel_fan_out"
+required-features = ["probe-spawn-count"]

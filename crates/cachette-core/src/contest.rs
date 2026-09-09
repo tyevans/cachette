@@ -336,21 +336,25 @@ pub fn resolve(
     let mut lists: Slots<Vec<Grievance>> =
         Slots::filled(threads, Vec::new()).map_err(|_| ContestError::ZeroThreads)?;
 
-    std::thread::scope(|scope| {
+    crate::parallel::fan_out_each({
         let mut first = 0u32;
-        for (entry, list) in planes.entries_mut().iter_mut().zip(lists.entries_mut()) {
-            let start = first;
-            let stop = (start as usize + block_chunk).min(blocks as usize) as u32;
-            first = stop;
-            scope.spawn(move || {
-                let mut sides = Sides::default();
-                for block in start..stop {
-                    resolve_block(
-                        table, relations, key, arena, bridge, block, entry, list, &mut sides,
-                    );
+        planes
+            .entries_mut()
+            .iter_mut()
+            .zip(lists.entries_mut())
+            .map(move |(entry, list)| {
+                let start = first;
+                let stop = (start as usize + block_chunk).min(blocks as usize) as u32;
+                first = stop;
+                move || {
+                    let mut sides = Sides::default();
+                    for block in start..stop {
+                        resolve_block(
+                            table, relations, key, arena, bridge, block, entry, list, &mut sides,
+                        );
+                    }
                 }
-            });
-        }
+            })
     });
 
     // The union of the planes is the plane. A bitwise or is commutative and

@@ -327,13 +327,13 @@ pub fn resolve(
     let mut lists: Slots<Vec<Convert>> =
         Slots::filled(threads, Vec::new()).map_err(|_| ConversionError::ZeroThreads)?;
 
-    std::thread::scope(|scope| {
+    crate::parallel::fan_out_each({
         let mut first = 0u32;
-        for entry in lists.entries_mut() {
+        lists.entries_mut().iter_mut().map(move |entry| {
             let start = first;
             let stop = (start as usize + block_chunk).min(blocks as usize) as u32;
             first = stop;
-            scope.spawn(move || {
+            move || {
                 let mut reader = CellReader::new(field, layout);
                 let mut groups = Vec::new();
                 for block in start..stop {
@@ -348,8 +348,8 @@ pub fn resolve(
                         entry,
                     );
                 }
-            });
-        }
+            }
+        })
     });
 
     for entry in lists.entries() {

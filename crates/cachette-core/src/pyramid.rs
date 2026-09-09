@@ -761,13 +761,12 @@ impl Pyramid {
 
         let chunk_len = self.cells.len().div_ceil(threads).max(1);
         let mut refusal: Option<BridgeError> = None;
-        std::thread::scope(|scope| {
-            let mut handles = Vec::new();
+        let results = crate::parallel::fan_out({
             let mut base = 0u32;
-            for chunk in self.cells.chunks_mut(chunk_len) {
+            self.cells.chunks_mut(chunk_len).map(move |chunk| {
                 let first = base;
                 base += chunk.len() as u32;
-                handles.push(scope.spawn(move || {
+                move || {
                     for (offset, cell) in chunk.iter_mut().enumerate() {
                         let block = first + offset as u32;
                         let moving =
@@ -775,14 +774,14 @@ impl Pyramid {
                         *cell = ground[block as usize].combine(moving);
                     }
                     Ok(())
-                }));
-            }
-            for handle in handles {
-                if let Ok(Err(error)) = handle.join() {
-                    refusal.get_or_insert(error);
                 }
-            }
+            })
         });
+        for outcome in results {
+            if let Err(error) = outcome {
+                refusal.get_or_insert(error);
+            }
+        }
 
         match refusal {
             Some(error) => Err(error),

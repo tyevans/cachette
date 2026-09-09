@@ -512,14 +512,14 @@ impl InfluenceField {
                 pass.fill(0, cell_count, &mut self.scratch);
             } else {
                 let chunk_len = cell_count.div_ceil(threads).max(1);
-                std::thread::scope(|scope| {
+                crate::parallel::fan_out_each({
                     let mut start = 0usize;
-                    for chunk in self.scratch.chunks_mut(chunk_len) {
+                    self.scratch.chunks_mut(chunk_len).map(move |chunk| {
                         let low = start;
                         let high = start + chunk.len();
                         start = high;
-                        scope.spawn(move || pass.fill(low, high, chunk));
-                    }
+                        move || pass.fill(low, high, chunk)
+                    })
                 });
             }
 

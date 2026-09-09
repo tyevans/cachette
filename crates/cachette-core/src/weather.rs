@@ -5595,13 +5595,13 @@ where
     }
     let chunk_len = count.div_ceil(threads).max(1);
     let fill = &fill;
-    std::thread::scope(|scope| {
+    crate::parallel::fan_out_each({
         let mut start = 0usize;
-        for chunk in out.chunks_mut(chunk_len) {
+        out.chunks_mut(chunk_len).map(move |chunk| {
             let low = start;
             start += chunk.len();
-            scope.spawn(move || fill(low, chunk));
-        }
+            move || fill(low, chunk)
+        })
     });
 }
 

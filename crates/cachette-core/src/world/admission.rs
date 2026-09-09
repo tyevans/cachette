@@ -365,60 +365,50 @@ pub(super) fn admit(
     // stops the world changing while the fill walks it.
     bridge.describes(soldiers)?;
     let chunk_len = segments.len().div_ceil(threads).max(1);
-    std::thread::scope(|scope| {
-        let mut handles = Vec::new();
-        for chunk in segments.chunks_mut(chunk_len) {
-            handles.push(scope.spawn(move || {
-                // The segments of a chunk are in ascending tile order, so one
-                // reader walks the block rather than searching it for each
-                // segment. A reader is per-thread, because it carries the
-                // position of its own walk.[^9]
+    crate::parallel::fan_out_each(segments.chunks_mut(chunk_len).map(move |chunk| {
+        move || {
+            // The segments of a chunk are in ascending tile order, so one
+            // reader walks the block rather than searching it for each
+            // segment. A reader is per-thread, because it carries the
+            // position of its own walk.[^9]
+            //
+            // [^9]: Findings register, FND-295. `docs/FINDINGS.md`
+            let mut cursor = bridge.tile_cursor();
+            for segment in chunk.iter_mut() {
+                let Some(address) = grid.address_of(TileIdx(segment.tile)) else {
+                    // The tile came from a key the sort built out of a
+                    // grid index, so it names a tile. An address that
+                    // does not resolve is a defect in the caller and the
+                    // whole step refuses below.
+                    continue;
+                };
+                // The ground states the capacity and a finished
+                // upgrade adds to it. One function answers the whole
+                // question, so admission cannot read the ground table
+                // without the upgrade table.[^8]
                 //
-                // [^9]: Findings register, FND-295. `docs/FINDINGS.md`
-                let mut cursor = bridge.tile_cursor();
-                for segment in chunk.iter_mut() {
-                    let Some(address) = grid.address_of(TileIdx(segment.tile)) else {
-                        // The tile came from a key the sort built out of a
-                        // grid index, so it names a tile. An address that
-                        // does not resolve is a defect in the caller and the
-                        // whole step refuses below.
-                        continue;
-                    };
-                    // The ground states the capacity and a finished
-                    // upgrade adds to it. One function answers the whole
-                    // question, so admission cannot read the ground table
-                    // without the upgrade table.[^8]
-                    //
-                    // [^8]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-                    // **The room a target holds is the room it holds for
-                    // the units that asked for it.** Every intent in a
-                    // segment came through the step gate above, so a segment
-                    // on open water holds crossing units alone and a segment
-                    // on any other ground answers the same capacity either
-                    // way. The pass therefore asks the table for the crossing
-                    // capacity, and it states no rule of its own about which
-                    // ground admits whom.[^12]
-                    //
-                    // [^12]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
-                    let ground = terrain.kind(address).map_or(0, |kind| {
-                        kind.capacity_for(crate::terrain::SOME_WATER_CROSSING)
-                    });
-                    segment.capacity = upgrade::capacity_with(
-                        ground,
-                        upgrades.standing(TileIdx(segment.tile), table),
-                    );
-                    segment.standing = bridge
-                        .units_on_tile(&mut cursor, TileIdx(segment.tile))
-                        .len() as u32;
-                }
-            }));
+                // [^8]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D3. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+                // **The room a target holds is the room it holds for
+                // the units that asked for it.** Every intent in a
+                // segment came through the step gate above, so a segment
+                // on open water holds crossing units alone and a segment
+                // on any other ground answers the same capacity either
+                // way. The pass therefore asks the table for the crossing
+                // capacity, and it states no rule of its own about which
+                // ground admits whom.[^12]
+                //
+                // [^12]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+                let ground = terrain.kind(address).map_or(0, |kind| {
+                    kind.capacity_for(crate::terrain::SOME_WATER_CROSSING)
+                });
+                segment.capacity =
+                    upgrade::capacity_with(ground, upgrades.standing(TileIdx(segment.tile), table));
+                segment.standing = bridge
+                    .units_on_tile(&mut cursor, TileIdx(segment.tile))
+                    .len() as u32;
+            }
         }
-        for handle in handles {
-            // A thread here reads shared memory and writes its own chunk of
-            // the table, so it has no failure of its own.
-            handle.join().expect("an admission thread cannot fail");
-        }
-    });
+    }));
 
     let mut granted = vec![false; intents.len()];
     let mut arrived = TileCounts::default();

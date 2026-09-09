@@ -97,13 +97,13 @@ impl World {
             Slots::filled(slot_count, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
         let bridge = &self.bridge;
         let arena = &self.soldiers;
-        std::thread::scope(|scope| {
+        crate::parallel::fan_out_each({
             let mut first = 0u32;
-            for slot in slots.entries_mut() {
+            slots.entries_mut().iter_mut().map(move |slot| {
                 let start = first;
                 let stop = (start as usize + block_chunk).min(blocks as usize) as u32;
                 first = stop;
-                scope.spawn(move || {
+                move || {
                     let factions = arena.faction_column();
                     let tiles = arena.tile_column();
                     let mut tally: Vec<(FactionId, u32)> = Vec::new();
@@ -146,8 +146,8 @@ impl World {
                             }
                         }
                     }
-                });
-            }
+                }
+            })
         });
         let mut occupancy = slots.combine(Vec::new(), |mut joined, slot| {
             joined.extend_from_slice(slot);
