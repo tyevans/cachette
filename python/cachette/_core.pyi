@@ -188,7 +188,6 @@ class SiteTakenColumns(TypedDict):
     A faction that takes a site takes the upgrades that stand on the ground.
     """
 
-
     # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     site: npt.NDArray[np.uint64]
@@ -197,48 +196,48 @@ class SiteTakenColumns(TypedDict):
     to_faction: npt.NDArray[np.uint16]
     kind: npt.NDArray[np.uint8]
     # End of the generated block.
+
 class FactionEliminatedColumns(TypedDict):
     """One column for each field of the faction elimination event.
 
     The released column counts the tiles the faction stopped holding.
     """
 
-
     # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     released: npt.NDArray[np.uint64]
     faction: npt.NDArray[np.uint16]
     # End of the generated block.
+
 class FireStartedColumns(TypedDict):
     """One column for each field of the fire starting event.
 
     The cause column says what lit the tile.
     """
 
-
     # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     tile: npt.NDArray[np.uint32]
     cause: npt.NDArray[np.uint8]
     # End of the generated block.
+
 class FireEndedColumns(TypedDict):
     """One column for each field of the fire ending event.
 
     The cause column says why the fire stopped.
     """
 
-
     # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
     tile: npt.NDArray[np.uint32]
     cause: npt.NDArray[np.uint8]
     # End of the generated block.
+
 class UnitBurnedColumns(TypedDict):
     """One column for each field of the unit burning event.
 
     The tile column holds the tile the unit stood on when the fire reached it.
     """
-
 
     # Generated from the engine by scripts/generate_event_stubs.py.
     tick: npt.NDArray[np.uint64]
@@ -247,6 +246,7 @@ class UnitBurnedColumns(TypedDict):
     faction: npt.NDArray[np.uint16]
     unit_type: npt.NDArray[np.uint8]
     # End of the generated block.
+
 class Storm(TypedDict):
     """What one call to ``World.inflict_weather`` did.
 
@@ -714,8 +714,47 @@ class ObservationField(TypedDict):
     dtype: str
     low: int
     high: int
+    form: str
     space: str | None
     channels: list[str]
+
+class ValueForm(TypedDict):
+    """One value form the observation uses, and how to invert it.
+
+    The name entry names the form, and it is the key the form table holds it
+    under. The low and high entries give the bounds every field of the form
+    declares. The unit entry gives the integer that stands for one unit of the
+    fixed-point scale.
+
+    The uniform entry holds ``True`` when every position of a field of the
+    form holds that one form. A form that groups several forms over one
+    quantity holds ``False``, and a reader of such a field must read the
+    channel and not the field.
+
+    The invertible entry holds ``True`` when a reader recovers the quantity
+    from the value and this entry alone.
+
+    The denominator entry holds ``per_field`` when the doc of each field names
+    the whole the value divides by, and ``sum_of_magnitudes`` when the form
+    divides by the sum of the two magnitudes it compares. Neither denominator
+    travels with the value, so neither form is invertible.
+
+    The log_base, log_offset and divisor_bits entries describe a compressed
+    magnitude. The form adds the offset to the quantity, takes the logarithm
+    in the base, and divides by the divisor. An inversion runs that backwards.
+    Every other form holds ``None`` in all three.
+    """
+
+    name: str
+    low: int
+    high: int
+    unit: int
+    uniform: bool
+    invertible: bool
+    denominator: str | None
+    log_base: int | None
+    log_offset: int | None
+    divisor_bits: int | None
 
 class ActionPosition(TypedDict):
     """One argument position of one verb of the action table.
@@ -799,6 +838,12 @@ class ObservationSchema(TypedDict):
     value at all. A cell of the frame outside the world reads zero in every
     channel, and that zero is an absent value and not a quantity of zero.
 
+    The value_forms entry names every value form the layout uses, keyed by
+    the name of the form. Each field names its form, and this table says what
+    that name means. A count crosses the boundary as a compressed magnitude,
+    so a reader that wants the count inverts the value through this table
+    rather than through a rule of its own.
+
     The fields entry lists one entry for each field, in the order the array
     holds them.
     """
@@ -808,6 +853,7 @@ class ObservationSchema(TypedDict):
     ring_cells: list[int]
     channel_order: str
     spatial_gate: str
+    value_forms: dict[str, ValueForm]
     fields: list[ObservationField]
 
 class FactionTileReport(TypedDict):

@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-689**
+**Next number: FND-690**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -18000,9 +18000,49 @@ search shape earns its alignment only when the parameters it trains span the
 rules the policy must state. Do not reach for a fixed random bottleneck again
 in order to make a trainable count small.
 
+### FND-689 — The observation version was raised for an addition that moved no position, and every stored weight file died for nothing
+
+**Believed.** The observation version must rise whenever the schema changes.
+The rule beside the constant says to raise it when the field list, a length
+rule or a bound rule changes, and a reader took a schema change for a field
+list change. A revision that added descriptive entries to the schema therefore
+raised the version from five to six.[^F689A]
+
+**True.** A stored weight file names a position by its index. A weight is
+wrong when a position moves, when a length changes, or when a value changes.
+It is not wrong when the schema says more about the layout it already had.
+
+The revision that raised the version to six moved nothing. Its own message
+records that the length held at 4819 before and after, and a later reader
+confirmed that the observation array was identical position for position
+across the bump. The raise refused every stored weight file, and the refusal
+bought no safety.
+
+**One clause of that revision was a real field list change**, and a later
+reader must not read this finding as saying the raise was groundless. The
+revision split one token field into four, because the four token sets hold
+different channel counts. The field list therefore changed by the letter of
+the rule while the array did not change at all. That is the case the rule did
+not separate.
+
+**Evidence.** The commit that raised the version holds the length figure and
+the field split.[^F689A] A later change added the value form of each field to
+the schema, held the version at six, and dumped the observation of one fixed
+world before and after itself. The two dumps agreed in all 4819 positions. Its
+commit holds the command and the digest.[^F689B]
+
+**Follows.** Raise the version when a position moves, when the length changes,
+or when a value changes. Do not raise it for an addition that describes the
+layout it already had. Before you raise it, dump the observation of a fixed
+world before and after the change and compare the arrays position for
+position. A run that is writing weights loses them when the version moves, so
+the comparison is the cheaper of the two.
+
 ## References
 
 [^F669A]: The signal catalogue and its tests. `python/cachette/learn/signals.py`
+[^F689A]: The commit `Publish the structure of the observation, not only its positions`. Read its message for the length figure and the field split.
+[^F689B]: The commit `Publish the value form of each observation field`. Read its message for the array comparison and the commands.
 [^F670A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D2. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F670B]: The commit `Record what the observation width follows, and how its own ground flickers`. Read its message for the figures.
 [^F676A]: The commit `Record that a difference reward telescopes, and what the array does not carry`. Read its message for the measurement.

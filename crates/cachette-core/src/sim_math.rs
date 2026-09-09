@@ -448,6 +448,25 @@ pub const fn sine_of_steps(phase: i64) -> Fix32 {
 /// [^1]: Research report 42, what a policy should be able to see, section 4. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
 pub const MAGNITUDE_CAP_BITS: u32 = 40;
 
+/// The base of the logarithm a compressed magnitude takes.
+///
+/// The compression reads [`log2_fixed`], so the base is two. An inversion
+/// raises this base to the recovered exponent, and it must take the base from
+/// the engine rather than restate it. A rule declared twice is the defect
+/// shape this project names first.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+pub const MAGNITUDE_LOG_BASE: u32 = 2;
+
+/// The amount a compressed magnitude adds before it takes the logarithm.
+///
+/// The offset carries a quantity of zero to a logarithm of zero, so the
+/// compression maps an empty quantity onto an empty value. An inversion
+/// subtracts this offset after it raises the base.
+pub const MAGNITUDE_LOG_OFFSET: u64 = 1;
+
 /// Returns the part of a whole, bounded to the unit range.
 ///
 /// The result lies between zero and one. A whole of zero or below reads as
@@ -519,7 +538,7 @@ pub const fn signed_relation(a: i64, b: i64) -> Fix32 {
 /// [^2]: Findings register, FND-670. `docs/FINDINGS.md`
 #[must_use]
 pub const fn compressed_magnitude(value: i64) -> Fix32 {
-    let logarithm = log2_fixed(1 + value.unsigned_abs()) as i64;
+    let logarithm = log2_fixed(MAGNITUDE_LOG_OFFSET + value.unsigned_abs()) as i64;
     let scaled = logarithm / (MAGNITUDE_CAP_BITS as i64);
     let one = Fix32::ONE.0 as i64;
     let bounded = if scaled > one {
