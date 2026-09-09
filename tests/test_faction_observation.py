@@ -212,13 +212,26 @@ def test_the_schema_names_the_channel_that_gates_a_cell() -> None:
 
 
 def test_the_channel_order_the_schema_states_is_the_order_the_engine_wrote() -> None:
-    """Read a channel the engine never fills, and find zero at every cell.
+    """Gather each cell, and find that a cell outside the world holds nothing.
 
-    The ring stack holds three channels that no source in the engine fills.
-    Each one reads zero in every cell of every world. A reader that took the
-    wrong axis for the fastest one gathers a different set of positions, and
-    those positions hold the quantities of the cells instead. The wrong order
-    therefore fails here and looks plausible everywhere else.
+    A cell that lies outside the world reads zero in the gate channel, and it
+    reads zero in every other channel of that cell, because there is no ground
+    to report.[^1] A reader that took the wrong axis for the fastest one
+    gathers the channels of several cells into one group, so a group whose gate
+    reads zero then holds the quantities of a cell that does exist. The wrong
+    order therefore fails here and looks plausible everywhere else.
+
+    The engine once left three channels of this block at the literal zero, and
+    this test read those three as its probe. Each of the three now carries a
+    value, so the probe is the gate rule instead.[^2]
+
+    References
+    ----------
+    [^1]: ADR-0195, the observation of a faction is a fixed-width scale-free
+        table, decision D8.
+        ``docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md``
+    [^2]: What a policy cannot see, section 2.2.
+        ``docs/research/what-a-policy-cannot-see.md``
     """
     world = a_seeded_world()
     schema = world.observation_schema()
@@ -226,15 +239,24 @@ def test_the_channel_order_the_schema_states_is_the_order_the_engine_wrote() -> 
     values = world.faction_observation(WATCHER)
     cells = sum(schema["ring_cells"])
     order = schema["channel_order"]
-    empty = ("memory_age", "own_strength", "rival_strength")
-    for channel in empty:
-        column = values[channel_column(row, channel, cells, order)]
-        assert not column.any(), (
-            f"the engine fills no source for {channel!r}, so every cell of it "
-            f"reads zero under the order {order!r}"
-        )
-    gate = values[channel_column(row, schema["spatial_gate"], cells, order)]
-    assert gate.any(), "the gate channel is not one of the empty ones"
+    gate_index = list(row["channels"]).index(schema["spatial_gate"])
+    groups = np.stack(
+        [
+            values[channel_column(row, channel, cells, order)]
+            for channel in row["channels"]
+        ],
+        axis=1,
+    )
+    outside = groups[:, gate_index] == 0
+    assert outside.any(), (
+        "the frame of this world reaches past its edge, so one cell of it lies "
+        f"outside the world under the order {order!r}"
+    )
+    assert not outside.all(), "the reader stands inside the world"
+    assert not groups[outside].any(), (
+        "a cell outside the world holds a value in another channel, so the "
+        f"order {order!r} does not gather the channels of one cell"
+    )
 
 
 def schema_binding_body() -> str:

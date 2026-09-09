@@ -23,9 +23,10 @@
 //! falls in ring 3 or below, because the near pass already read every tile
 //! of that ground.
 //!
-//! Three entity passes fill the channels that no summary holds. One walks the
-//! tiles the faction holds, one walks the settlements of the world, and one
-//! walks the upgrade sites of the world. Each is bounded by an entity count.
+//! Four entity passes fill the channels that no summary holds. One walks the
+//! tiles the faction holds, one walks the settlements of the world, one walks
+//! the upgrade sites of the world, and one walks the burning tiles. Each is
+//! bounded by an entity count and none of them is bounded to a band.
 //!
 //! # A faction is not fogged from its own ground
 //!
@@ -37,29 +38,30 @@
 //! reader has of the ground. It does not hide the border of the reader from
 //! the reader.
 //!
-//! # The channels this block cannot fill
+//! # Every channel reads a source in every ring
 //!
-//! Some channels of the design have no source in the engine, and this block
-//! publishes zero in them rather than a number it invented.
+//! **A channel that a far cell cannot fill is worse than a reserved channel.**
+//! The schema states a real bound for it, the gate channel says the cell lies
+//! inside the world, and a reader then takes the zero for a real absence. The
+//! gate works for a whole cell, and a channel that stops at ring 3 fails one
+//! level below it.[^5]
 //!
-//! The memory age channel carries the age of a memory. The fog layer holds
-//! two boolean bitsets for each faction and no tick, so the engine cannot say
-//! when a faction last saw a tile. The channel stays in the layout, because a
-//! remembered value and a seen value are different facts and the layout must
-//! keep room to say so.
+//! Each channel therefore names a source that both passes reach. The near
+//! pass reads the tile, and the far pass reads the field of the summary that
+//! holds the same quantity. Four channels needed a derivation to reach the
+//! far band, and each one reads a quantity the summary already holds. The
+//! water share is the ground the summary does not open, the resource share is
+//! the deposit count, the height spread is the second moment of the height,
+//! and the ground water is one reading for each block of the weather
+//! lattice.[^6]
 //!
-//! The own strength channel and the rival strength channel carry military
-//! strength. The engine holds an attack column and an armour column for each
-//! unit type, and it holds no strength quantity and no record that defines
-//! one.
+//! Two channels reach every ring through a pass of their own rather than
+//! through the summary. The hazard share walks the burning tiles, which the
+//! fire field holds as a list. The memory age reads the clock that records
+//! the tick each faction last saw each block.[^7]
 //!
-//! Further channels have a source at level 0 and no source at the summary
-//! level, so a far ring reads zero in them. They are the water share, the
-//! height deviation, the tile water, the resource share and the hazard share.
-//! The summary level holds a tile count, an open tile count, a unit count, a
-//! held tile count, and a value, a height and a food total. It holds nothing
-//! else, so a channel outside that list cannot reach a far ring without a new
-//! summary field.
+//! A test reads a live world and fails when a channel holds zero in every
+//! cell of it, so a channel cannot go dark without something failing.[^8]
 //!
 //! # Determinism
 //!
@@ -67,8 +69,9 @@
 //! distance and then in ascending position around each ring. The far pass
 //! runs in ascending block index, which is the order the fog layer already
 //! holds. The holding pass runs in ascending tile index. The settlement pass
-//! and the upgrade pass run in ascending arena slot. Nothing reads a thread
-//! identity and nothing reads a completion order.[^4]
+//! and the upgrade pass run in ascending arena slot. The hazard pass runs in
+//! the order the fire field holds. Nothing reads a thread identity and
+//! nothing reads a completion order.[^4]
 //!
 //! # References
 //!
@@ -76,6 +79,10 @@
 //! [^2]: ADR-0059, fog storage grows with observed area, not with world area, decision D1. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
 //! [^3]: Findings register, FND-671. `docs/FINDINGS.md`
 //! [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+//! [^5]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D8. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+//! [^6]: ADR-0024, every summary field is declared extensive or intensive, decision D2. `docs/adrs/accepted/adr-0024-every-summary-field-is-declared-extensive-or-intensive.md`
+//! [^7]: ADR-0059, fog storage grows with observed area, not with world area, decision D5. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+//! [^8]: Testing Rules, section 2a. `.agents/rules/testing.md`
 
 use crate::faction_view::{Admit, BlockMask, FactionTile, FactionViewError};
 use crate::hex::Axial;
@@ -84,8 +91,9 @@ use crate::obs_ring::{
     ring_position, CellExtent, FIRST_FAR_RING, NEAR_DISTANCE, RING_STACK_CELLS,
     RING_STACK_CHANNELS,
 };
+use crate::pyramid::spread_of;
 use crate::sim_math;
-use crate::types::{FactionId, Fix32};
+use crate::types::{Accum, FactionId, Fix32};
 use crate::world::World;
 
 /// The positions that the ring stack block holds.
@@ -201,6 +209,8 @@ pub struct RingStackCost {
     pub settlements: i64,
     /// The upgrade sites the upgrade pass walked.
     pub upgrade_sites: i64,
+    /// The burning tiles the hazard pass walked.
+    pub burning_tiles: i64,
 }
 
 /// The totals that one cell of the frame accumulates.
@@ -217,11 +227,11 @@ struct CellTotals {
     observed: i64,
     seen_now: i64,
     open: i64,
-    water: i64,
     height_total: i64,
-    height_deviation_total: i64,
+    height_square_total: i64,
     food_total: i64,
     ground_water_total: i64,
+    memory_age_total: i64,
     value_total: i64,
     resource_tiles: i64,
     own_held: i64,
@@ -229,6 +239,8 @@ struct CellTotals {
     unclaimed_open: i64,
     own_units: i64,
     rival_units: i64,
+    own_strength: i64,
+    rival_strength: i64,
     own_settlements: i64,
     rival_settlements: i64,
     own_upgrades: i64,
@@ -313,12 +325,12 @@ impl World {
         let mut totals = vec![CellTotals::default(); RING_STACK_CELLS as usize];
         let mut cost = RingStackCost::default();
 
-        let heights = self.accumulate_near(faction, centre, &mut totals, &mut cost);
+        self.accumulate_near(faction, centre, &mut totals, &mut cost);
         self.accumulate_far(faction, centre, &mut totals, &mut cost)?;
         self.accumulate_holding(faction, centre, &mut totals, &mut cost);
         self.accumulate_settlements(faction, centre, &mut totals, &mut cost);
         self.accumulate_upgrades(faction, centre, &mut totals, &mut cost);
-        add_height_deviation(&mut totals, &heights);
+        self.accumulate_hazards(faction, centre, &mut totals, &mut cost);
 
         let mut slots = vec![0i64; RING_STACK_SLOTS as usize];
         for (cell, total) in totals.iter().enumerate() {
@@ -382,25 +394,28 @@ impl World {
         Axial::new((sum_q / count) as i32, (sum_r / count) as i32)
     }
 
-    /// Reads the level 0 tiles of rings 0 to 3 and returns their heights.
+    /// Reads the level 0 tiles of rings 0 to 3.
     ///
     /// The pass visits every tile of the near band once, in ascending hex
     /// distance and then in ascending position around each ring. It asks the
     /// world about 169 addresses on every world, so its cost is a constant.
     ///
-    /// The returned pairs carry the cell and the height of each observed near
-    /// tile. The height deviation channel needs the mean of the cell before
-    /// it can accumulate a deviation, so a second walk over these pairs
-    /// replaces a second walk over the tiles.
+    /// **Every total the pass accumulates has a twin in the summary the far
+    /// pass reads.** A total that only the near pass fills reads zero in 120
+    /// of the 151 cells, and the cell gate cannot say so, because the gate
+    /// answers for a whole cell and the failure is one channel of it.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D8. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
     fn accumulate_near(
         &self,
         faction: FactionId,
         centre: Axial,
         totals: &mut [CellTotals],
         cost: &mut RingStackCost,
-    ) -> Vec<(u32, i64)> {
+    ) {
         let grid = self.grid();
-        let mut heights = Vec::new();
         for distance in 0..=NEAR_DISTANCE {
             let positions = if distance == 0 { 1 } else { 6 * distance };
             for step in 0..positions {
@@ -422,12 +437,10 @@ impl World {
                 };
                 total.observed += 1;
                 total.height_total += i64::from(ground.height.0);
-                heights.push((cell, i64::from(ground.height.0)));
+                total.height_square_total +=
+                    i64::from(sim_math::mul(ground.height, ground.height).0);
                 if ground.kind.is_passable() {
                     total.open += 1;
-                }
-                if ground.kind.to_u8() == 0 {
-                    total.water += 1;
                 }
                 if ground.generated.iter().any(|amount| amount.0 > 0) {
                     total.resource_tiles += 1;
@@ -436,9 +449,7 @@ impl World {
                 if let Some(water) = self.ground_water_at(address) {
                     total.ground_water_total += water;
                 }
-                if self.tile_is_burning(address) == Some(true) {
-                    total.hazard_tiles += 1;
-                }
+                total.memory_age_total += self.tile_memory_age(faction, address);
                 if let FactionTile::Seen(seen) = tile {
                     total.seen_now += 1;
                     total.value_total += i64::from(seen.value.0);
@@ -453,21 +464,76 @@ impl World {
                 }
             }
         }
-        heights
     }
 
-    /// Adds the units of one seen tile to the own count and the rival count.
+    /// Returns the ticks since the faction last saw the ground of one tile.
+    ///
+    /// **The clock counts one entry for each block and not one for each
+    /// tile**, so every tile of one block reads one age.[^1] A tile the
+    /// faction sees now reads zero, and a tile it has never seen reads zero
+    /// as well, because a cell it has never seen reports nothing at all.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D5. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    fn tile_memory_age(&self, faction: FactionId, address: Axial) -> i64 {
+        let layout = self.observation().layout();
+        let Some(tile) = self.grid().index_of(address) else {
+            return 0;
+        };
+        let Some(key) = layout.key_of(tile) else {
+            return 0;
+        };
+        let block = layout.block_of_key(key);
+        self.block_memory_age(faction, block)
+    }
+
+    /// Returns the ticks since the faction last saw one block.
+    ///
+    /// The clock answers nothing for a block the faction has never seen, and
+    /// this reads that answer as zero. Such a block contributes no observed
+    /// tile either, so it never reaches the denominator of the channel.
+    fn block_memory_age(&self, faction: FactionId, block: u32) -> i64 {
+        self.observation()
+            .block_age(faction, block, self.tick())
+            .map_or(0, |age| age.min(i64::MAX as u64) as i64)
+    }
+
+    /// Adds the units of one seen tile to the own totals and the rival
+    /// totals.
     ///
     /// A tile carries at most its capacity in units, so the walk over one
     /// tile is bounded by the terrain rules and not by the population.
+    ///
+    /// **The strength of a unit comes from the unit type table**, which is
+    /// the one place that pairs an attack column and an armour column with a
+    /// strength. A second rule for the strength of a unit would be one fact
+    /// in two places.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
     fn split_units_on(&self, faction: FactionId, address: Axial, total: &mut CellTotals) {
         let Ok(units) = self.soldiers_on(address) else {
             return;
         };
         for unit in units {
+            let strength = self
+                .soldiers()
+                .unit_type(*unit)
+                .map_or(Fix32::ZERO, |kind| self.unit_types().strength(kind));
             match self.soldiers().faction(*unit) {
-                Some(owner) if owner == faction => total.own_units += 1,
-                Some(_) => total.rival_units += 1,
+                Some(owner) if owner == faction => {
+                    total.own_units += 1;
+                    total.own_strength =
+                        sim_math::accumulate(Accum(total.own_strength), strength).0;
+                }
+                Some(_) => {
+                    total.rival_units += 1;
+                    total.rival_strength =
+                        sim_math::accumulate(Accum(total.rival_strength), strength).0;
+                }
                 None => {}
             }
         }
@@ -482,9 +548,25 @@ impl World {
     /// It skips a block whose centre falls in ring 3 or below, because the
     /// near pass already read every tile of that ground.
     ///
+    /// **The pass fills every total the near pass fills, except the hazard
+    /// count.** A total the far pass leaves at zero reads zero in 120 of the
+    /// 151 cells while the cell gate still says the cell lies inside the
+    /// world.[^2] The water count, the deposit count and the second moment of
+    /// the height come from the summary. The ground water comes from the
+    /// weather cell of the block, and the memory age from the clock of the
+    /// fog layer. A separate pass walks the burning tiles, because the
+    /// summary holds no hazard.
+    ///
+    /// The weather lattice and the fog lattice share one block, so one
+    /// reading of the ground water serves every tile of the block.[^3] The
+    /// pass multiplies that reading by the admitted tiles, which is what the
+    /// near pass accumulates one tile at a time.
+    ///
     /// # References
     ///
     /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D1. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    /// [^2]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D8. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+    /// [^3]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
     fn accumulate_far(
         &self,
         faction: FactionId,
@@ -526,12 +608,23 @@ impl World {
             total.seen_now += i64::from(visible.map_or(0, |layer| layer.block_population(block)));
             total.open += summary.open_tiles();
             total.height_total += summary.height_total().0;
+            total.height_square_total += summary.height_square_total().0;
             total.food_total += summary.food_total().0;
             total.value_total += summary.value_total().0;
+            total.resource_tiles += summary.deposit_tiles();
             total.rival_held += masked.other_held_tiles();
             total.own_units += masked.own_units();
             total.rival_units += masked.other_units();
+            total.own_strength += masked.own_strength().0;
+            total.rival_strength += masked.other_strength().0;
             total.unclaimed_open += (summary.open_tiles() - summary.held_tiles()).max(0);
+            total.ground_water_total += self
+                .ground_water_at(Axial::new(column * edge, row * edge))
+                .unwrap_or(0)
+                .saturating_mul(masked.admitted());
+            total.memory_age_total += self
+                .block_memory_age(faction, block)
+                .saturating_mul(masked.admitted());
         }
         Ok(())
     }
@@ -639,29 +732,49 @@ impl World {
             }
         }
     }
+
+    /// Adds the burning tiles of the world to the cell each one falls in.
+    ///
+    /// **The fire field holds the burning tiles as a list**, so the pass
+    /// costs the burning count and never the world.[^1] The near pass reads
+    /// each tile of its own band, and it could count a fire there. It does
+    /// not, because a per-band count reads zero in every far cell and the
+    /// cell gate cannot say so.
+    ///
+    /// A fire is a fact of the present frame, so the pass counts a fire only
+    /// where the reader sees the ground this frame. A remembered tile carries
+    /// the ground alone.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
+    /// [^2]: ADR-0059, fog storage grows with observed area, not with world area, decision D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    fn accumulate_hazards(
+        &self,
+        faction: FactionId,
+        centre: Axial,
+        totals: &mut [CellTotals],
+        cost: &mut RingStackCost,
+    ) {
+        let grid = self.grid();
+        for burning in self.fire().burning() {
+            cost.burning_tiles += 1;
+            let Some(address) = grid.address_of(burning.tile) else {
+                continue;
+            };
+            if !self.faction_sees_now(faction, address) {
+                continue;
+            }
+            if let Some(total) = totals.get_mut(cell_at(centre, address) as usize) {
+                total.hazard_tiles += 1;
+            }
+        }
+    }
 }
 
 /// Returns the cell of the frame that one world address falls in.
 fn cell_at(centre: Axial, address: Axial) -> u32 {
     cell_of_delta(Axial::new(address.q - centre.q, address.r - centre.r))
-}
-
-/// Adds the absolute height deviation of each near tile to its cell.
-///
-/// The channel reports the mean absolute difference from the mean height of
-/// the cell, so the pass needs the mean before it can accumulate. It walks
-/// the near heights a second time rather than the near tiles.
-fn add_height_deviation(totals: &mut [CellTotals], heights: &[(u32, i64)]) {
-    for (cell, height) in heights {
-        let Some(total) = totals.get_mut(*cell as usize) else {
-            continue;
-        };
-        if total.observed == 0 {
-            continue;
-        }
-        let mean = total.height_total / total.observed;
-        total.height_deviation_total += (height - mean).abs();
-    }
 }
 
 /// Merges two ascending block lists into one ascending list with no repeats.
@@ -711,6 +824,38 @@ fn mean_share(total: i64, count: i64) -> Fix32 {
     sim_math::bounded_share(total, count.saturating_mul(i64::from(Fix32::ONE.0)))
 }
 
+/// Returns the mean of a fixed-point total over a count.
+///
+/// The total is already a sum of Q16.16 values, so the mean needs no scale
+/// of its own. A density of whole numbers needs one, and the density reader
+/// above supplies it.
+fn fixed_mean(total: i64, count: i64) -> i64 {
+    if count < 1 {
+        return 0;
+    }
+    total / count
+}
+
+/// Returns how much the height of a cell varies, over its observed tiles.
+///
+/// **The reading comes from the summary type**, which is the one place that
+/// states what a spread of the height means and why the mean absolute
+/// difference is not it.[^1] A second formula here would be one fact in two
+/// places.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+/// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+fn height_spread(total: CellTotals) -> Fix32 {
+    spread_of(
+        Accum(total.height_total),
+        Accum(total.height_square_total),
+        total.observed,
+    )
+    .unwrap_or(Fix32::ZERO)
+}
+
 /// Declares the channel table of one cell of the ring stack.
 ///
 /// **The table is the one place that pairs a channel name with a channel
@@ -745,13 +890,16 @@ macro_rules! declare_ring_channels {
         /// total.[^1] Each one goes through the arithmetic boundary of the
         /// project.[^2]
         ///
-        /// A channel that the engine holds no source for reads zero. The
-        /// module documentation names each one and says what is missing.
+        /// **Every channel here names a source that the near pass and the
+        /// far pass both reach.** A channel of the literal zero, or a
+        /// channel that only one pass fills, publishes a real bound over a
+        /// constant, and a reward term then reads a constant as truth.[^3]
         ///
         /// # References
         ///
         /// [^1]: Report 42, what a policy should be able to see, section 8.1. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
         /// [^2]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+        /// [^3]: What a policy cannot see, section 2.3. `docs/research/what-a-policy-cannot-see.md`
         fn channels_of(
             $total: CellTotals,
             $extent: &CellExtent,
@@ -770,11 +918,11 @@ declare_ring_channels! {
         "area_inside_world" => sim_math::bounded_share(extent.inside(cell), extent.sampled(cell));
         "observed_share" => sim_math::bounded_share(observed, in_world);
         "seen_now_share" => sim_math::bounded_share(total.seen_now, in_world);
-        "memory_age" => Fix32::ZERO;
+        "memory_age" => sim_math::compressed_magnitude(fixed_mean(total.memory_age_total, observed));
         "open_share" => sim_math::bounded_share(total.open, observed);
-        "water_share" => sim_math::bounded_share(total.water, observed);
+        "water_share" => sim_math::bounded_share(observed - total.open, observed);
         "mean_height" => mean_share(total.height_total, observed);
-        "height_deviation" => mean_share(total.height_deviation_total, observed);
+        "height_spread" => height_spread(total);
         "food_density" => sim_math::compressed_magnitude(density(total.food_total, observed));
         "ground_water_density" => sim_math::compressed_magnitude(density(total.ground_water_total, observed));
         "value_density" => sim_math::compressed_magnitude(density(total.value_total, observed));
@@ -790,7 +938,7 @@ declare_ring_channels! {
         "rival_upgrades" => sim_math::compressed_magnitude(total.rival_upgrades);
         "own_reach_share" => sim_math::bounded_share(total.own_held, in_world);
         "hazard_share" => sim_math::bounded_share(total.hazard_tiles, observed);
-        "own_strength" => Fix32::ZERO;
-        "rival_strength" => Fix32::ZERO;
+        "own_strength_density" => sim_math::compressed_magnitude(fixed_mean(total.own_strength, observed));
+        "rival_strength_density" => sim_math::compressed_magnitude(fixed_mean(total.rival_strength, observed));
     }
 }
