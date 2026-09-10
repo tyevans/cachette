@@ -124,6 +124,33 @@ build_key() {
 say() { printf '=== %s\n' "$1" >&2; }
 die() { printf '%s\n' "$1" >&2; exit 1; }
 
+# Refuses a set of trainer arguments that names an output directory.
+#
+# **The follower fetches from one directory, and the launcher names it.** The
+# instance runs the trainer with `--out runs/learn`, and the follower copies
+# the weights from there. An `--out` in the run arguments sent the weights
+# somewhere else, and the follower then fetched nothing for the whole run.
+# Nothing failed, so a reclaim lost the weights as if the fetch did not exist.
+#
+# The trainer reads an abbreviation of an option as the option, so `--ou` is
+# `--out` as well. Each form is refused here, before anything is spent.
+refuse_out_argument() {
+    local word
+    local -a words
+    read -r -a words <<<"$1"
+    for word in "${words[@]}"; do
+        case "$word" in
+            --ou|--out|--ou=*|--out=*)
+                printf 'The run arguments name an output directory with %s.\n' \
+                    "$word" >&2
+                printf 'The launcher names it, because the follower fetches the weights from it. Remove it.\n' >&2
+                return 1
+                ;;
+        esac
+    done
+    return 0
+}
+
 # ---------------------------------------------------------------- orphan mode
 
 # Lists every instance that a run of this script created and left running.
@@ -217,6 +244,12 @@ esac
 default_args="--generations 20 --population 24 --seeds 6 --holdout 256 \
 --learning-rate 0.3 --validation 128 --validate-every 2"
 train_args="${CACHETTE_TRAIN_ARGS:-$default_args}"
+
+# A run that is already on an instance must still stop and still attach, so
+# the refusal applies only to a run that has not started.
+if [ "$mode" = "run" ] || [ "$mode" = "dry" ]; then
+    refuse_out_argument "$train_args" || exit 1
+fi
 
 # **The trainer answers the world.** The extent, the faction count and
 # the tick limit all reach the cost of a run: a tick of a larger world costs
@@ -398,14 +431,34 @@ fetch_file() {
 # The files are a few hundred kilobytes each. The cost of a fetch is the
 # connection and not the bytes, and the poll opens a connection anyway.
 #
+# **The pattern `*.npz` takes the copy of every generation as well.** The
+# trainer keeps the resume point of each generation under its own name, so a
+# fetch brings back every centre of the run and not only the newest. A file
+# that the trainer is still writing has a name that ends in `.part`, so the
+# pattern never takes half of one.[^4]
+#
+# Each poll copies every generation again, so the bytes of a poll grow with
+# the generations of the run. Twenty generations of a few hundred kilobytes
+# is a few megabytes each poll. That is small against the poll, and a copy
+# that skips the files already here would need a list of the far side first.
+#
 # **A failed fetch is not a failed run.** The instance may be loaded or
 # briefly unreachable and still be training, so this reports and returns.
 #
+# **The line counts the weights apart from the other files.** It counted the
+# report and the status with the weights, so a round whose weight copy failed
+# still said that it fetched two files. The stamp in `last-fetch` moves only
+# in a round that brought weights, because it states how old the weights on
+# this machine are.[^5]
+#
 # References
 #   [^3]: Findings register, FND-746. `docs/FINDINGS.md`
+#   [^4]: The trainer, the checkpoint of a run. `python/cachette/learn/train.py`
+#   [^5]: Findings register, FND-760. `docs/FINDINGS.md`
 fetch_checkpoints() {
     local staging="$out_dir/learn.part"
-    local kept=0
+    local weights=0
+    local others=0
     local name
     mkdir -p "$out_dir/learn"
     rm -rf "$staging"
@@ -415,24 +468,29 @@ fetch_checkpoints() {
         for name in "$staging"/*.npz; do
             if [ -f "$name" ]; then
                 mv -f "$name" "$out_dir/learn/${name##*/}"
-                kept=$(( kept + 1 ))
+                weights=$(( weights + 1 ))
             fi
         done
     fi
     rm -rf "$staging"
     if fetch_file "cachette/runs/learn/report.json" "$out_dir/learn/report.json"; then
-        kept=$(( kept + 1 ))
+        others=$(( others + 1 ))
     fi
     if fetch_file "cachette/runs/learn/status" "$out_dir/learn/status"; then
-        kept=$(( kept + 1 ))
+        others=$(( others + 1 ))
     fi
-    if [ "$kept" -eq 0 ]; then
-        printf '   fetched nothing this round. The run continues\n' >&2
+    if [ "$weights" -eq 0 ]; then
+        local stamp="no earlier round"
+        if [ -f "$out_dir/last-fetch" ]; then
+            stamp="$(cat "$out_dir/last-fetch")"
+        fi
+        printf '   no weights arrived this round, and %s other files did. The weights here date from %s. The run continues\n' \
+            "$others" "$stamp" >&2
         return 0
     fi
     date -u '+%Y-%m-%dT%H:%M:%SZ' > "$out_dir/last-fetch"
-    printf '   fetched %s files into %s at %s. A reclaim now costs one poll\n' \
-        "$kept" "$out_dir/learn" "$(cat "$out_dir/last-fetch")" >&2
+    printf '   fetched %s weight files and %s other files into %s at %s. A reclaim now costs one poll\n' \
+        "$weights" "$others" "$out_dir/learn" "$(cat "$out_dir/last-fetch")" >&2
 }
 
 # Says what this machine already holds for the run.
@@ -454,6 +512,7 @@ report_local() {
     ls -la "$out_dir/learn"/*.npz >&2
     printf 'A file NAME-latest.npz is the resume point of strategy NAME.\n' >&2
     printf 'A file NAME.npz is the best validated centre of strategy NAME.\n' >&2
+    printf 'A file NAME-genNNN.npz is the resume point of strategy NAME at generation NNN.\n' >&2
 }
 
 # Renders the dashboard from the log the instance has written so far.
@@ -1178,12 +1237,17 @@ all_names="$(printf '%s' "$names" | tr ' ' ',')"
     # half load for hours while it kept billing. The trainer writes a resume
     # point for each strategy every generation, so a restart costs one
     # generation of each strategy and never the run.
+    #
+    # **The output directory comes last, so it wins.** The trainer takes the
+    # last value of an option. The launcher refuses an `--out` in the run
+    # arguments before it rents anything, and this order holds the same rule
+    # for a run whose arguments reach the instance by another path.
     attempt=1
     extra=""
     while :; do
         started="$(date +%s)"
         uv run python -u -m cachette.learn --only "$all_names" \
-            --out runs/learn $TRAIN_ARGS $extra --pool "$cores" 2>&1 \
+            $TRAIN_ARGS $extra --pool "$cores" --out runs/learn 2>&1 \
             | tee -a runs/learn/train.log
         code="${PIPESTATUS[0]}"
         ran=$(( $(date +%s) - started ))

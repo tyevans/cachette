@@ -21107,6 +21107,57 @@ covers every overlay without drawing, so the class is closed. Repairing the
 sampled pixel is a separate piece of work, and the crowding overlay shows that
 it cannot be done by choosing a different tile.
 
+### FND-760 — A fetch that runs every poll could still lose weights in four ways
+
+**Believed.** The follower fetches the weight files of every strategy at every
+poll, so a reclaimed spot instance costs the work of one poll and never a
+centre. FND-746 closed the loss of a whole run that way.
+
+**True.** The fetch carried the newest files and not every file, and it could
+carry a broken one or report weights it did not have. Four defects lay on the
+path.
+
+1. **Only the newest centre survived.** The trainer kept one resume point for
+   each strategy and overwrote it every generation. A walk can end downhill, so
+   the centre of an earlier generation is worth keeping, and nothing kept it.
+2. **A weight file was written in place.** Both policy kinds saved straight
+   onto the final path, so a poll could copy a half-written archive. The
+   launcher then moved that copy over the whole one on this machine. The
+   launcher protects its own copy with a temporary name, and the trainer did
+   not protect the file that the launcher copied.
+3. **The fetch line counted the report and the status with the weights.** A
+   round whose weight copy failed still said that it fetched two files and
+   moved the stamp that dates the weights.
+4. **An `--out` in the run arguments beat the one the launcher passes.** The
+   trainer takes the last value of an option, and the run arguments came after
+   the launcher's value. The weights then went to a directory the follower does
+   not read, and every fetch found nothing.
+
+**Evidence.** A reading of the trainer, the two saves and the launcher found
+all four, before four strategies went out to four instances.[^F760A] [^F760B]
+[^F760C] No loss of weights is recorded against them. Each one is a path to a
+loss, and a test that goes red with the defect put back now holds each.
+
+**Follows.** Four things.
+
+**The trainer keeps a copy of the resume point of every generation**, under a
+name that holds the generation number. The follower pattern takes these copies
+with no change.
+
+**Every weight file goes to a temporary name, then one rename puts it in
+place.** The temporary name ends in `.part` and never in `.npz`, because the
+follower fetches by the pattern `*.npz`. A test stops a save half way and reads
+the directory at that moment.[^F760D]
+
+**The fetch line counts the weights apart from the other files**, and the stamp
+moves only in a round that brought weights. **The launcher refuses an `--out`
+in the run arguments before it rents**, and it passes its own value last.
+
+**A protection on one side of a copy does not protect the other side.** The
+launcher wrote its copy atomically and the trainer did not. The fetch probe
+now holds a file under a temporary name on the instance, and it asserts that
+the fetch leaves it there.[^F746A]
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -21157,3 +21208,7 @@ it cannot be done by choosing a different tile.
 [^F758C]: The viewer test of the overlay deck. `crates/cachette-view/tests/the_watcher_switches_the_map_between_overlays.rs`
 [^F758D]: The overlay palette check. `crates/cachette-view/tests/an_overlay_colour_never_hides_the_holder.rs`
 [^F759A]: The viewer test of the overlay deck, the readability test. `crates/cachette-view/tests/the_watcher_switches_the_map_between_overlays.rs`
+[^F760A]: The trainer, the checkpoint of a run. `python/cachette/learn/train.py`
+[^F760B]: The atomic writer and the linear save. `python/cachette/learn/policy.py`
+[^F760C]: The training launcher, the fetch of the weights. `scripts/graviton-train.sh`
+[^F760D]: The weight file tests. `tests/test_learner_weight_files.py`

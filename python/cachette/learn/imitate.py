@@ -57,7 +57,7 @@ import numpy as np
 
 from .env import Env, EnvConfig, viable_seeds
 from .inspect import verb_of
-from .policy import LinearPolicy, encode_many
+from .policy import LinearPolicy, encode_many, save_arrays
 from .reward import Scoring
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
@@ -117,23 +117,30 @@ class Dataset:
 
         The recording is the expensive half of this module. A caller that
         changes only the fit reads the file back and pays nothing.
+
+        **The write is atomic**, as the write of a weight file is. A recording
+        that stops half way through a save leaves the earlier file whole, and
+        a later run that reads it back does not read half of one.
         """
-        np.savez_compressed(
+        save_arrays(
             path,
-            observations=self.observations,
-            targets=self.targets,
-            masks=self.masks,
-            episodes=self.episodes,
-            sizes=self.sizes,
-            counts=np.asarray(
-                [
-                    self.commands,
-                    self.unencodable,
-                    self.silent_windows,
-                    self.lost_windows,
-                ],
-                dtype=np.int64,
-            ),
+            {
+                "observations": self.observations,
+                "targets": self.targets,
+                "masks": self.masks,
+                "episodes": self.episodes,
+                "sizes": self.sizes,
+                "counts": np.asarray(
+                    [
+                        self.commands,
+                        self.unencodable,
+                        self.silent_windows,
+                        self.lost_windows,
+                    ],
+                    dtype=np.int64,
+                ),
+            },
+            compressed=True,
         )
 
     @staticmethod

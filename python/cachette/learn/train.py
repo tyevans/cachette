@@ -49,6 +49,10 @@ run with no validation seeds wrote nothing until it ended, so an early stop
 lost everything. Writing only the latest meant that the first full run stored
 a centre taken from inside a collapsed region.
 
+The run also keeps a copy of the resume point of every generation, under a
+name that holds the generation number. The resume point holds the newest
+generation only, and a reader who wants an earlier centre reads its copy.
+
 # The yardstick is measured in the single-seat world
 
 A candidate in a league meets another candidate and one built-in controller.
@@ -96,6 +100,7 @@ from .policy import (
     PolicyFit,
     PolicyFitError,
     load_policy,
+    write_atomically,
 )
 from .presets import ObjectiveSchedule
 from .record import (
@@ -246,14 +251,25 @@ def _stored_figure(meta: Mapping[str, object], prefix: str) -> ValidationScore |
 
 @dataclass(frozen=True)
 class Checkpoint:
-    """The two centres of one run on disk, and how to read them back.
+    """The centres of one run on disk, and how to read them back.
 
     The best path is what a reader loads to play or to measure. The latest
     path is the resume point, and the run writes it after every generation.
 
+    **The run also keeps a copy of the resume point of every generation.** The
+    latest file holds only the newest generation, so each generation used to
+    overwrite the one before it. A walk can end downhill, and a reader who
+    wants an earlier centre then had nothing to read.[^1] The copy of a
+    generation is named with its number, padded to three digits so that the
+    names sort in the order of the run.
+
     The normalizer entry is the feature transform of the run. It goes into
     the fit of every file this writes, and a resumed run refuses a checkpoint
     that was written under another one.
+
+    References
+    ----------
+    [^1]: Findings register, FND-760. ``docs/FINDINGS.md``
     """
 
     name: str
@@ -272,6 +288,23 @@ class Checkpoint:
     def latest_path(self) -> Path:
         """Where the run stores the centre of the last generation."""
         return self.out_dir / f"{self.name}-latest.npz"
+
+    def generation_path(self, generation: int) -> Path:
+        """Where the run keeps the resume point of one generation."""
+        return self.out_dir / f"{self.name}-gen{generation:03d}.npz"
+
+    def keep_generation(self, generation: int) -> Path:
+        """Copy the resume point to the file of its generation, and return it.
+
+        The copy holds the same bytes as the resume point, so a reader loads
+        it as it loads the resume point. The copy is atomic, as every weight
+        file of the run is, so a fetch that runs during the copy reads a
+        whole file.
+        """
+        target = self.generation_path(generation)
+        content = self.latest_path.read_bytes()
+        write_atomically(target, lambda handle: handle.write(content))
+        return target
 
     def write(
         self,
@@ -1194,6 +1227,10 @@ def store_centres(
     validation gate and no improvement gate. This is the resume point, and a
     run that stops between two validation passes must still leave one behind.
 
+    **Each generation also keeps a copy of its resume point**, under a name
+    that holds the generation number. The next generation overwrites the
+    resume point and not the copy, so every centre of the run survives it.
+
     The best centre moves only when a validation pass finds something better.
     A run with no validation seeds has no way to tell one centre from another,
     so it writes the centre of this generation to both files.
@@ -1215,6 +1252,7 @@ def store_centres(
         judge.best,
         judge.held_out,
     )
+    checkpoint.keep_generation(record.generation)
     if judge.seeds and judge.best_generation != record.generation:
         return
     centre, from_generation = judge.stored_centre(policy, record.generation)

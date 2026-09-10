@@ -50,6 +50,8 @@ report() {
 # It maps a remote specification onto FAKE_REMOTE. SCP_FAIL makes every copy
 # fail, and SCP_TRUNCATE makes it deliver the first bytes of each file, which
 # is what a connection that dies part way through leaves behind.
+# SCP_FAIL_MATCH is a pattern, and a copy whose remote path matches it fails
+# while every other copy succeeds.
 mkdir -p "$work/bin"
 cat > "$work/bin/scp" <<'SHIM'
 #!/usr/bin/env bash
@@ -68,6 +70,11 @@ unset 'sources[count-1]'
 status=0
 for spec in "${sources[@]}"; do
     path="${spec#*:}"
+    if [ -n "${SCP_FAIL_MATCH:-}" ]; then
+        case "$path" in
+            $SCP_FAIL_MATCH) status=1; continue ;;
+        esac
+    fi
     for file in $FAKE_REMOTE/$path; do
         if [ ! -e "$file" ]; then
             status=1
@@ -115,7 +122,7 @@ take() {
 # longer ends on a bare closing brace comes out truncated. Each name below must
 # yield a body that opens and closes, and the probe stops when one does not.
 definitions="$work/definitions.sh"
-for name in fetch_file fetch_checkpoints report_local collect; do
+for name in fetch_file fetch_checkpoints report_local collect refuse_out_argument; do
     body="$work/$name.body"
     take "$name" > "$body"
     if [ "$(head -1 "$body")" != "$name() {" ] || [ "$(tail -1 "$body")" != "}" ]
@@ -137,13 +144,24 @@ export RUN_ID
 
 # ------------------------------------------------------------- the fake world
 
-# The trainer writes a resume point and a best centre for each strategy, the
-# report of the run, and the log. The names below are the names it uses.
+# The trainer writes a resume point and a best centre for each strategy, a
+# copy of the resume point for each generation, the report of the run, and the
+# log. The names below are the names it uses.
+#
+# **The trainer writes each weight file under a temporary name first.** That
+# name ends in `.part`, and the fake world holds one, as an instance does in
+# the middle of a save. A fetch must never take it.
 FAKE_REMOTE="$work/remote"
 export FAKE_REMOTE
 mkdir -p "$FAKE_REMOTE/cachette/runs/learn"
 printf 'the resume point of alpha, generation twelve\n' \
     > "$FAKE_REMOTE/cachette/runs/learn/alpha-latest.npz"
+printf 'the resume point of alpha, generation eleven\n' \
+    > "$FAKE_REMOTE/cachette/runs/learn/alpha-gen011.npz"
+printf 'the resume point of alpha, generation twelve\n' \
+    > "$FAKE_REMOTE/cachette/runs/learn/alpha-gen012.npz"
+printf 'half of a resume point\n' \
+    > "$FAKE_REMOTE/cachette/runs/learn/alpha-latest.npz.4242.part"
 printf 'the best validated centre of alpha\n' \
     > "$FAKE_REMOTE/cachette/runs/learn/alpha.npz"
 printf 'the resume point of beta, generation twelve\n' \
@@ -172,11 +190,24 @@ else
     report "a fetch brings back every file the trainer wrote" 0
 fi
 
-if grep -q 'fetched 5 files' <<<"$fetch_output"; then
-    report "the fetch says in the output of the run that it happened" 0
+if [ -f "$out_dir/learn/alpha-gen011.npz" ] \
+    && [ -f "$out_dir/learn/alpha-gen012.npz" ]; then
+    report "a fetch brings back the copy of every generation" 0
+else
+    report "a fetch brings back the copy of every generation" 1
+fi
+
+if compgen -G "$out_dir/learn/*.part" > /dev/null; then
+    report "a fetch never takes a weight file the trainer is still writing" 1
+else
+    report "a fetch never takes a weight file the trainer is still writing" 0
+fi
+
+if grep -q 'fetched 5 weight files and 2 other files' <<<"$fetch_output"; then
+    report "the fetch counts the weights apart from the other files" 0
 else
     printf '  the output was: %s\n' "$fetch_output"
-    report "the fetch says in the output of the run that it happened" 1
+    report "the fetch counts the weights apart from the other files" 1
 fi
 
 if [ -s "$out_dir/last-fetch" ]; then
@@ -235,6 +266,68 @@ if compgen -G "$out_dir/learn/*.part" > /dev/null \
     report "a failed fetch leaves no partial file behind" 1
 else
     report "a failed fetch leaves no partial file behind" 0
+fi
+
+# -------------------------- case: the weights fail and the other files arrive
+
+# **The fetch line counted every file together.** A round whose weight copy
+# failed still fetched the report and the status, so it said that it fetched
+# two files and moved the stamp. A reader then took stale weights for new
+# ones. This case fails the weight copy alone, and the count of the other
+# files in the output proves that the rest of the round went through.
+printf 'the stamp of the last round that brought weights\n' > "$out_dir/last-fetch"
+stamp_before="$(cat "$out_dir/last-fetch")"
+weightless="$(SCP_FAIL_MATCH='*.npz' fetch_checkpoints 2>&1)"
+if grep -q 'no weights arrived this round, and 2 other files did' <<<"$weightless" \
+    && ! grep -q 'fetched' <<<"$weightless"; then
+    report "a round with no weights says that no weights arrived" 0
+else
+    printf '  the output was: %s\n' "$weightless"
+    report "a round with no weights says that no weights arrived" 1
+fi
+
+if [ "$(cat "$out_dir/last-fetch")" = "$stamp_before" ]; then
+    report "a round with no weights leaves the stamp of the weights alone" 0
+else
+    report "a round with no weights leaves the stamp of the weights alone" 1
+fi
+
+# ------------------------------------ case: the run arguments name an output
+
+# The follower fetches from the directory the launcher names. An `--out` in
+# the run arguments sent the weights elsewhere, and every fetch then found
+# nothing. The trainer reads an abbreviation of an option as the option.
+refused=""
+for arguments in "--generations 3 --out /tmp/elsewhere" "--out=/tmp/elsewhere" \
+    "--seeds 2 --ou /tmp/elsewhere" "--ou=/tmp/elsewhere"; do
+    if refuse_out_argument "$arguments" 2>/dev/null; then
+        refused="$refused [$arguments]"
+    fi
+done
+if [ -z "$refused" ]; then
+    report "the launcher refuses an output directory in the run arguments" 0
+else
+    printf '  it accepted:%s\n' "$refused"
+    report "the launcher refuses an output directory in the run arguments" 1
+fi
+
+if refuse_out_argument "--generations 3 --only alpha --pool 4" 2>/dev/null; then
+    report "the launcher accepts run arguments that name no output" 0
+else
+    report "the launcher accepts run arguments that name no output" 1
+fi
+
+# **A refusal that runs after the rental refuses nothing that matters.** The
+# launcher is one script that runs from the top, so the order of its lines is
+# the order of its work.
+refuse_line="$(grep -nF "refuse_out_argument \"\$train_args\"" "$launcher" | head -1 | cut -d: -f1)"
+rent_line="$(grep -n 'run-instances' "$launcher" | head -1 | cut -d: -f1)"
+if [ -n "$refuse_line" ] && [ -n "$rent_line" ] && [ "$refuse_line" -lt "$rent_line" ]; then
+    report "the launcher refuses an output directory before it rents" 0
+else
+    printf '  the refusal is on line %s and the rental on line %s\n' \
+        "${refuse_line:-none}" "${rent_line:-none}"
+    report "the launcher refuses an output directory before it rents" 1
 fi
 
 # ------------------------------------ case: the instance never answers again
