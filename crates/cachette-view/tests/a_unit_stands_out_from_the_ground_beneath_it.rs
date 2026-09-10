@@ -153,6 +153,7 @@ const fn settings() -> WorldConfig {
         seed: SEED,
         faction_count: FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     }
 }
 

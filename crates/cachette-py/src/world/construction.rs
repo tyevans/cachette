@@ -28,8 +28,9 @@ impl PyWorld {
     /// # Errors
     ///
     /// Raises `ConfigError` when the arguments do not describe a world. A side
-    /// of zero, a faction count above 63, and a weather pitch that is not a
-    /// power of two are the cases a caller meets first.
+    /// of zero, a faction count above 63, a weather pitch that is not a power
+    /// of two, and a latitude span that passes a pole are the cases a caller
+    /// meets first.
     ///
     /// # References
     ///
@@ -41,6 +42,8 @@ impl PyWorld {
         seed = 0x0123_4567_89ab_cdef,
         faction_count = 4,
         weather_cell_tiles = None,
+        latitude_centre = None,
+        latitude_span = None,
     ))]
     fn new(
         width: u32,
@@ -48,6 +51,8 @@ impl PyWorld {
         seed: u64,
         faction_count: u16,
         weather_cell_tiles: Option<u32>,
+        latitude_centre: Option<i32>,
+        latitude_span: Option<i32>,
     ) -> PyResult<Self> {
         // **The default lives in the engine and nowhere else.** A caller that
         // states no pitch gets whatever the engine calls its default, so this
@@ -58,6 +63,10 @@ impl PyWorld {
             None => WeatherScale::DEFAULT,
             Some(tiles) => scale_of_tiles(tiles)?,
         };
+        // **The latitude default lives in the engine as well.** A caller that
+        // states no centre and no span gets the settings the engine calls its
+        // default, so this binding holds no second copy of either number.[^3]
+        let defaults = WorldConfig::DEFAULT;
         let world = CoreWorld::with_weather_scale(
             WorldConfig {
                 width,
@@ -65,6 +74,8 @@ impl PyWorld {
                 seed,
                 faction_count,
                 unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+                latitude_centre: latitude_centre.unwrap_or(defaults.latitude_centre),
+                latitude_span: latitude_span.unwrap_or(defaults.latitude_span),
             },
             scale,
         )
@@ -114,6 +125,35 @@ impl PyWorld {
     #[getter]
     fn seed(&self) -> u64 {
         self.lock().config().seed
+    }
+
+    /// The latitude of the middle row of the world, in hundredths of a degree.
+    ///
+    /// This is the value the constructor took for `latitude_centre`, or the
+    /// engine default when the caller stated none. It never changes. A
+    /// positive value is north of the equator.
+    ///
+    /// **The reader takes the value from the weather field that the world
+    /// runs**, and not from the settings it was built with, so it reports the
+    /// span the engine uses.
+    #[getter]
+    fn latitude_centre(&self) -> i32 {
+        self.lock().weather().latitudes().centre()
+    }
+
+    /// The latitude from the first row of the world to the last, in
+    /// hundredths of a degree.
+    ///
+    /// This is the value the constructor took for `latitude_span`, or the
+    /// engine default when the caller stated none. It never changes. A span
+    /// of 18000 makes the world a whole planet.
+    ///
+    /// **The reader takes the value from the weather field that the world
+    /// runs**, and not from the settings it was built with, so it reports the
+    /// span the engine uses.
+    #[getter]
+    fn latitude_span(&self) -> i32 {
+        self.lock().weather().latitudes().span()
     }
 
     /// The number of factions the world holds, as an integer.

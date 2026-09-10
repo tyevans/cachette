@@ -91,6 +91,7 @@ fn ground_with_a_finished_lodging() -> Ground {
         seed: SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     world
@@ -237,6 +238,7 @@ fn a_founded_settlement_reaches_the_log() {
         seed: SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     let (seat, _) = seat_with_a_neighbour(&fresh);

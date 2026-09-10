@@ -233,6 +233,7 @@ fn the_world_step_joins_its_slots_through_the_reduction() {
         seed: 0x0123_4567_89ab_cdef,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     };
     let mut expected: Option<Vec<u8>> = None;
     for threads in THREAD_COUNTS {

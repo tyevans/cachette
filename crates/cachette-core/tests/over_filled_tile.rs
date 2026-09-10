@@ -119,6 +119,7 @@ fn world_of(seed: u64) -> World {
         seed,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     // A unit takes an intent at the interval its level 1 cell schedules. A

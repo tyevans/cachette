@@ -130,6 +130,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
             seed: 7,
             faction_count: 2,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         Population::Empty,
         FRAMES,
@@ -142,6 +143,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
             seed: 0x0123_4567_89ab_cdef,
             faction_count: 4,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         Population::Empty,
         FRAMES,
@@ -154,6 +156,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
             seed: 0xfeed_face,
             faction_count: 3,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         Population::Spread,
         FRAMES,
@@ -166,6 +169,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
             seed: 0x0cac_4e77_0068,
             faction_count: 3,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         Population::Spread,
         WIDE_FRAMES,
@@ -178,6 +182,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
             seed: 0x0cac_4e77_0023,
             faction_count: 2,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         Population::Crowd,
         FRAMES,
@@ -190,6 +195,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
             seed: 0x0cac_4e77_0052,
             faction_count: 3,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         Population::Settled,
         FRAMES,
@@ -202,6 +208,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
             seed: 0x0cac_4e77_0123,
             faction_count: 2,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         Population::Gathering,
         FRAMES,
@@ -214,6 +221,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
             seed: 0x0cac_4e77_0345,
             faction_count: 2,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         Population::Contested,
         FRAMES,
@@ -226,6 +234,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
             seed: 0x0cac_4e77_0061,
             faction_count: 4,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         Population::Founded,
         WIDE_FRAMES,
@@ -238,6 +247,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
             seed: 102,
             faction_count: 2,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         Population::Wonder,
         WONDER_FRAMES,
@@ -250,6 +260,7 @@ const SCENARIOS: &[(&str, WorldConfig, Population, u64)] = &[
             seed: 0x0cac_4e77_0497,
             faction_count: 2,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         Population::Building,
         FRAMES,

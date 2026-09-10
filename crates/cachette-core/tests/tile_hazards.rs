@@ -34,6 +34,7 @@ fn world() -> World {
         seed: 11,
         faction_count: 2,
         unit_capacity: 16,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world")
 }
@@ -95,14 +96,34 @@ fn a_burning_tile_reports_a_hazard() {
 /// The eye drifts on the tick, so the caller reads which tiles the storm
 /// covers rather than assuming the tile it was raised over.
 ///
+/// **The eye starts near the middle of the world, and the world runs one
+/// weather cell for each tile.** A storm drifts about one cell of its own
+/// lattice in a tick. On a lattice of four cells that carries the eye off the
+/// world, and the fixture then reaches no tile under a storm at all.[^1]
+///
 /// # References
 ///
 /// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
 fn a_world_under_one_storm() -> (World, Vec<Axial>, Vec<Axial>) {
-    let mut world = world();
+    let mut world = World::with_weather_scale(
+        WorldConfig {
+            width: EDGE,
+            height: EDGE,
+            seed: 11,
+            faction_count: 2,
+            unit_capacity: 16,
+            ..WorldConfig::DEFAULT
+        },
+        WeatherScale::PER_TILE,
+    )
+    .expect("the extent must describe a world");
     world.step(1).expect("the step must run");
     let dry = dry_ground(&world);
-    let eye = *dry.first().expect("the world holds passable ground");
+    let middle = Axial::new((EDGE / 2) as i32, (EDGE / 2) as i32);
+    let eye = *dry
+        .iter()
+        .min_by_key(|here| (here.q - middle.q).abs() + (here.r - middle.r).abs())
+        .expect("the world holds passable ground");
     world
         .raise_cyclone(eye, CycloneSetting::SEVERE)
         .expect("the place lies inside the world");
@@ -185,6 +206,7 @@ fn the_storm_depth_grades_the_cone_and_the_bool_thresholds_it() {
             seed: 11,
             faction_count: 2,
             unit_capacity: 16,
+            ..WorldConfig::DEFAULT
         },
         WeatherScale::from_bits(0).expect("one tile is a lattice pitch"),
     )

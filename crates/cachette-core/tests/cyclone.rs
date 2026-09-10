@@ -26,7 +26,7 @@ use cachette_core::weather::{
     cyclone_capacity, cyclone_forms, cyclone_genesis_cell, cyclone_wander, Drops, WeatherError,
 };
 use cachette_core::{
-    Axial, Cyclone, CycloneSetting, TileIdx, WeatherScale, World, WorldConfig,
+    Axial, Cyclone, CycloneSetting, Latitudes, TileIdx, WeatherScale, World, WorldConfig,
     CYCLONE_DEPTH_CEILING, CYCLONE_RADIUS_CEILING,
 };
 
@@ -43,6 +43,16 @@ const SEED: u64 = 0x2f;
 const SETTLE: u64 = 120;
 
 /// Builds a world whose weather lattice holds one cell for each tile.
+///
+/// **The world spans the globe, and the storm tests need that.** A world that
+/// states no span is one region of a planet, and a region holds no warm moist
+/// band against a drier surround. The test that asks a storm to rain harder
+/// than the field around it then measures 32 drops for each cell and tick
+/// against 34, and the storm disappears into the background.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
 fn fine_world() -> World {
     let mut world = World::with_weather_scale(
         WorldConfig {
@@ -51,6 +61,8 @@ fn fine_world() -> World {
             seed: SEED,
             faction_count: 2,
             unit_capacity: 1024,
+            latitude_centre: Latitudes::PLANET.centre(),
+            latitude_span: Latitudes::PLANET.span(),
         },
         WeatherScale::PER_TILE,
     )
@@ -67,22 +79,27 @@ fn fine_world() -> World {
 /// the one a real storm would choose. The test asks the world for it rather
 /// than naming a place that a change to the ground generator would move.
 fn warmest_place(world: &World) -> Axial {
-    let cells = world.weather().cells();
+    // **The walk goes over the world and not over the whole lattice.** The
+    // lattice carries a margin of cells that no reader sees, and the warmest
+    // cell of the whole lattice can stand in that margin. A place taken from
+    // there is outside the world, and the verb refuses it.
+    let lattice = world.weather_lattice();
     let plane = world.weather().warmth_plane();
-    let mut best = 0usize;
-    for cell in 0..plane.len() {
-        if plane[cell] > plane[best] {
-            best = cell;
+    let mut best = 0u32;
+    let mut warmest = i32::MIN;
+    for cell in 0..lattice.inner().tile_count() {
+        let Some(whole) = lattice.whole_of_inner(cell) else {
+            continue;
+        };
+        let warmth = plane[whole as usize];
+        if warmth > warmest {
+            warmest = warmth;
+            best = whole;
         }
     }
-    let inner = world
-        .weather_lattice()
-        .inner_address_of(best as u32)
-        .unwrap_or_else(|| {
-            cells
-                .address_of(TileIdx(best as u32))
-                .expect("the cell is on the lattice")
-        });
+    let inner = lattice
+        .inner_address_of(best)
+        .expect("the cell stands inside the world");
     Axial::new(inner.q, inner.r)
 }
 

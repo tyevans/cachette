@@ -47,6 +47,7 @@ fn main() {
             seed,
             faction_count: 1,
             unit_capacity: 64,
+            ..WorldConfig::DEFAULT
         },
         scale,
     )

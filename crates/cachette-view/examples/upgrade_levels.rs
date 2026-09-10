@@ -67,6 +67,7 @@ fn main() {
         seed: SEED,
         faction_count: 2,
         unit_capacity: 4096,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     let seat = Axial::new(EXTENT as i32 / 2, EXTENT as i32 / 2);

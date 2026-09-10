@@ -29,6 +29,7 @@ const CONFIG: WorldConfig = WorldConfig {
     seed: 0x0123_4567_89ab_cdef,
     faction_count: 2,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    ..WorldConfig::DEFAULT
 };
 
 /// The deeds that make a unit eligible in these fixtures.

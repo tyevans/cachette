@@ -33,6 +33,7 @@ const CONFIG: WorldConfig = WorldConfig {
     seed: 0x5eed_0266_0266_5eed,
     faction_count: 4,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    ..WorldConfig::DEFAULT
 };
 
 /// The number of frames that a scenario runs.

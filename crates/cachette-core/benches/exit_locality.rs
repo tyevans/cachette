@@ -185,6 +185,7 @@ fn main() {
         seed: SEED,
         faction_count: FACTIONS,
         unit_capacity: units.max(1024),
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::new(config).expect("the extent must describe a world");
     let placed = populate_scattered(&mut world, units);
@@ -466,6 +467,7 @@ fn frame_rows(arguments: &[String]) {
         seed: SEED,
         faction_count: FACTIONS,
         unit_capacity: units.max(1024),
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::new(config).expect("the extent must describe a world");
     let placed = populate_scattered(&mut world, units);
@@ -527,6 +529,7 @@ fn decide_rows(arguments: &[String]) {
         seed: SEED,
         faction_count: FACTIONS,
         unit_capacity: units.max(1024),
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::new(config).expect("the extent must describe a world");
     let placed = populate_scattered(&mut world, units);
@@ -584,6 +587,7 @@ fn apply_rows(arguments: &[String]) {
         seed: SEED,
         faction_count: FACTIONS,
         unit_capacity: units.max(1024),
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::new(config).expect("the extent must describe a world");
     let placed = populate_scattered(&mut world, units);
@@ -642,6 +646,7 @@ fn held_rows(arguments: &[String]) {
         seed: SEED,
         faction_count: FACTIONS,
         unit_capacity: units.max(1024),
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::new(config).expect("the extent must describe a world");
     let placed = populate_scattered(&mut world, units);
@@ -699,6 +704,7 @@ fn growth_rows(arguments: &[String]) {
         seed: SEED,
         faction_count: FACTIONS,
         unit_capacity: units.max(1024),
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::new(config).expect("the extent must describe a world");
     let placed = populate_scattered(&mut world, units);

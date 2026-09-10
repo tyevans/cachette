@@ -68,6 +68,7 @@ fn world() -> World {
         seed: 11,
         faction_count: FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("a large extent describes a world");
     let open = open_tiles(&world);
@@ -395,6 +396,7 @@ fn a_world_of_one_faction_counts_only_that_faction() {
         seed: 3,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     let open = open_tiles(&world);
@@ -433,6 +435,7 @@ fn the_panel_still_draws_when_the_window_holds_no_unit() {
         seed: 3,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     let open = open_tiles(&world);
@@ -649,6 +652,7 @@ fn sparse_demonstration_world() -> World {
         seed: 0x0cac_4e77_e5ee_d001,
         faction_count: FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     let open = open_tiles(&world);
@@ -1034,6 +1038,7 @@ fn founded_world() -> (World, Vec<FoundingOutcome>) {
         seed: 11,
         faction_count: FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("a large extent describes a world");
     // The run founds one group for each faction. These tests state one
@@ -1278,6 +1283,7 @@ fn the_panel_describes_every_founding_the_caller_holds() {
         seed: 11,
         faction_count: FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("a large extent describes a world");
     // The run founds one group for each faction, so the fixture holds every

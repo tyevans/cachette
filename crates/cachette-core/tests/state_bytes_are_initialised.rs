@@ -80,6 +80,7 @@ fn config() -> WorldConfig {
         seed: 0x0123_4567_89ab_cdef,
         faction_count: 2,
         unit_capacity: CAPACITY,
+        ..WorldConfig::DEFAULT
     }
 }
 

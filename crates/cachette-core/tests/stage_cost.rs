@@ -69,6 +69,7 @@ fn world_with_units(units: u32) -> World {
         seed: SEED,
         faction_count: 4,
         unit_capacity: 1024,
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::new(config).expect("the extent must describe a world");
     let mut placed = 0u32;

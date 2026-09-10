@@ -64,6 +64,7 @@ fn world() -> World {
         seed: 0,
         faction_count: FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the shape must describe a world");
     world.seed_world().expect("the world must seed");

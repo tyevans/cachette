@@ -257,6 +257,7 @@ fn build() -> World {
         seed: SEED,
         faction_count: 3,
         unit_capacity: 32_768,
+        ..WorldConfig::DEFAULT
     })
     .expect("the measured world is inside every ceiling")
 }

@@ -409,6 +409,7 @@ fn the_world_answers_a_tile_after_the_step_rebuilds_the_bridge() {
         seed: 11,
         faction_count: 3,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::new(config).expect("the extent must describe a world");
     let mut expected = Vec::new();
@@ -460,6 +461,7 @@ fn a_world_that_rebuilds_outside_a_step_answers_again() {
         seed: 3,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     let soldier = world

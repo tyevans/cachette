@@ -54,6 +54,7 @@ fn founded(steps: usize) -> (World, Vec<FoundingOutcome>, Axial) {
         seed: 0x0cac_4e77_e5ee_d001,
         faction_count: 3,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     let outcomes = world.found_run_for_every_faction(GROUP);

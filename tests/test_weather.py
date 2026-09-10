@@ -14,7 +14,7 @@ from __future__ import annotations
 import pytest
 
 from cachette import World
-from cachette._core import VerbError
+from cachette._core import ConfigError, VerbError
 
 # A world that holds open water somewhere, so the sea lifts water on its own.
 COASTAL = {"width": 128, "height": 128, "seed": 0x0123456789ABCDEF, "faction_count": 2}
@@ -151,3 +151,22 @@ def test_the_verb_refuses_more_places_than_one_call_carries() -> None:
     world, place = a_congregation()
     with pytest.raises(VerbError):
         world.inflict_weather(0, [place] * (world.weather_places_ceiling + 1), 1)
+
+
+def test_a_world_states_the_region_of_a_planet_it_covers() -> None:
+    """A map is one region of a planet, and the constructor says which one."""
+    world = World(**INLAND, latitude_centre=-4000, latitude_span=200)
+    assert world.latitude_centre == -4000
+    assert world.latitude_span == 200
+
+
+def test_a_world_that_states_no_latitude_takes_the_engine_default() -> None:
+    """The default lives in the engine, so the binding holds no copy of it."""
+    world = World(**INLAND)
+    assert world.latitude_span > 0
+    assert world.latitude_span < 18000
+
+
+def test_a_latitude_span_that_passes_a_pole_refuses() -> None:
+    with pytest.raises(ConfigError):
+        World(**INLAND, latitude_centre=8000, latitude_span=4000)

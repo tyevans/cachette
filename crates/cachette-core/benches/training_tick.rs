@@ -104,6 +104,7 @@ impl Shape {
             seed: self.seed,
             faction_count: self.faction_count,
             unit_capacity: self.unit_capacity,
+            ..WorldConfig::DEFAULT
         })
         .expect("the shape must describe a world");
         world.seed_world().expect("the world must seed");

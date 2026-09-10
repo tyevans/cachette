@@ -61,6 +61,7 @@ fn main() {
         seed: SEED,
         faction_count: FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     let outcomes = world.seed_world().expect("the world seeds once");

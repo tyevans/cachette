@@ -132,6 +132,7 @@ fn run(scale: WeatherScale, margin: u32) -> Option<Row> {
         seed: 0x9e37_79b9_7f4a_7c15,
         faction_count: 2,
         unit_capacity: 64,
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::with_weather_margin(config, scale, margin).ok()?;
     // **A cost probe measures elapsed time and the engine must not.** The

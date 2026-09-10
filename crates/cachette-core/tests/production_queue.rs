@@ -50,6 +50,7 @@ const CONFIG: WorldConfig = WorldConfig {
     seed: 0x0cac_4e77_0497,
     faction_count: 2,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    ..WorldConfig::DEFAULT
 };
 
 /// Builds a world whose queue advances on every tick, and founds one site.
@@ -419,6 +420,7 @@ fn the_built_in_controller_queues_through_the_same_verb() {
         seed: 0x0cac_4e77_0472,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     let outcomes = world.seed_world().expect("a fresh world seeds once");

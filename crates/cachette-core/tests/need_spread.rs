@@ -148,6 +148,7 @@ fn consuming_world(placement: Placement) -> World {
         seed: 42,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     world

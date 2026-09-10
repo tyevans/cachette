@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-735**
+**Next number: FND-736**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20079,3 +20079,61 @@ league median of 2100 to 2450 ticks exists for the engine before the rule, and
 it mixes trained policies with the controller and states a median. The figure
 above is a mean over controller games alone. The two do not compare, and a
 controller-only pass on the earlier engine would be needed to compare them.
+
+### FND-735 — A map is one region of a planet, and the tile edge is a measurement
+
+**Believed.** A map is a whole planet. The project owner ruled that on 6
+September 2026, and the weather took the row axis of a world as a latitude
+that runs from one pole to the other. The tile edge was then a game unit and
+not a length, because a world of the target tile count is a few hundred
+kilometres across and that is not a globe.
+
+**True.** A map is one region of a planet. The project owner reversed the
+ruling on 9 September 2026 and made the latitude span configuration. The tile
+edge is a measurement again, and the span a world takes when it states none is
+the span that the extent of the world is worth.
+
+**Evidence.** Two things.
+
+**The register had to deny one of its own rows.** The scale table derives a
+world extent of about 330 kilometres from the tile edge at the target tile
+count. The planet ruling forced a paragraph under that table saying the figure
+is not the extent of the world and that the weather does not read the tile
+edge. A register that denies a row it holds is a register that lost an
+argument.
+
+**Every map showed the same three belts at the same latitudes.** The field
+imposes a low at the equator, a high at thirty degrees and a low at sixty,
+because a single-layer field cannot grow those belts on its own. A world that
+spanned the globe therefore put three horizontal bands of weather at the same
+rows of every world it built, and the result looked unnatural.
+
+**Follows.** Four things.
+
+**A default reaches every world.** The span was configuration before this
+change and nothing overrode it, so the default decided what every map looked
+like. A parameter that no caller ever states is the value of its default.
+
+**The imposed belts stay in the code.** Across a span of three degrees the
+offset runs as one steady slope, so it imposes no belt boundary and costs a
+region nothing. A caller that states a span from pole to pole still gets the
+belts, and a reader who deletes the offset removes that reading.
+
+**A span is a second declaration site whenever a second thing builds a
+weather field.** The climate spin built one of its own and took the default,
+so a world at a stated span would have been spun under a different sky. The
+settings of the world are now the one site that states the span, and a test
+builds two worlds a hemisphere apart and asks that their climates differ.
+
+**A storm is bigger and more frequent on a region than on a planet, and both
+figures now sit at a clamp.** The reach of a storm is 11 degrees of latitude
+divided by what one row of the lattice spans, and the gradient that admits a
+front is one step of the temperature plane for each degree that one row spans.
+Over a 64-row world the planet span gives a reach of 3 cells and a mark of 2
+steps. The default span gives a reach of 234 cells, which the ceiling of 8
+takes, and a mark of 0.047 steps, which the floor of 1 takes. So the field
+raises fronts wherever two neighbours differ at all, and every storm it raises
+is as wide as the engine allows. Four storm tests state the planet span for
+that reason, and the commit body names them. **Nobody has ruled on whether
+these two figures should follow the span of the world or the globe**, in the
+way that the sun normalisers follow the globe.

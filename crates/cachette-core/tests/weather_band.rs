@@ -63,6 +63,11 @@ const STANDING_FLOOR: usize = 2;
 const WATCH_TICKS: u32 = 400;
 
 /// Builds a world at one weather cell for each tile.
+///
+/// **The world spans the globe, and every test here asks about a planet.**
+/// The tests read the tropics, the belts and the band that holds the wettest
+/// air, and none of the three exists inside the span that a world takes when
+/// it states none.
 fn world_of(extent: u32) -> World {
     World::with_weather_scale(
         WorldConfig {
@@ -71,6 +76,8 @@ fn world_of(extent: u32) -> World {
             seed: SEED,
             faction_count: 4,
             unit_capacity: 1024,
+            latitude_centre: Latitudes::PLANET.centre(),
+            latitude_span: Latitudes::PLANET.span(),
         },
         WeatherScale::PER_TILE,
     )

@@ -49,7 +49,7 @@ fn demonstration() -> World {
         height: 256,
         seed: 0x0123_4567_89ab_cdef,
         faction_count: 4,
-        ..Default::default()
+        ..WorldConfig::DEFAULT
     })
     .expect("the world builds")
 }
@@ -161,7 +161,7 @@ fn a_world_built_for_the_carry() -> Carriers {
         height: 256,
         seed: CARRY_SEED,
         faction_count: 2,
-        ..Default::default()
+        ..WorldConfig::DEFAULT
     })
     .expect("the world builds");
     // **Every faction is under external control, so the built-in controller
@@ -692,7 +692,7 @@ fn a_laden_unit_reaches_the_tile_of_its_home_and_not_only_the_cell() {
             height: 256,
             seed,
             faction_count: 2,
-            ..Default::default()
+            ..WorldConfig::DEFAULT
         })
         .expect("the world builds");
         // Nothing starves and nothing eats, so the test measures the walk.

@@ -97,6 +97,7 @@ fn world(seed: u64) -> World {
         seed,
         faction_count: FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the settings describe a world")
 }

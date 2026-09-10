@@ -53,6 +53,7 @@ fn world_of(seed: u64) -> World {
         seed,
         faction_count: 2,
         unit_capacity: 64,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     // A draw reads the derived structure, and a fresh one is stale.
@@ -136,6 +137,7 @@ fn the_count_follows_the_window_and_not_the_world() {
             seed: SEED,
             faction_count: 2,
             unit_capacity: 64,
+            ..WorldConfig::DEFAULT
         })
         .expect("the extent describes a world");
         world.rebuild_bridge(1).expect("the rebuild must succeed");

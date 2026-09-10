@@ -36,6 +36,7 @@ const CONFIG: WorldConfig = WorldConfig {
     seed: 0x0123_4567_89ab_cdef,
     faction_count: 2,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    ..WorldConfig::DEFAULT
 };
 
 /// Builds a world that rebalances on every tick, and founds one site.

@@ -65,6 +65,7 @@ const CONFIG: WorldConfig = WorldConfig {
     seed: 0x0123_4567_89ab_cdef,
     faction_count: 4,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    ..WorldConfig::DEFAULT
 };
 
 /// Runs one frame and returns the event log as bytes.
@@ -184,6 +185,7 @@ fn the_stock_key_test_fails_when_the_resource_key_drops_the_row() {
         seed: 0x0123_4567_89ab_cdef,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     let column = RESOURCE_EXTENT as i32 / 2;
@@ -230,6 +232,7 @@ fn gathered_after_a_frame(threads: usize) -> Vec<CarryLoad> {
         seed: 0x0cac_4e77_0072,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     // The choice pass writes the gather order of a unit whose level 1 cell
@@ -335,6 +338,7 @@ fn crowded_after_a_frame(threads: usize) -> Vec<Axial> {
         seed: 0x0cac_4e77_0023,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     // A unit takes an intent at the interval its level 1 cell schedules, and
@@ -440,6 +444,7 @@ fn the_candidate_key_test_fails_when_the_founding_key_drops_the_row() {
         seed: 0x0cac_4e77_0061,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     let survey = world
@@ -493,6 +498,7 @@ fn rationed_after_frames(threads: usize) -> Vec<u8> {
         seed: 42,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     world
@@ -580,6 +586,7 @@ fn the_tie_break_test_fails_when_the_option_order_breaks() {
         seed: 7,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     world
@@ -675,6 +682,7 @@ fn the_direction_tie_break_test_fails_when_the_direction_order_breaks() {
         seed: 7,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
 
@@ -767,6 +775,7 @@ fn starved_after_frames(threads: usize) -> Vec<u8> {
         seed: 42,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     world

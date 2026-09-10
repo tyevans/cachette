@@ -25,11 +25,50 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-161**
+**Next number: BLK-162**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
 ## Open
+
+### BLK-161 — Does a storm take its size and its threshold from the world or from the globe?
+
+**Blocks.** Any statement about how often a world raises a storm, and how wide
+a storm it raises. Every storm figure of a world that states no span sits at a
+clamp today.
+
+**Owner.** The project owner.
+
+**Status.** Open.
+
+**What is not known.** Whether the reach of a storm and the gradient that
+admits a front follow the latitude span of the world, or the globe. The sun
+normalisers follow the globe, and a record states that rule for them. The two
+storm figures follow the world.
+
+**What follows from that today.** A map is one region of a planet, and a world
+that states no span spans three degrees. The reach of a storm is 11 degrees of
+latitude divided by what one row of the lattice spans, so a narrow span asks
+for a reach far above the ceiling of 8 cells and every storm is as wide as the
+engine allows. The gradient that admits a front is one step of the temperature
+plane for each degree that one row spans, so a narrow span asks for a mark
+below the floor of one step and the field admits a front wherever two
+neighbours differ at all. A world of the default span therefore carries more
+storms, and wider ones, than the planet it is a region of.
+
+**What would close this.** A statement of whether a storm is a size on the
+ground, as the code says it is, or a size on the lattice. If it is a size on
+the ground, the answer is what a world of a few hundred kilometres should hold
+at a lattice of tens of cells, because the ground truth is that such a world
+holds a fraction of one storm.
+
+**What the project does meanwhile.** The two figures stay as they are, and
+four storm tests state the planet span so that they measure a storm against a
+quiet background. The findings register holds the arithmetic.[^BLK161A]
+
+## References
+
+[^BLK161A]: Findings register, FND-735. `docs/FINDINGS.md`
 
 ### BLK-159 — Does this engine hold people apart from units, and what is a settlement population?
 

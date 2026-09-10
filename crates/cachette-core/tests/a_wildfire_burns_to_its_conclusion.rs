@@ -61,6 +61,7 @@ fn bare_world(seed: u64) -> World {
         seed,
         faction_count: FACTIONS,
         unit_capacity: 4096,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world")
 }

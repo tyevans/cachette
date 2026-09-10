@@ -49,6 +49,7 @@ fn one_unit_world() -> (World, Entity, Axial) {
         seed: 11,
         faction_count: 1,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
 
@@ -272,6 +273,7 @@ fn the_table_never_holds_more_units_than_its_bound() {
         seed: 11,
         faction_count: 1,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
 

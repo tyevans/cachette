@@ -69,6 +69,7 @@ fn seed_a_demonstration_world(seed: u64) -> Vec<FoundingOutcome> {
         seed,
         faction_count: DEMONSTRATION_FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     let outcomes = world.seed_world().expect("the world seeds once");
@@ -143,6 +144,7 @@ fn seed_a_small_world(side: u32, seed: u64) -> (World, Vec<FoundingOutcome>) {
         seed,
         faction_count: DEMONSTRATION_FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     let outcomes = world.seed_world().expect("the world seeds once");

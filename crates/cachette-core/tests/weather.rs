@@ -54,6 +54,7 @@ fn coastal_world() -> World {
         seed: WET_SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     assert!(
@@ -71,6 +72,7 @@ fn inland_world() -> World {
         seed: DRY_SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     assert_eq!(
@@ -269,6 +271,7 @@ fn per_tile_world() -> World {
             seed: WET_SEED,
             faction_count: 2,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         weather::WeatherScale::PER_TILE,
     )
@@ -1160,6 +1163,7 @@ fn the_peak_of_the_air_plane_keeps_moving() {
         seed: 0x2f,
         faction_count: 4,
         unit_capacity: 1024,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     let mut peaks: Vec<usize> = Vec::new();
@@ -1255,6 +1259,7 @@ fn the_air_never_stands_above_the_saturation_mark() {
             seed: WET_SEED,
             faction_count: 2,
             unit_capacity: 1024,
+            ..WorldConfig::DEFAULT
         },
         weather::WeatherScale::PER_TILE,
     )
@@ -1402,6 +1407,7 @@ fn the_air_never_stands_above_the_capacity_of_its_own_cell() {
             seed: WET_SEED,
             faction_count: 2,
             unit_capacity: 1024,
+            ..WorldConfig::DEFAULT
         },
         weather::WeatherScale::PER_TILE,
     )
@@ -1478,6 +1484,7 @@ fn the_inland_high_latitudes_hold_cloud() {
             seed: POLAR_SEA_SEED,
             faction_count: 2,
             unit_capacity: 1024,
+            ..WorldConfig::DEFAULT
         },
         weather::WeatherScale::PER_TILE,
     )
@@ -1965,6 +1972,7 @@ fn the_banded_pressure_follows_the_world_row_and_not_the_lattice_row() {
             seed: POLAR_SEA_SEED,
             faction_count: 1,
             unit_capacity: 64,
+            ..WorldConfig::DEFAULT
         },
         weather::WeatherScale::PER_TILE,
     )

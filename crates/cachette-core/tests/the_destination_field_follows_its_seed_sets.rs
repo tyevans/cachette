@@ -65,6 +65,7 @@ fn world() -> World {
         seed: SEED,
         faction_count: FACTIONS,
         unit_capacity: 1024,
+        ..WorldConfig::DEFAULT
     })
     .expect("the shape must describe a world");
     for faction in 0..FACTIONS {

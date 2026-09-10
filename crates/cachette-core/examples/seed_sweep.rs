@@ -70,6 +70,7 @@ fn main() {
             seed,
             faction_count: factions,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         })
         .expect("the extent must describe a world");
         if bound > 0 {

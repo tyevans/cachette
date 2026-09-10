@@ -44,6 +44,7 @@ fn config(seed: u64) -> WorldConfig {
         seed,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     }
 }
 

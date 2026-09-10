@@ -390,6 +390,23 @@ pub enum WorldError {
     ///
     /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
     FactionCountAboveCeiling(u16),
+    /// The configured latitudes do not fit on the globe.
+    ///
+    /// The row axis of a world carries a latitude. The configuration states
+    /// the middle of that axis and the span from the first row to the last,
+    /// both in hundredths of a degree. A span that passes a pole describes no
+    /// ground, so the world refuses to build.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    LatitudesOutsideTheGlobe {
+        /// The latitude of the middle row, in hundredths of a degree.
+        centre: i32,
+        /// The latitude from the first row to the last, in hundredths of a
+        /// degree.
+        span: i32,
+    },
     /// The influence field refused to build.
     Influence(InfluenceError),
     /// The weather field refused to build.
@@ -422,6 +439,11 @@ impl core::fmt::Display for WorldError {
             Self::FactionCountAboveCeiling(count) => write!(
                 formatter,
                 "the world asks for {count} factions, and the ceiling is {FACTION_CEILING}"
+            ),
+            Self::LatitudesOutsideTheGlobe { centre, span } => write!(
+                formatter,
+                "the world asks for a latitude span of {span} at a centre of {centre}, \
+                 in hundredths of a degree, and that does not fit on the globe"
             ),
             Self::Influence(error) => {
                 write!(formatter, "the world has no influence field: {error:?}")

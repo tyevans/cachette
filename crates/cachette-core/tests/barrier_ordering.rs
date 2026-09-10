@@ -44,6 +44,7 @@ fn peopled() -> (World, Vec<Entity>) {
         seed: SEED,
         faction_count: 3,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     // The choice interval is not the subject of this file. A unit takes an

@@ -47,6 +47,7 @@ fn build(extent: u32, seed: u64, scale: WeatherScale) -> World {
             seed,
             faction_count: 4,
             unit_capacity: 1024,
+            ..WorldConfig::DEFAULT
         },
         scale,
     )

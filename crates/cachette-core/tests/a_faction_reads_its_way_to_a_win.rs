@@ -65,6 +65,7 @@ fn a_still_world(extent: u32, seed: u64) -> World {
         seed,
         faction_count: 3,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     world.set_tick_limit(FAR_LIMIT);

@@ -15,6 +15,7 @@ fn main() {
         seed: 0x0cac_4e77_5104_0001,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the settings describe a world");
     let outcomes = world.found_run_for_every_faction(30);

@@ -41,6 +41,7 @@ const VARIED: WorldConfig = WorldConfig {
     seed: 0x00c0_ffee_0123_4567,
     faction_count: 3,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    ..WorldConfig::DEFAULT
 };
 
 /// The number of threads that the tick under test runs on.

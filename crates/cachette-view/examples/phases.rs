@@ -37,6 +37,7 @@ fn build(width: u32, height: u32, soldiers: u32) -> World {
         seed: 0x0cac_4e77_e5ee_d001,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     // The ground refuses a soldier on water, so the measurement places its

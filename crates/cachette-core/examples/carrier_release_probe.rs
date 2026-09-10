@@ -45,7 +45,7 @@ fn main() {
         height: 256,
         seed: 0x0123_4567_89ab_cdef,
         faction_count: 4,
-        ..Default::default()
+        ..WorldConfig::DEFAULT
     })
     .expect("the world builds");
     let outcomes = world.found_run_for_every_faction(64);

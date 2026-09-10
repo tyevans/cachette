@@ -31,6 +31,7 @@ const CONFIG: WorldConfig = WorldConfig {
     seed: 7,
     faction_count: 2,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    ..WorldConfig::DEFAULT
 };
 
 /// How many units live in the crowded dwelling.

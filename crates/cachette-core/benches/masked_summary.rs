@@ -83,6 +83,7 @@ fn a_world(radius: u32) -> (World, Axial) {
         seed: SEED,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::new(config).expect("the configuration describes a world");
     world

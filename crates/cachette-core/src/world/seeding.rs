@@ -48,7 +48,7 @@ use crate::trade::{MarketTable, TradeTable, DEFAULT_BOARD_ROWS, DEFAULT_LAND_LIS
 use crate::types::{Accum, Tick, TileIdx, FACTION_CEILING};
 use crate::unit_type::DEFAULT_UNIT_TYPE_TABLE;
 use crate::upgrade::{self, UpgradeMap};
-use crate::weather::{ground_over_lattice, Latitudes, WeatherField, WeatherScale};
+use crate::weather::{ground_over_lattice, WeatherField, WeatherScale};
 
 impl World {
     /// Builds a world from the settings.
@@ -113,7 +113,14 @@ impl World {
         if spin_ticks == 0 {
             return Ok(world);
         }
-        let climate = ClimateField::spin(world.terrain, weather_scale, spin_ticks, threads)?;
+        // **The spin reads the span of the world it spins.** A spin that
+        // reached for a default would run a different sky from the one the
+        // world then runs, and nothing would fail when the two disagreed.[^2]
+        //
+        // [^2]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+        let latitudes = world.weather.latitudes();
+        let climate =
+            ClimateField::spin(world.terrain, weather_scale, latitudes, spin_ticks, threads)?;
         world.climate_reference = climate.wetness_reference();
         world.climate = climate;
         Ok(world)
@@ -145,8 +152,9 @@ impl World {
     /// # Errors
     ///
     /// Returns an error when the configured extent does not describe a grid,
-    /// when the scale does not describe a lattice over that extent, and when
-    /// the margin makes the lattice too large to index.
+    /// when the scale does not describe a lattice over that extent, when the
+    /// margin makes the lattice too large to index, and when the configured
+    /// latitudes do not fit on the globe.
     ///
     /// # References
     ///
@@ -156,39 +164,27 @@ impl World {
         weather_scale: WeatherScale,
         weather_margin: u32,
     ) -> Result<Self, WorldError> {
-        Self::with_weather_latitudes(config, weather_scale, weather_margin, Latitudes::DEFAULT)
-    }
-
-    /// Builds a world at a stated weather resolution, margin and latitude
-    /// span.
-    ///
-    /// **The span says what the row axis of the world means.** A span from
-    /// pole to pole makes the world a planet: it has poles, a banded
-    /// circulation, subtropical deserts and an equatorial rain belt. A narrow
-    /// span makes the world one region of a planet, and the latitude term
-    /// then goes flat and the climate comes from the ground and the sea
-    /// alone.[^1]
-    ///
-    /// A world that states no span is a planet.[^1]
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the configured extent does not describe a grid,
-    /// when the scale does not describe a lattice over that extent, and when
-    /// the margin makes the lattice too large to index.
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-    pub fn with_weather_latitudes(
-        config: WorldConfig,
-        weather_scale: WeatherScale,
-        weather_margin: u32,
-        latitudes: Latitudes,
-    ) -> Result<Self, WorldError> {
         if config.faction_count > FACTION_CEILING {
             return Err(WorldError::FactionCountAboveCeiling(config.faction_count));
         }
+        // **The span says what the row axis of the world means.** A span from
+        // pole to pole makes the world a planet: it has poles, a banded
+        // circulation, subtropical deserts and an equatorial rain belt. The
+        // default span makes the world one region of a planet, and the
+        // latitude term then goes flat and the climate comes from the ground
+        // and the sea alone.[^5]
+        //
+        // The configuration is the one site that states the span, so no
+        // constructor here holds a default of its own.[^6]
+        //
+        // [^5]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+        // [^6]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+        let latitudes = config
+            .latitudes()
+            .map_err(|_| WorldError::LatitudesOutsideTheGlobe {
+                centre: config.latitude_centre,
+                span: config.latitude_span,
+            })?;
         let grid = Grid::new(config.width, config.height)?;
         // The tile value field stores nothing here. It holds the seed and
         // the extent, and it generates a tile when a reader asks for one, so

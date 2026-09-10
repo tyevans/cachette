@@ -24,6 +24,7 @@ const TWO_SIDES: WorldConfig = WorldConfig {
     seed: 0x00c0_ffee_0123_4567,
     faction_count: 3,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    ..WorldConfig::DEFAULT
 };
 
 /// A world small enough for one unit to see every tile of it.
@@ -38,6 +39,7 @@ const ONE_BLOCK: WorldConfig = WorldConfig {
     seed: 0x00c0_ffee_0123_4567,
     faction_count: 2,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    ..WorldConfig::DEFAULT
 };
 
 /// The faction that watches in every fixture below.

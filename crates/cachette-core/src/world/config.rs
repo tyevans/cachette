@@ -4,6 +4,8 @@
 //! builds a world from the result. They sit apart from the world because they
 //! describe the world before it exists.
 
+use crate::weather::{Latitudes, WeatherError};
+
 /// The settings that build a world.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WorldConfig {
@@ -50,6 +52,44 @@ pub struct WorldConfig {
     /// [^2]: ADR-0084, the world reserves the unit columns at construction, decision D2. `docs/adrs/draft/adr-0084-the-world-reserves-the-unit-columns-at-construction.md`
     /// [^3]: PRD-0012, a world starts small and grows. `docs/product/accepted/prd-0012-a-world-starts-small-and-grows.md`
     pub unit_capacity: u32,
+    /// The latitude of the middle row of the world, in hundredths of a
+    /// degree.
+    ///
+    /// **A map is one region of a planet, and the region stands somewhere.**
+    /// The row axis of the world carries a latitude, and this value says
+    /// where the middle of that axis stands. A positive value is north of the
+    /// equator.[^1]
+    ///
+    /// The default stands at forty-five degrees north, which is the middle
+    /// latitude of the temperate belt.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    pub latitude_centre: i32,
+    /// The latitude from the first row of the world to the last, in
+    /// hundredths of a degree.
+    ///
+    /// **The default is three degrees, because that is how wide a world of
+    /// the target tile count is.** The scale register derives a world extent
+    /// of about 330 kilometres from the tile edge at the target tile count,
+    /// and that distance is about three degrees of latitude.[^1]
+    ///
+    /// A caller that wants the published pressure belts states a span from
+    /// pole to pole instead, which is 18000 hundredths of a degree. No belt
+    /// is three degrees wide, so a world of the default span carries one
+    /// prevailing wind and not three.[^2]
+    ///
+    /// **This is the one place that states the span.** The weather field, the
+    /// climate spin and the Python constructor all take it from here, so no
+    /// second site can disagree with this one.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+    /// [^2]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+    /// [^3]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    pub latitude_span: i32,
 }
 
 impl WorldConfig {
@@ -98,6 +138,46 @@ impl WorldConfig {
     /// three is a purpose that stands in the code.
     pub const PLANES_FOR_ONE_FACTION: u16 = 3;
 
+    /// The settings that a caller gets when it states none.
+    ///
+    /// **This is the one site that states each default.** The trait
+    /// implementation below returns this value, so a constant and a runtime
+    /// caller read the same settings and no second site can disagree with
+    /// this one.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    pub const DEFAULT: Self = Self {
+        width: 64,
+        height: 64,
+        seed: 0x0123_4567_89ab_cdef,
+        faction_count: 4,
+        unit_capacity: Self::TARGET_UNIT_POPULATION,
+        // The region span is declared once, beside the planet span it stands
+        // against. This reads it rather than repeating it.
+        latitude_centre: Latitudes::REGION.centre(),
+        latitude_span: Latitudes::REGION.span(),
+    };
+
+    /// Returns the latitudes that the rows of this world stand at.
+    ///
+    /// **Every reader of the span goes through this call.** The weather
+    /// field and the climate spin both read the span of the world they run
+    /// over, so neither of them holds a default of its own.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the span is negative, when it is wider than the
+    /// globe, and when either end of it passes a pole.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    pub const fn latitudes(&self) -> Result<Latitudes, WeatherError> {
+        Latitudes::new(self.latitude_centre, self.latitude_span)
+    }
+
     /// Returns the destination planes that a world of this shape holds.
     ///
     /// The count gives each faction the planes it climbs at the same time,
@@ -118,12 +198,6 @@ impl WorldConfig {
 
 impl Default for WorldConfig {
     fn default() -> Self {
-        Self {
-            width: 64,
-            height: 64,
-            seed: 0x0123_4567_89ab_cdef,
-            faction_count: 4,
-            unit_capacity: Self::TARGET_UNIT_POPULATION,
-        }
+        Self::DEFAULT
     }
 }

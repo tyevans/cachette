@@ -61,6 +61,7 @@ fn founded() -> (World, Vec<cachette_core::FoundingOutcome>, Axial) {
         seed: 0x0cac_4e77_e5ee_d001,
         faction_count: FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     let outcomes = world.found_run_for_every_faction(GROUP);
@@ -171,6 +172,7 @@ fn the_glass_states_what_is_left_of_the_food_the_ground_gave() {
         seed: 0x0cac_f00d,
         faction_count: 1,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     world.rebuild_bridge(1).expect("the rebuild must succeed");

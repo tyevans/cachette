@@ -65,6 +65,7 @@ const SCENARIOS: &[(&str, WorldConfig, u64)] = &[
             seed: 1,
             faction_count: 1,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         1,
     ),
@@ -76,6 +77,7 @@ const SCENARIOS: &[(&str, WorldConfig, u64)] = &[
             seed: 0xdead_beef,
             faction_count: 2,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         4,
     ),
@@ -87,6 +89,7 @@ const SCENARIOS: &[(&str, WorldConfig, u64)] = &[
             seed: 0x0123_4567_89ab_cdef,
             faction_count: 4,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         8,
     ),
@@ -98,6 +101,7 @@ const SCENARIOS: &[(&str, WorldConfig, u64)] = &[
             seed: 42,
             faction_count: 16,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         4,
     ),
@@ -142,6 +146,7 @@ fn run_seeded(threads: usize) -> (Vec<u8>, u64) {
         seed: 0x0cac_4e77_0472,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::new(config).expect("the extent must describe a world");
     let outcomes = world.seed_world().expect("a fresh world seeds once");
@@ -201,6 +206,7 @@ fn run_with_queue(threads: usize) -> (Vec<u8>, u64) {
         seed: 0x0cac_4e77_0497,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::new(config).expect("the extent must describe a world");
     world.set_queue_schedule(RateSchedule::new(1, 0).expect("one is inside the range"));
@@ -298,6 +304,7 @@ fn run_with_wonder(threads: usize) -> (Vec<u8>, u64) {
         seed: 102,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::new(config).expect("the extent must describe a world");
     world
@@ -1456,6 +1463,7 @@ const CONTESTED: &[(&str, WorldConfig, u64)] = &[
             seed: 1,
             faction_count: 2,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         4,
     ),
@@ -1467,6 +1475,7 @@ const CONTESTED: &[(&str, WorldConfig, u64)] = &[
             seed: 0x0123_4567_89ab_cdef,
             faction_count: 4,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         8,
     ),
@@ -1478,6 +1487,7 @@ const CONTESTED: &[(&str, WorldConfig, u64)] = &[
             seed: 42,
             faction_count: 16,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         4,
     ),
@@ -1581,6 +1591,7 @@ const CONVERTED: &[(&str, WorldConfig, u64)] = &[
             seed: 7,
             faction_count: 2,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         6,
     ),
@@ -1592,6 +1603,7 @@ const CONVERTED: &[(&str, WorldConfig, u64)] = &[
             seed: 0x0123_4567_89ab_cdef,
             faction_count: 4,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         8,
     ),
@@ -1603,6 +1615,7 @@ const CONVERTED: &[(&str, WorldConfig, u64)] = &[
             seed: 42,
             faction_count: 16,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         },
         6,
     ),

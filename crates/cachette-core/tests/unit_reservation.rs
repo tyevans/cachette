@@ -49,6 +49,7 @@ fn world() -> World {
         seed: 0x5eed_0000_0000_0084,
         faction_count: 1,
         unit_capacity: RESERVATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("a small extent describes a world")
 }
@@ -204,6 +205,7 @@ fn a_founding_past_the_reservation_is_refused_and_leaves_nothing() {
         seed: 0x5eed_0000_0000_0084,
         faction_count: 1,
         unit_capacity: GROUP / 2,
+        ..WorldConfig::DEFAULT
     })
     .expect("a small extent describes a world");
     // A refused founding does not restore the state hash, and it must not be
@@ -242,6 +244,7 @@ fn a_refused_founding_frees_the_slots_it_opened() {
         seed: 0x5eed_0000_0000_0084,
         faction_count: 1,
         unit_capacity: GROUP / 2,
+        ..WorldConfig::DEFAULT
     })
     .expect("a small extent describes a world");
     assert!(world.found_run(GROUP, FactionId(0)).is_err());

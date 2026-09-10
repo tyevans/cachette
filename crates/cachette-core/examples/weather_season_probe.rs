@@ -25,9 +25,10 @@ fn main() {
     let mark = argument(3, 60) as i32;
     let scale = WeatherScale::from_bits(bits).expect("the scale describes a lattice");
     let rows = extent / scale.side();
-    // The latitudes of the world. A world that states none is a planet, so
-    // the probe reports the planet reading.
-    let latitudes = Latitudes::DEFAULT;
+    // The probe walks from the equator to a pole, so it states the planet
+    // span. A world that states none is one region of a planet, and a region
+    // holds no pole to walk to.
+    let latitudes = Latitudes::PLANET;
     // The sun stands at one limit a quarter of the way through the swing and
     // at the other three quarters of the way through it.
     let summer = Tick((SEASON_PERIOD_TICKS / 4) as u64);
