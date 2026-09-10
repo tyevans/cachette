@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import replace
+from functools import cache
 
 import pytest
 
@@ -33,9 +34,11 @@ from cachette.learn.__main__ import (
     FOUND_READY,
     SETTLEMENT_TARGET,
     STRATEGIES,
+    WIN,
     WORLD,
     strategy_table,
 )
+from cachette.learn.endings import PATH_PROGRESS
 from cachette.learn.env import Env
 from cachette.learn.policy import LinearPolicy
 from cachette.learn.presets import ObjectiveSchedule
@@ -49,6 +52,22 @@ from cachette.learn.train import first_scoring
 # the engine publishes.
 SETTLEMENT_FIELD = "settlements"
 READY_FIELD = "may_found"
+
+# The win path whose published share the reader of the path never compares.
+#
+# The share is the held tiles of the faction over the passable tiles of the
+# whole world. The reader ranks the factions against each other at the tick
+# limit and holds no denominator, so the share reaches no winning value and
+# nothing bounds a weight on it against the win it leads to.
+#
+# The name comes from the join the reporting instrument holds, so this states
+# no signal name of its own.
+UNBOUNDED_PATH = "territory"
+
+# The win paths whose published share reaches one exactly where the reader of
+# the path fires. A weight on one of these is bounded against the crossing it
+# climbs to, and the tests below derive that bound.
+BOUNDED_PATHS = tuple(name for name in PATH_PROGRESS if name != UNBOUNDED_PATH)
 
 # What the builder answers for each kind the table may name. A kind outside
 # this mapping is a kind no run can train.
@@ -79,11 +98,13 @@ def _level_of(weighting: Weighting, field: str) -> float:
     return float(weight)
 
 
+@cache
 def _probe() -> Env:
     """Build the probe environment the table's own world states.
 
     Every row states one world, so this asserts that and then builds it once.
-    A probe for each row would build the same world eight times.
+    A probe for each row would build the same world once for each row of the
+    table.
     """
     configs = {config for config, _, _ in STRATEGIES.values()}
     assert len(configs) == 1, "the rows of the table state more than one world"
@@ -251,6 +272,179 @@ def test_the_founding_ladder_never_outpays_the_founding_it_leads_to() -> None:
             f"the readiness weight of {name} outpays founding at settlement "
             f"{SETTLEMENT_TARGET + 1}"
         )
+
+
+def _win_path_levels(weighting: Weighting) -> dict[str, float]:
+    """Return the level weight of each bounded win path share of one row.
+
+    The signal of each path comes from the join the reporting instrument
+    holds, so this states no signal name of its own.
+    """
+    return {
+        PATH_PROGRESS[path]: float(weight)
+        for path in BOUNDED_PATHS
+        if (weight := weighting.levels.get(PATH_PROGRESS[path])) is not None
+    }
+
+
+def _share_top(field: str) -> float:
+    """Return the reading that stands for one in a published share.
+
+    The schema states the highest value and the unit of every field, and the
+    quotient of the two is the top of the share. **A number written here
+    would be a second declaration of an engine rule**, and nothing would fail
+    when the two disagreed.
+    """
+    form = _probe().signals.signal(field).form
+    assert form is not None, f"the schema publishes no value form for {field}"
+    assert form.unit > 0, f"the schema states no unit for {field}"
+    return float(form.high) / float(form.unit)
+
+
+def test_the_table_shapes_a_row_at_the_progress_of_a_win_path() -> None:
+    """One row of the table pays for the progress of a path that wins a game.
+
+    Every row of this table weighed a stock of the faction once: the held
+    ground, the settlements, the stores or the people. **No win reader
+    compares any of those quantities.** A policy that climbs one of them
+    climbs a gradient that ends in nothing the engine rewards.[^5]
+
+    This asserts that the table also holds a row whose shaped weight reads
+    the published progress of a win path, so that a run can compare the two
+    kinds of shaping against each other.
+
+    References
+    ----------
+    [^5]: Research, what the win conditions are and what can reach them.
+    ``docs/research/what-the-win-conditions-are-and-what-can-reach-them.md``
+    """
+    shaped = [
+        name
+        for name, (_, scoring, _) in STRATEGIES.items()
+        if _win_path_levels(_weighting(scoring))
+    ]
+    assert shaped, (
+        "no row of the table pays for the progress of a win path, so every "
+        "row shapes at a quantity no win reader compares"
+    )
+
+
+def test_no_row_weighs_the_share_no_win_reader_compares() -> None:
+    """The held ground share states a threshold the engine does not hold.
+
+    The engine publishes the held tiles of the faction over the passable
+    tiles of the whole world. The reader of that path ranks the factions
+    against each other at the tick limit, so it holds no denominator and the
+    share reaches no winning value.[^5] A weight on that share therefore has
+    no bound against the win it leads to, and a policy that climbs it cannot
+    read how far it has to go.
+
+    The held tile field carries the same quantity under a name that states no
+    threshold, and the rows that play for ground weigh that field instead.
+
+    References
+    ----------
+    [^5]: Research, what the win conditions are and what can reach them.
+    ``docs/research/what-the-win-conditions-are-and-what-can-reach-them.md``
+    """
+    field = PATH_PROGRESS[UNBOUNDED_PATH]
+    for name, (_, scoring, _) in STRATEGIES.items():
+        weighting = _weighting(scoring)
+        assert field not in weighting.levels, (
+            f"{name} weighs {field}, which measures a requirement that no win "
+            f"reader compares"
+        )
+        assert field not in weighting.terms
+
+
+def test_a_win_path_term_never_outpays_the_crossing_it_climbs_to() -> None:
+    """A rung of a win path must pay less than crossing the threshold pays.
+
+    The published progress of a win path reaches the top of its share exactly
+    where the reader of the path fires.[^5] A level weight is paid on every
+    decision, so a row whose weight is `w` pays `w` times the top times the
+    horizon over an episode held at that top.
+
+    **A faction paid more for standing at the threshold than for crossing it
+    never crosses.** This derives the top from the schema of the world and
+    the horizon from the world the table states, so no figure here restates
+    one the run already holds.
+
+    References
+    ----------
+    [^5]: Research, what the win conditions are and what can reach them.
+    ``docs/research/what-the-win-conditions-are-and-what-can-reach-them.md``
+    """
+    for name, (world, scoring, _) in STRATEGIES.items():
+        weighting = _weighting(scoring)
+        for field, weight in _win_path_levels(weighting).items():
+            paid = weight * _share_top(field) * world.horizon
+            assert paid < WIN, (
+                f"{name} pays {paid} for a full {field} against {WIN} for the "
+                f"win it leads to, so the row pays a faction to stand short "
+                f"of the threshold"
+            )
+
+
+def test_a_win_path_row_pays_an_earlier_crossing_more_than_a_later_one() -> None:
+    """The early weight must cover the area a slower climb adds.
+
+    A faction that crosses a threshold later climbs the share for longer, so
+    the area under the share is larger and the level term pays more. A delay
+    of one decision adds about half the weight times the top of the share,
+    because the share rises from zero to the top over the climb.
+
+    The early weight pays for the time a win leaves on the clock, and one
+    decision of delay costs the early weight over the horizon. **A row whose
+    level term outpays that is a row that pays a faction to build slowly.**
+
+    A row that states no early weight fails here, because zero covers
+    nothing.
+
+    References
+    ----------
+    [^5]: Research, what the win conditions are and what can reach them.
+    ``docs/research/what-the-win-conditions-are-and-what-can-reach-them.md``
+    """
+    for name, (world, scoring, _) in STRATEGIES.items():
+        weighting = _weighting(scoring)
+        for field, weight in _win_path_levels(weighting).items():
+            added = weight * _share_top(field) / 2.0
+            taken = weighting.won_early / world.horizon
+            assert taken > added, (
+                f"a decision of delay adds {added} to the {field} term of "
+                f"{name} and costs {taken} in the early term, so the row pays "
+                f"a faction to cross later"
+            )
+
+
+def test_the_win_path_term_outpays_every_rung_of_its_own_row() -> None:
+    """The path a row plays for must pay more than the means it pays for.
+
+    A row that plays for a win path also pays for the means that reach it. A
+    worker adds the work a wonder asks for, and a soldier fells the units the
+    renown counts.
+
+    **A means weight at or above the weight of the end pays a faction to
+    raise the means and never spend it.** This is the founding ladder in
+    another place, and it fails in the same way.
+    """
+    for name, (_, scoring, _) in STRATEGIES.items():
+        weighting = _weighting(scoring)
+        paths = _win_path_levels(weighting)
+        if not paths:
+            continue
+        rungs = {
+            field: float(weight)
+            for field, weight in weighting.levels.items()
+            if field not in paths and weight is not None
+        }
+        least = min(paths.values())
+        for field, weight in rungs.items():
+            assert weight < least, (
+                f"{name} pays {weight} for {field} against {least} for the win "
+                f"path it leads to, so the row pays a faction to hold the means"
+            )
 
 
 def test_every_level_weight_names_a_field_the_world_publishes() -> None:

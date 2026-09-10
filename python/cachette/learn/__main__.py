@@ -415,6 +415,38 @@ SETTLEMENT_TARGET = 8
 # cannot disagree.
 FOUND_READY = 0.003
 
+# What the progress of a win path pays, against what the win pays.
+#
+# The engine publishes the progress of a win path as a share, and the schema
+# states the reading that stands for one. The reader of the path fires where
+# the share reaches that reading. A level weight is paid on every decision, so
+# a weight of this ratio times the level unit pays this ratio times the win
+# weight over an episode held at the top of the share.
+#
+# **A ratio of one or above pays a faction to stand just short of the
+# threshold.** Such a faction collects what crossing pays and never crosses.
+#
+# **The ratio must also stay under twice the early weight over the win
+# weight.** A faction that crosses later climbs the share for longer, so the
+# area under the share is larger and the shaped term pays more. The early
+# weight is what takes that back, and it takes back half the ratio for the
+# same delay. A run whose early weight is half the win weight therefore holds
+# at the same bound of one.
+#
+# One test derives both bounds from the schema of the world and from the
+# weights above, and it fails when this ratio passes either.
+WIN_PATH_PROGRESS = 0.5
+
+# What the unit total pays inside a row whose point is one win path, against
+# what the progress of that path pays. A unit is the rung of that ladder: a
+# worker adds the work a wonder asks for, and a soldier fells the units renown
+# counts.
+#
+# **A rung weight at or above the weight of the thing it leads to pays a
+# faction to raise units and never spend them.** One test asserts that the win
+# path term is the largest level weight of its row.
+WIN_PATH_UNITS = 0.25
+
 
 StrategyTable = dict[str, tuple[EnvConfig, "Scoring | ObjectiveSchedule", str]]
 
@@ -425,6 +457,8 @@ _SETTLEMENTS = "settlements"
 _MAY_FOUND = "may_found"
 _STORE = "store_total"
 _PEOPLE = "population"
+_WONDER = "wonder_track_progress"
+_RENOWN = "renown_progress"
 
 
 def strategy_table(world: EnvConfig) -> StrategyTable:
@@ -450,10 +484,73 @@ def strategy_table(world: EnvConfig) -> StrategyTable:
     and not a constant.** A caller that sets the decision interval changes
     the horizon, and this rebuilds the table against it.
 
+    A row weighs a stock of the faction, or it weighs the progress of a win
+    path
+    -----------------------------------------------------------------------
+
+    The conquest row, the ground row, the wealth row and the people row pay
+    for held ground, for settlements, for the stores and for the people.
+    **No win reader compares any of those quantities.** The engine ends a
+    game when one faction holds every live seat or annihilates every rival,
+    when a wonder stands on the ground of a faction, when a character reaches
+    the renown target, or on a comparison of held ground at the tick
+    limit.[^3]
+
+    The wonder row and the renown row weigh the published progress of one win
+    path each. The wonder share is the work toward a wonder over the work the
+    wonder row asks for, and the renown share is the best renown of the
+    faction over the renown target. **Each of the two reaches one exactly
+    where its reader fires**, so a policy that climbs one of them walks toward
+    a win and reads one on the tick it crosses.[^3]
+
+    The win path rows stay beside the stock rows rather than replacing them.
+    A run trains both kinds and compares them, which is the only way to say
+    whether the progress of a win path is the better thing to pay for.
+
+    The wonder path is the one path a peaceful faction reaches
+    ---------------------------------------------------------
+
+    A wonder asks for worker ticks on one tile, and the faction must still
+    hold that tile when the reader runs. The renown path asks for felled
+    enemy units, and the domination path asks for the seat of every live
+    rival. **Renown and domination are close to the same plan**, because both
+    need soldiers, campaigns and kills.[^3] The renown row therefore stands
+    for both, and no row weighs the domination share.
+
+    Two reasons rule the domination share out as the term of a row. Its
+    reader holds a second clause that the observation never publishes, so a
+    faction can win the path while the share sits at its floor. The share
+    also holds a floor of one over the count of live seated factions, and it
+    rises one step for each rival seat taken, so it gives a policy one step
+    for each rival and no dense climb.[^3]
+
+    **No row weighs the held ground share of the territory path.** That share
+    is the held tiles of the faction over the passable tiles of the whole
+    world, and the reader of that path compares the factions against each
+    other and holds no denominator at all.[^3] The share therefore never
+    reaches one, and nothing bounds a weight on it against the win it leads
+    to. The held tile term of the ground row already pays for the same
+    quantity, and it pays for it under a name that states no false threshold.
+
+    A win path term must not outpay the crossing it leads to
+    -------------------------------------------------------
+
+    A weight on the progress of a win path has the shape of a ladder rung. A
+    faction that is paid enough for standing at nine tenths of a threshold
+    never crosses it. The ratio the two rows use is under one, so the whole
+    episode pays less for a full share than the crossing pays.
+
+    **Both rows also state an early weight.** A faction that crosses later
+    climbs the share for longer, so the area under the share is larger. The
+    early weight pays for the time a win leaves on the clock, and it is what
+    makes the earlier crossing the better one.
+
     References
     ----------
     [^1]: Findings register, FND-679. `docs/FINDINGS.md`
     [^2]: Findings register, FND-700. `docs/FINDINGS.md`
+    [^3]: Research, what the win conditions are and what can reach them.
+    `docs/research/what-the-win-conditions-are-and-what-can-reach-them.md`
     """
     level = WIN / max(world.horizon, 1)
     found_ready = level * FOUND_READY
@@ -516,6 +613,26 @@ def strategy_table(world: EnvConfig) -> StrategyTable:
         lost=-LOSS,
         drawn=0.0,
     )
+    wonder = Weighting(
+        levels={
+            _WONDER: level * WIN_PATH_PROGRESS,
+            _PEOPLE: level * WIN_PATH_UNITS,
+        },
+        won=WIN,
+        lost=-LOSS,
+        drawn=0.0,
+        won_early=EARLY,
+    )
+    renown = Weighting(
+        levels={
+            _RENOWN: level * WIN_PATH_PROGRESS,
+            _PEOPLE: level * WIN_PATH_UNITS,
+        },
+        won=WIN,
+        lost=-LOSS,
+        drawn=0.0,
+        won_early=EARLY,
+    )
     return {
         "conquer": (world, conquest, "linear"),
         # The same scoring as the conquest strategy, over the structured
@@ -538,6 +655,21 @@ def strategy_table(world: EnvConfig) -> StrategyTable:
         "people": (world, people, "linear"),
         # The same scoring as the people strategy, over the structured policy.
         "people-structured": (world, people, STRUCTURED_KIND),
+        # Build the wonder. The wonder share is the work toward a wonder over
+        # the work the wonder row asks for, and it reaches one where the
+        # wonder reader fires. The unit term pays for the workers that add
+        # the work, and the tile term pays for the ground the wonder must
+        # stand on.
+        "wonder": (world, wonder, "linear"),
+        # The same scoring as the wonder strategy, over the structured policy.
+        "wonder-structured": (world, wonder, STRUCTURED_KIND),
+        # Take the renown. The renown share is the best renown of the faction
+        # over the renown target, and it reaches one where the renown reader
+        # fires. The unit term pays for the soldiers that fell the units the
+        # renown counts.
+        "renown": (world, renown, "linear"),
+        # The same scoring as the renown strategy, over the structured policy.
+        "renown-structured": (world, renown, STRUCTURED_KIND),
     }
 
 

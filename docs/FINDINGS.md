@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-738**
+**Next number: FND-739**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20172,6 +20172,63 @@ change against a path it believes is inert.
 reader.** The comment cites a superseded record and it reads as current. The
 recurring defect rule already holds this shape.[^F562A]
 
+### FND-738 — The shaped part of the wealth objective does not predict winning
+
+**Believed.** The wealth row of the strategy table shapes the reward at the
+store total and at the held tile count. A policy that climbs that shaped return
+plays better, so the shaped term leads the policy toward a win.
+
+**True.** It does not. The engine ends a game on four paths, and no reader of
+any of them compares a store total.[^F738A] The wealth path was retired, and a
+record holds the retirement.[^F738B] The shaped part of the wealth return
+therefore climbs a quantity that decides nothing.
+
+**Evidence.** One pass played the generation-zero population of the linear
+policy, 16 antithetic candidates over 8 seeds, for 128 episodes. The world was
+64 columns, three factions, a tick limit of 3000 and a decision every 10 ticks.
+Five episodes ended in a win for the seat. Each episode was scored again under
+several weightings that state a level weight and three zero terminal weights,
+so each of those returns holds the shaped part alone.
+
+| Shaped return | Correlation with a win |
+|---|---|
+| The wealth row, store and held tiles | +0.09 |
+| The store total alone | +0.07 |
+| The held tile count alone | +0.21 |
+| The held ground share | +0.42 |
+| The wonder share | +0.17 |
+| The renown share | +0.14 |
+
+The standard error of a correlation over 128 samples is about 0.09, so the
+first two figures are inside one standard error of zero. **The whole wealth
+return, which carries the win weight and the loss weight as well, correlates at
++0.75.** That figure is the outcome term and not the shaping.
+
+**The held ground share leads that table for a reason the world produced.** The
+tick limit of this pass is low, so 71 of the 128 games ended on the territory
+path, which ranks held ground at the limit. Over the 57 episodes that ended on
+another path the held ground share falls to +0.09, the wonder share rises to
++0.41 and the renown share rises to +0.48. Those 57 episodes hold two wins, so
+the three figures are weak.
+
+One episode drove the wonder share to one and one drove the renown share to
+one. The seat won both. **The two shares reach one where their readers fire**,
+which is what a shaped term needs in order to lead anywhere.
+
+**Follows.** Three things.
+
+**Shape the reward at a quantity a win reader compares.** The strategy table now
+holds a wonder row and a renown row beside the four stock rows, and a run
+compares them.
+
+**A weight on the progress of a win path is a ladder rung.** A faction paid
+enough for standing short of a threshold never crosses it, and a faction paid
+for the area under a rising share is paid to rise slowly. Two tests derive both
+bounds from the schema of the world and from the win weight.
+
+**A correlation over five wins is a direction and not a result.** A pass that
+answers this properly needs the training world and a few thousand episodes.
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -20179,3 +20236,5 @@ recurring defect rule already holds this shape.[^F562A]
 [^F737A]: The upgrade table, the wonder victory claim constant. `crates/cachette-core/src/upgrade.rs`
 [^F737B]: The win path readers. `crates/cachette-core/src/world/victory.rs`
 [^F737C]: ADR-0174, a wonder is a win path and a stock total is not. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
+[^F738A]: Research, what the win conditions are and what can reach them. `docs/research/what-the-win-conditions-are-and-what-can-reach-them.md`
+[^F738B]: ADR-0174, a wonder is a win path and a stock total is not. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
