@@ -278,8 +278,23 @@ fn a_settler_sent_at_a_tile_arrives_at_that_tile_and_founds_there() {
     let mut arrived = None;
     for tick in 0..TICKS {
         world.step(THREADS).expect("the step runs");
+        // **A settler that left the world did not leave a last mile open.**
+        // A storm ends a unit that stands in the open, and a loop that broke
+        // out here reported the open last mile that this test exists to
+        // catch.[^2] The run names what took the settler instead.
+        //
+        // [^2]: Findings register, FND-725. `docs/FINDINGS.md`
         let Some(at) = world.soldiers().address(settler) else {
-            break;
+            let taken = world
+                .units_lost_to_storms()
+                .iter()
+                .any(|lost| lost.unit == settler.to_bits());
+            assert!(
+                !taken,
+                "a storm ended the settler on tick {tick}, so this run measured the sky and \
+                 not the settling field"
+            );
+            panic!("the settler left the world on tick {tick}, and no storm log names it");
         };
         if cell_of(&world, at) == cell_of(&world, target) && entered.is_none() {
             entered = Some(tick);
