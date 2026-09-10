@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-753**
+**Next number: FND-754**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20814,6 +20814,69 @@ term deleted from the engine. Nothing in the text of the test showed that.
 **A region world may leave foraged food unable to grow back at all.** A blocker
 holds that question.[^F752C]
 
+### FND-753 — A storm broke the recovery fixture of the resource suite, and one of its assertions could never have failed
+
+**Believed.** Two things. The recovery fixture of the resource suite stops
+every gatherer, so nothing takes anything more and recovery is the only thing
+that moves a stock. A deposit that never holds more than it started with is
+checked by reading the stock of the tile against what the tile started
+with.[^F753A]
+
+**True.** Neither holds.
+
+A storm flattens a share of the food a tile carries into the same ledger that a
+gather writes, so a food stock falls in a world where no unit gathers.[^F745A]
+The register already held that for the production suite, and the resource suite
+carries the same shape. Three tests read a stock at two ticks, or bounded what
+recovery returned by what the gather log reported, and all three measured the
+storm as well as the recovery.
+
+The second belief is the worse one. The stock reader takes the stored take off
+what the tile started with and stops at zero, so it cannot answer above the
+start whatever the ledger holds.[^F753B] An assertion that a stock is at or
+below the start is therefore true by construction. It could not have failed
+against any defect.
+
+**Evidence.** Three tests of the resource suite failed at the tip. The test
+file is byte for byte the same at the commit that made a map one region of a
+planet and at the tip, and it differs from the parent of that commit by three
+lines that the commit itself added. The suite passes at the parent, 41 of 41.
+It fails at the region commit with the same three panics as the tip, and the
+panic text matches character for character.
+
+A probe stepped the fixture for 64 ticks and printed the ledger on each tick.
+No gather event was logged after the fixture stopped its units. The ledger held
+17 entries and 66 stored units at tick 9, and 6331 entries and 6362 stored units
+at tick 10. The stock of the partly worked deposit rose from 5 to 8 by tick 8
+and fell to 0 by tick 29. Recovery returned 6346 units of food against a
+gathered take of 32.
+
+The recovery period the engine read over that tile ran 24, 9, 3, 6, 18, 30 and
+48 ticks over the first 22 ticks, against a stated 3. The weather moves the tile
+through the moisture bands, so a period read once is not the period the run
+acts on.
+
+The vacuous assertion was found by putting a defect back. The recovery rule was
+made to give back more than a deposit owed, which wraps the stored take to a
+very large number. The assertion on the stock still passed. The same run against
+an assertion on the stored take fails, and it names the tile.
+
+**Follows.** Three things.
+
+**Assert on the state, not on a reader that clamps.** A reader that saturates
+answers inside the range whatever the state holds. An assertion on it measures
+the reader.
+
+**A fixture that stops the units has not stopped the world.** The weather takes
+food, ends units and moves every recovery period. A fixture that must hold a
+quantity still states how, and a fixture that cannot hold it still measures the
+part the other source cannot reach. A storm takes food and takes nothing else,
+so wood and stone still carry an exact bound.
+
+**A window stated from one reading of a period is too short.** A fixture that
+waits on a rate the weather bends states a fixed window, and then asserts that
+the window covered the longest period the engine read.
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -20847,3 +20910,5 @@ holds that question.[^F752C]
 [^F752A]: The recovery rule, the moisture curve of a period. `crates/cachette-core/src/resource.rs`
 [^F752B]: The production pipeline, the resident term. `crates/cachette-core/src/effective.rs`
 [^F752C]: Blockers register, BLK-162. `docs/BLOCKERS.md`
+[^F753A]: The recovery tests of the resource suite. `crates/cachette-core/tests/resource.rs`
+[^F753B]: The stock reader of a tile. `crates/cachette-core/src/world/resources.rs`
