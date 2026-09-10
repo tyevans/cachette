@@ -53,16 +53,17 @@ schema-declared bounded tables, decision D5.
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, BinaryIO, Protocol
 
 import numpy as np
 
 from .layout import ObservationLayout
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
     from cachette._core import ActionSchema, ObservationSchema
 
@@ -1348,16 +1349,15 @@ class LinearPolicy:
         its verb and its candidate coordinates, decision D1.
         ``docs/adrs/draft/adr-0200-a-stored-policy-names-each-action-row-by-verb-and-coordinates.md``
         """
-        path.parent.mkdir(parents=True, exist_ok=True)
         normalizer = self.normalizer.as_arrays() if self.normalizer is not None else {}
-        # numpy declares ``allow_pickle`` as a keyword before its own
-        # ``**kwds``, so a mapping keyed on ``str`` can never unpack cleanly.
-        np.savez(
+        save_arrays(
             path,
-            weights=self.weights,
-            kind=np.array("linear"),
-            **normalizer,  # type: ignore[arg-type]
-            **{key: np.array(value) for key, value in meta.items()},  # type: ignore[arg-type]
+            {
+                "weights": self.weights,
+                "kind": np.array("linear"),
+                **normalizer,
+                **{key: np.array(value) for key, value in meta.items()},
+            },
         )
 
     @classmethod
@@ -1372,6 +1372,76 @@ class LinearPolicy:
         skip = {"weights", *NORMALIZER_KEYS}
         meta = {key: stored[key].tolist() for key in stored.files if key not in skip}
         return cls(stored["weights"], FeatureNormalizer.read(stored)), meta
+
+
+def write_atomically(target: Path, fill: Callable[[BinaryIO], object]) -> None:
+    """Write one file so that a reader sees the old file or the new one.
+
+    **A reader never sees half of a file.** The training launcher copies the
+    weight files of a run off a spot instance every two minutes, while the
+    trainer writes them. A save straight onto the final path let a copy take a
+    half-written archive and move it over the whole copy on this machine.[^1]
+
+    The bytes go to a temporary name in the same directory. The writer flushes
+    them and syncs them to the disk, and one rename then puts the file in
+    place. A rename inside one file system is atomic, so a copy that runs at
+    any moment reads a whole file.
+
+    **The temporary name never ends in ``.npz``.** The launcher fetches a
+    run by the pattern ``*.npz``, and a temporary name that matched it would
+    carry the half-written file across anyway. The name ends in ``.part``
+    and holds the process identity, as the baseline cache does.[^2]
+
+    A write that fails removes the temporary file and leaves the final path
+    as it was.
+
+    References
+    ----------
+    [^1]: Findings register, FND-746 and FND-760. ``docs/FINDINGS.md``
+
+    [^2]: The baseline cache, the write of one measurement.
+    ``python/cachette/learn/baseline.py``
+    """
+    target.parent.mkdir(parents=True, exist_ok=True)
+    temporary = target.with_name(f"{target.name}.{os.getpid()}.part")
+    try:
+        with temporary.open("wb") as handle:
+            fill(handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, target)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
+
+
+def npz_path(path: Path) -> Path:
+    """Return the path that a save to this path writes.
+
+    numpy adds ``.npz`` to a name that does not end in it. The atomic writer
+    gives numpy an open file and not a name, so numpy adds nothing. This keeps
+    the rule of numpy, so every caller finds its file where it did before.
+    """
+    if path.name.endswith(".npz"):
+        return path
+    return path.with_name(f"{path.name}.npz")
+
+
+def save_arrays(
+    path: Path, arrays: Mapping[str, np.ndarray], *, compressed: bool = False
+) -> Path:
+    """Write a set of named arrays to one ``.npz`` file, atomically.
+
+    This gives back the path it wrote, which ends in ``.npz``.
+
+    numpy declares ``allow_pickle`` as a keyword before its own keyword
+    arguments, so a mapping keyed on ``str`` never unpacks cleanly into it.
+    The type checker therefore needs the exemption on the one call below.
+    """
+    target = npz_path(path)
+    writer = np.savez_compressed if compressed else np.savez
+    write_atomically(target, lambda handle: writer(handle, **arrays))  # type: ignore[arg-type]
+    return target
 
 
 def load_policy(

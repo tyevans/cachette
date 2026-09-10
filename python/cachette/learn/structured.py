@@ -101,6 +101,7 @@ from .policy import (
     encode,
     encode_many,
     masked_choices,
+    save_arrays,
 )
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
@@ -784,7 +785,6 @@ class StructuredPolicy:
         standardized feature, so a file without its normalizer states nothing
         a reader can play.
         """
-        path.parent.mkdir(parents=True, exist_ok=True)
         stored: dict[str, np.ndarray] = {
             "flat": self.flat(),
             "layout_ring_cells": np.asarray(
@@ -813,13 +813,8 @@ class StructuredPolicy:
             stored.update(self.normalizer.as_arrays())
         for index, block in enumerate(self.layout.tokens):
             stored[f"layout_token_positions_{index}"] = block.gather()
-        # numpy declares ``allow_pickle`` beside its own keyword arguments, so
-        # a mapping keyed on ``str`` can never unpack cleanly.
-        np.savez(
-            path,
-            **stored,  # type: ignore[arg-type]
-            **{key: np.array(value) for key, value in meta.items()},  # type: ignore[arg-type]
-        )
+        stored.update({key: np.array(value) for key, value in meta.items()})
+        save_arrays(path, stored)
 
     @classmethod
     def restore(cls, stored: Mapping[str, np.ndarray]) -> StructuredPolicy:
