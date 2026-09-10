@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-725**
+**Next number: FND-726**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19723,3 +19723,43 @@ share of a seat that sends nothing, and nobody had measured it.
 other faction with the most held ground, so the weakest seat of a game was the
 one seat nobody marched on. That is a real gap in the opponent, and it is
 worth closing on its own terms. It is not the reason a policy won.
+
+### FND-725 — A hazard that ends a unit invalidates every fixture that holds one
+
+**Believed.** A test of the consumption pass may hold a unit for the whole run
+and read it at the end. The fixture of the consumption tests set the bound of
+the need rule far out of reach, so no unit of it could starve.[^F725A] The test
+then read the need of every hungry unit after 64 steps.
+
+**True.** The storm pass ends a unit that stands in the open, and it obeys no
+rule of the consumption pass. One hungry unit went at step 57 of 64, and the
+read of it panicked on "the unit lives" during the assertion.
+
+**Evidence.** A probe stepped the same fixture and printed the storm log of
+each step beside the units that had gone. The storm log named the same unit
+identity that had vanished, on the same step. No other unit of the fixture
+went. Disabling the hunt did not change the outcome, which rules the contest
+pass out.
+
+**Follows.** Three things.
+
+**This is the second instance of one shape in two days.** A fixture of the
+choice tests demanded that every unit it made was alive at the end, and a
+storm took one.[^F725B] The repair there flattened the reading, so that a dead
+unit and a live one that chose nothing both read the same. The repair here
+skips the units the storm log names, and nothing else.
+
+**Skip the named casualty, not every dead unit.** A repair that skipped any
+unit with no need would pass against a run in which starvation ended them all,
+and the test would then measure the fixture rather than the saturating
+subtract.[^F725C] The test counts the units it read, and it refuses a count of
+zero.
+
+**A fixture that reads a unit at the end of a long run needs the casualty
+log.** The engine publishes what the storms took, and a fixture that holds a
+unit over many steps must read it. The alternative is a fixture that breaks
+whenever the weather of a seed changes.
+
+[^F725A]: The consumption tests. `crates/cachette-core/tests/consumption.rs`
+[^F725B]: The choice tests. `crates/cachette-core/tests/choice.rs`
+[^F725C]: Testing rules, section 2a. `.agents/rules/testing.md`

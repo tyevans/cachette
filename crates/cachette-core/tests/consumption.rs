@@ -163,6 +163,21 @@ fn stored(world: &World) -> Accum {
     total
 }
 
+/// A need falls to zero by a saturating subtract, and it stops there.
+///
+/// The run is long enough that a storm can take a hungry unit. The test
+/// collects what the storms took as it steps, and it skips those units.
+/// It skips no other dead unit. A unit that starvation ended still fails
+/// the read below, because the fixture puts the bound of the rule out of
+/// reach on purpose.
+///
+/// The count of the units the test read guards the case. A repair that
+/// skipped every dead unit would pass against a run that reached no need
+/// at zero, and it would then measure the fixture.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.claude/rules/testing.md`
 #[test]
 fn a_need_falls_to_zero_and_stops_there() {
     // The need of a unit at a site that cannot feed it falls by a
@@ -184,10 +199,16 @@ fn a_need_falls_to_zero_and_stops_there() {
         .collect();
     assert!(!hungry.is_empty(), "the fixture must hold a hungry unit");
 
+    let mut taken_by_a_storm: Vec<u64> = Vec::new();
     for _ in 0..64 {
         world.step(4).expect("the step must run");
+        taken_by_a_storm.extend(world.units_lost_to_storms().iter().map(|lost| lost.unit));
     }
+    let mut read = 0usize;
     for unit in &hungry {
+        if taken_by_a_storm.contains(&unit.to_bits()) {
+            continue;
+        }
         let need = world.soldiers().need(*unit).expect("the unit lives");
         assert_eq!(
             need,
@@ -199,7 +220,12 @@ fn a_need_falls_to_zero_and_stops_there() {
             deficit > Fix32::ZERO,
             "a unit at zero need must carry a deficit"
         );
+        read += 1;
     }
+    assert!(
+        read > 0,
+        "a storm took every hungry unit, so the run read no need at all"
+    );
     assert!(world.check_invariants());
 }
 
