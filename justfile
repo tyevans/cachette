@@ -210,7 +210,7 @@ golden:
 
 # Run the slower gates: release tests, licence audit, and the target check.
 test-slow:
-    cargo test --workspace --release
+    cargo test --workspace --release --no-fail-fast
     cargo deny check
     # The target check is the same one `target-check` runs, and it excludes the
     # viewer for the same reason: the viewer links a window library that needs a
