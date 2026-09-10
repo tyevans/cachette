@@ -218,6 +218,7 @@ SHAPED_ROWS: Final[tuple[str, ...]] = (
     "best_renown",
     "wonder_progress",
     "wonder_track_progress",
+    "renown_progress",
 )
 
 # The outcome the timing term pays on. It is named once, because the term

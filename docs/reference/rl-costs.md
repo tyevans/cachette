@@ -52,10 +52,16 @@ in the derivation column.
 | `best_renown`, the weight of the compressed best renown | The reward of a faction | unset, the project owner | BLK-050 | |
 | `wonder_progress`, the weight of the wonder work share | The reward of a faction | unset, the project owner | BLK-050 | |
 | `wonder_track_progress`, the weight of the wonder share of the faction | The reward of a faction | unset, the project owner | BLK-050 | |
+| `renown_progress`, the weight of the renown share of the faction | The reward of a faction | unset, the project owner | BLK-050 | |
 
 A caller may weigh any other field of the observation array that holds one
 position. The rows above are the terms the project reserved, and the module
-names the same eight.
+names the same set in the same order.
+
+**Three of the rows above weigh the progress of a win path.** The domination
+share, the wonder share and the renown share each reach one where the reader of
+that path fires, so a weight on one of them is bounded against the win it climbs
+to. The other rows weigh a stock that no win reader compares.[^27]
 
 **A weight over a change telescopes, and the same eight names take a weight
 over a level.** An evolution strategy sums the reward of every decision of the
@@ -406,3 +412,4 @@ target platform measures it.
 [^24]: The strategy table of the trainer. `python/cachette/learn/__main__.py`
 [^25]: The test of the terminal scale. `tests/test_learner_terminal_scale.py`
 [^26]: Target platform costs. `docs/reference/graviton-costs.md`
+[^27]: Research, what the win conditions are and what can reach them. `docs/research/what-the-win-conditions-are-and-what-can-reach-them.md`
