@@ -20649,7 +20649,7 @@ of the far city at 900 ticks, at 2400 ticks and at 4000 ticks alike, while the
 count of open road projects grows from two to eighteen. Rain and storms wear the
 levels that stand, and a builder pays the whole repair price before it advances
 a level, so eight builders cannot raise the last stretch faster than the sky
-takes it back.[^F749A]
+takes it back.[^F747B]
 
 Under a polar region the same fixture joins the two cities on tick 112.
 
@@ -20682,7 +20682,7 @@ Sixteen carriers stood on two tiles of food, both tiles read zero, and no
 carrier reached the carry mark in 2000 ticks. A deposit under the sky of a
 region returns one unit in tens of ticks, and a storm flattens a share of what a
 tile still holds, so the food under a carrier is a property of the
-weather.[^F750A] [^F750B]
+weather.[^F750A] [^F745A]
 
 Raising the carrier count against the storms made the second cause worse, because
 it put more units on the same two tiles.
@@ -20736,6 +20736,4 @@ worse.[^F750A]
 [^F747A]: The wear pass, the cause of a tick. `crates/cachette-core/src/world/upgrades.rs`
 [^F747B]: Findings register, FND-744. `docs/FINDINGS.md`
 [^F748A]: Findings register, FND-747. `docs/FINDINGS.md`
-[^F749A]: Findings register, FND-744. `docs/FINDINGS.md`
 [^F750A]: Findings register, FND-745. `docs/FINDINGS.md`
-[^F750B]: Findings register, FND-728. `docs/FINDINGS.md`
