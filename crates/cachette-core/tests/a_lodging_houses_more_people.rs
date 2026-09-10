@@ -8,9 +8,20 @@
 //! with room for most of a run, and a fixture that copied it would measure
 //! the fixture.[^1]
 //!
-//! Each test states its own housing and its own birth chance. The default
-//! values are placeholders that the balance harness will change, and a test
-//! that read them would measure the register.[^2]
+//! Each test states its own housing, its own birth chance and its own
+//! lodging work. The default values are placeholders that the balance
+//! harness will change, and a test that read them would measure the
+//! register.[^2]
+//!
+//! **The sky of a world decides a long run, so the fixture keeps its runs
+//! short and states what the sky must not do.** Every tile of a world passes
+//! under rain and under storms. Rain and a storm wear a level that stands, a
+//! builder pays the repair before it advances the level, and a storm ends a
+//! unit that stands under it. A fixture that waited for a long build would
+//! measure the weather, and a fixture that ordered a builder a storm had
+//! ended would step a world that built nothing. Each loop here therefore
+//! writes the state it asks about on every tick, and states that the builder
+//! is alive on every tick.[^1]
 //!
 //! # References
 //!
@@ -23,7 +34,7 @@ use cachette_core::rates::RateSchedule;
 use cachette_core::site::CommodityId;
 use cachette_core::terrain::TileKind;
 use cachette_core::upgrade::{
-    BuildRefusal, UpgradeCategory, UpgradeRow, LODGING_FIT, LODGING_LEVEL_1_WORK,
+    BuildRefusal, UpgradeCategory, UpgradeRow, BUILD_RATE, LODGING_FIT, UPGRADE_LEVEL_COUNT,
 };
 use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
 
@@ -60,11 +71,42 @@ const FOOD: Fix32 = Fix32::ONE;
 /// need rule takes nothing.
 const BOUND: Fix32 = Fix32::from_int(4);
 
-/// How many ticks a build is given before a test gives up.
+/// The work that each level of a lodging asks for in these tests.
 ///
-/// The work of the first level divided by the one builder that adds to it,
-/// with room for the ticks the fixture spends settling.
-const PATIENCE: u64 = (LODGING_LEVEL_1_WORK as u64) * 4;
+/// **The fixture states the work, because a long build measures the sky.** A
+/// level that stands wears under the rain and the storms of a world, and a
+/// builder pays the repair before it advances the level. The count of ticks a
+/// long build takes is therefore a property of the weather, and a test that
+/// waited for it would measure the weather.
+///
+/// The value is a small multiple of the work one builder adds in a tick, so a
+/// build still takes several ticks and still holds state between them, and it
+/// is short enough that the wear of the window costs a builder nothing. The
+/// fixture asserts both properties rather than restating them.
+const LODGING_WORK: u32 = (BUILD_RATE as u32) * 8;
+
+/// The margin on the ticks a build is given, above the work it asks for.
+///
+/// **This bounds a loop that leaves early. It is not a count of ticks that a
+/// test takes.** A build of the stated work finishes in the ticks the work
+/// asks for and takes none of this margin. The margin covers the ticks the
+/// fixture spends settling and the odd tick a builder spends repairing what a
+/// storm took.
+const BUILD_MARGIN: u64 = 4;
+
+/// How many ticks a window that must stay closed runs for.
+///
+/// **This is a count of applications of the growth stage.** The growth
+/// schedule of the fixture applies the stage on every tick, so a site with no
+/// free place refuses a birth this many times before a test reads it.
+const CLOSED_WINDOW: u64 = 128;
+
+/// How many ticks the solver is given to reach a category.
+///
+/// **This bounds a loop that leaves early in the second half of the solver
+/// test, and it is the whole window in the first half.** The first half
+/// asserts that the solver zones no lodging, so it runs the window out.
+const SOLVER_WINDOW: u64 = 128;
 
 /// How many ticks a growth is given before a test gives up.
 ///
@@ -154,6 +196,7 @@ fn ground() -> Ground {
         world.set_externally_controlled(OWNER, true),
         "the faction is in the world"
     );
+    state_the_lodging_work(&mut world);
     let (seat, beside) = seat_with_a_neighbour(&world);
     // **The founding records the seat of the faction.** The solver plans
     // around the seat, and a faction with no seat receives no evaluation, so
@@ -169,6 +212,39 @@ fn ground() -> Ground {
         seat,
         beside,
     }
+}
+
+/// Writes the work of every lodging level, and leaves every other column of
+/// the row as the default table states it.
+///
+/// The housing column is what the raise tests read, so the fixture must not
+/// touch it. Only the work moves, and only because the length of a build is
+/// the one thing about a lodging that the weather decides.
+///
+/// **A build that finished in one tick would hold no state between two
+/// ticks.** The engine asks for a work above the work one builder adds, and
+/// this function asserts that the work the fixture states still meets that.
+fn state_the_lodging_work(world: &mut World) {
+    for level in 1..=UPGRADE_LEVEL_COUNT as u8 {
+        let row = world
+            .upgrade_table()
+            .row(UpgradeCategory::LODGING, level)
+            .expect("the default table holds every lodging level");
+        world
+            .define_upgrade_row(
+                UpgradeCategory::LODGING.to_u8(),
+                level,
+                UpgradeRow {
+                    work: LODGING_WORK,
+                    ..row
+                },
+            )
+            .expect("the category and the level are in the table");
+    }
+    assert!(
+        i64::from(LODGING_WORK) > BUILD_RATE,
+        "the stated work must take a builder more than one tick"
+    );
 }
 
 /// Finds a tile that admits a city and has a neighbour a lodging fits.
@@ -209,19 +285,45 @@ fn order_a_lodging(world: &mut World, address: Axial) -> Entity {
     unit
 }
 
+/// Returns the ticks a build of one level is given before a test gives up.
+///
+/// The budget is the work that every level up to the target asks for, divided
+/// by the work one builder adds in a tick, and multiplied by a margin. The
+/// fixture reads the work from the table rather than restating it, so a
+/// change to the work moves the budget with it.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+fn build_patience(world: &World, level: u8) -> u64 {
+    let table = world.upgrade_table();
+    let asked: i64 = (1..=level)
+        .map(|step| table.work_at(UpgradeCategory::LODGING, step))
+        .sum();
+    let ticks = asked / BUILD_RATE;
+    assert!(ticks > 0, "the stated work must ask a builder for a tick");
+    (ticks as u64) * BUILD_MARGIN
+}
+
 /// Steps until the level on a tile reaches one value, and returns the ticks.
+///
+/// **The fixture states that the builder is alive.** A storm ends a unit, and
+/// a fixture that ordered a builder the world had ended would step a world
+/// that built nothing. It would then report a slow world, and the cause would
+/// be a dead builder.
 ///
 /// **The order goes again on every tick.** The choice pass moves an idle
 /// unit, and a builder that wandered off would make a test measure the walk
 /// rather than the raise. A caller may order a build on every tick, so the
 /// fixture does.
 fn step_until_level(world: &mut World, unit: Entity, address: Axial, level: u8) -> u64 {
-    for taken in 1..=PATIENCE {
-        let here = world
-            .soldiers_on(address)
-            .map(|units| units.contains(&unit))
-            .unwrap_or(false);
-        if !here {
+    let budget = build_patience(world, level);
+    for taken in 1..=budget {
+        assert!(
+            world.build_order(unit).is_some(),
+            "the world ended the builder at tick {taken}, so the weather decided this test"
+        );
+        if !stands_on(world, unit, address) {
             world
                 .place_soldier(unit, address)
                 .expect("the ground admits the builder");
@@ -232,7 +334,15 @@ fn step_until_level(world: &mut World, unit: Entity, address: Axial, level: u8) 
             return taken;
         }
     }
-    panic!("the level {level} did not stand after {PATIENCE} ticks");
+    panic!("the level {level} did not stand after {budget} ticks");
+}
+
+/// Reports whether one builder stands on one tile.
+fn stands_on(world: &World, builder: Entity, address: Axial) -> bool {
+    world
+        .soldiers_on(address)
+        .map(|units| units.contains(&builder))
+        .unwrap_or(false)
 }
 
 // ---------------------------------------------------------------------------
@@ -330,16 +440,18 @@ fn a_lodging_far_from_every_site_raises_no_housing() {
 /// A site whose residents fill its housing grows nobody, and it grows again
 /// once a lodging finishes.
 ///
-/// **The fixture states the extreme and asserts that it reached it.** The
-/// housing is written to exactly the resident count, so the site has no free
-/// place at the moment the test begins.[^1]
+/// **The fixture states the extreme and holds it on every tick.** The housing
+/// is written to the residents the engine counts, so the site has no free
+/// place at any tick of the closed window. A storm ends a resident, and a
+/// housing written once would then stand above the residents and would open a
+/// free place the test did not ask for.[^1]
 ///
 /// **The store is refilled on every tick, and the test asserts that it
 /// pays.** A site pays a share of its store to hold it, so a store written
-/// once empties over a long window. The window here follows the work of a
-/// lodging, so a fixture that filled the store once would end with an empty
-/// store, and the site would grow nobody because it could not pay. The test
-/// would then read as a housing bound and would measure the store.[^2]
+/// once empties over a long window. A fixture that filled the store once
+/// would end with an empty store, and the site would grow nobody because it
+/// could not pay. The test would then read as a housing bound and would
+/// measure the store.[^2]
 ///
 /// # References
 ///
@@ -355,12 +467,9 @@ fn a_site_at_its_housing_grows_again_once_a_lodging_finishes() {
     } = ground();
     world.set_birth_chance(Fix32::ONE);
     fill_the_store(&mut world, site);
-    let residents = world.site_residents(site).expect("the site is live");
-    assert!(
-        world.set_site_housing(site, residents),
-        "the site must take the housing that fills it"
-    );
+    close_the_site(&mut world, site);
     world.step(1).expect("the step must run");
+    close_the_site(&mut world, site);
     assert_eq!(
         world.site_free_places(site),
         Some(0),
@@ -370,15 +479,15 @@ fn a_site_at_its_housing_grows_again_once_a_lodging_finishes() {
     // A site with no free place grows nobody, however long the run is and
     // however much the store holds.
     let stopped = world.site_residents(site).expect("the site is live");
-    for _ in 0..PATIENCE {
+    for _ in 0..CLOSED_WINDOW {
         fill_the_store(&mut world, site);
+        close_the_site(&mut world, site);
         world.step(1).expect("the step must run");
+        assert!(
+            world.site_residents(site).expect("the site is live") <= stopped,
+            "a site with no free place grew somebody"
+        );
     }
-    assert_eq!(
-        world.site_residents(site),
-        Some(stopped),
-        "a site with no free place grew somebody"
-    );
     assert!(
         pays_for_a_birth(&world, site),
         "the fixture must still pay for a birth, or the store refused and not the housing"
@@ -387,6 +496,7 @@ fn a_site_at_its_housing_grows_again_once_a_lodging_finishes() {
     // The builder is a resident of nowhere, so it never fills the site it
     // builds beside.
     let closed = world.site_housing(site).expect("the site is live");
+    let held = world.site_residents(site).expect("the site is live");
     let unit = order_a_lodging(&mut world, beside);
     step_until_level(&mut world, unit, beside, 1);
     assert!(
@@ -400,13 +510,36 @@ fn a_site_at_its_housing_grows_again_once_a_lodging_finishes() {
     //
     // The site may have grown already. Growth runs in the tick that finished
     // the level, so the loop reads the state before it steps again.
-    let grew = world.site_residents(site).expect("the site is live") > stopped
+    let grew = world.site_residents(site).expect("the site is live") > held
         || step_until(&mut world, site, |world| {
-            world.site_residents(site).expect("the site is live") > stopped
+            world.site_residents(site).expect("the site is live") > held
         });
     assert!(
         grew,
         "a site whose housing rose did not grow again inside {GROWTH_PATIENCE} ticks"
+    );
+}
+
+/// Writes the housing that leaves a site with no free place.
+///
+/// The fixture writes it on every tick of a window that must stay closed, in
+/// the way it refills the store on every tick. A storm ends a resident, and a
+/// housing written once would stand above the residents the engine counts
+/// from that moment on.
+fn close_the_site(world: &mut World, site: Entity) {
+    let residents = world.site_residents(site).expect("the site is live");
+    assert!(
+        world.set_site_housing(site, residents),
+        "the site must take the housing that fills it"
+    );
+}
+
+/// Writes the housing that leaves a site with a stated count of free places.
+fn open_the_site(world: &mut World, site: Entity, places: u32) {
+    let residents = world.site_residents(site).expect("the site is live");
+    assert!(
+        world.set_site_housing(site, residents + places),
+        "the site must take a housing above its residents"
     );
 }
 
@@ -551,10 +684,15 @@ fn a_lodging_on_ground_that_does_not_fit_is_refused() {
 /// what the plan zones, so this test drives the step and reads the plan
 /// rather than constructing a project of its own.[^1] [^2]
 ///
+/// **The fixture writes the housing on every tick.** A storm ends a resident,
+/// so a housing written once stops describing the state the test asks the
+/// solver about.[^3]
+///
 /// # References
 ///
-/// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D2. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+/// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D2. `docs/adrs/draft/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 /// [^2]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
+/// [^3]: Testing Rules, section 2a. `.agents/rules/testing.md`
 #[test]
 fn a_faction_with_no_free_place_comes_to_zone_a_lodging() {
     let Ground {
@@ -566,14 +704,11 @@ fn a_faction_with_no_free_place_comes_to_zone_a_lodging() {
     );
     world.set_birth_chance(Fix32::ZERO);
     // A site with room. The solver has other work, so it zones no lodging.
-    let residents = world.site_residents(site).expect("the site is live");
-    assert!(
-        world.set_site_housing(site, residents + 1),
-        "the site must take a housing above its residents"
-    );
-    for _ in 0..PATIENCE {
+    for _ in 0..SOLVER_WINDOW {
+        open_the_site(&mut world, site, 1);
         world.step(1).expect("the step must run");
     }
+    open_the_site(&mut world, site, 1);
     assert!(
         world.site_free_places(site).unwrap_or(0) > 0,
         "the fixture must reach a site with a free place"
@@ -584,16 +719,14 @@ fn a_faction_with_no_free_place_comes_to_zone_a_lodging() {
     );
 
     // The same site with no free place. Now the solver zones a lodging.
-    assert!(
-        world.set_site_housing(site, residents),
-        "the site must take the housing that fills it"
-    );
-    for _ in 0..PATIENCE {
+    for _ in 0..SOLVER_WINDOW {
+        close_the_site(&mut world, site);
         world.step(1).expect("the step must run");
         if plans_a_lodging(&world) {
             break;
         }
     }
+    close_the_site(&mut world, site);
     assert_eq!(
         world.site_free_places(site),
         Some(0),

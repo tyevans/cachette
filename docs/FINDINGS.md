@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-744**
+**Next number: FND-745**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20418,6 +20418,52 @@ one.** The relation of the test reached the war band and left it again, so the
 rule under test worked and the assertion still failed. Read a decaying value
 against the span it is read over, or fix the inputs that govern the span.
 
+### FND-744 — A world is one region of a stormy planet, so no ground is dry and a fixture that waited for a long build measured the weather
+
+**Believed.** A fixture may raise a lodging on quiet ground, count the ticks a
+builder takes, and read a budget from the work of one level. The lodging test
+did all three: it took the first tile of the world that admitted a city, it
+gave every build the work of the first level times four, and it ordered one
+builder for the whole run.
+
+**True.** A map is one region of a planet, and the latitude span is
+configuration.[^F744A] Every tile of every world now passes under rain and
+under storms inside about two hundred ticks. Rain and a storm wear a level
+that stands, and a builder pays the whole repair price before it advances the
+level, so the ticks a long build takes are a property of the sky.[^F744B] A
+storm also ends a unit that stands under it, and it ends a resident the same
+way.[^F744C]
+
+**Evidence.** The same test file passes at the commit before the span change
+and fails at it, four tests of seven. A probe of the fixture world reads the
+first level standing at tick 144 under both, and the second level at tick 576
+before the change against tick 1175 after it. The builder of one test was
+ended by a storm at tick 138, and the fixture then ordered a dead builder for
+the remaining 438 ticks and reported a slow world. The two founding residents
+of another were ended at ticks 149 and 515. A survey of the 4007 seats of the
+world that admit a city and have a neighbour a lodging fits found none whose
+ground stays dry and clear of storms for 1200 ticks, at nine latitude centres
+and at four spans, the whole globe among them.
+
+**Follows.** A budget taken from the work of one level and applied to a build
+of two levels was wrong before the sky changed and passed by coincidence: the
+first level asks for 144 work and the two levels together ask for 576, which
+is what the old budget allowed. The budget now reads the work of every level
+up to the target from the table.
+
+**A fixture cannot wait out the weather, so it states the run it needs.** The
+fixture writes the work of a lodging level, so a build is short and the wear
+of the window costs a builder nothing. It states that the builder is alive on
+every tick, so a storm gives a failure that names the cause. It writes the
+housing of the site on every tick of a window that must stay closed, in the
+way it already refilled the store on every tick, so a resident a storm ends
+cannot open a free place the test did not ask for.
+
+**A long window is an input, not a neutral choice.** Any fixture in this
+project that runs a world for hundreds of ticks now runs it under weather that
+ends units and wears what they build. Check every such fixture for an
+assumption that a count of people or a piece of ground holds still.
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -20438,3 +20484,6 @@ against the span it is read over, or fix the inputs that govern the span.
 [^F743B]: The controller stage of the world, the speaker scan. `crates/cachette-core/src/world/controller.rs`
 [^F743C]: The relation matrix, the drift. `crates/cachette-core/src/relation.rs`
 [^F743D]: Findings register, FND-739. `docs/FINDINGS.md`
+[^F744A]: ADR-0177, the row axis of a world is a latitude that the world states. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+[^F744B]: The wear pass and the repair price. `crates/cachette-core/src/world/upgrades.rs`
+[^F744C]: The storm damage pass. `crates/cachette-core/src/world/storm.rs`
