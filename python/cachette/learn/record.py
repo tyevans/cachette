@@ -76,6 +76,7 @@ from typing import TYPE_CHECKING, Protocol
 
 import numpy as np
 
+from .endings import UNFINISHED
 from .reward import OUTCOMES, RUNNING
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
@@ -83,6 +84,7 @@ if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
 
     from cachette._core import GameEnd
 
+    from .endings import Endings
     from .env import Env
 
 
@@ -282,6 +284,30 @@ def end_tick_of(world: EndedWorld) -> int:
     return int(end["tick"])
 
 
+def end_path_of(world: EndedWorld) -> str:
+    """Return the name of the win path one finished episode ended on.
+
+    An episode whose world holds an end record reads the path the engine
+    named. An episode that holds no end record reads the name a report gives
+    an ending nobody won.
+
+    **The outcome and the end path answer different questions.** The outcome
+    says whether the seat won, lost or drew. The end path says which reader
+    ended the game, and a seat loses on every path as readily as it wins on
+    one. A run that reported only the outcome could not tell a policy that
+    kept every game to the tick limit from one the rivals ended by
+    domination.
+
+    An episode reads the unfinished name only when the horizon of the learner
+    stopped it before the world reached its tick limit, or when the readers
+    were off. The territory reader ends every game that reaches the limit.
+    """
+    end = world.game_end()
+    if end is None:
+        return UNFINISHED
+    return str(end["path"])
+
+
 def outcome_columns(outcome: str) -> dict[str, float]:
     """Return one column for each outcome, with a one in the column that holds.
 
@@ -340,6 +366,11 @@ class EpisodeRecord:
     world and never a signal, because the engine publishes no observation
     field that carries it.[^1]
 
+    The end path entry names the win path the game ended on, or states that
+    the episode holds no end record. **It is not the outcome.** The outcome
+    says whether the seat won, and the end path says which reader ended the
+    game, for whoever it ended for.
+
     The tally entry holds the two behaviour instruments over the decisions of
     this episode. They say whether the policy answered one row at every
     decision, which the return of the episode cannot say.[^2]
@@ -359,6 +390,7 @@ class EpisodeRecord:
     chosen: int
     refused: int
     end_tick: int
+    end_path: str = UNFINISHED
     signals: Mapping[str, float] = field(default_factory=dict)
     objectives: Mapping[str, float] = field(default_factory=dict)
     tally: ActionTally = field(default_factory=ActionTally)
@@ -387,9 +419,10 @@ class EpisodeRecord:
         the further scorings it read. A name of ``None`` asks the primary
         scoring, which is what one play under one objective wants.
 
-        The end tick comes from the world of the episode, through the one
-        reader this module holds for it. **It does not come from the
-        signals.** The engine publishes no signal that carries it.
+        The end tick and the end path come from the world of the episode,
+        through the two readers this module holds for it. **Neither comes
+        from the signals.** The engine publishes no signal that carries
+        either.
         """
         return cls(
             candidate=candidate,
@@ -400,6 +433,7 @@ class EpisodeRecord:
             chosen=chosen,
             refused=refused,
             end_tick=end_tick_of(env.world),
+            end_path=end_path_of(env.world),
             signals=env.signals.read_scalars(np.asarray(env.observation())),
             objectives=dict(env.objectives_under(scoring_name)),
             tally=ActionTally() if tally is None else tally,
@@ -456,6 +490,7 @@ class EpisodeRecord:
             "chosen": self.chosen,
             "refused": self.refused,
             "end_tick": self.end_tick,
+            "end_path": self.end_path,
             "signals": dict(self.signals),
             "objectives": dict(self.objectives),
             "most_common_share": self.tally.most_common_share,
@@ -572,6 +607,13 @@ class GenerationRecord:
     The episodes entry is empty for a generation that a seated league played,
     because that path builds its worlds itself and reports no episode.
 
+    The endings entry says why the episodes ended and how near the losing
+    ones came to a win. **A win share alone cannot say that.** A generation
+    that won nothing while reaching most of a wonder and a generation that
+    won nothing while reaching none of it report the same win share and call
+    for opposite decisions. A generation that carries no episode carries no
+    endings either.
+
     References
     ----------
     [^1]: The search, the agreement of a generation.
@@ -591,6 +633,7 @@ class GenerationRecord:
     refused: int
     episodes: tuple[EpisodeRecord, ...] = ()
     objectives: Mapping[str, float] = field(default_factory=dict)
+    endings: Endings | None = None
 
     @property
     def refusal_share(self) -> float:
@@ -623,6 +666,13 @@ class GenerationRecord:
         The win entries are the quantity that measures play, and the return
         entries are the shaped training signal. The two are kept apart under
         their own names.
+
+        The ending entries say why the episodes ended and how far the seat
+        came along each win path. **A win share is a threshold event, so it
+        stands still and then jumps.** The reach entries move before it does,
+        and a row that held only the win share could not say whether a run
+        was creeping toward the threshold or maximising a return that never
+        ends a game.
 
         The degenerate entry is one when the generation carried no
         information and the centre did not move. A reader of the report finds
@@ -660,6 +710,7 @@ class GenerationRecord:
             "yardstick": None if yardstick is None else yardstick.mean,
             "yardstick_won": None if yardstick is None else yardstick.won,
             **objective_columns(self.objectives),
+            **({} if self.endings is None else self.endings.columns()),
             "above_controller": (
                 None
                 if validation is None or yardstick is None
@@ -689,6 +740,7 @@ class GenerationRecord:
             "refused": self.refused,
             "refusal_share": self.refusal_share,
             "objectives": dict(self.objectives),
+            "endings": None if self.endings is None else self.endings.as_dict(),
             "episodes": [row.as_dict() for row in self.episodes],
         }
 
@@ -817,6 +869,7 @@ __all__ = [
     "GenerationRecord",
     "PopulationRecord",
     "ValidationScore",
+    "end_path_of",
     "end_tick_of",
     "episode_records",
     "mean_objectives",

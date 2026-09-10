@@ -85,6 +85,7 @@ from typing import TYPE_CHECKING, NotRequired, TypedDict
 import numpy as np
 
 from .config import TrainConfig
+from .endings import Endings, summarise_endings
 from .env import Env, EnvConfig, viable_seeds
 from .measure import SOLE, queued_population, queued_repeats, start_measurement
 from .normalize import reference_normalizer
@@ -764,6 +765,20 @@ def train(
     interval says how often the run plays them. **A run that a wall clock cap
     ends must still leave an honest figure behind**, and a pass that ran only
     after this function returned left none for four published policies.
+
+    **Each generation prints two further lines: why its episodes ended, and
+    how far the seat came along each win path.** A win share is a threshold
+    event, so it stands still and then jumps, and a run that reported only
+    that share could not say whether a policy was creeping toward the
+    threshold or maximising a return that never ends a game. The lines sit
+    under the generation line because that line is already wide. The whole
+    distribution, and the same figures for the leading faction, reach the
+    report file instead.
+
+    The instrument costs one pass over the episodes and no tick. Every figure
+    comes from the end record of a world and from the observation the seat
+    trained on, and the record of the episode read both when the episode
+    ended.
     """
     fixed = first_scoring(scoring)
     probe = Env(env_config, fixed)
@@ -886,7 +901,12 @@ def train(
                     f"The centre does not move",
                     flush=True,
                 )
-            record = generation_record(generation, seeds, played, update)
+            endings = (
+                summarise_endings(played.episodes, probe.signals)
+                if played.episodes
+                else None
+            )
+            record = generation_record(generation, seeds, played, update, endings)
             records.append(record)
 
             # **The schedule of a pass is declared once and read twice.** The
@@ -937,6 +957,10 @@ def train(
                 + f"[{history[-1]['seconds']:.0f}s]",
                 flush=True,
             )
+            if endings is not None:
+                head = f"  {name} generation {generation:2d}"
+                print(f"{head} ended {endings.ended_line()}", flush=True)
+                print(f"{head} reach {endings.reach_line()}", flush=True)
 
         # **The run states its bar before it ends.** A wall clock cap may end
         # the loop at any generation, and a pass left in the queue would then
@@ -1124,13 +1148,20 @@ def no_information_reason(update: Update, played: Generation) -> str:
 
 
 def generation_record(
-    generation: int, seeds: Sequence[int], played: Generation, update: Update
+    generation: int,
+    seeds: Sequence[int],
+    played: Generation,
+    update: Update,
+    endings: Endings | None = None,
 ) -> GenerationRecord:
     """Join what the generation scored to what the search made of it.
 
     The spread of the raw return is recorded beside the spread of the ranked
     score, because the two answer different questions and a run that recorded
     one of them could not be compared with the other.
+
+    The endings entry says why the episodes ended and how near the losing
+    ones came. A generation that reports no episode carries none.
     """
     return GenerationRecord(
         generation=generation,
@@ -1146,6 +1177,7 @@ def generation_record(
         refused=played.refused,
         episodes=played.episodes,
         objectives=played.objectives,
+        endings=endings,
     )
 
 
