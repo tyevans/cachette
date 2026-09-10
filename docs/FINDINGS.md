@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-745**
+**Next number: FND-746**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20464,6 +20464,63 @@ project that runs a world for hundreds of ticks now runs it under weather that
 ends units and wears what they build. Check every such fixture for an
 assumption that a count of people or a piece of ground holds still.
 
+### FND-745 — The sky decides a short run as well as a long one, and a deposit no longer recovers inside one
+
+**Believed.** The weather breaks a fixture that runs a world for hundreds of
+ticks. A fixture of forty ticks is short enough to be safe, and a fixture that
+holds no unit past the first storm cycle needs no repair.
+
+**True.** Two of the fixtures that broke run well under a hundred ticks, and
+one of them broke without a storm at all. The sky of a world decides the food
+a tile carries and the period on which a deposit recovers, and a map is one
+region of a planet at forty-five degrees north.
+
+The promotion fixture is the clearest case. It put five gatherers on the one
+richest tile of its world and ran forty ticks, and it then demanded that
+somebody passed the deed threshold. The tile carries twelve food, a gatherer
+takes four in a tick, and three of the five emptied it on the first tick. The
+tile then stayed at zero for thirty-two ticks. Nobody reached the threshold of
+eight, the fixture reached no promotion, and the test failed on its own
+precondition with a message that named the thread count.
+
+The starvation fixture of a founded group is the second case. It ran a written
+span of a hundred and twenty ticks and demanded that every seated person was
+alive. Two people starved at tick 110 and a storm took a third at tick 113.
+
+**Evidence.** A probe stepped the promotion fixture and printed the tile stock
+and the deeds of each gatherer on every tick. The same probe under the planet
+span, with every other setting equal, promoted two gatherers and left the
+first one on thirty-six deeds. The storm log named nobody in either run. A
+probe of the founded group fixture printed the tick each person left the world
+and the log that named it: two in the starved log at tick 110, one in the
+storm log at tick 113. The same fixture under the planet span kept all one
+hundred and twenty people and recorded no storm and no starvation.
+
+**Follows.** Four things.
+
+**A tick count is not a measure of exposure.** A fixture is exposed when it
+depends on something the sky decides, and the food of a tile is decided from
+the first tick. Read what a fixture depends on, and not how long it runs.
+
+**Give each unit the ground it needs, rather than a crowd one tile.** A
+deposit carries one gatherer past a threshold and then waits tens of ticks for
+the next recovery. A fixture that wants several units past a threshold states
+that each deposit it takes is enough for the unit that stands on it.
+
+**A budget derived from one rule is still a budget the sky can break.** The
+span of the founded group fixture was derived from the need rule, and the
+derived value landed one tick from the point at which a group with no rate
+loses its first person. The defect went back in and the test stayed green. A
+derivation that has no clearance is the same defect as a written number.
+
+**Hold a term still by comparison when no span can hold it.** The founded
+group fixture now runs the same seed twice, once with the rate its founding
+set and once without, and it asserts that the first keeps strictly more
+people. The two runs meet the same sky, so what differs between them is the
+rate. This is the repair that the depletion ledger case already
+recorded.[^F745A]
+
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -20487,3 +20544,4 @@ assumption that a count of people or a piece of ground holds still.
 [^F744A]: ADR-0177, the row axis of a world is a latitude that the world states. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
 [^F744B]: The wear pass and the repair price. `crates/cachette-core/src/world/upgrades.rs`
 [^F744C]: The storm damage pass. `crates/cachette-core/src/world/storm.rs`
+[^F745A]: Findings register, FND-728. `docs/FINDINGS.md`

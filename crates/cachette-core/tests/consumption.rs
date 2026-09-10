@@ -251,17 +251,35 @@ fn a_fed_unit_holds_its_need_and_carries_no_deficit() {
         .collect();
     assert!(!fed.is_empty(), "the fixture must hold a fed unit");
 
+    // A storm ends a unit that stands in the open, and it obeys no rule of
+    // this pass. The run reads the log of what the storms took, and it skips
+    // the units the log names and no others. A run that skipped every unit
+    // that left the world would pass against a world that starved them all,
+    // and it would then measure the fixture.[^1]
+    //
+    // [^1]: Findings register, FND-725. `docs/FINDINGS.md`
+    let mut taken_by_a_storm: Vec<u64> = Vec::new();
     for _ in 0..32 {
         world.step(4).expect("the step must run");
+        taken_by_a_storm.extend(world.units_lost_to_storms().iter().map(|lost| lost.unit));
     }
+    let mut read = 0usize;
     for unit in &fed {
+        if taken_by_a_storm.contains(&unit.to_bits()) {
+            continue;
+        }
         assert_eq!(
             world.soldiers().need(*unit),
             Some(NEED_FULL),
             "a unit that receives its whole ration holds its need"
         );
         assert_eq!(world.soldiers().deficit(*unit), Some(Fix32::ZERO));
+        read += 1;
     }
+    assert!(
+        read > 0,
+        "a storm took every fed unit, so the run read no need at all"
+    );
 }
 
 #[test]

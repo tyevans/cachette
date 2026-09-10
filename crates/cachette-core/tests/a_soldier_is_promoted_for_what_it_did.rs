@@ -40,6 +40,12 @@ const CONFIG: WorldConfig = WorldConfig {
 /// than the default asks for.
 const THRESHOLD: u64 = 8;
 
+/// How many gatherers the thread-count fixture puts to work.
+///
+/// Each one takes a deposit of its own, so the count is also a count of the
+/// deposits the fixture asks the world for.
+const GATHERERS: usize = 5;
+
 /// Builds a world that promotes on every tick, at a threshold this world can
 /// reach.
 ///
@@ -56,9 +62,18 @@ fn world() -> World {
 
 /// Returns the open address that carries the most food.
 ///
-/// The fixture asserts that it found food worth gathering. A deposit is small
-/// and it recovers, so a unit reaches the threshold by returning to it over
-/// several frames rather than by emptying it once.
+/// The fixture asserts that it found food worth gathering.
+///
+/// **One deposit feeds one gatherer past the threshold, and no more.** A
+/// deposit recovers on a period the moisture of its ground decides, and the
+/// ground of this world is a region of a planet rather than a globe. A
+/// gatherer empties the deposit in the first few ticks and then waits tens of
+/// ticks for the next recovery, so a fixture that wants several units past
+/// the threshold gives each one a deposit of its own.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-745. `docs/FINDINGS.md`
 fn deposit(world: &World) -> Axial {
     let grid = world.grid();
     let mut best: Option<(u32, Axial)> = None;
@@ -122,6 +137,67 @@ fn run(world: &mut World, frames: u64, threads: usize) {
     for _ in 0..frames {
         world.step(threads).expect("the step must run");
         assert!(world.check_invariants(), "the world lost an invariant");
+    }
+}
+
+/// Spawns one gatherer on each of the richest deposits, and returns them.
+///
+/// **Each gatherer takes a deposit of its own.** A deposit carries one unit
+/// past the threshold and then recovers on a period of tens of ticks, so
+/// several units on one deposit share the food that one of them needs and
+/// none of them arrives. The fixture states that every deposit it takes
+/// carries the unit that stands on it past the threshold, so a run that
+/// promotes nobody names a defect and not a thin world.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-745. `docs/FINDINGS.md`
+fn gatherers_on_deposits_of_their_own(world: &mut World, count: usize) -> Vec<Entity> {
+    let ground = deposits(world);
+    assert!(
+        ground.len() >= count,
+        "the fixture needs {count} deposits and found {}",
+        ground.len()
+    );
+    let threshold = world.deed_threshold();
+    let mut units = Vec::with_capacity(count);
+    for (stock, address) in ground.into_iter().take(count) {
+        assert!(
+            u64::from(stock) >= threshold,
+            "a deposit of {stock} does not carry one gatherer past the threshold of {threshold}"
+        );
+        units.push(gatherer(world, address));
+    }
+    units
+}
+
+/// Steps the world, and states that every unit of a set is alive at each
+/// frame.
+///
+/// **A storm ends a unit that stands in the open.** A fixture that lost its
+/// gatherers would promote nobody and would then fail on its own
+/// precondition, which names the fixture rather than the weather. This helper
+/// names the frame the storm struck on and the identities the storm log
+/// holds.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-745. `docs/FINDINGS.md`
+fn run_with_the_units_alive(world: &mut World, frames: u64, threads: usize, units: &[Entity]) {
+    for frame in 1..=frames {
+        world.step(threads).expect("the step must run");
+        assert!(world.check_invariants(), "the world lost an invariant");
+        for unit in units {
+            assert!(
+                world.soldiers().contains(*unit),
+                "the world ended a gatherer at frame {frame}, and the storm log of that frame names {:?}",
+                world
+                    .units_lost_to_storms()
+                    .iter()
+                    .map(|lost| lost.unit)
+                    .collect::<Vec<u64>>()
+            );
+        }
     }
 }
 
@@ -411,15 +487,20 @@ fn the_promotion_is_the_same_at_every_thread_count() {
     // The promotion must depend on what a unit did and never on the order the
     // threads finished in.[^1]
     //
+    // **Each gatherer stands on a deposit of its own, and the run states that
+    // each one is alive.** A crowd on one deposit shares the food that one of
+    // them needs to pass the threshold, and a storm ends a unit that stands
+    // in the open. Either failure promotes nobody, and the test would then
+    // fail on its own precondition and name the fixture rather than the
+    // cause.[^2]
+    //
     // [^1]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    // [^2]: Findings register, FND-745. `docs/FINDINGS.md`
     let mut answers = Vec::new();
     for threads in [1usize, 2, 12] {
         let mut world = world();
-        let at = deposit(&world);
-        for _ in 0..5 {
-            gatherer(&mut world, at);
-        }
-        run(&mut world, 40, threads);
+        let units = gatherers_on_deposits_of_their_own(&mut world, GATHERERS);
+        run_with_the_units_alive(&mut world, 40, threads, &units);
         assert!(
             !world.characters().is_empty(),
             "the fixture must promote somebody at {threads} threads"
