@@ -118,8 +118,19 @@ published, and no decision read it. A tool that ranks versions of the
 controller had to leave the weight out of its key, because two versions that
 differed only there played one game twice.[^14]
 
+Local instance. The training launcher declared that a resume point costs a
+reclaimed run one generation. The trainer wrote the resume point every
+generation, and nothing copied it to this machine until the stop path ran. A
+reclaimed spot instance never lets the stop path run, so the copy had no
+caller on the one failure it was for. One run lost the best policy this project
+has measured.[^15]
+
 **Rule.** Ask who is obligated to invoke this: the user, or the engine. If the
 engine, the test must start at the engine.[^6]
+
+**Rule.** A recovery step that only the ordinary end reaches does not cover a
+failure that removes the ordinary end. Name the failure the platform has, and
+ask which step of the recovery it deletes.
 
 **Rule.** Do not declare a capability before something calls it.
 
@@ -195,3 +206,4 @@ Before you claim work is done, check each line.
 [^12]: Findings register, FND-628. `docs/FINDINGS.md`
 [^13]: Findings register, FND-701. `docs/FINDINGS.md`
 [^14]: Findings register, FND-739. `docs/FINDINGS.md`
+[^15]: Findings register, FND-746. `docs/FINDINGS.md`

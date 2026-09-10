@@ -298,7 +298,7 @@ train-progress dir:
         --price "$PRICE" --generations "$TOTAL_GENERATIONS" \
         --instance-type "$INSTANCE_TYPE" --zone "$ZONE" --run-id "$RUN_ID" \
         --started "$(./scripts/train-started.sh {{dir}})" \
-        --report {{dir}}/report.json
+        --report {{dir}}/learn/report.json
 
 # Print one screen of what a training run is doing.
 #
@@ -383,6 +383,18 @@ docs:
 # broke. The second case is the one that reports nothing on its own.
 docs-probe:
     ./scripts/docs-probe.sh
+
+# The launcher copies the resume point of every strategy to this machine at
+# every poll, so a reclaimed spot instance costs the work of one poll. Before
+# that fetch existed a reclaim cost the whole run, and one run lost the best
+# policy this project has measured. The script rents nothing. It puts a
+# stand-in for `scp` on the path and drives the real functions of the launcher
+# over a directory of files.
+#
+# Prove that the launcher fetches the weights, and that a broken copy cannot
+# destroy the ones already here.
+train-fetch-probe:
+    ./scripts/train-fetch-probe.sh
 
 # Run mutation testing over the Rust core. Slow. Not a commit gate.
 mutants:
@@ -473,7 +485,7 @@ check:
 # The gates themselves. Run `just check` instead, to get the cost report.
 gates:
     @failed=""; \
-    for recipe in fmt-check lint test records records-probe merge-defects; do \
+    for recipe in fmt-check lint test records records-probe merge-defects train-fetch-probe; do \
         echo "=== $recipe ==="; \
         just "$recipe" || failed="$failed $recipe"; \
     done; \

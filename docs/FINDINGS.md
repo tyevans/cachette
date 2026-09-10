@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-746**
+**Next number: FND-747**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20520,6 +20520,49 @@ people. The two runs meet the same sky, so what differs between them is the
 rate. This is the repair that the depletion ledger case already
 recorded.[^F745A]
 
+### FND-746 — A resume point on a machine that vanishes protects nothing
+
+**Believed.** The training launcher stated that an interruption costs one
+generation and never a strategy. The trainer writes a resume point for each
+strategy every generation, and the launcher said a reclaimed spot instance
+loses no more than that.
+
+**True.** The statement held on the instance and not on this machine. Nothing
+copied a resume point back until `--stop` ran, and a reclaimed spot instance
+never lets `--stop` run. The protection therefore covered the trainer failing,
+which is the failure the machine survives, and not the machine going away,
+which is the failure a spot instance actually has.
+
+**Evidence.** A run was reclaimed two hours into a cap of six hours. It had
+reached a held-out win share of 0.42 over 256 seeds against a built-in
+controller that wins 0.333, which is the best policy this project has produced.
+The launcher answered `Nothing to collect yet` and the run directory held no
+weight file. The only surviving trace of the policy is the figure in the
+log.[^F625A]
+
+**Follows.** Four things.
+
+**A protection that runs at the end protects nothing against a failure that
+removes the end.** Read the failure the platform has, and ask which step of the
+recovery it deletes. The self-destruct deadline of this same launcher was
+written that way and is sound, because it runs on the far side.
+
+**Copy the artefact while the work is alive.** The follower now fetches the
+resume point and the best centre of every strategy at every poll, so a reclaim
+costs the work of one poll and not the work of the run.[^F625A]
+
+**A copy that dies half way must not overwrite the copy already here.** Every
+fetch lands under a temporary name and moves into place with one rename. A
+truncated weight file that replaced a whole one would lose exactly what the
+fetch exists to keep, and it would read as a successful fetch.
+
+**A shell script that nobody exercises is a claim, not a mechanism.** A probe
+now drives the real functions of the launcher against a stand-in for `scp` that
+can fail and can truncate.[^F746A] The first version of that probe passed with
+the defect put back, because it asserted on the weight files and the report
+travelled by a second mechanism that had no protection at all. Two mechanisms
+need two cases.
+
 
 ## References
 
@@ -20545,3 +20588,4 @@ recorded.[^F745A]
 [^F744B]: The wear pass and the repair price. `crates/cachette-core/src/world/upgrades.rs`
 [^F744C]: The storm damage pass. `crates/cachette-core/src/world/storm.rs`
 [^F745A]: Findings register, FND-728. `docs/FINDINGS.md`
+[^F746A]: The fetch probe of the training launcher. `scripts/train-fetch-probe.sh`

@@ -22,6 +22,11 @@
 #    dollars spent so far and for each generation, and the time left.
 # 3. **A way to stop and keep the work.** `--stop` ends a run, brings back
 #    everything the instance has written, and terminates the machine.
+# 4. **The weights come back while the run is alive.** The follower copies the
+#    resume point and the best centre of every strategy to this machine at
+#    every poll, so a reclaimed spot instance costs the work of one poll and
+#    not the whole run. `--stop` and `--attach` report what is already here,
+#    including for a run whose instance has gone.
 #
 # Usage:
 #   scripts/graviton-train.sh                 price it, ask, then run
@@ -353,14 +358,109 @@ teardown() {
 ssh_options=()
 remote=""
 
+# Copies one remote file into place through a temporary name beside it.
+#
+# **A copy that dies half way must not destroy the copy already here.** The
+# connection to a spot instance breaks for ordinary reasons, and a truncated
+# weight file that overwrote a whole one would lose exactly what this fetch
+# exists to keep. The temporary name sits in the target directory, so the move
+# is a rename inside one file system and a reader sees the old file or the new
+# one and never half of either. A failure removes the temporary file and
+# leaves everything else alone.
+fetch_file() {
+    local source="$1"
+    local target="$2"
+    mkdir -p "$(dirname "$target")"
+    if scp "${ssh_options[@]}" "$remote:$source" "$target.part" 2>/dev/null; then
+        mv -f "$target.part" "$target"
+        return 0
+    fi
+    rm -f "$target.part"
+    return 1
+}
+
+# **Brings the weights back while the run is still alive.**
+#
+# The trainer writes a resume point for each strategy every generation and the
+# best validated centre beside it, and this launcher said an interruption cost
+# one generation and never a strategy. That was true on the instance and false
+# here. Nothing copied those files back until `--stop` ran, and a reclaimed
+# spot instance never lets `--stop` run. One run reached the best held-out
+# figure this project has measured and left nothing behind but that number in
+# a log.[^3]
+#
+# The follower calls this every poll. The poll is two minutes, so a reclaim
+# now costs at most the two minutes since the last fetch. Two minutes is
+# shorter than one generation and much shorter than the gap between two
+# held-out passes, so every held-out figure arrives here together with the
+# weights it describes.
+#
+# The files are a few hundred kilobytes each. The cost of a fetch is the
+# connection and not the bytes, and the poll opens a connection anyway.
+#
+# **A failed fetch is not a failed run.** The instance may be loaded or
+# briefly unreachable and still be training, so this reports and returns.
+#
+# References
+#   [^3]: Findings register, FND-746. `docs/FINDINGS.md`
+fetch_checkpoints() {
+    local staging="$out_dir/learn.part"
+    local kept=0
+    local name
+    mkdir -p "$out_dir/learn"
+    rm -rf "$staging"
+    mkdir -p "$staging"
+    if scp "${ssh_options[@]}" "$remote:cachette/runs/learn/*.npz" \
+        "$staging/" >/dev/null 2>&1; then
+        for name in "$staging"/*.npz; do
+            if [ -f "$name" ]; then
+                mv -f "$name" "$out_dir/learn/${name##*/}"
+                kept=$(( kept + 1 ))
+            fi
+        done
+    fi
+    rm -rf "$staging"
+    if fetch_file "cachette/runs/learn/report.json" "$out_dir/learn/report.json"; then
+        kept=$(( kept + 1 ))
+    fi
+    if fetch_file "cachette/runs/learn/status" "$out_dir/learn/status"; then
+        kept=$(( kept + 1 ))
+    fi
+    if [ "$kept" -eq 0 ]; then
+        printf '   fetched nothing this round. The run continues\n' >&2
+        return 0
+    fi
+    date -u '+%Y-%m-%dT%H:%M:%SZ' > "$out_dir/last-fetch"
+    printf '   fetched %s files into %s at %s. A reclaim now costs one poll\n' \
+        "$kept" "$out_dir/learn" "$(cat "$out_dir/last-fetch")" >&2
+}
+
+# Says what this machine already holds for the run.
+#
+# **The launcher answered `Nothing to collect yet` for a run whose instance was
+# already gone**, and said nothing about the files here. A reader needs to know
+# which centres survived and when they were taken, because that is the whole
+# of what a reclaimed run leaves.
+report_local() {
+    if ! compgen -G "$out_dir/learn/*.npz" >/dev/null; then
+        printf 'This machine holds no weights for %s.\n' "${RUN_ID:-this run}" >&2
+        return 0
+    fi
+    local fetched="unrecorded"
+    if [ -f "$out_dir/last-fetch" ]; then
+        fetched="$(cat "$out_dir/last-fetch")"
+    fi
+    printf 'Weights on this machine, last fetched at %s:\n' "$fetched" >&2
+    ls -la "$out_dir/learn"/*.npz >&2
+    printf 'A file NAME-latest.npz is the resume point of strategy NAME.\n' >&2
+    printf 'A file NAME.npz is the best validated centre of strategy NAME.\n' >&2
+}
+
 # Renders the dashboard from the log the instance has written so far.
 render_progress() {
     local log="$out_dir/train.log"
-    local report="$out_dir/report.json"
-    scp "${ssh_options[@]}" "$remote:cachette/runs/learn/train.log" "$log" \
-        2>/dev/null || return 0
-    scp "${ssh_options[@]}" "$remote:cachette/runs/learn/report.json" "$report" \
-        2>/dev/null || true
+    local report="$out_dir/learn/report.json"
+    fetch_file "cachette/runs/learn/train.log" "$log" || return 0
     python3 "$root/scripts/train_progress.py" "$log" \
         --price "$PRICE" \
         --generations "$TOTAL_GENERATIONS" \
@@ -373,20 +473,40 @@ render_progress() {
 # Brings back everything the instance has written. It runs before the machine
 # is destroyed on every path, including an early stop, so the weights of a
 # run that ends early survive it.
+#
+# **A last copy must not overwrite a fetched file with a truncated one.** This
+# copies the whole directory to a staging name first. Only a copy that finished
+# moves into place, one rename for each file, so a run whose instance died part
+# way through this keeps what the follower already fetched.
 collect() {
+    local staging="$out_dir/collect.part"
+    local name
     say "Collecting the results"
     mkdir -p "$out_dir/learn"
-    scp -r "${ssh_options[@]}" "$remote:cachette/runs/learn/." "$out_dir/learn/" \
-        2>/dev/null || printf 'Nothing to collect yet.\n' >&2
-    scp "${ssh_options[@]}" "$remote:run.log" "$out_dir/console.log" 2>/dev/null || true
-    scp "${ssh_options[@]}" "$remote:/tmp/throughput.txt" \
-        "$out_dir/throughput.txt" 2>/dev/null || true
+    rm -rf "$staging"
+    if scp -r "${ssh_options[@]}" "$remote:cachette/runs/learn/." \
+        "$staging/" 2>/dev/null; then
+        for name in "$staging"/*; do
+            if [ -e "$name" ]; then
+                if [ -d "$name" ]; then
+                    rm -rf "${out_dir:?}/learn/${name##*/}"
+                fi
+                mv -f "$name" "$out_dir/learn/${name##*/}"
+            fi
+        done
+    else
+        printf 'The instance gave nothing back. What the follower fetched stands.\n' >&2
+    fi
+    rm -rf "$staging"
+    fetch_file "run.log" "$out_dir/console.log" || true
+    fetch_file "/tmp/throughput.txt" "$out_dir/throughput.txt" || true
     if [ -f "$out_dir/learn/train.log" ]; then
         python3 "$root/scripts/train_progress.py" "$out_dir/learn/train.log" \
             --rows --run-id "$RUN_ID" > "$out_dir/generations.jsonl" || true
     fi
     printf 'Results are in %s\n' "$out_dir" >&2
     ls -la "$out_dir/learn" 2>/dev/null >&2 || true
+    report_local
 }
 
 # Sets up the connection to an instance this script already made.
@@ -446,6 +566,7 @@ follow() {
         local state
         state="$(ssh "${ssh_options[@]}" "$remote" 'cat /tmp/marker 2>/dev/null' \
             2>/dev/null || true)"
+        fetch_checkpoints
         render_progress
         fetch_wheel
         fetch_baselines
@@ -488,12 +609,13 @@ if [ "$mode" = "attach" ] || [ "$mode" = "stop" ]; then
     group_id="$GROUP_ID"
     key_name="$KEY_NAME"
     connect
+    report_local
     if [ "$mode" = "stop" ]; then
         trap teardown EXIT INT TERM
         say "Ending the run on $instance_id and keeping what it wrote"
-        # The trainer writes the weights after a generation it improved on,
-        # so what is on the instance now is what survives. Nothing is
-        # interrupted before it is copied.
+        # The follower fetches the weights every poll, so this machine already
+        # holds them. The copy below takes anything written since the last
+        # fetch, and it reports what is here when the instance answers nothing.
         collect
         exit 0
     fi
@@ -501,6 +623,7 @@ if [ "$mode" = "attach" ] || [ "$mode" = "stop" ]; then
     # watching, so this path keeps the instance unless the run ends.
     keep_instance=1
     trap teardown EXIT INT TERM
+    fetch_checkpoints
     render_progress
     follow
     keep_instance=0
@@ -623,7 +746,10 @@ $size_warning
   generation, so an interruption costs one generation and never a strategy.
   It validates every $validate_every generations and keeps the best centre
   beside that. $holdout_words
-  A spot instance can be taken back at any time, and the same rule holds.
+  A spot instance can be taken back at any time, and the follower copies the
+  resume point and the best centre of every strategy to this machine every two
+  minutes. A reclaim therefore costs the work of two minutes, and the weights
+  land in $out_dir/learn whether or not the instance answers again.
 
 PLAN
 
