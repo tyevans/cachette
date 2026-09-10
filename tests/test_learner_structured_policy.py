@@ -308,12 +308,12 @@ def test_the_stated_layout_trains_the_count_the_design_claims() -> None:
     policy = StructuredPolicy.zeros(9, layout, shape)
     assert policy.counts() == _expected_count(layout, 9, shape)
     assert policy.counts() == {
-        "scalars": 48,
-        "ring": 45,
-        "tokens": 56,
-        "trunk": 540,
-        "readout": 117,
-        "total": 806,
+        "scalars": 96,
+        "ring": 65,
+        "tokens": 112,
+        "trunk": 1780,
+        "readout": 189,
+        "total": 2242,
     }
     assert policy.flat().size == policy.parameter_count
 
@@ -513,6 +513,53 @@ def test_the_reader_refuses_a_structured_file_of_another_ring_geometry(
         load_policy(path, _fit(observation_version=5), regrouped)
     read, _ = load_policy(path, _fit(observation_version=5), layout)
     np.testing.assert_array_equal(read.flat(), policy.flat())
+
+
+def test_a_stored_policy_rebuilds_at_the_widths_its_file_names(
+    tmp_path: Path,
+) -> None:
+    """A published file rebuilds at its own widths and not at today's default.
+
+    The default widths change when the project buys reading power. A file
+    written before such a change holds the widths of its own run, and the
+    writer states them in the file. A reader that took the default instead
+    would cut the stored vector at the wrong layer boundaries, and every
+    published policy would then play as something else.
+
+    **This test carries its own proof that it can fail.** The widths below
+    differ from the default in every field, so a reader that ignored the
+    stored widths refuses the vector rather than passing quietly.[^1]
+
+    References
+    ----------
+    [^1]: Testing Rules, section 1. ``.agents/rules/testing.md``
+    """
+    layout = _small_layout()
+    stated = StructuredShape(
+        scalar_width=3,
+        ring_width=2,
+        ring_bands=2,
+        sector_kernel=5,
+        token_width=3,
+        trunk_width=7,
+    )
+    assert stated != StructuredShape()
+    shell = StructuredPolicy.zeros(9, layout, stated)
+    trained = shell.rebuild(
+        np.random.default_rng(31).standard_normal(shell.parameter_count)
+    )
+    assert trained.parameter_count != StructuredPolicy.zeros(9, layout).parameter_count
+
+    path = tmp_path / "stated.npz"
+    trained.save(path, _fit(observation_version=5).as_meta())
+    read, meta = load_policy(path, _fit(observation_version=5), layout)
+
+    assert meta["kind"] == "structured"
+    assert isinstance(read, StructuredPolicy)
+    assert read.shape == stated
+    np.testing.assert_array_equal(read.flat(), trained.flat())
+    encoded = encode_many(_rows(layout))
+    np.testing.assert_array_equal(read.scores(encoded), trained.scores(encoded))
 
 
 def _catalogue(geometry: dict[str, object], signals: list[Signal]) -> SignalCatalogue:

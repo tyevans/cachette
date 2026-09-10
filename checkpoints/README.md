@@ -46,7 +46,10 @@ retired policies played.
 
 Four policies from one run of the play style table, on a 128 by 128 world of
 three factions at a tick limit of 6000, at observation version 7 and action
-version 2. Every one is a structured policy of 5354 trainable weights.
+version 2. Every one is a structured policy of 5354 trainable weights, at the
+widths that run trained. The project has widened the default since, so a
+policy trained today holds another count. Each file names its own widths, and
+the reader rebuilds it at them.
 
 **A number in the return column is not a win rate, not a percentage, and not
 a held-out measurement.** It is the largest mean shaped return the run reached
