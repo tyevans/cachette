@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-746**
+**Next number: FND-747**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20520,6 +20520,51 @@ people. The two runs meet the same sky, so what differs between them is the
 rate. This is the repair that the depletion ledger case already
 recorded.[^F745A]
 
+### FND-746 — An assertion that accepts a set of causes measures whichever cause arrived, and a polar region is the one sky that leaves an army alone
+
+**Believed.** A test that reads a cause column may accept the causes its
+fixture could plausibly produce. The collapse test listed three of them: an
+army, the weather, and the two together. A new cause then reached the row, a
+storm, and the fix looked like adding the storm to the list.
+
+**True.** The list was already the defect, and adding to it would have hidden a
+worse one. The wear pass sums four terms over a tile and names the collapse
+after the heaviest term of the tick that ended it.[^F746A] A storm takes more
+in one tick than twelve hostile units do, so a storm on the last tick erases
+the army from the row whatever the army did over the ticks before it. A test
+that accepts the storm therefore asserts nothing about the army, and the whole
+fixture of that test seats hostile units and declares a war.
+
+**Evidence.** The army term was deleted from the wear pass, so that no hostile
+unit took any condition at all. The list with the storm added to it passed all
+three tests of the file. The repaired test failed. The repaired test also
+failed when the army term named itself the weather, and when the army rate was
+doubled or halved.
+
+A survey of the latitude settings measured the ground and the sky over the
+tile the fixture builds on. The default region of three degrees is wet on
+every tick at every centre from 85 south to 85 north, except at 70 south and
+beyond, where the ground is dry and storms still pass. A region that spreads
+thirty degrees over its rows and stands at 70 south leaves the tile dry and
+clear of storms for 4000 ticks, and so does every centre from 62 south to 75
+south. The wear test runs about 210 ticks.
+
+**Follows.** Three things.
+
+**Pin a cause column to the cause the fixture arranged.** A set of accepted
+values is a statement that the test does not know what it built. Every other
+assertion in that file pins one column to one value, and the cause column was
+the one that did not.
+
+**A cold, wide region is the sky that leaves a wear term alone.** Cold air
+carries little water, so no rain reaches the ground. A wide latitude span
+raises the front mark above the temperature gradient of a polar region, so no
+storm forms. A fixture that must isolate one term of the wear pass states both.
+
+**The earlier survey looked for a dry seat and not for a dry sky.** The survey
+that found no seat dry and clear for 1200 ticks varied the seat over one
+world.[^F746B] It stands for the regions it tested. A region exists that holds
+the tile dry and clear, and it is not a region of the target world.
 
 ## References
 
@@ -20545,3 +20590,5 @@ recorded.[^F745A]
 [^F744B]: The wear pass and the repair price. `crates/cachette-core/src/world/upgrades.rs`
 [^F744C]: The storm damage pass. `crates/cachette-core/src/world/storm.rs`
 [^F745A]: Findings register, FND-728. `docs/FINDINGS.md`
+[^F746A]: The wear pass, the cause of a tick. `crates/cachette-core/src/world/upgrades.rs`
+[^F746B]: Findings register, FND-744. `docs/FINDINGS.md`
