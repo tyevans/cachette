@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-722**
+**Next number: FND-723**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19583,3 +19583,52 @@ long as nobody opened the test.
 
 **A bound that a change to another subsystem can move is not a bound.** State
 the bound the test asserts, and state what the test compares.
+
+
+### FND-722 — A gate that stops at its first failure stops being a gate, and this one hid a changed simulation
+
+**Believed.** `just check` is the gate of this project. A green gate means the
+tests, the thread-count equivalence test and the golden state hash all passed.
+A red gate names the one thing that is wrong, and somebody reads it.
+
+**True.** `just gates` runs its recipes in order and stops at the first that
+fails, and `lint-rust` runs before `test`. Eight clippy errors, which no
+behaviour depended on, stopped the gate before it reached a single test. The
+golden state hash had moved in three scenarios and nothing reported it.
+
+**Four independent changes hid the fourth between them, and no one of them was
+careless.** A commit retuned four cyclone constants on purpose and cited a
+finding for the reasoning.[^F722A] It did not re-record the golden file.
+Separate commits left eight clippy errors in test targets and an example of the
+core crate. Clippy stops a crate at its first failing target, so the first four
+errors hid the second four, and the lint needed two rounds of repair before it
+passed at all. Only then did the gate reach the golden state hash and fail.
+
+**Evidence.** The golden state hash failed the same way on three builds at
+three commits, so the difference is stable and it is not a live
+nondeterminism. The thread-count equivalence test passed 19 of 19 throughout,
+so no ordering was lost. A search over the first-parent history put the change
+between two commits one apart, and the only change to simulated state in that
+range was the four constants. Three scenarios moved: one at its last tick, one
+over its last three ticks, and one over twenty ticks. The commit body holds the
+constants, the hashes and the commands. It ran on 9 September 2026 on one
+development machine (x86-64).
+
+**Follows.** Three things.
+
+**Report every failing gate, or order the gates so that a cheap check cannot
+hide an expensive one.** The cosmetic checks ran first and the load-bearing
+ones last. That is the order which makes a formatting slip cost a determinism
+result.
+
+**A stale golden file is not a small debt.** It is the only defence this
+project holds against a silent change of behaviour. The next person to record
+it would have blessed three scenarios of unread difference in one command.
+
+**Prove a repair is inert before you re-record a golden file.** The state hash
+sequence of the repaired tree matched the sequence of the tree before the
+repairs, byte for byte, so every repair was inert with respect to simulated
+state. Without that check the re-record would have baked in whatever the
+repairs did, and the evidence that they did anything would be gone.
+
+[^F722A]: Findings register, FND-712. `docs/FINDINGS.md`
