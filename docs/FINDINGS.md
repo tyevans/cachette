@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-753**
+**Next number: FND-754**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20814,6 +20814,50 @@ term deleted from the engine. Nothing in the text of the test showed that.
 **A region world may leave foraged food unable to grow back at all.** A blocker
 holds that question.[^F752C]
 
+### FND-753 — A territory win is the truncation of another path, so the engine holds three plans and one ranking
+
+**Believed.** The engine holds four win paths, and a player may choose any one
+of them and steer toward it. The project stated the four as domination,
+territory, wonder and renown, and treated territory as a plan beside the other
+three.
+
+**True.** Territory is not a plan. Its reader holds no bar. It refuses to answer
+below the tick limit, and at the limit it ranks the factions and names the
+leader. A faction that makes no act keeps the ground its first city holds, so
+the ranking asks for no act at all. A territory ending and a game that runs out
+of ticks are one event.
+
+**Evidence.** Three readings agree.
+
+The balance register records a seed correspondence: every seed that a run at the
+long horizon ends on renown above the short horizon is a seed that the short run
+ends on territory at the limit.[^F753A] The two runs used one seed set and one
+machine.
+
+A code audit of the four readers reports that the territory reader returns
+nothing below the tick limit, that it compares the factions against each other
+and against no number, and that it names a faction whenever any faction is still
+in the game.[^F753B]
+
+A measurement of 60 games over two fields of players reports that both games
+which reached the tick limit ended on territory, and that no game which ended
+early ended on territory.[^F753C]
+
+**Follows.** Three things.
+
+**A win path needs a bar of its own, and a record now states that rule.**[^F753D]
+The territory bar becomes a share of the passable ground of the world, and the
+tick limit ends a game with no winner.
+
+**A published win share that counts territory as a path overstates the count of
+live plans.** A run that reports its win share reports the ranking beside three
+plans, and a reader who wants the count of live plans subtracts the ranking
+until the bar exists.
+
+**Read a path with no threshold as a path with no plan.** A reader that compares
+one faction against another states which faction leads. It does not state that
+any faction did anything.
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -20847,3 +20891,7 @@ holds that question.[^F752C]
 [^F752A]: The recovery rule, the moisture curve of a period. `crates/cachette-core/src/resource.rs`
 [^F752B]: The production pipeline, the resident term. `crates/cachette-core/src/effective.rs`
 [^F752C]: Blockers register, BLK-162. `docs/BLOCKERS.md`
+[^F753A]: Balance register, the win-path share row. `docs/reference/balance.md`
+[^F753B]: The audit of the four win readers. `docs/research/what-the-win-conditions-are-and-what-can-reach-them.md`
+[^F753C]: The measurement of every win quantity over 60 games. `docs/research/what-a-game-attains-on-every-win-quantity.md`
+[^F753D]: ADR-0204, every win path holds a bar of its own. `docs/adrs/draft/adr-0204-every-win-path-holds-a-bar-of-its-own.md`
