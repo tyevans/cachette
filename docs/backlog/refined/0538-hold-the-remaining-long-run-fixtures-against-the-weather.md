@@ -29,6 +29,14 @@ hundred ticks found many more that pass today by luck. Five were repaired
 under this survey. The rest are listed below, in the order a worker should
 take them.
 
+**The tick count was the wrong criterion, and the list below is therefore not
+the list of the files at risk.** A storm reaches a unit in the open on any
+tick, so exposure is what a fixture depends on and not how long it runs. One
+file that steps twenty-four ticks was red at the tip and the survey never
+listed it.[^12] Each row below is still worth taking. A worker that finishes
+them has not finished the sweep, and the sweep ends when a search of the whole
+crate for a stepping test comes back clean.
+
 ## The architectural impact review
 
 The review is done, and the three questions have answers.
@@ -90,8 +98,8 @@ the same seed twice, change one thing, and assert the difference.[^7]
 
 ### What is repaired
 
-Six files are repaired, and each repair was proven able to fail. The commit
-bodies hold the probes and their output.
+The table below holds the files that are repaired. Each repair was proven able
+to fail. The commit bodies hold the probes and their output.
 
 | File | What it now proves |
 |---|---|
@@ -102,8 +110,9 @@ bodies hold the probes and their output.
 | `crates/cachette-core/tests/an_upgrade_that_wears_away_says_so.rs` | The build states that its builder lives on every tick, so a death names the cause |
 | `crates/cachette-core/tests/a_settler_takes_the_best_place_it_can_reach.rs` | A settler that leaves the world is named as such, and not as an open last mile |
 | `crates/cachette-core/tests/barrier_ordering.rs` | The barrier ordering, over a watched set the storms thin, with an exact population equality |
+| `crates/cachette-core/tests/passable_ground.rs` | The movement pass refuses water, over a company seated on the shoreline and sent across a lake, and thinned by the storms the log names |
 
-The last file was not on the list below. It was red at the tip.
+The last two files were not on the list below, and both were red at the tip.
 
 ### The rows that remain, highest risk first
 
@@ -142,3 +151,4 @@ fixtures assumed a sky that no longer exists.
 [^9]: Findings register, FND-749. `docs/FINDINGS.md`
 [^10]: Findings register, FND-748. `docs/FINDINGS.md`
 [^11]: Findings register, FND-750. `docs/FINDINGS.md`
+[^12]: Findings register, FND-751. `docs/FINDINGS.md`

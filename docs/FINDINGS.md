@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-751**
+**Next number: FND-752**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20708,6 +20708,53 @@ it at the value a region gives measures the weather.
 the storms, and the crowd on one deposit is the shape that a larger crowd makes
 worse.[^F750A]
 
+### FND-751 — A survey that selects a fixture by its tick count misses a short run, and a company on open ground never reaches the shoreline
+
+**Believed.** A fixture that the weather can break steps a world past about a
+hundred ticks. The survey of the fixtures at risk under the new sky used that
+count to choose the files it listed.[^F751A]
+
+**True.** The count is not the exposure, which the register already
+states.[^F751B] The passable ground suite steps twenty-four ticks and a storm
+broke it. The survey did not list the file, so the file stayed red while
+nineteen others were listed.
+
+A second thing is true of the same file, and it is the worse one. The stepping
+test seated a company on open ground and left it to steer itself. A probe
+counted the steps that company took from a tile beside water: fourteen over the
+whole run, and none at all for the first seven ticks. The gate the test names
+was then deleted from the movement pass, so that a step onto water was
+permitted, and every test of the file still passed.
+
+**Evidence.** The test failed with `nothing despawned the soldier`, which names
+no cause. A probe printed the storm log on each tick: two soldiers of one
+hundred and fifty-two left the world on tick 20, and the storm log named both.
+No soldier ever stood on water.
+
+The passability gate of the movement pass was replaced by `Some(target)`, which
+permits every step. The repaired test passed. The fixture was then rebuilt: it
+seats each soldier on a tile with water on two sides and sends the company at
+the middle of a lake, so the exit of each cell points at water. Against the
+whole engine that fixture passes. Against the deleted gate it fails on tick 0,
+with thirteen soldiers standing on water.
+
+**Follows.** Three things.
+
+**A tick count selects the wrong files.** A fixture is exposed when it depends
+on something the sky decides, and a storm reaches a unit in the open on any
+tick. Read what a fixture depends on. The remaining rows of the survey are each
+sound, and the list of them is not the list of the files at risk.
+
+**Skip the units the casualty log names, and refuse a run that keeps nobody.**
+The stepping test now drops exactly the soldiers the storm log names, and it
+refuses a tick that leaves fewer than a quarter of the company on the
+shoreline.
+
+**A company that steers itself does not go where the test needs it.** The
+destination plane is how a fixture puts a unit against the ground it must be
+refused by. A fixture that seats units and waits measures the steering, and the
+steering avoids the case.
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -20737,3 +20784,5 @@ worse.[^F750A]
 [^F747B]: Findings register, FND-744. `docs/FINDINGS.md`
 [^F748A]: Findings register, FND-747. `docs/FINDINGS.md`
 [^F750A]: Findings register, FND-745. `docs/FINDINGS.md`
+[^F751A]: Backlog item 0538, hold the remaining long-run fixtures against the weather. `docs/backlog/refined/0538-hold-the-remaining-long-run-fixtures-against-the-weather.md`
+[^F751B]: Findings register, FND-745. `docs/FINDINGS.md`
