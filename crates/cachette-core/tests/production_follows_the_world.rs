@@ -24,6 +24,13 @@
 //! that searched one run for a matching pair would depend on the seed, and a
 //! seed is not a fixture.
 //!
+//! **The ground fixture states the rate at which a deposit grows back.** A
+//! drawn-down disc that never grows back holds the ground term at one value,
+//! and the comparison then measures nothing. The rate the balance table gives
+//! depends on the weather, so a fixture that takes it depends on the weather
+//! as well. The fixture holds the other three inputs of the pipeline still by
+//! comparison, because it can no longer hold them still by construction.
+//!
 //! # References
 //!
 //! [^1]: Backlog item 0136, provision a founded site from the ground it reaches. `docs/backlog/complete/0136-provision-a-founded-site-from-the-ground-it-reaches.md`
@@ -37,7 +44,7 @@ use cachette_core::cohort::NeedRule;
 use cachette_core::effective::{SCALE_CEILING, SCALE_FLOOR, WET_WEIGHT};
 use cachette_core::founding::{disc, SURVEY_RADIUS};
 use cachette_core::hex::Axial;
-use cachette_core::resource::ResourceKind;
+use cachette_core::resource::{RecoveryRules, ResourceKind};
 use cachette_core::upgrade::UpgradeCategory;
 use cachette_core::{sim_math, CommodityId, Entity, FactionId, Fix32, World, WorldConfig};
 
@@ -81,6 +88,33 @@ const SEAT_SPACING: usize = 24;
 /// stops there. The floor is far above the span the comparison needs, so a run
 /// that lost its site early fails rather than comparing a handful of ticks.
 const SAMPLE_FLOOR: usize = 400;
+
+/// The ticks that one deposit of the ground fixture takes to regain one unit,
+/// before the moisture curve bends it.
+///
+/// **The ground fixture states this rate instead of taking the balance
+/// value.** A map is one region of a planet, so rain reaches every tile of it
+/// and the ground of the site stands in the wettest moisture band. Food grows
+/// slowest of all in that band. Under the balance value the group strips the
+/// disc inside the settling ticks, the disc then regains nothing for the whole
+/// run, and the ground term holds one value from the first sample to the
+/// last.[^9]
+///
+/// **The site already stands in the slowest band of the seven, so no weather
+/// can slow this rate further.** The moisture curve multiplies the number
+/// below by sixteen at that band and by one at the fastest, so a run reads
+/// between the two. The disc of the run holds fewer than fifty units of food
+/// over about ten tiles, and each tile regains one unit in each period, so the
+/// disc refills many times inside one run at either end of the curve.
+///
+/// The fixture gathers food only. It gives wood the same period, so that no
+/// deposit of the run waits on the weather, and it gives stone no period at
+/// all, because stone does not grow back.
+///
+/// # References
+///
+/// [^9]: Findings register, FND-752. `docs/FINDINGS.md`
+const RECOVERY_TICKS: u32 = 2;
 
 /// The ticks the weather fixture runs.
 ///
@@ -166,11 +200,16 @@ struct Sample {
     scale: Fix32,
     wet: bool,
     terraces: usize,
+    residents: u32,
 }
 
 /// Runs a fixture and samples the pipeline on every tick.
 fn sample_a_run(seed: u64, ticks: u32) -> Vec<Sample> {
     let mut world = world(seed);
+    world.set_recovery_rules(
+        RecoveryRules::from_ticks([Some(RECOVERY_TICKS), Some(RECOVERY_TICKS), None])
+            .expect("no period is zero"),
+    );
     let site = seated(&mut world);
     everybody_gathers(&mut world);
     run(&mut world, SETTLE);
@@ -197,6 +236,7 @@ fn sample_a_run(seed: u64, ticks: u32) -> Vec<Sample> {
             scale,
             wet: world.ground_is_wet(address) == Some(true),
             terraces: terraces_over_the_disc(&world, address),
+            residents: world.site_residents(site).unwrap_or(0),
         });
     }
     assert!(
@@ -208,34 +248,54 @@ fn sample_a_run(seed: u64, ticks: u32) -> Vec<Sample> {
     samples
 }
 
-#[test]
-fn production_falls_as_the_ground_is_drawn_down_and_recovers_when_it_does() {
-    let samples = sample_a_run(0x0cac_4e77_5104_0001, 1200);
-
-    // Hold every other input still. Compare only the samples that agree on
-    // the weather and on the terraces, so the ground is the one term left
-    // that can move.
-    //
-    // **The reference is the state the run spent the most ticks in, and not
-    // the state of its last tick.** A run ends when its site falls, so the
-    // last tick reports whatever the weather happened to be at that moment. A
-    // reference taken from one arbitrary tick can name a rare state, and the
-    // span is then too short to compare. The most common state is the longest
-    // span the run offers, which is what the assertion below asks for.[^8]
-    //
-    // [^8]: Findings register, FND-727. `docs/FINDINGS.md`
-    let mut spans: BTreeMap<(bool, usize), usize> = BTreeMap::new();
-    for sample in &samples {
-        *spans.entry((sample.wet, sample.terraces)).or_default() += 1;
+/// Returns the samples of the one state that the run spent the most ticks in.
+///
+/// The state is the weather, the terraces and the people of the site. Those
+/// are the three inputs of the pipeline that the ground is not, so samples
+/// that agree on all three leave the ground as the one term that can move.
+///
+/// **The people belong in the state, and the test lost its whole subject when
+/// they were left out.** A site gains and loses residents across a run, and
+/// that term moves the scale on its own. A state of the weather and the
+/// terraces alone let the people sweep, and the test then passed with the
+/// ground term taken out of the engine altogether.[^9]
+///
+/// **The reference is the state the run spent the most ticks in, and not the
+/// state of its last tick.** A run ends when its site falls, so the last tick
+/// reports whatever the weather happened to be at that moment. A reference
+/// taken from one arbitrary tick can name a rare state, and the span is then
+/// too short to compare.[^10]
+///
+/// # References
+///
+/// [^9]: Findings register, FND-752. `docs/FINDINGS.md`
+/// [^10]: Findings register, FND-727. `docs/FINDINGS.md`
+fn the_longest_span_that_holds_the_other_terms_still(samples: &[Sample]) -> Vec<&Sample> {
+    let mut spans: BTreeMap<(bool, usize, u32), usize> = BTreeMap::new();
+    for sample in samples {
+        *spans
+            .entry((sample.wet, sample.terraces, sample.residents))
+            .or_default() += 1;
     }
     let (state, _) = spans
         .iter()
         .max_by_key(|(_, count)| **count)
         .expect("the run has samples");
-    let held: Vec<&Sample> = samples
+    samples
         .iter()
-        .filter(|sample| (sample.wet, sample.terraces) == *state)
-        .collect();
+        .filter(|sample| (sample.wet, sample.terraces, sample.residents) == *state)
+        .collect()
+}
+
+/// The scale must both fall and rise inside the span that holds the other
+/// terms still. A rate that only falls is a sink with no source, which is the
+/// same defect as a source with no sink. Both directions are read from the one
+/// span, so the ground is what moved them.
+#[test]
+fn production_falls_as_the_ground_is_drawn_down_and_recovers_when_it_does() {
+    let samples = sample_a_run(0x0cac_4e77_5104_0001, 1200);
+
+    let held = the_longest_span_that_holds_the_other_terms_still(&samples);
     assert!(
         held.len() > 100,
         "the fixture must hold the other terms still for a long span, but it \
@@ -266,13 +326,10 @@ fn production_falls_as_the_ground_is_drawn_down_and_recovers_when_it_does() {
         fullest.scale
     );
 
-    // And the ground recovers, so the scale must both fall and rise over the
-    // run. A rate that only falls is a sink with no source, which is the same
-    // defect as a source with no sink.
-    let fell = samples.windows(2).any(|pair| pair[1].scale < pair[0].scale);
-    let rose = samples.windows(2).any(|pair| pair[1].scale > pair[0].scale);
-    assert!(fell, "the scale never fell over the run");
-    assert!(rose, "the scale never rose over the run");
+    let fell = held.windows(2).any(|pair| pair[1].scale < pair[0].scale);
+    let rose = held.windows(2).any(|pair| pair[1].scale > pair[0].scale);
+    assert!(fell, "the scale never fell while the ground drew down");
+    assert!(rose, "the scale never rose while the ground grew back");
 }
 
 #[test]
