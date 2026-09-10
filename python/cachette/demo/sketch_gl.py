@@ -107,11 +107,28 @@ def _defines() -> str:
         "HATCH_SPACING": ink.HATCH_SPACING,
         "CLIFF_SPACING": ink.CLIFF_SPACING,
         "WATER_SPACING": ink.WATER_SPACING,
-        "CLOUD_SPACING": ink.CLOUD_SPACING,
         "SHADOW_START": ink.SHADOW_START,
         "CROSS_START": ink.CROSS_START,
         "CLOUD_FLOOR": ink.CLOUD_FLOOR,
         "CLOUD_SHADOW_DEPTH": ink.CLOUD_SHADOW_DEPTH,
+        "CLOUD_GRAIN": ink.CLOUD_GRAIN,
+        "CLOUD_OCTAVE_FALL": ink.CLOUD_OCTAVE_FALL,
+        "CLOUD_OCTAVE_SHIFT": ink.CLOUD_OCTAVE_SHIFT,
+        "CLOUD_SWIRL": ink.CLOUD_SWIRL,
+        "CLOUD_SWIRL_GRAIN": ink.CLOUD_SWIRL_GRAIN,
+        "CLOUD_SWIRL_APART": ink.CLOUD_SWIRL_APART,
+        "CLOUD_DRIFT": ink.CLOUD_DRIFT,
+        "CLOUD_GUST": ink.CLOUD_GUST,
+        "CLOUD_EDGE": ink.CLOUD_EDGE,
+        "CLOUD_OPEN": ink.CLOUD_OPEN,
+        "CLOUD_MARK_HIGH": ink.CLOUD_MARK_HIGH,
+        "CLOUD_MARK_LOW": ink.CLOUD_MARK_LOW,
+        "CLOUD_LIGHT_STEP": ink.CLOUD_LIGHT_STEP,
+        "CLOUD_RELIEF": ink.CLOUD_RELIEF,
+        "CLOUD_FACE_LIT": ink.CLOUD_FACE_LIT,
+        "CLOUD_FACE_DARK": ink.CLOUD_FACE_DARK,
+        "SKY_DEEP_MARK": ink.SKY_DEEP_MARK,
+        "SKY_GLOOM": ink.SKY_GLOOM,
         "HOLDER_WASH": ink.HOLDER_WASH,
         "WASH_GAIN": ink.WASH_GAIN,
         "GRANULATION": ink.GRANULATION,
@@ -123,9 +140,16 @@ def _defines() -> str:
         "WAY_CROWN_INK": ink.WAY_CROWN_INK,
         "WAY_PLANNED_INK": ink.WAY_PLANNED_INK,
     }
-    colours = {"PAPER": ink.PAPER, "INK": ink.INK, "SKY_INK": ink.SKY_INK}
+    colours = {
+        "PAPER": ink.PAPER,
+        "INK": ink.INK,
+        "SKY_INK": ink.SKY_INK,
+        "STORM_INK": ink.STORM_INK,
+    }
     whole = {
         "PALETTE_ROOM": PALETTE_ROOM,
+        "CLOUD_TABLE": ink.CLOUD_TABLE,
+        "CLOUD_OCTAVES": ink.CLOUD_OCTAVES,
         "NEAR_REACH": NEAR_REACH,
         "FAR_REACH": FAR_REACH,
         "CROWNED_LEVEL": ink.CROWNED_LEVEL,
@@ -491,31 +515,26 @@ class GlSketch(Sketch):
         self._has_ways = bool(level.any())
 
         if self._sky:
-            cloud = self._world.cloud_shares().reshape(rows, columns).astype(
-                np.float32
-            ) / max(self._whole_sky, 1.0)
-            winds = self._world.tile_winds()
-            wind_q = winds["q"].reshape(rows, columns).astype(np.float32)
-            wind_r = winds["r"].reshape(rows, columns).astype(np.float32)
-            # The wind stands on the axes of the hex grid, and the page turns
-            # those axes, so the wind turns with them. The angles come from
-            # the view, which is the one place that holds them.
-            plan_x = wind_q + wind_r * 0.5
-            plan_y = wind_r * ink.ROW_PITCH
-            along_turn = math.cos(self.view.turn)
-            across_turn = math.sin(self.view.turn)
-            page_dx = plan_x * along_turn - plan_y * across_turn
-            page_dy = (plan_x * across_turn + plan_y * along_turn) * self.view.lean
-            length = np.hypot(page_dx, page_dy)
-            moving = length > 0.0
-            page_dx = np.where(moving, page_dx / np.where(moving, length, 1.0), 1.0)
-            page_dy = np.where(moving, page_dy / np.where(moving, length, 1.0), 0.0)
-            device.upload("tile_cloud", cloud, "r32f")
-            device.upload("tile_across_x", page_dy.astype(np.float32), "r32f")
-            device.upload("tile_across_y", (-page_dx).astype(np.float32), "r32f")
+            # **The array renderer holds the one reader, and this calls it.**
+            # The cover, the heading of the wind and the lattice the cloud
+            # noise reads all come from that module, so the two renderers
+            # cannot read the sky two ways.[^3]
+            #
+            # [^3]: Recurring Defect Shapes, shape 1.
+            # `.agents/rules/recurring-defects.md`
+            cover, along_x, along_y = self.sky_fields()
+            device.upload("tile_cloud", cover, "r32f")
+            device.upload("tile_along_x", along_x, "r32f")
+            device.upload("tile_along_y", along_y, "r32f")
+            device.upload("cloud_table", self.cloud_lattice(), "r32f")
         else:
             # The shader binds these whether it reads them or not.
-            for name in ("tile_cloud", "tile_across_x", "tile_across_y"):
+            for name in (
+                "tile_cloud",
+                "tile_along_x",
+                "tile_along_y",
+                "cloud_table",
+            ):
                 device.ensure(name, "r32f")
 
     def _send_wash(self, overlay: str | None) -> bool:
@@ -580,7 +599,7 @@ class GlSketch(Sketch):
         )
         page = self._page_for(camera, width, height)
         kept = self._panels(pixels, camera, width, height, overlay, phase)
-        drawn = self._composite(page, overlay, camera, width, height)
+        drawn = self._composite(page, overlay, camera, width, height, phase)
         frame = pixels.reshape(height, width)
         frame[...] = np.where(kept, frame, drawn)
         return reading
@@ -592,8 +611,13 @@ class GlSketch(Sketch):
         camera: Camera,
         width: int,
         height: int,
+        phase: float,
     ) -> npt.NDArray[np.uint32]:
-        """Run the paper through the device, and give back the packed frame."""
+        """Run the paper through the device, and give back the packed frame.
+
+        The phase is the share of the current tick that has elapsed. The cloud
+        drifts on it, so a sky moves smoothly at every speed of the world.
+        """
         device = self.device
         device.make_current()
         self._draw_page(page)
@@ -616,8 +640,8 @@ class GlSketch(Sketch):
             ("page_grain", 1),
             ("tile_holder", 2),
             ("tile_cloud", 3),
-            ("tile_across_x", 4),
-            ("tile_across_y", 5),
+            ("tile_along_x", 4),
+            ("tile_along_y", 5),
             ("tile_hue", 6),
             ("wash_settled", 7),
             ("wash_blurred", 8),
@@ -626,6 +650,7 @@ class GlSketch(Sketch):
             ("fit_y", 11),
             ("tile_joins", 12),
             ("tile_level", 13),
+            ("cloud_table", 14),
         ]
         for name, unit in units:
             device.bind(program, name, unit)
@@ -648,6 +673,10 @@ class GlSketch(Sketch):
         program["draws_wash"] = 1 if washes else 0
         program["cloud_step"] = max(int(page_cols * ink.CLOUD_SHADOW_STEP), 1)
         program["cloud_lift"] = int(stood.rise * ink.CLOUD_HEIGHT)
+        # **The array renderer holds the clock and the lean, and this calls
+        # it.** A clock worked out twice would be one value in two places.
+        program["cloud_clock"] = self.sky_clock(phase)
+        program["cloud_lean"] = float(self.view.lean)
         program["fit_size"] = (width, height)
         # **The ways read the page backwards.** The lift is a whole count of
         # rows and it follows the height the mesh pass wrote, so the row of

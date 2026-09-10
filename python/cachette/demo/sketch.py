@@ -43,11 +43,16 @@ presence names a vertical face.
 The water hatch runs across the page. Its weight grows with the water. The
 weight of this set is the depth.
 
-The cloud hatch runs with the wind, because the phase of its lines is the
-distance across the wind of the tile under them. Its weight grows with the
-cloud share. A watcher therefore reads the circulation and the cover from one
-set of marks. The sky carries the lightest marks on the page, so the land
-holds the weight.
+The cloud is not a set of marks. It is a mass, and it stands where a field
+of noise rises over a mark that the cover sets. A cover of a third therefore
+paints cloud over a third of the sky and open sky beside it, which is what a
+broken sky is. The mass drifts along the wind and a second, slower field
+bends it as it goes, so a watcher reads the circulation from the shape and
+the motion rather than from a stripe.
+
+The deep of the sky is the top of the cover range. A sky that stands there
+darkens, its cloud closes over, and the page turns from the ink of a fair sky
+to the ink of a deep one.
 
 What costs what
 ---------------
@@ -105,13 +110,17 @@ WATER_KIND = 0
 # is this number. The page divides by it once and works in shares of one.
 FIXED_POINT = 65536.0
 
-# The paper, the ink, and the ink of the sky, as red, green and blue.
+# The paper, the ink, the ink of a fair sky and the ink of a deep one, as
+# red, green and blue.
 #
-# The sky is lighter than the land on purpose. In a pencil study the clouds
-# are the lightest marks on the page.
+# A fair sky is lighter than the land on purpose. In a pencil study a fair
+# cloud is among the lightest marks on the page. A deep sky is not: the
+# heaviest ink on the page is the ink of the weather, because that is what a
+# watcher sees when the weather turns.
 PAPER = np.array([0xF2, 0xEC, 0xDD], dtype=np.float32)
 INK = np.array([0x25, 0x23, 0x20], dtype=np.float32)
 SKY_INK = np.array([0x5A, 0x62, 0x6E], dtype=np.float32)
+STORM_INK = np.array([0x2B, 0x2E, 0x3A], dtype=np.float32)
 
 # Where the light stands. It comes from the upper left, which is where a right
 # handed person holding a pencil puts it.
@@ -168,7 +177,6 @@ CONTOUR_WEIGHT = 0.16
 HATCH_SPACING = 6.0
 CLIFF_SPACING = 3.0
 WATER_SPACING = 7.0
-CLOUD_SPACING = 8.0
 
 # The tone at which the shadow hatch starts, and at which the cross hatch
 # starts. A tone runs from zero in full light to one in full shade.
@@ -186,7 +194,144 @@ CLOUD_SHADOW_STEP = 0.030
 # paper behind a mountain would say nothing about the height of the mountain.
 CLOUD_FLOOR = 0.18
 CLOUD_HEIGHT = 1.6
-CLOUD_SHADOW_DEPTH = 0.16
+CLOUD_SHADOW_DEPTH = 0.30
+
+# How far the mean of the cover reaches, as a share of the pitch of the
+# weather lattice.
+#
+# **The weather stands on a lattice coarser than the tiles.** Every tile of
+# one cell reports one cover, so the raw field is a staircase with a step at
+# each cell edge. A cloud drawn from the raw field carries that staircase, and
+# a watcher reads a straight edge that no weather has. The engine publishes
+# the pitch, so this is a share of that pitch and never a count of tiles.[^1]
+#
+# **The mean runs over a box, and this is half its width.** A half therefore
+# makes the box exactly one cell wide, which is the width that turns a
+# staircase of that pitch into a slope with no step left in it. A wider box
+# takes the tops off the field as well, and the deep of the sky is the top of
+# the field.
+#
+# [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+SKY_SMOOTHING = 0.5
+
+# The lattice of values that the cloud noise reads, and the number it draws
+# from.
+#
+# **The lattice comes from an integer hash and never from a sine.** A hash
+# built on a sine gives one answer on the processor and another on the
+# graphics device, and the two renderers then draw two pictures. An integer
+# hash gives one answer everywhere. The array renderer builds the lattice and
+# the device renderer is given it, so one table serves both.
+#
+# The side is a power of two, so a cell number folds into the table with one
+# mask. The cloud repeats over this many cells, which is far wider than a
+# page.
+CLOUD_TABLE = 256
+CLOUD_SEED = 0x1B2F_A5C7
+
+# How wide one cell of the coarsest cloud octave is, in page points, how many
+# octaves the cloud carries, how much each finer octave weighs, and how far
+# each octave is shifted from the one before it.
+#
+# **The octaves are what makes a mass read as a mass.** One octave gives a
+# blob. Three give a body with a ragged edge and detail inside it. The shift
+# keeps the octaves from lining up at the corner of the page.
+CLOUD_GRAIN = 44.0
+CLOUD_OCTAVES = 3
+CLOUD_OCTAVE_FALL = 0.52
+CLOUD_OCTAVE_SHIFT = 19.0
+
+# How far the swirl moves a reading, in cells of the coarsest octave, how wide
+# one cell of the swirl field is against a cloud cell, and how far apart the
+# two readings of that field are taken.
+#
+# **The swirl is what makes the sky read as weather rather than as wool.** The
+# cloud field is read at a place that a second, coarser field moves. A mass
+# therefore bends, curls and tears along a line the second field draws, and
+# that is the shape a front has.
+CLOUD_SWIRL = 1.45
+CLOUD_SWIRL_GRAIN = 4.0
+CLOUD_SWIRL_APART = 31.0
+
+# How far the cloud moves along the wind in one tick, in page points, and how
+# much slower the swirl field moves than the cloud.
+#
+# **The motion belongs to the renderer.** The sky over a place holds one
+# narrow band and it does not leave it, so a picture that waited for the
+# engine to move the weather would never move.[^1] The cover says how much
+# cloud stands over a place. The drift says where the masses that make up
+# that cover are at this moment.
+#
+# The two rates differ on purpose. The swirl field crosses the page more
+# slowly than the cloud does, so a mass runs through the swirl and deforms as
+# it goes. Two fields at one rate would slide together and nothing would
+# change shape.
+#
+# [^1]: Findings register, FND-715. `docs/FINDINGS.md`
+CLOUD_DRIFT = 2.4
+CLOUD_GUST = 0.35
+
+# The largest tick the cloud drifts on.
+#
+# The drift is a distance in page points, and it grows with the tick. A real
+# number holds a large distance coarsely, so the tick folds into this range
+# and the picture keeps its detail however long a world runs. The range is a
+# power of two, so the fold is exact.
+CLOUD_CLOCK_MASK = 0xF_FFFF
+
+# The two marks that the cover puts the cloud field against, how soft the edge
+# of a mass is, and the cover over which a cloud opens from nothing.
+#
+# **A cover share and an opacity are two quantities, and the engine carries
+# one.** A broken sky is one part of the sky at full opacity beside a part at
+# none. The cover therefore sets a mark, and the cloud stands where the field
+# is above that mark. A cover of a third then paints cloud over a third of the
+# sky, and not thin cloud everywhere.[^1]
+#
+# The two marks span the range that the field reaches in practice, so a low
+# cover leaves the sky open and a high cover closes it.
+#
+# [^1]: Findings register, FND-715. `docs/FINDINGS.md`
+CLOUD_MARK_HIGH = 0.86
+CLOUD_MARK_LOW = 0.13
+CLOUD_EDGE = 0.11
+CLOUD_OPEN = 0.10
+
+# How far the cloud reads toward the light, in cells of the coarsest octave,
+# how hard that reading turns into a face, and how dark the two faces of a
+# mass draw.
+#
+# **A mass has a lit side and a shaded side, and that is what gives it
+# body.** The page reads the coarsest octave at the point and again a short
+# step toward the light. A mass that falls away toward the light is turned
+# into the light, and it draws pale. A mass that rises toward the light stands
+# in its own shade, and it draws heavy.
+#
+# The light is where the light of the ground is. This module holds one light
+# and the sky reads it, so the cloud and the hill cannot be lit from two
+# places.
+CLOUD_LIGHT_STEP = 0.55
+CLOUD_RELIEF = 3.2
+CLOUD_FACE_LIT = 0.20
+CLOUD_FACE_DARK = 0.74
+
+# The cover at which the sky begins to go deep, and how far a deep sky darkens
+# the whole of itself.
+#
+# **A deep sky is the top of the cover range, and it is measured.** Over four
+# hundred ticks, 522 cells of 9216 stood overcast at every tick and the set of
+# overcast cells turned over.[^1] The deep of the sky is therefore a real
+# thing that moves, and not a mark this module invented.
+#
+# **The engine holds a storm as an object, and this is not that object.** A
+# storm puts a pressure deficit on the cells it reaches. The engine holds that
+# deficit and the Python boundary does not publish it for each tile, so this
+# module cannot read it. When it does, the deep of the sky reads the deficit
+# and this mark goes.
+#
+# [^1]: Findings register, FND-715. `docs/FINDINGS.md`
+SKY_DEEP_MARK = 0.84
+SKY_GLOOM = 0.46
 
 # How far the height of the ground is smoothed before it is lifted, in tiles.
 #
@@ -357,6 +502,151 @@ def _grain(width: int, height: int, seed: int) -> np.ndarray:
     coarse = engine.random((height // 3 + 2, width // 3 + 2), dtype=np.float32)
     grown = np.repeat(np.repeat(coarse, 3, axis=0), 3, axis=1)
     return grown[:height, :width]
+
+
+def _cloud_table(seed: int) -> np.ndarray:
+    """Give back the lattice of values that the cloud noise reads.
+
+    The answer is a square of real numbers from nothing to one, one for each
+    corner of the cloud lattice. The side is ``CLOUD_TABLE``.
+
+    **The value comes from an integer hash of the two cell numbers.** A hash
+    built on a sine gives one answer on the processor and another on the
+    graphics device, because the two round a sine differently. The two
+    renderers would then draw two skies, and only the frame comparison would
+    notice. Integer operations give one answer on every machine.
+
+    **One table serves both renderers.** The array renderer builds it here and
+    the device renderer uploads this same table, so the two read one set of
+    numbers rather than each hashing its own.[^1]
+
+    The value keeps 24 bits, which a real number holds exactly, so the table
+    is the same to the last bit on both sides.
+
+    [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    """
+    side = np.arange(CLOUD_TABLE, dtype=np.uint32)
+    cell_y, cell_x = np.meshgrid(side, side, indexing="ij")
+    mixed = (
+        cell_x * np.uint32(0x27D4_EB2D)
+        + cell_y * np.uint32(0x9E37_79B1)
+        + np.uint32(seed & 0xFFFF_FFFF)
+    )
+    mixed ^= mixed >> np.uint32(15)
+    mixed *= np.uint32(0x85EB_CA6B)
+    mixed ^= mixed >> np.uint32(13)
+    mixed *= np.uint32(0xC2B2_AE35)
+    mixed ^= mixed >> np.uint32(16)
+    kept: np.ndarray = (mixed >> np.uint32(8)).astype(np.float32) / 16777216.0
+    return kept
+
+
+def _cloud_noise(table: np.ndarray, at_x: np.ndarray, at_y: np.ndarray) -> np.ndarray:
+    """Give back the value of the cloud field at a place on its lattice.
+
+    The place is given in cells of the lattice. The answer runs from nothing
+    to one, and it is smooth across a cell edge, so a last bit of difference
+    in the place gives a last bit of difference in the answer.
+
+    The cell number folds into the table with a mask, so the field repeats
+    over ``CLOUD_TABLE`` cells and a page never reaches that far.
+    """
+    fold = np.int32(CLOUD_TABLE - 1)
+    base_x = np.floor(at_x)
+    base_y = np.floor(at_y)
+    part_x = at_x - base_x
+    part_y = at_y - base_y
+    ease_x = part_x * part_x * (3.0 - 2.0 * part_x)
+    ease_y = part_y * part_y * (3.0 - 2.0 * part_y)
+    cell_x = base_x.astype(np.int32) & fold
+    cell_y = base_y.astype(np.int32) & fold
+    next_x = (cell_x + 1) & fold
+    next_y = (cell_y + 1) & fold
+    # The table is read as one row of numbers. A read of two axes costs about
+    # four times a read of one, and the two give the same value.
+    flat = table.reshape(-1)
+    row = cell_y * np.int32(CLOUD_TABLE)
+    row_next = next_y * np.int32(CLOUD_TABLE)
+    here = np.take(flat, row + cell_x)
+    right = np.take(flat, row + next_x)
+    under = np.take(flat, row_next + cell_x)
+    across = np.take(flat, row_next + next_x)
+    near = here + (right - here) * ease_x
+    far = under + (across - under) * ease_x
+    mixed: np.ndarray = near + (far - near) * ease_y
+    return mixed
+
+
+def _cloud_cover(share: np.ndarray) -> np.ndarray:
+    """Say how much of the sky closes, from nothing to all of it.
+
+    The share is how much of the sky the engine reports as cloud. The floor is
+    the share below which the page draws no cloud at all, and the answer opens
+    from nothing at that floor.
+
+    **One place holds this ramp.** The mark and the mass both read the cover,
+    and a second ramp would be one rule in two places.[^1]
+
+    [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    """
+    opened: np.ndarray = np.clip((share - CLOUD_FLOOR) / (1.0 - CLOUD_FLOOR), 0.0, 1.0)
+    return opened
+
+
+def _cloud_mark(cover: np.ndarray) -> np.ndarray:
+    """Say what the cloud field must reach for a cloud to stand here.
+
+    The answer runs from the high mark at a clear sky to the low mark at a
+    closed one. The two marks span the range that the field reaches, so a low
+    cover leaves the sky open and a high cover closes it.
+    """
+    marked: np.ndarray = CLOUD_MARK_HIGH + (CLOUD_MARK_LOW - CLOUD_MARK_HIGH) * cover
+    return marked
+
+
+def cloud_mass_of(density: np.ndarray, share: np.ndarray) -> np.ndarray:
+    """Say how much cloud stands at a place, from none to all of it.
+
+    The density is the value of the cloud field. The share is how much of the
+    sky the engine reports as cloud.
+
+    **The cover sets a mark and the mass stands over it.** A cover share and
+    an opacity are two quantities, and the engine carries one. A renderer that
+    turned the share into a weight painted thin cloud everywhere, and a broken
+    sky cannot be drawn that way.[^1] A cover of a third therefore paints
+    cloud over a third of the sky and open sky beside it.
+
+    The cover also opens the cloud from nothing over the first part of its
+    range, so a sky the engine calls clear draws no wisp.
+
+    **Both renderers hold this rule and the device renderer repeats it in the
+    shader.** A test compares the frames the two draw.[^2]
+
+    [^1]: Findings register, FND-715. `docs/FINDINGS.md`
+    [^2]: The two renderers, and the bound they agree within.
+    `tests/test_demo_sketch_gl.py`
+    """
+    cover = _cloud_cover(share)
+    raw = np.clip((density - _cloud_mark(cover)) / CLOUD_EDGE + 1.0, 0.0, 1.0)
+    eased = raw * raw * (3.0 - 2.0 * raw)
+    massed: np.ndarray = eased * np.clip(cover / CLOUD_OPEN, 0.0, 1.0)
+    return massed
+
+
+def _toward_light() -> tuple[float, float]:
+    """Give back the direction of the light on the page, of length one.
+
+    **This module holds one light and every layer reads it.** A cloud lit from
+    one place and a hill lit from another would read as two drawings. The
+    shader normalises the same two bands of the same light, so the two
+    renderers hold no second copy of the direction.[^1]
+
+    [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    """
+    across = float(LIGHT[0])
+    down = float(LIGHT[1])
+    length = math.hypot(across, down)
+    return (across / length, down / length)
 
 
 def _grown(mask: np.ndarray, radius: int) -> np.ndarray:
@@ -582,6 +872,7 @@ class Sketch:
     """
 
     __slots__ = (
+        "_cloud",
         "_deep",
         "_grain",
         "_grain_size",
@@ -637,6 +928,8 @@ class Sketch:
             "tile_kinds",
             "cloud_shares",
             "tile_winds",
+            "weather_cell_tiles",
+            "tick",
             "overlay_paint",
             "road_ways",
         ):
@@ -683,6 +976,7 @@ class Sketch:
         self._scratch: dict[str, npt.NDArray[np.uint32]] = {}
         self._grain: np.ndarray | None = None
         self._grain_size = (0, 0)
+        self._cloud: np.ndarray | None = None
 
     def window(self) -> tuple[int, int, int, int] | None:
         """Give back the window of tiles the last frame drew, or nothing.
@@ -737,7 +1031,7 @@ class Sketch:
             speed_milli=speed_milli,
         )
         ground = self._for(camera, width, height)
-        page = self._draw(ground, overlay, camera, width, height)
+        page = self._draw(ground, overlay, camera, width, height, phase)
         kept = self._panels(pixels, camera, width, height, overlay, phase)
         frame = pixels.reshape(height, width)
         stood = self.projection(ground.window, width, height, int(ground.stand[2]))
@@ -1239,18 +1533,22 @@ class Sketch:
         camera: Camera,
         width: int,
         height: int,
+        phase: float,
     ) -> np.ndarray:
         """Put the layers that change over the ground the build drew.
 
         The ground is a copy. The cloud, the wind, the faction that holds each
         tile and a named overlay all change with the world, so they are read
         and drawn here.
+
+        The phase is the share of the current tick that has elapsed. The cloud
+        drifts on it, so a sky moves smoothly at every speed of the world.
         """
         page = ground.sheet.copy()
         page = self._holders(page, ground)
         rise = max(int(ground.drawn.shape[1] * self._relief), 1)
         if self._sky:
-            page = self._sky_over(page, ground, rise)
+            page = self._sky_over(page, ground, rise, phase)
         page = self._wash(page, ground, overlay, camera, width, height)
         page = (
             page * (1.0 - ground.coverage[..., None]) + INK * ground.coverage[..., None]
@@ -1490,20 +1788,186 @@ class Sketch:
         )
         return glazed
 
-    def _sky_over(self, page: np.ndarray, ground: Ground, rise: int) -> np.ndarray:
-        """Put the cloud over the ground, as a layer and not as a tint.
+    def sky_fields(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Give back the cover and the heading of the wind, for every tile.
+
+        The answer is three arrays shaped like the world. The first is how
+        much of the sky the engine reports as cloud, from nothing to one. The
+        second and the third are the direction the wind blows on the page, as
+        a vector of length one.
+
+        **This is the one reader of the sky, and both renderers call it.** The
+        array renderer gathers these at the pixel. The device renderer uploads
+        the same arrays to the graphics device. A renderer that worked the
+        turn of the wind out again would hold a second copy of it, and nothing
+        would fail when the two disagreed.[^1]
+
+        **The weather stands on a lattice coarser than the tiles.** Every tile
+        of one cell reports one cover and one wind, so the raw fields step at
+        a cell edge and a cloud drawn from them carries a straight edge that
+        no weather has. The mean over the pitch of that lattice turns the step
+        into a slope. The engine publishes the pitch.
+
+        **The wind stands on the axes of the hex grid.** The page turns those
+        axes, so the wind turns with them. This is the forward turn, and the
+        page is built from the backward one, so the two use one pair of angles
+        and cannot part company.
+
+        [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+        """
+        rows, columns = self._world.height, self._world.width
+        reach = max(int(self._world.weather_cell_tiles * SKY_SMOOTHING), 1)
+        raw = self._world.cloud_shares().reshape(rows, columns).astype(np.float32)
+        cover = _smooth(raw / max(self._whole_sky, 1.0), reach)
+        winds = self._world.tile_winds()
+        wind_q = _smooth(winds["q"].reshape(rows, columns).astype(np.float32), reach)
+        wind_r = _smooth(winds["r"].reshape(rows, columns).astype(np.float32), reach)
+        plan_x = wind_q + wind_r * 0.5
+        plan_y = wind_r * ROW_PITCH
+        along_turn = math.cos(self.view.turn)
+        across_turn = math.sin(self.view.turn)
+        page_dx = plan_x * along_turn - plan_y * across_turn
+        page_dy = (plan_x * across_turn + plan_y * along_turn) * self.view.lean
+        length = np.hypot(page_dx, page_dy)
+        moving = length > 0.0
+        held = np.where(moving, length, 1.0)
+        return (
+            cover.astype(np.float32),
+            np.where(moving, page_dx / held, 1.0).astype(np.float32),
+            np.where(moving, page_dy / held, 0.0).astype(np.float32),
+        )
+
+    def sky_clock(self, phase: float) -> float:
+        """Give back the clock that the cloud drifts on, in ticks.
+
+        The phase is the share of the current tick that has elapsed, so the
+        answer moves smoothly and a slow world still shows a moving sky.
+
+        **The tick folds into a range.** The drift is a distance that grows
+        with the clock, and a real number holds a large distance coarsely. The
+        range is a power of two, so the fold costs nothing and the picture
+        keeps its detail however long a world runs.
+
+        **Both renderers call this.** A clock worked out twice would be one
+        value in two places, and the two skies would part company on a frame
+        where the tick advanced between the two readings.[^1]
+
+        [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+        """
+        return float(self._world.tick & CLOUD_CLOCK_MASK) + phase
+
+    def cloud_lattice(self) -> np.ndarray:
+        """Give back the lattice of values the cloud noise reads, built once.
+
+        The device renderer uploads this same table, so one set of numbers
+        serves both renderers.
+        """
+        if self._cloud is None:
+            self._cloud = _cloud_table(CLOUD_SEED)
+        return self._cloud
+
+    def cloud_body(
+        self,
+        place_x: np.ndarray,
+        place_y: np.ndarray,
+        along_x: np.ndarray,
+        along_y: np.ndarray,
+        clock: float,
+        lean: float,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Read the cloud field at a place on the page.
+
+        The place is a point of the page. The heading is where the wind blows
+        there, on the page. The clock is in ticks and the lean is how far the
+        page tips away from the watcher.
+
+        Returns the density of the whole field, the value of its coarsest
+        octave, and the two numbers of the place on the cloud lattice that the
+        drift and the swirl carried the reading to. The caller reads the last
+        two again to find the face of a mass against the light.
+
+        **The motion belongs to the renderer.** The sky over a place holds one
+        narrow band and does not leave it, so a picture that waited for the
+        engine to move the weather would stand still.[^1] The drift carries
+        the whole field along the wind at a fixed rate.
+
+        **The swirl is a second field, and it crosses the page more slowly.**
+        A mass therefore runs through it and deforms as it goes. Two fields
+        at one rate would slide together and nothing would change shape.
+
+        **The cloud layer leans with the page.** A layer seen from the side is
+        shorter down the page than it is across it, so the reading divides the
+        row by the lean and the cells of the field lean with the ground.
+
+        **This declares the arithmetic and the shader repeats it.** A test
+        compares the frames that the two renderers draw.[^2]
+
+        [^1]: Findings register, FND-715. `docs/FINDINGS.md`
+        [^2]: The two renderers, and the bound they agree within.
+        `tests/test_demo_sketch_gl.py`
+        """
+        table = self.cloud_lattice()
+        tall = CLOUD_GRAIN * max(lean, 1e-3)
+        run = clock * CLOUD_DRIFT
+        gust = run * CLOUD_GUST
+        swirl_x = (place_x - along_x * gust) / (CLOUD_GRAIN * CLOUD_SWIRL_GRAIN)
+        swirl_y = (place_y - along_y * gust) / (tall * CLOUD_SWIRL_GRAIN)
+        turn_u = _cloud_noise(table, swirl_x, swirl_y) - 0.5
+        turn_v = (
+            _cloud_noise(
+                table, swirl_x + CLOUD_SWIRL_APART, swirl_y + CLOUD_SWIRL_APART
+            )
+            - 0.5
+        )
+        at_x = (place_x - along_x * run) / CLOUD_GRAIN + turn_u * CLOUD_SWIRL
+        at_y = (place_y - along_y * run) / tall + turn_v * CLOUD_SWIRL
+        total = np.zeros_like(at_x)
+        coarse = np.zeros_like(at_x)
+        weight = 0.0
+        scale = 1.0
+        part = 1.0
+        for octave in range(CLOUD_OCTAVES):
+            shift = octave * CLOUD_OCTAVE_SHIFT
+            value = _cloud_noise(table, at_x * scale + shift, at_y * scale + shift)
+            if octave == 0:
+                coarse = value
+            total = total + value * part
+            weight = weight + part
+            scale = scale * 2.0
+            part = part * CLOUD_OCTAVE_FALL
+        return total / weight, coarse, at_x, at_y
+
+    def _sky_over(
+        self, page: np.ndarray, ground: Ground, rise: int, phase: float
+    ) -> np.ndarray:
+        """Put the cloud over the ground, as a mass and not as a tint.
 
         **The cloud is a layer above the ground.** It sits higher on the page
         than the tallest ground, so a mass crosses the paper over a mountain
         and a watcher reads that the mountain stands under it. A tint on the
         ground would say nothing about height.
 
-        **The hatch runs with the wind.** The phase of its lines is the
-        distance across the wind, so a line runs along the wind and a watcher
-        reads the circulation. The weight of the lines is the cloud.
+        **The cover sets a mark and the mass stands over it.** A cover share
+        and an opacity are two quantities, and the engine carries one. A
+        renderer that turned the share into a weight painted thin cloud
+        everywhere, and a broken sky cannot be drawn that way.[^3] The cover
+        therefore says how much of the sky closes, and a field of noise says
+        which part of it.
 
-        **The sky carries the lightest marks on the page.** A sky drawn as
-        heavily as the land buries the land.
+        **A mass has a lit side and a shaded side.** The page reads the
+        coarsest octave again a short step toward the light, and the
+        difference is the face. That is what gives a mass body.
+
+        **The deep of the sky is the top of the cover range.** A sky that
+        stands there darkens the whole of itself and closes its cloud over.
+        The engine holds a storm as an object with a pressure deficit, and the
+        Python boundary does not publish that deficit for each tile, so this
+        reads the cover instead.[^3]
+
+        **The shadow of a mass is that mass, moved.** The cloud drawn at a
+        point of the page stands over the ground a lift below it, so the
+        shadow at a point of the ground is the mass drawn a lift above it and
+        a step across it. The array renderer moves the field it already drew.
 
         **The page has an edge and the sky stops at it.** The world does not
         wrap, so a point off the page is not a point of another part of the
@@ -1518,57 +1982,56 @@ class Sketch:
         decision D2.
         `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
         [^2]: Findings register, FND-627. `docs/FINDINGS.md`
+        [^3]: Findings register, FND-715. `docs/FINDINGS.md`
         """
-        rows, columns = self._world.height, self._world.width
-        cloud = self._world.cloud_shares().reshape(rows, columns).astype(
-            np.float32
-        ) / max(self._whole_sky, 1.0)
-        winds = self._world.tile_winds()
-        wind_q = winds["q"].reshape(rows, columns).astype(np.float32)
-        wind_r = winds["r"].reshape(rows, columns).astype(np.float32)
-        # The wind stands on the axes of the hex grid. The page turns those
-        # axes, so the wind turns with them. This is the forward turn, and the
-        # page is built from the backward one, so the two use one pair of
-        # angles and cannot part company.
-        plan_x = wind_q + wind_r * 0.5
-        plan_y = wind_r * ROW_PITCH
-        along_turn = math.cos(self.view.turn)
-        across_turn = math.sin(self.view.turn)
-        page_dx = plan_x * along_turn - plan_y * across_turn
-        page_dy = (plan_x * across_turn + plan_y * along_turn) * self.view.lean
-        length = np.hypot(page_dx, page_dy)
-        moving = length > 0.0
-        page_dx = np.where(moving, page_dx / np.where(moving, length, 1.0), 1.0)
-        page_dy = np.where(moving, page_dy / np.where(moving, length, 1.0), 0.0)
-
-        share = self._gather(ground, cloud)
-        across_x = self._gather(ground, page_dy)
-        across_y = self._gather(ground, -page_dx)
+        cover, heading_x, heading_y = self.sky_fields()
+        clock = self.sky_clock(phase)
+        lean = float(self.view.lean)
+        share = self._gather(ground, cover)
+        along_x = self._gather(ground, heading_x)
+        along_y = self._gather(ground, heading_y)
         # **The page has an edge, and the sky stops at it.** A field rolled
-        # off one side and back onto the other casts the shadow of one part
-        # of the world onto another part, and a watcher reads a mark shaped
+        # off one side and back onto the other draws the weather of one part
+        # of the world over another part, and a watcher reads a mark shaped
         # like ground that is somewhere else.
+        lift = int(rise * CLOUD_HEIGHT)
         step = max(int(ground.drawn.shape[1] * CLOUD_SHADOW_STEP), 1)
-        under = np.clip((_slid(share, step, 1) - CLOUD_FLOOR), 0.0, 1.0)
+        above = _slid(share, -lift, 0)
+        heads_x = _slid(along_x, -lift, 0)
+        heads_y = _slid(along_y, -lift, 0)
+        stands = above > CLOUD_FLOOR
+        mass = np.zeros(above.shape, dtype=np.float32)
+        face = np.zeros(above.shape, dtype=np.float32)
+        if stands.any():
+            density, coarse, at_x, at_y = self.cloud_body(
+                ground.page_x[stands],
+                ground.page_y[stands],
+                heads_x[stands],
+                heads_y[stands],
+                clock,
+                lean,
+            )
+            toward_x, toward_y = _toward_light()
+            ahead = _cloud_noise(
+                self.cloud_lattice(),
+                at_x + toward_x * CLOUD_LIGHT_STEP,
+                at_y + toward_y * CLOUD_LIGHT_STEP,
+            )
+            mass[stands] = cloud_mass_of(density, above[stands])
+            face[stands] = np.clip(0.5 - (coarse - ahead) * CLOUD_RELIEF, 0.0, 1.0)
         # **A shadow falls on something.** The cloud is drawn above the
         # ground, so it crosses bare paper, and a shadow that crossed the
         # paper with it drew a grey copy of the ground beside the ground. A
         # watcher read a shape like the terrain that stood in the wrong
         # place.[^2]
-        under = under * ground.drawn
+        under = _slid(_slid(mass, lift, 0), step, 1) * ground.drawn
         page = page * (1.0 - under[..., None] * CLOUD_SHADOW_DEPTH)
-
-        lift = int(rise * CLOUD_HEIGHT)
-        above = _slid(share, -lift, 0)
-        turn_x = _slid(across_x, -lift, 0)
-        turn_y = _slid(across_y, -lift, 0)
-        thick = np.clip((above - CLOUD_FLOOR) / (1.0 - CLOUD_FLOOR), 0.0, 1.0)
-        # The distance across the wind. A line of constant phase runs along
-        # the wind, so the hatch runs with the circulation.
-        phase = ground.page_x * turn_x + ground.page_y * turn_y
-        along = _lines(phase, CLOUD_SPACING, thick * 0.42)
-        marks = (along * 0.50)[..., None]
-        clouded: np.ndarray = page * (1.0 - marks) + SKY_INK * marks
+        deep = np.clip((above - SKY_DEEP_MARK) / (1.0 - SKY_DEEP_MARK), 0.0, 1.0)
+        sky = SKY_INK + (STORM_INK - SKY_INK) * deep[..., None]
+        gloom = (deep * SKY_GLOOM)[..., None]
+        page = page * (1.0 - gloom) + sky * gloom
+        ink = mass * (CLOUD_FACE_LIT + (CLOUD_FACE_DARK - CLOUD_FACE_LIT) * face)
+        clouded: np.ndarray = page * (1.0 - ink[..., None]) + sky * ink[..., None]
         return clouded
 
     def _paper_grain(self, rows: int, cols: int) -> np.ndarray:
