@@ -20715,7 +20715,7 @@ hundred ticks. The survey of the fixtures at risk under the new sky used that
 count to choose the files it listed.[^F751A]
 
 **True.** The count is not the exposure, which the register already
-states.[^F751B] The passable ground suite steps twenty-four ticks and a storm
+states.[^F750A] The passable ground suite steps twenty-four ticks and a storm
 broke it. The survey did not list the file, so the file stayed red while
 nineteen others were listed.
 
@@ -20785,4 +20785,3 @@ steering avoids the case.
 [^F748A]: Findings register, FND-747. `docs/FINDINGS.md`
 [^F750A]: Findings register, FND-745. `docs/FINDINGS.md`
 [^F751A]: Backlog item 0538, hold the remaining long-run fixtures against the weather. `docs/backlog/refined/0538-hold-the-remaining-long-run-fixtures-against-the-weather.md`
-[^F751B]: Findings register, FND-745. `docs/FINDINGS.md`
