@@ -264,33 +264,7 @@ impl World {
         take: Consideration,
         term: u32,
     ) -> Result<(), TradeError> {
-        self.check_pair(proposer, responder)?;
-        // An offer across a pair at war is refused before anything else is
-        // read. The predicate is the relation module's, so the trade verbs
-        // and the contest read one statement of the war band.[^war]
-        //
-        // [^war]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
-        if !self.relations.permits_offer(proposer, responder) {
-            return Err(TradeError::AtWar);
-        }
-        let give = self.check_consideration(proposer, give)?;
-        let take = self.check_consideration(responder, take)?;
-        if term == 0 {
-            return Err(TradeError::NoDeadline);
-        }
-        if self.live_orientation(proposer, responder).is_ok() {
-            return Err(TradeError::AlreadyOpen);
-        }
-        let row = self
-            .trade
-            .row(proposer, responder)
-            .ok_or(TradeError::NoSuchFaction(proposer))?;
-        if row.closed_until.0 > self.tick.0 {
-            return Err(TradeError::Closed(row.closed_until));
-        }
-        if !self.stands_in_territory_of(proposer, responder) {
-            return Err(TradeError::NoPresence);
-        }
+        let (give, take) = self.offer_refusal(proposer, responder, give, take, term)?;
         let tick = self.tick;
         let index = self
             .trade
@@ -315,6 +289,58 @@ impl World {
         self.trade.set_land(index, true, take.tiles);
         self.say(proposer, responder, ACT_OFFER, TRADE_OFFERED);
         Ok(())
+    }
+
+    /// Returns the two checked sides of an offer, or the refusal the offer
+    /// verb would give.
+    ///
+    /// **This is the one statement of the rule.** The offer verb calls it
+    /// before it writes the row. The legality answer calls it through the
+    /// negotiation step of the controller.[^1] Nothing here mutates.
+    ///
+    /// An offer across a pair at war is refused before anything else is
+    /// read. The predicate is the relation module's, so the trade verbs and
+    /// the contest read one statement of the war band.[^2]
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal the offer verb would return.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    /// [^2]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D4. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
+    pub(super) fn offer_refusal(
+        &self,
+        proposer: FactionId,
+        responder: FactionId,
+        give: Consideration,
+        take: Consideration,
+        term: u32,
+    ) -> Result<(Consideration, Consideration), TradeError> {
+        self.check_pair(proposer, responder)?;
+        if !self.relations.permits_offer(proposer, responder) {
+            return Err(TradeError::AtWar);
+        }
+        let give = self.check_consideration(proposer, give)?;
+        let take = self.check_consideration(responder, take)?;
+        if term == 0 {
+            return Err(TradeError::NoDeadline);
+        }
+        if self.live_orientation(proposer, responder).is_ok() {
+            return Err(TradeError::AlreadyOpen);
+        }
+        let row = self
+            .trade
+            .row(proposer, responder)
+            .ok_or(TradeError::NoSuchFaction(proposer))?;
+        if row.closed_until.0 > self.tick.0 {
+            return Err(TradeError::Closed(row.closed_until));
+        }
+        if !self.stands_in_territory_of(proposer, responder) {
+            return Err(TradeError::NoPresence);
+        }
+        Ok((give, take))
     }
 
     /// Checks one side of a contract against its debtor and returns it in
@@ -537,28 +563,8 @@ impl World {
         give: Consideration,
         take: Consideration,
     ) -> Result<(), TradeError> {
-        self.check_pair(speaker, other)?;
-        // A counter across a pair at war is refused, as an offer is. A war
-        // declared during a negotiation therefore ends the talking.
-        if !self.relations.permits_offer(speaker, other) {
-            return Err(TradeError::AtWar);
-        }
-        let (proposer, responder) = self.live_orientation(speaker, other)?;
-        let give = self.check_consideration(proposer, give)?;
-        let take = self.check_consideration(responder, take)?;
-        let row = self
-            .trade
-            .row(proposer, responder)
-            .ok_or(TradeError::NothingOpen)?;
-        if row.is_bound() {
-            return Err(TradeError::AlreadyBound);
-        }
-        if Self::turn_of(row, proposer, responder) != Some(speaker) {
-            return Err(TradeError::NotYourTurn);
-        }
-        if !self.stands_in_territory_of(speaker, other) {
-            return Err(TradeError::NoPresence);
-        }
+        let (proposer, responder, row, give, take) =
+            self.counter_refusal(speaker, other, give, take)?;
         let status = if row.status == TRADE_OFFERED {
             TRADE_COUNTERED
         } else {
@@ -586,17 +592,76 @@ impl World {
         Ok(())
     }
 
-    /// Agrees to the terms of a live negotiation, so a contract binds both.
+    /// Returns the orientation, the row and the two checked sides of a
+    /// counteroffer, or the refusal the counter verb would give.
     ///
-    /// The speaker is the party that did not speak last. The deadline is this
-    /// tick plus the term the offer named.
+    /// **This is the one statement of the rule.** The counter verb calls it
+    /// before it writes the row. The legality answer calls it through the
+    /// negotiation step of the controller.[^1] Nothing here mutates.
+    ///
+    /// A counter across a pair at war is refused, as an offer is. A war
+    /// declared during a negotiation therefore ends the talking.
     ///
     /// # Errors
     ///
-    /// Returns an error when the pair holds no live negotiation, when the
-    /// terms already bind both parties, when the other party has not answered
-    /// yet, or when the speaker has no presence.
-    pub fn accept_trade(&mut self, speaker: FactionId, other: FactionId) -> Result<(), TradeError> {
+    /// Returns the refusal the counter verb would return.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    pub(super) fn counter_refusal(
+        &self,
+        speaker: FactionId,
+        other: FactionId,
+        give: Consideration,
+        take: Consideration,
+    ) -> Result<(FactionId, FactionId, TradeRow, Consideration, Consideration), TradeError> {
+        self.check_pair(speaker, other)?;
+        if !self.relations.permits_offer(speaker, other) {
+            return Err(TradeError::AtWar);
+        }
+        let (proposer, responder) = self.live_orientation(speaker, other)?;
+        let give = self.check_consideration(proposer, give)?;
+        let take = self.check_consideration(responder, take)?;
+        let row = self
+            .trade
+            .row(proposer, responder)
+            .ok_or(TradeError::NothingOpen)?;
+        if row.is_bound() {
+            return Err(TradeError::AlreadyBound);
+        }
+        if Self::turn_of(row, proposer, responder) != Some(speaker) {
+            return Err(TradeError::NotYourTurn);
+        }
+        if !self.stands_in_territory_of(speaker, other) {
+            return Err(TradeError::NoPresence);
+        }
+        Ok((proposer, responder, row, give, take))
+    }
+
+    /// Returns the orientation and the row of the live negotiation that one
+    /// faction answers, or the refusal an answer would give.
+    ///
+    /// **This is the one statement of the rule that the accept, the refuse
+    /// and the close verbs share.** Each calls it before it writes. The
+    /// legality answer calls it through the negotiation step of the
+    /// controller.[^1] Nothing here mutates.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the pair names no pair of this world, when the
+    /// pair holds no live negotiation, when the terms already bind both
+    /// parties, when the other party has not answered yet, or when the
+    /// speaker has no presence.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    pub(super) fn answer_refusal(
+        &self,
+        speaker: FactionId,
+        other: FactionId,
+    ) -> Result<(FactionId, FactionId, TradeRow), TradeError> {
         self.check_pair(speaker, other)?;
         let (proposer, responder) = self.live_orientation(speaker, other)?;
         let row = self
@@ -612,6 +677,21 @@ impl World {
         if !self.stands_in_territory_of(speaker, other) {
             return Err(TradeError::NoPresence);
         }
+        Ok((proposer, responder, row))
+    }
+
+    /// Agrees to the terms of a live negotiation, so a contract binds both.
+    ///
+    /// The speaker is the party that did not speak last. The deadline is this
+    /// tick plus the term the offer named.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the pair holds no live negotiation, when the
+    /// terms already bind both parties, when the other party has not answered
+    /// yet, or when the speaker has no presence.
+    pub fn accept_trade(&mut self, speaker: FactionId, other: FactionId) -> Result<(), TradeError> {
+        let (proposer, responder, row) = self.answer_refusal(speaker, other)?;
         let deadline = Tick(self.tick.0.saturating_add(u64::from(row.term)));
         let entry = self
             .trade
@@ -636,21 +716,7 @@ impl World {
     /// terms already bind both parties, when the other party has not answered
     /// yet, or when the speaker has no presence.
     pub fn refuse_trade(&mut self, speaker: FactionId, other: FactionId) -> Result<(), TradeError> {
-        self.check_pair(speaker, other)?;
-        let (proposer, responder) = self.live_orientation(speaker, other)?;
-        let row = self
-            .trade
-            .row(proposer, responder)
-            .ok_or(TradeError::NothingOpen)?;
-        if row.is_bound() {
-            return Err(TradeError::AlreadyBound);
-        }
-        if Self::turn_of(row, proposer, responder) != Some(speaker) {
-            return Err(TradeError::NotYourTurn);
-        }
-        if !self.stands_in_territory_of(speaker, other) {
-            return Err(TradeError::NoPresence);
-        }
+        let (proposer, responder, _) = self.answer_refusal(speaker, other)?;
         let index = self
             .trade
             .index_of(proposer, responder)
@@ -698,20 +764,7 @@ impl World {
         if ticks == 0 {
             return Err(TradeError::NoDuration);
         }
-        let (proposer, responder) = self.live_orientation(speaker, other)?;
-        let row = self
-            .trade
-            .row(proposer, responder)
-            .ok_or(TradeError::NothingOpen)?;
-        if row.is_bound() {
-            return Err(TradeError::AlreadyBound);
-        }
-        if Self::turn_of(row, proposer, responder) != Some(speaker) {
-            return Err(TradeError::NotYourTurn);
-        }
-        if !self.stands_in_territory_of(speaker, other) {
-            return Err(TradeError::NoPresence);
-        }
+        let (proposer, responder, _) = self.answer_refusal(speaker, other)?;
         let until = Tick(self.tick.0.saturating_add(u64::from(ticks)));
         let index = self
             .trade

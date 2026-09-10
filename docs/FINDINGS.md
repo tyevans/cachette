@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-761**
+**Next number: FND-762**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -21158,6 +21158,52 @@ launcher wrote its copy atomically and the trainer did not. The fetch probe
 now holds a file under a temporary name on the instance, and it asserts that
 the fetch leaves it there.[^F746A]
 
+### FND-761 — The legality answer allowed a trade row that the offer verb refused
+
+**Believed.** The legality answer reads the check that each verb calls before
+it acts. A row that the answer allows is therefore a row that the verb takes.
+The action module states this, and ADR-0154 decision D5 asks for it.[^F581A]
+
+**True.** The trade arm of the answer did not read the checks of the trade
+verbs. It asked only whether a negotiation step was due, through the two due
+readers of the controller. The offer, counter, accept and refuse verbs read
+three more gates. A speaker must stand in the territory of the listener. A
+closed direction refuses an offer. A pair at war refuses a counteroffer.
+
+So a faction with a matched board and no unit on rival ground got a legal
+trade row. The verb then refused the row and changed nothing. A policy that
+chose it spent a decision.
+
+**Evidence.** The legality test of the learner applies allowed rows over six
+seeds.[^F761A] It found one refused row: seed 70005, decision 38, row 167. Row
+167 is the trade verb, and the tick was 380. A probe read that state. No pair
+held a live negotiation, the boards matched, and the relation band was 2. The
+seat stood in the territory of neither rival. The trade log held no entry
+after the act, so the offer verb refused before it wrote.
+
+The trade arm is older than the failure. It came in with the action table on
+6 September 2026. It stood at both parents of the merge that first failed. The
+weather change 6120e0db and the renown change c4edf36a each pass alone. Their
+merge 17bfefb1 moved the game, and the sweep then reached a matched board with
+no guest. The Rust agreement test runs two factions for nine ticks at most. No
+board matches in that span, so that test never reached the row.
+
+**Follows.** Each trade verb now reads a check before it writes. The check
+states the refusals of the verb and changes nothing.[^F761B] The controller
+chooses its trade step once, through a reader that changes nothing.[^F761C]
+The answer allows the trade row when that step exists and the check of its
+verb passes.[^F761D] The step runs through the same verbs, so no state hash
+moves.
+
+Two engine tests build a refused offer and a refused counteroffer. Each test
+then places a guest as the control, and the verb takes the row. Both tests
+fail with the old answer put back.[^F761E]
+
+**The built-in controller still plans a trade step that a verb can refuse.**
+Its flag for a due trade reads the two due readers. That costs the controller
+one wasted choice, and it gives no wrong answer to a learner. A change there
+moves every golden state hash, so it is a separate piece of work.
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -21212,3 +21258,8 @@ the fetch leaves it there.[^F746A]
 [^F760B]: The atomic writer and the linear save. `python/cachette/learn/policy.py`
 [^F760C]: The training launcher, the fetch of the weights. `scripts/graviton-train.sh`
 [^F760D]: The weight file tests. `tests/test_learner_weight_files.py`
+[^F761A]: The legality test of the learner. `tests/test_learner_legality_agrees_with_the_verbs.py`
+[^F761B]: The trade verbs and their refusal checks. `crates/cachette-core/src/world/trade.rs`
+[^F761C]: The controller, the trade step and its refusal reader. `crates/cachette-core/src/world/controller.rs`
+[^F761D]: The legality answer, the trade arm. `crates/cachette-core/src/world/actions.rs`
+[^F761E]: The learner action tests, the two trade row tests. `crates/cachette-core/tests/learner_acts.rs`
