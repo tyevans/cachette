@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-748**
+**Next number: FND-751**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20609,6 +20609,105 @@ that found no seat dry and clear for 1200 ticks varied the seat over one
 world.[^F747B] It stands for the regions it tested. A region exists that holds
 the tile dry and clear, and it is not a region of the target world.
 
+### FND-748 — A polar region with a wide span leaves the ground dry, and a storm still forms over a world of full extent
+
+**Believed.** A region at 70 south that spreads thirty degrees over its rows is
+dry and clear of storms. The survey of the latitude settings measured the
+ground and the sky over one tile, and it reported both.[^F748A]
+
+**True.** The dry half holds and the storm half does not. A fixture that
+carried the road between two cities asserted on every tick that the storm depth
+over a corridor of tiles was zero. It failed on tick 37 with a depth of sixteen,
+at a centre of 70 south and a span of thirty degrees. The ground of the same
+corridor stayed dry on every tick, and the storms of that run ended no unit.
+
+**Evidence.** The corridor holds every tile whose distance to the two cities
+sums to four above the gap, in a world of 100 tiles a side. The assertion on
+`ground_is_wet` passed for 384 ticks and the assertion on `storm_depth_at`
+failed on tick 37. With the storm assertion removed the run held, and the
+casualty log named nobody.
+
+**Follows.** Two things.
+
+**A survey over one tile stands for one tile.** The earlier survey stepped one
+world and read one seat, so it could not see a storm that forms elsewhere and
+travels. A fixture that needs a quiet sky over a corridor reads the corridor.
+
+**State the regime a fixture depends on, and no more.** The road fixture needs
+dry ground, because rain wears a level that stands and a builder pays the
+repair price first. It does not need a sky with no storm in it. A fixture that
+claims the wider regime fails on a claim it never needed.
+
+### FND-749 — A road of sixteen tiles is never finished under the sky of a region, at any run length
+
+**Believed.** A fixture that waits for a long build and fails has too small a
+budget. The road join fixture ran 900 ticks, the way stopped two tiles short of
+the far city, and a larger budget looked like the repair.
+
+**True.** The way stops two tiles short and stays there. It reaches within two
+of the far city at 900 ticks, at 2400 ticks and at 4000 ticks alike, while the
+count of open road projects grows from two to eighteen. Rain and storms wear the
+levels that stand, and a builder pays the whole repair price before it advances
+a level, so eight builders cannot raise the last stretch faster than the sky
+takes it back.[^F749A]
+
+Under a polar region the same fixture joins the two cities on tick 112.
+
+**Evidence.** The fixture was run at three budgets under the sky of a region
+and the report each time named the same distance of two. The same fixture
+under a centre of 70 south and a span of thirty degrees joined at tick 112 of
+384, and the storms of that run ended no unit.
+
+**Follows.** Two things.
+
+**A budget is not the repair when the state is stable.** Read what the run
+reached at two budgets before raising one. A figure that does not move with the
+budget says the run is at a fixed point, and a larger budget only spends more
+machine to report the same thing.
+
+**A fixture that must finish a long build states its sky.** The engine is not
+at fault. A world of this project wears what it builds, and a fixture that
+wants to measure a solver rather than the weather stands where the weather is
+quiet.
+
+### FND-750 — The weather broke one fixture twice, and the second cause was the ground
+
+**Believed.** A fixture that the weather broke has one cause. The carry fixture
+gated on every carrier being laden, a storm ended some of them, and skipping
+the units the storm log names looked like the whole repair.
+
+**True.** The storm repair was necessary and it was not sufficient. With the
+casualties dropped and the carrier count raised, the load stage still failed.
+Sixteen carriers stood on two tiles of food, both tiles read zero, and no
+carrier reached the carry mark in 2000 ticks. A deposit under the sky of a
+region returns one unit in tens of ticks, and a storm flattens a share of what a
+tile still holds, so the food under a carrier is a property of the
+weather.[^F750A] [^F750B]
+
+Raising the carrier count against the storms made the second cause worse, because
+it put more units on the same two tiles.
+
+**Evidence.** A probe printed the seed count, the carrier count, the laden count
+and the food on each seed tile at the end of the load window: two seeds, eight
+carriers, zero laden, zero food. With one tile of food for each carrier the
+reading was sixteen seeds, eight carriers, zero laden and zero food on every
+tile. With the recovery period set to one tick the file passed, and it ran in
+eleven seconds against one hundred and six.
+
+**Follows.** Three things.
+
+**Read the fixture again after the storm repair.** A run that steps a world for
+thousands of ticks depends on the sky in more than one way. The casualty log
+covers the units. It covers nothing about the ground they stand on.
+
+**A fixture that must hold a rate over a window states the recovery period.** The
+period is a rule of the world and a caller may replace it. A fixture that leaves
+it at the value a region gives measures the weather.
+
+**A repair for one cause can deepen another.** The carrier count rose to survive
+the storms, and the crowd on one deposit is the shape that a larger crowd makes
+worse.[^F750A]
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -20636,3 +20735,7 @@ the tile dry and clear, and it is not a region of the target world.
 [^F746A]: The fetch probe of the training launcher. `scripts/train-fetch-probe.sh`
 [^F747A]: The wear pass, the cause of a tick. `crates/cachette-core/src/world/upgrades.rs`
 [^F747B]: Findings register, FND-744. `docs/FINDINGS.md`
+[^F748A]: Findings register, FND-747. `docs/FINDINGS.md`
+[^F749A]: Findings register, FND-744. `docs/FINDINGS.md`
+[^F750A]: Findings register, FND-745. `docs/FINDINGS.md`
+[^F750B]: Findings register, FND-728. `docs/FINDINGS.md`
