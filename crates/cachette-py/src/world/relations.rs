@@ -243,4 +243,23 @@ impl PyWorld {
     fn set_campaign_cohort_size(&self, cohort: u32) {
         self.lock().set_campaign_cohort_size(cohort);
     }
+
+    /// The held ground a faction must have over another before it hunts it,
+    /// as a raw Q16.16 factor. The value is a row of the balance
+    /// register.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
+    #[getter]
+    fn overmatch_ratio(&self) -> i32 {
+        self.lock().overmatch_ratio()
+    }
+
+    /// Sets the held ground a faction must have over another before it hunts
+    /// it, as a raw Q16.16 factor. A ratio at or below zero takes the rule
+    /// out of the game. Returns `None`.
+    fn set_overmatch_ratio(&self, raw: i32) {
+        self.lock().set_overmatch_ratio(raw);
+    }
 }
