@@ -26,6 +26,7 @@
 //! [^2]: ADR-0168, a build order holds a unit on its tile, and the hold is derived and never stored, decisions D1, D2 and D3. `docs/adrs/draft/adr-0168-a-build-order-holds-a-unit-on-its-tile.md`
 //! [^3]: Testing rules, section 5. `.agents/rules/testing.md`
 //! [^4]: Testing rules, section 2a. `.agents/rules/testing.md`
+//! [^5]: Findings register, FND-745. `docs/FINDINGS.md`
 
 use cachette_core::cohort::NeedRule;
 use cachette_core::types::Fix32;
@@ -167,6 +168,17 @@ fn work_in(world: &World, tile: Axial) -> i64 {
 /// stood still and built nothing would satisfy the hold on every frame and
 /// would be a different defect.
 ///
+/// **The loop states that the builder is alive before it reads where it
+/// stands.** A road is shelter only when it stands, so the builder of a road
+/// is in the open for the whole build, and a storm ends a unit in the open. A
+/// reader that answers no address for a unit the world ended would report
+/// that the builder left its tile, and the failure would name the movement
+/// pass rather than the sky.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-745. `docs/FINDINGS.md`
+///
 /// Returns the number of frames the build took.
 fn build_the_road(world: &mut World, unit: Entity, tile: Axial) -> u64 {
     let mut before = work_in(world, tile);
@@ -185,6 +197,16 @@ fn build_the_road(world: &mut World, unit: Entity, tile: Axial) -> u64 {
             );
             return frame;
         }
+        assert!(
+            world.soldiers().contains(unit),
+            "the world ended the builder of tile {tile:?} on frame {frame}, and the storm log \
+             of that frame names {:?}",
+            world
+                .units_lost_to_storms()
+                .iter()
+                .map(|lost| lost.unit)
+                .collect::<Vec<u64>>()
+        );
         assert_eq!(
             world.soldiers().address(unit),
             Some(tile),

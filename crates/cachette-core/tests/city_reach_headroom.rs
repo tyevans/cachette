@@ -66,11 +66,58 @@ fn build_a_road(field: &mut World, address: Axial, faction: FactionId) -> Entity
     unit
 }
 
-/// Steps the world until one road finishes.
-fn finish_the_road(field: &mut World) {
-    for _ in 0..=DEFAULT_UPGRADE_TABLE.work_above(UpgradeCategory::ROAD, 0) {
+/// The margin on the ticks a road build is given, above the work it asks for.
+///
+/// **This bounds a loop that leaves early. It is not a count of ticks that a
+/// test takes.** A build of the stated work finishes in the ticks the work
+/// asks for and takes none of this margin. The margin covers the ticks a
+/// builder spends repairing what the rain and the storms of a world take off
+/// the level while it stands.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-745. `docs/FINDINGS.md`
+const BUILD_MARGIN: i64 = 4;
+
+/// Steps the world until every road of a set stands, and returns the ticks.
+///
+/// **The budget comes from the work table, and it carries a margin.** Rain
+/// and a storm wear a level that stands, and a builder pays the repair before
+/// it advances the level, so the ticks a build takes are a property of the
+/// sky. A budget equal to the work asks the sky to stay quiet.[^1]
+///
+/// **The loop states that the builder of every road still going up is
+/// alive.** A storm ends a unit that stands in the open, and a fixture that
+/// waited on a dead builder would step a world that built nothing and would
+/// then report a slow world. A road that already stands needs no builder, so
+/// the loop reads none.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-745. `docs/FINDINGS.md`
+fn hold_the_roads(field: &mut World, roads: &[(Axial, Entity)]) -> u64 {
+    let work = DEFAULT_UPGRADE_TABLE.work_above(UpgradeCategory::ROAD, 0);
+    assert!(work > 0, "a road level must ask a builder for work");
+    let budget = (work * BUILD_MARGIN) as u64 * roads.len() as u64;
+    for taken in 1..=budget {
+        for (address, builder) in roads {
+            if field.finished_upgrade(*address) == Some(UpgradeCategory::ROAD) {
+                continue;
+            }
+            assert!(
+                field.soldiers().contains(*builder),
+                "the world ended the builder of {address:?} at tick {taken}, so the weather decided this test"
+            );
+        }
         field.step(1).expect("the step must run");
+        if roads
+            .iter()
+            .all(|(address, _)| field.finished_upgrade(*address) == Some(UpgradeCategory::ROAD))
+        {
+            return taken;
+        }
     }
+    panic!("the roads did not all stand after {budget} ticks");
 }
 
 #[test]
@@ -98,7 +145,7 @@ fn a_city_reports_its_finished_upgrades_and_its_remaining_reach() {
     );
 
     let first = Axial::new(seat.q + 1, seat.r);
-    build_a_road(&mut field, first, FactionId(0));
+    let first_builder = build_a_road(&mut field, first, FactionId(0));
     field.step(1).expect("the step must run");
     assert!(
         field
@@ -112,7 +159,7 @@ fn a_city_reports_its_finished_upgrades_and_its_remaining_reach() {
         "an unfinished upgrade must not count"
     );
 
-    finish_the_road(&mut field);
+    hold_the_roads(&mut field, &[(first, first_builder)]);
     assert_eq!(field.finished_upgrade(first), Some(UpgradeCategory::ROAD));
     assert_eq!(
         field.city_finished_upgrades(site),
@@ -127,8 +174,11 @@ fn a_city_reports_its_finished_upgrades_and_its_remaining_reach() {
     );
 
     let second = Axial::new(seat.q + 2, seat.r);
-    build_a_road(&mut field, second, FactionId(0));
-    finish_the_road(&mut field);
+    let second_builder = build_a_road(&mut field, second, FactionId(0));
+    hold_the_roads(
+        &mut field,
+        &[(first, first_builder), (second, second_builder)],
+    );
     assert_eq!(field.finished_upgrade(second), Some(UpgradeCategory::ROAD));
     assert_eq!(field.city_reach(site), Some(rules.cap()));
     assert_eq!(field.city_reach_headroom(site), Some(0));
