@@ -46,11 +46,15 @@ References
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 from cachette import VerbError, World
+
+if TYPE_CHECKING:  # pragma: no cover - the stub declares the row for the checker
+    from cachette._core import ObservationField
 
 # The binding that carries the schema across the boundary. The test that reads
 # it asserts that it states no number of its own.
@@ -103,21 +107,23 @@ def field(world: World, values: np.ndarray, name: str) -> np.ndarray:
     raise AssertionError(f"the schema declares no field named {name}")
 
 
-def rows_of_space(world: World, space: str) -> list[dict]:
+def rows_of_space(world: World, space: str) -> list[ObservationField]:
     """Return every schema row the engine marks with one space."""
     return [
         row for row in world.observation_schema()["fields"] if row["space"] == space
     ]
 
 
-def ring_row(world: World) -> dict:
+def ring_row(world: World) -> ObservationField:
     """Return the one row the engine marks as ring space."""
     rows = rows_of_space(world, "ring")
     assert len(rows) == 1, "the engine publishes one ring stack"
     return rows[0]
 
 
-def channel_column(row: dict, channel: str, cells: int, order: str) -> np.ndarray:
+def channel_column(
+    row: ObservationField, channel: str, cells: int, order: str
+) -> np.ndarray:
     """Return the position of one channel of a row, at every place.
 
     The channel order says which axis runs first, so this reads the order

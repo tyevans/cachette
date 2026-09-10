@@ -32,6 +32,7 @@ import importlib.util
 import sys
 from pathlib import Path
 from types import ModuleType
+from typing import Any
 
 import pytest
 
@@ -122,7 +123,7 @@ def test_a_seed_only_one_side_played_leaves_the_paired_count_alone() -> None:
 
 def test_the_win_path_and_the_end_tick_come_from_the_readings() -> None:
     """The path names come from the engine, so nothing here may list them."""
-    readings = [
+    readings: list[Any] = [
         _reading("controller", seed=1, population=1.0, path="domination", end_tick=310),
         _reading("controller", seed=2, population=1.0, path="territory"),
         _reading("controller", seed=3, population=1.0, path="territory"),

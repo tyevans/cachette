@@ -166,9 +166,9 @@ class ValueForm:
         """Read one form from the entry the schema publishes for it."""
         return cls(
             name=str(row.get("name", name)),
-            low=int(row["low"]),  # type: ignore[arg-type]
-            high=int(row["high"]),  # type: ignore[arg-type]
-            unit=int(row["unit"]),  # type: ignore[arg-type]
+            low=_int_of(row["low"]),
+            high=_int_of(row["high"]),
+            unit=_int_of(row["unit"]),
             uniform=bool(row["uniform"]),
             invertible=bool(row["invertible"]),
             denominator=_text_or_none(row.get("denominator")),
@@ -232,7 +232,8 @@ class ValueForm:
         magnitude = np.abs(np.asarray(value, dtype=np.float64))
         exponent = magnitude * self.divisor_bits / self.unit
         recovered = np.float_power(self.log_base, exponent) - self.log_offset
-        return np.sign(np.asarray(value, dtype=np.float64)) * recovered
+        signed: np.ndarray = np.sign(np.asarray(value, dtype=np.float64)) * recovered
+        return signed
 
 
 @dataclass(frozen=True)
@@ -380,11 +381,25 @@ def _text_or_none(value: object) -> str | None:
     return str(value)
 
 
+def _int_of(value: object) -> int:
+    """Read one required integer entry of a schema row.
+
+    A schema row arrives as a mapping of text to an unknown value, because
+    the engine publishes it as data. This reader states what the schema
+    promises. It accepts a number or the text of a number, and it refuses
+    anything else with a message that names the entry it read.
+    """
+    if isinstance(value, (int, float, str)):
+        return int(value)
+    message = f"the schema entry {value!r} is not an integer"
+    raise TypeError(message)
+
+
 def _int_or_none(value: object) -> int | None:
     """Read one optional integer entry of a schema row."""
     if value is None:
         return None
-    return int(value)  # type: ignore[call-overload]
+    return _int_of(value)
 
 
 def _forms_of(published: object) -> dict[str, ValueForm]:

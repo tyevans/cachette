@@ -89,12 +89,13 @@ def facts(**changed: object) -> object:
         "cores": 64,
     }
     base.update(changed)
-    return watch.Facts(**base)  # type: ignore[arg-type]
+    return watch.Facts(**base)
 
 
 def screen(text: str, **changed: object) -> str:
     """Return the rendered screen of this log, in plain text."""
-    return watch.render(watch.read(text), facts(**changed))
+    rendered: str = watch.render(watch.read(text), facts(**changed))
+    return rendered
 
 
 def test_a_finished_baseline_pass_is_not_a_live_process() -> None:

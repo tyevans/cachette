@@ -65,7 +65,6 @@ from .style import (
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Mapping, Sequence
 
-    from .reward import Scoring
     from .signals import SignalCatalogue
 
 # The table this package ships. A caller that gives no path reads this one.
@@ -221,7 +220,9 @@ class ObjectiveSchedule:
             )
             raise LibraryError(message)
 
-    def for_generation(self, generation: int, episodes: int) -> tuple[Scoring, ...]:
+    def for_generation(
+        self, generation: int, episodes: int
+    ) -> tuple[ObjectiveScoring, ...]:
         """Return the scoring of each episode position of one generation.
 
         The result holds one entry for each position of the seed set of the

@@ -99,7 +99,7 @@ def _game(
     )
 
 
-def _seat_wins(seatings: list[object], seat: int = 0) -> list[object]:
+def _seat_wins(seatings: list[Any], seat: int = 0) -> list[object]:
     """Play a synthetic league in which one seat wins every game.
 
     This is pure seat luck with the quality of the players held equal. A

@@ -327,9 +327,11 @@ def test_a_catalogue_of_a_schema_with_no_form_table_still_reads(
     hand builds the same one it built before. Such a signal refuses an
     inversion and says that the schema stated no form.
     """
-    schema = dict(world.observation_schema())
+    schema: dict[str, object] = dict(world.observation_schema())
     del schema["value_forms"]
-    for row in schema["fields"]:
+    fields = schema["fields"]
+    assert isinstance(fields, list), "the schema states its fields as a list"
+    for row in fields:
         row.pop("form", None)
 
     class Formless:

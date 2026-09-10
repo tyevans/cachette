@@ -19,9 +19,11 @@ from __future__ import annotations
 
 import subprocess
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 
 from cachette import World, _core
 
@@ -66,7 +68,9 @@ def test_the_module_reports_a_schema_for_every_event() -> None:
 
 
 def _check_columns(
-    columns: dict[str, object], fields: list[tuple[str, str]], reader: str
+    columns: Mapping[str, npt.NDArray[np.generic]],
+    fields: list[tuple[str, str]],
+    reader: str,
 ) -> None:
     """Check one reading against the fields the schema declares for it."""
     for column, dtype in fields:

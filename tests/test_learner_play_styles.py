@@ -61,6 +61,7 @@ from cachette.learn import (
     Signal,
     SignalCatalogue,
     StyleError,
+    StyleLibrary,
     Term,
     TermKind,
     Variation,
@@ -111,7 +112,7 @@ def a_catalogue() -> SignalCatalogue:
     return SignalCatalogue.of_world(world)
 
 
-def a_library():  # noqa: ANN201
+def a_library() -> StyleLibrary:
     """Return the play style table this package ships."""
     return load_library()
 
@@ -246,9 +247,9 @@ def test_a_run_records_the_objective_vector_of_every_episode() -> None:
 
     scoring = library.scoring("aggressive", a_catalogue())
     record = run_population(CONFIG, scoring, [RandomPolicy(seed=0)], SEEDS, workers=1)
-    row = record.episodes[0].as_row()
+    columns = record.episodes[0].as_row()
     for name in declared:
-        assert f"{OBJECTIVE_PREFIX}{name}" in row
+        assert f"{OBJECTIVE_PREFIX}{name}" in columns
     assert record.objectives
 
 

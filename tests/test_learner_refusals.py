@@ -222,10 +222,15 @@ def test_a_run_records_the_score_of_every_candidate_and_every_episode(
     assert len(result["generations"]) == 1
     row = result["generations"][0]
     assert row["generation"] == 0
-    assert len(row["ranked"]) == train_config.population
-    assert len(row["absolute"]) == train_config.population
-    assert row["seeds"] == seeds[:1]
+    ranked = row["ranked"]
+    absolute = row["absolute"]
     episodes = row["episodes"]
+    assert isinstance(ranked, list), "a generation records the ranked scores"
+    assert isinstance(absolute, list), "a generation records the absolute scores"
+    assert isinstance(episodes, list), "a generation records its episodes"
+    assert len(ranked) == train_config.population
+    assert len(absolute) == train_config.population
+    assert row["seeds"] == seeds[:1]
     assert len(episodes) == train_config.population
     assert [entry["candidate"] for entry in episodes] == list(
         range(train_config.population)

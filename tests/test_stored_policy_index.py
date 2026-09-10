@@ -77,6 +77,19 @@ def index_names(kept: bool) -> set[str]:
     return {match.group(1) for match in ROW.finditer(head if kept else tail)}
 
 
+def an_int(value: object) -> int:
+    """Read one integer out of the entries a stored file states.
+
+    The loader publishes the entries as a mapping of text to an unknown
+    value, because a stored file is data. This reader states what the file
+    promises, and it refuses anything that is not a number.
+    """
+    if isinstance(value, (int, float, str)):
+        return int(value)
+    message = f"the stored entry {value!r} is not an integer"
+    raise TypeError(message)
+
+
 def a_world(meta: dict[str, object] | None = None) -> World:
     """Build the world a stored file names, seeded so it publishes its schemas.
 
@@ -86,10 +99,10 @@ def a_world(meta: dict[str, object] | None = None) -> World:
     a larger world then failed to place against it, and the failure named the
     loader rather than the assumption.
     """
-    width = int(meta["width"]) if meta and "width" in meta else EXTENT
-    height = int(meta["height"]) if meta and "height" in meta else EXTENT
+    width = an_int(meta["width"]) if meta and "width" in meta else EXTENT
+    height = an_int(meta["height"]) if meta and "height" in meta else EXTENT
     factions = (
-        int(meta["faction_count"]) if meta and "faction_count" in meta else FACTIONS
+        an_int(meta["faction_count"]) if meta and "faction_count" in meta else FACTIONS
     )
     world = World(width=width, height=height, seed=0, faction_count=factions)
     world.seed_world()
