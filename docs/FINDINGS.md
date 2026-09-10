@@ -20269,7 +20269,7 @@ plays better, so the shaped term leads the policy toward a win.
 
 **True.** It does not. The engine ends a game on four paths, and no reader of
 any of them compares a store total.[^F740A] The wealth path was retired, and a
-record holds the retirement.[^F740B] The shaped part of the wealth return
+record holds the retirement.[^F737C] The shaped part of the wealth return
 therefore climbs a quantity that decides nothing.
 
 **Evidence.** One pass played the generation-zero population of the linear
@@ -20332,4 +20332,3 @@ answers this properly needs the training world and a few thousand episodes.
 [^F739E]: The controller version probe, the steering key. `scripts/controller_versions.py`
 [^F739F]: Recurring defect shapes, shapes 1 and 3. `.agents/rules/recurring-defects.md`
 [^F740A]: Research, what the win conditions are and what can reach them. `docs/research/what-the-win-conditions-are-and-what-can-reach-them.md`
-[^F740B]: ADR-0174, a wonder is a win path and a stock total is not. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
