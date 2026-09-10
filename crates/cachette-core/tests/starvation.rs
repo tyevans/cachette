@@ -79,6 +79,24 @@ fn open_ground(world: &World) -> Vec<Axial> {
         .collect()
 }
 
+/// Answers whether the storm log of the last step names the unit.
+///
+/// A storm ends a unit that stands in the open, and it obeys no rule of the
+/// need pass.[^1] Every test below drops the units this answers for, and no
+/// others. A test that dropped every unit the world no longer holds would pass
+/// against a run in which the shortage ended them all, and it would then
+/// measure the fixture.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-725. `docs/FINDINGS.md`
+fn a_storm_took(world: &World, unit: Entity) -> bool {
+    world
+        .units_lost_to_storms()
+        .iter()
+        .any(|lost| lost.unit == unit.to_bits())
+}
+
 /// What one fixture built.
 struct Fixture {
     /// The units that belong to a site which feeds them.
@@ -155,10 +173,17 @@ fn build(world: &mut World, bound: Fix32) -> Fixture {
     fixture
 }
 
+/// The condition is what a watcher reads.
+///
+/// A watcher that read the accumulator would hold the bound of the rule a
+/// second time.
+///
+/// **A storm ends a unit that stands in the open.** The run collects the storm
+/// log of every step and drops the units it names. It counts what it read on
+/// each side, and it refuses a count of zero, so a run that lost a whole side
+/// fails rather than passes.
 #[test]
 fn a_watcher_reads_the_condition_by_name() {
-    // The condition is what a watcher reads. A watcher that read the
-    // accumulator would hold the bound of the rule a second time.
     let mut world = World::new(CONFIG).expect("the extent must describe a world");
     let fixture = build(&mut world, FAR_BOUND);
     for unit in fixture.fed.iter().chain(&fixture.hungry) {
@@ -168,26 +193,61 @@ fn a_watcher_reads_the_condition_by_name() {
             "a unit arrives fed"
         );
     }
+    let mut taken: Vec<u64> = Vec::new();
     for _ in 0..16 {
         world.step(4).expect("the step must run");
+        taken.extend(world.units_lost_to_storms().iter().map(|lost| lost.unit));
     }
+
+    let mut short_read = 0usize;
     for unit in &fixture.hungry {
+        if taken.contains(&unit.to_bits()) {
+            continue;
+        }
         assert_eq!(
             world.unit_condition(*unit),
             Some(NeedCondition::Short),
             "a unit that failed its draw is in a condition a watcher can name"
         );
+        short_read += 1;
     }
+    assert!(
+        short_read > 0,
+        "the storms took every hungry unit, so the run read no condition"
+    );
+
+    let mut fed_read = 0usize;
     for unit in &fixture.fed {
+        if taken.contains(&unit.to_bits()) {
+            continue;
+        }
         assert_eq!(world.unit_condition(*unit), Some(NeedCondition::Fed));
+        fed_read += 1;
     }
+    assert!(
+        fed_read > 0,
+        "the storms took every fed unit, so the run read no condition"
+    );
     assert!(world.check_invariants());
 }
 
+/// Both directions of the rule.
+///
+/// A rule that only rose would pass a test that watched a deficit grow, and a
+/// unit would then never recover.
+///
+/// **The run watches the whole hungry set and not one unit.** A storm ends a
+/// unit that stands in the open, and this run steps the world for hundreds of
+/// ticks.[^1] The run drops a unit on the tick the storm log names it, and it
+/// refuses to go on with an empty set. It reads the deficit of a unit it holds
+/// on every tick, so a unit that leaves the world without the storm log naming
+/// it fails on that tick and names the tick.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-725. `docs/FINDINGS.md`
 #[test]
 fn the_condition_gets_worse_while_the_shortage_lasts_and_recovers_when_it_ends() {
-    // Both directions. A rule that only rose would pass a test that
-    // watched a deficit grow, and a unit would then never recover.
     let mut world = World::new(CONFIG).expect("the extent must describe a world");
     let fixture = build(&mut world, FAR_BOUND);
     // The ration of this test is above the decay, so a unit that eats
@@ -207,20 +267,40 @@ fn the_condition_gets_worse_while_the_shortage_lasts_and_recovers_when_it_ends()
         )
         .expect("every rate is at or above zero"),
     );
-    let watched = fixture.hungry[0];
+    let mut watched: Vec<(Entity, Fix32)> = fixture
+        .hungry
+        .iter()
+        .map(|unit| {
+            (
+                *unit,
+                world.soldiers().deficit(*unit).expect("the unit lives"),
+            )
+        })
+        .collect();
 
     let mut worse = 0;
-    let mut last = world.soldiers().deficit(watched).expect("the unit lives");
-    for _ in 0..24 {
+    for tick in 0..24 {
         world.step(4).expect("the step must run");
-        let now = world.soldiers().deficit(watched).expect("the unit lives");
-        if now > last {
-            worse += 1;
+        watched.retain(|(unit, _)| !a_storm_took(&world, *unit));
+        assert!(
+            !watched.is_empty(),
+            "the storms took every hungry unit by tick {tick}, so the run watches nothing"
+        );
+        for (unit, last) in &mut watched {
+            let now = world
+                .soldiers()
+                .deficit(*unit)
+                .unwrap_or_else(|| panic!("unit {unit:?} left the world on tick {tick}"));
+            if now > *last {
+                worse += 1;
+            }
+            *last = now;
         }
-        last = now;
     }
     assert!(worse > 0, "the deficit never rose, so the shortage did not");
-    assert_eq!(world.unit_condition(watched), Some(NeedCondition::Short));
+    for (unit, _) in &watched {
+        assert_eq!(world.unit_condition(*unit), Some(NeedCondition::Short));
+    }
 
     // The shortage ends. Every site that produced nothing now produces more
     // than its people eat.
@@ -229,45 +309,76 @@ fn the_condition_gets_worse_while_the_shortage_lasts_and_recovers_when_it_ends()
             .set_production_rate(site, FOOD, Fix32::from_int(4))
             .expect("the rate is at or above zero");
     }
-    let peak = last;
+    let peak = watched.clone();
     let mut better = 0;
     // The recovery takes off a fixed amount at each application, so a
     // deficit that took a dozen applications to build takes more than a
     // dozen to clear. The count is what the rates of this test give, and
     // the test asserts the whole way back to fed.
-    for _ in 0..240 {
+    for tick in 0..240 {
         world.step(4).expect("the step must run");
-        let now = world.soldiers().deficit(watched).expect("the unit lives");
-        if now < last {
-            better += 1;
+        watched.retain(|(unit, _)| !a_storm_took(&world, *unit));
+        assert!(
+            !watched.is_empty(),
+            "the storms took every hungry unit by tick {tick} of the recovery"
+        );
+        for (unit, last) in &mut watched {
+            let now = world
+                .soldiers()
+                .deficit(*unit)
+                .unwrap_or_else(|| panic!("unit {unit:?} left the world on tick {tick}"));
+            if now < *last {
+                better += 1;
+            }
+            *last = now;
         }
-        last = now;
     }
     assert!(
         better > 0,
         "the deficit never fell after the shortage ended"
     );
-    assert!(last < peak, "the deficit did not recover");
-    assert_eq!(
-        world.unit_condition(watched),
-        Some(NeedCondition::Fed),
-        "a unit that recovered its need carries no deficit"
-    );
+    for (unit, last) in &watched {
+        let top = peak
+            .iter()
+            .find(|(other, _)| other == unit)
+            .expect("a watched unit was watched before the shortage ended")
+            .1;
+        assert!(last < &top, "the deficit of unit {unit:?} did not recover");
+        assert_eq!(
+            world.unit_condition(*unit),
+            Some(NeedCondition::Fed),
+            "a unit that recovered its need carries no deficit"
+        );
+    }
     assert!(world.check_invariants());
 }
 
+/// A shortage that lasts long enough ends the unit.
+///
+/// **The fixture starves some units and not others.** A fixture that starved
+/// every unit would pass this test with a rule that ends every unit. A storm
+/// also ends a unit that stands in the open, so the run collects the storm log
+/// of every step and drops the units it names, and no others. It counts what it
+/// read on each side and refuses a count of zero.
 #[test]
 fn a_shortage_that_lasts_long_enough_ends_the_unit() {
     let mut world = World::new(CONFIG).expect("the extent must describe a world");
     let fixture = build(&mut world, NEAR_BOUND);
     let mut ended = Vec::new();
+    let mut taken: Vec<u64> = Vec::new();
     for _ in 0..FRAMES {
         world.step(4).expect("the step must run");
         ended.extend_from_slice(world.starved_log());
+        taken.extend(world.units_lost_to_storms().iter().map(|lost| lost.unit));
         assert!(world.check_invariants());
     }
     assert!(!ended.is_empty(), "the shortage ended nobody");
+
+    let mut starved_read = 0usize;
     for unit in &fixture.hungry {
+        if taken.contains(&unit.to_bits()) {
+            continue;
+        }
         assert!(
             !world.soldiers().contains(*unit),
             "a unit the shortage starved must be gone"
@@ -276,34 +387,64 @@ fn a_shortage_that_lasts_long_enough_ends_the_unit() {
             ended.iter().any(|event| event.unit == unit.to_bits()),
             "the end of a unit must reach the log"
         );
+        starved_read += 1;
     }
-    // The fixture starves some units and not others. A fixture that starved
-    // every unit would pass this test with a rule that ends every unit.
+    assert!(
+        starved_read > 0,
+        "the storms took every hungry unit, so the run read no starvation"
+    );
+
+    let mut fed_read = 0usize;
     for unit in &fixture.fed {
+        if taken.contains(&unit.to_bits()) {
+            continue;
+        }
         assert!(
             world.soldiers().contains(*unit),
             "a unit that eats must survive"
         );
         assert_eq!(world.unit_condition(*unit), Some(NeedCondition::Fed));
+        fed_read += 1;
     }
+    assert!(
+        fed_read > 0,
+        "the storms took every fed unit, so the run read no survivor"
+    );
 }
 
+/// The same fixture, the same frames, two bounds.
+///
+/// A bound written into a kernel would give the same answer twice.
+///
+/// **A storm ends a unit in either world, and the two worlds need not lose the
+/// same units.** The run collects both storm logs and skips a unit that either
+/// log names. It counts the units it compared, and it refuses a count of zero.
 #[test]
 fn the_bound_is_a_parameter_and_not_a_constant() {
-    // The same fixture, the same frames, two bounds. A bound written into a
-    // kernel would give the same answer twice.
     let mut near = World::new(CONFIG).expect("the extent must describe a world");
     let hungry = build(&mut near, NEAR_BOUND).hungry;
     let mut far = World::new(CONFIG).expect("the extent must describe a world");
     build(&mut far, FAR_BOUND);
+    let mut taken: Vec<u64> = Vec::new();
     for _ in 0..FRAMES {
         near.step(4).expect("the step must run");
         far.step(4).expect("the step must run");
+        taken.extend(near.units_lost_to_storms().iter().map(|lost| lost.unit));
+        taken.extend(far.units_lost_to_storms().iter().map(|lost| lost.unit));
     }
+    let mut compared = 0usize;
     for unit in &hungry {
+        if taken.contains(&unit.to_bits()) {
+            continue;
+        }
         assert!(!near.soldiers().contains(*unit), "the near bound must end");
         assert!(far.soldiers().contains(*unit), "the far bound must not end");
+        compared += 1;
     }
+    assert!(
+        compared > 0,
+        "the storms took every hungry unit, so the run compared no bound"
+    );
 }
 
 #[test]
@@ -318,10 +459,17 @@ fn a_dead_identity_never_resolves_to_the_unit_spawned_next_in_its_slot() {
     world.set_birth_chance(Fix32::ZERO);
     let fixture = build(&mut world, NEAR_BOUND);
     let ground = open_ground(&world);
+    let mut starved = Vec::new();
     for _ in 0..FRAMES {
         world.step(4).expect("the step must run");
+        starved.extend_from_slice(world.starved_log());
     }
-    let dead = fixture.hungry[0];
+    let starved: Vec<u64> = starved.iter().map(|event| event.unit).collect();
+    let dead = *fixture
+        .hungry
+        .iter()
+        .find(|unit| starved.contains(&unit.to_bits()))
+        .expect("the shortage must end a hungry unit, and a storm death proves nothing here");
     assert!(!world.soldiers().contains(dead));
     assert_eq!(world.unit_condition(dead), None);
 
