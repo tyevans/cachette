@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-725**
+**Next number: FND-732**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19723,3 +19723,224 @@ share of a seat that sends nothing, and nobody had measured it.
 other faction with the most held ground, so the weakest seat of a game was the
 one seat nobody marched on. That is a real gap in the opponent, and it is
 worth closing on its own terms. It is not the reason a policy won.
+
+### FND-725 — A road fixture counted ticks against a work figure it did not read
+
+**Believed.** The two road tests of the viewer failed for the reason five
+overlay tests had failed the same day: the fixture ordered a road on a tile it
+never zoned, and the engine refused the order. The zoning repair was believed to
+be the whole of it.
+
+**True.** The zoning was already repaired, and the road order is accepted. The
+fixture stepped the world forty times with one builder on the tile. A road level
+costs forty-eight work and one builder adds one work each tick, so the loop
+stopped eight ticks short and no road ever stood. The work figure rose from a
+smaller value three days before the failure was read.
+
+**Evidence.** A probe rebuilt the fixture and printed the site on every tick.
+The progress rose by one on each of the forty ticks and reached forty, the
+condition never fell, and no unit died. The order returned success. The commit
+body holds the probe and the search that found the work constant.
+
+**Follows.** Three things.
+
+**A fixture must ask the engine whether the work is done.** A loop of a fixed
+length is a second statement of a work figure and a work rate, and nothing fails
+when the two disagree. The loop simply stops short, and the failure then names
+the wrong subsystem.
+
+**A balance value moves, and a fixture written against one goes stale
+silently.** The work of an upgrade level lives in the balance register. A
+fixture that builds anything must read the outcome rather than count the ticks.
+
+**Read the failure before you accept a diagnosis that fits.** The zoning
+diagnosis matched the shape of the failure, matched a repair made the same day,
+and was wrong.
+
+### FND-726 — A storm takes a builder, and an unfinished site shelters nobody
+
+**Believed.** A fixture that puts a builder on a tile and orders it to build can
+give that identity an order on every tick until the work is done.
+
+**True.** A storm takes units caught in the open. Shelter is a finished upgrade,
+so a builder standing on a site that is still going up is in the open. The
+builder of the tile panel fixture died partway through a two hundred tick loop,
+and the build order then failed with the refusal that names no builder. The
+refusal reads as an engine defect and is not one.
+
+**Evidence.** The viewer test that asks the tile panel to name the upgrade under
+the pointer failed on the build order and not on any panel assertion. No storm
+verb appears anywhere in that file.
+
+**Follows.** Two things.
+
+**A fixture that needs a unit for a long run must replace one that dies.** The
+subject of that test is the panel. A fixture that stops at the first casualty
+measures the weather instead.
+
+**The shelter rule is a property of the finished upgrade and not of the
+project.** A fixture cannot shelter its own builder while the builder is still
+building.
+
+### FND-727 — A founded site does not survive a long run, and a reference taken from the last tick names an arbitrary state
+
+**Believed.** A site that a founding seats answers its production rate for every
+tick of a twelve hundred tick run, and the state of the last tick of the run is
+a fair reference for the states before it.
+
+**True.** Neither holds. In the ground fixture of the production tests the site
+stops existing after about eleven hundred ticks of a twelve hundred tick run, in
+a world of four factions. The fixture then panicked inside its own sampling loop
+on a reader that answers only for a live site.
+
+The second half is the quieter one. The test held the weather and the terraces
+still by taking the values of the last sample and keeping every sample that
+agreed with it. A run that ends when its site falls ends at whatever weather
+stood at that moment, so the reference can name a rare state and leave too few
+samples to compare.
+
+**Evidence.** A probe stepped the fixture world and reported the tick at which
+the settlement reader stopped answering. The site went at sample tick 1118 of
+1200, and the settlement was gone rather than merely unreadable. With the
+sampling loop stopped at that tick, the span that agreed with the last sample
+held fewer than a hundred ticks and the test failed on its own span bound. This
+failure predates the storm damage pass and the controller prey rule. It survives
+with both of them removed.
+
+**Follows.** Two things.
+
+**Take a reference from the longest span, not from one arbitrary tick.** The
+test wants a long span in which the other terms are still. The most common state
+of a run is that span by definition, and it does not depend on where the run
+happened to stop.
+
+**A sampling loop that can end early must state how many samples it needs.** A
+loop that breaks silently and then compares three ticks passes while measuring
+nothing.
+
+### FND-728 — A world that holds no unit no longer holds the ground term still
+
+**Believed.** Nothing draws the food of a tile down except a unit that gathers
+it. A fixture that spawns no unit therefore holds the ground term of the
+production pipeline still by construction, and the reader of what a tile has
+lost answers zero on every tick.
+
+**True.** A storm flattens a share of the food a tile carries, and the loss goes
+into the same depletion ledger that a gather writes. The reader that answers
+what a tile has lost therefore answers above zero in a world that holds no unit
+at all.
+
+**Evidence.** The weather term test of the production pipeline seats sites
+across the world, spawns nothing, and asserted that its discs had lost nothing.
+It failed with eight taken over one disc. The test passes with the storm damage
+pass and the storm wear term removed, and it fails with either of them present.
+
+**Follows.** Two things.
+
+**Hold a term still by comparison when construction can no longer hold it.** The
+repair records what each disc had lost beside each sample, and it compares a wet
+tick against a dry tick that had lost the same amount. The exact equality the
+test asserts is unchanged, and the ground term is still held.
+
+**A hazard that writes a shared ledger reaches every fixture that reads it.**
+The ledger is the one record of what left a tile, which is correct. Every
+fixture that read it as a record of gathering alone is now stale.
+
+### FND-729 — A carrier delivers later in a world that has weather
+
+**Believed.** A bound contract with carriers assigned delivers a quantity inside
+six hundred ticks, and a fixture that waits that long and sees nothing has found
+a defect.
+
+**True.** The delivery happens, and it happens later than that. In the carrier
+fixture the first quantity moved at loop tick 1308, under a contract term that
+allows four thousand. The carriers stayed assigned, the contract stayed bound,
+and no carrier died.
+
+**Evidence.** The test passes at the baseline commit and fails at the tip. The
+cause is the storm work and not the controller prey rule. The test still fails
+with the prey rule reverted, and it passes as soon as the storm damage pass and
+the storm wear term are both removed. With the loop bound raised, the delivery
+arrives at loop tick 1308.
+
+**Follows.** Two things.
+
+**A tick bound in a fixture is patience, not a promise.** No assertion in that
+file reads the bound as a latency the engine offers. A bound that is too tight
+reports a defect that does not exist.
+
+**A hazard that changes the ground changes every walk over it.** A storm wears
+the ways and flattens the food under a carrier, so a fixture that measured a
+walk before the weather existed measured a different world.
+
+### FND-730 — The capacity of a cell is stated twice, and the air stands above one of them
+
+**Believed.** The air over a weather cell never stands above the capacity of
+that cell, and the published reader of that capacity states the bound the settle
+pass applies. The reader says so in its own words: air that cooled or climbed on
+its way holds less than the figure it returns.
+
+**True.** The two are different figures. The published reader answers the
+capacity of air at rest over the cell, which follows the temperature alone. The
+settle pass bounds the air at a travelling capacity, which takes the temperature
+and then applies the cooling the air met and the slope it went up. The slope
+term is signed on purpose, because air that descends warms and holds what it
+carries. A descending parcel therefore holds legitimately more than the
+published reader reports.
+
+**Evidence.** A probe stepped the fixture world of the weather test twenty times
+and walked the whole plane. One cell stood above its own published capacity, by
+23 drops of 1526. That cell carried no pressure deficit, so no storm was
+involved. At the temperature of that cell the travelling capacity of air that
+descends reaches 1740 against a published 1526, and it reaches 2289 at the
+steepest descent the term allows. The figures are derived on one development
+machine (x86-64), and the commit body holds the probe.
+
+**Follows.** Three things.
+
+**The test that asserts the bound is right to fail, and it stays red.** It
+asserts a bound that nothing promises. Relaxing it would state something false,
+and the honest repair is a decision about which reader states the capacity of a
+cell. A backlog item holds that work.
+
+**This is one value with two declaration sites.** The published reader and the
+settle pass each state what a cell can hold, and nothing fails when they
+disagree. The failure of that shape here is quiet. The reader is read back
+correctly, and it reports a different quantity from the one that bounds
+anything.
+
+**The picture is not wrong today.** The reader that turns the pair into a cloud
+share clamps its answer, so a watcher never sees more than a whole sky. The
+clamp is what has hidden this.
+
+### FND-731 — A commit widened the panel and left the stored picture behind
+
+**Believed.** The stored picture of the panel described the panel the viewer
+draws, so a difference against it means the panel changed in the change under
+review.
+
+**True.** The picture was stale before either renderer change of that day. A
+commit two days earlier widened the panel by forty-two pixels, so that a
+plausible weather total is not cut, and it did not write the picture again.
+Every row of the stored picture that reaches the panel edge is forty-two pixels
+short.
+
+**Evidence.** A comparison of the stored picture against the drawn one accounts
+for every differing row by that one widening. A row that holds text keeps its
+left edge and moves its right-aligned value by forty-two columns. A row that
+holds a rule or the panel edge grows by forty-two. The rows that hold the
+stacked bar grow by forty-two across four segments in proportion. No row differs
+in any other way, and the cloud rework of the same day reaches none of them,
+because the picture is the difference between a drawn frame and the same frame
+with no panel.
+
+**Follows.** Two things.
+
+**A change to a layout constant must write its stored picture in the same
+commit.** Nothing else fails, and the next reader inherits a difference that
+looks like their own work.
+
+**Read the difference before you write the picture again.** The re-record is
+correct here only because the difference was accounted for first. A re-record
+made without that step destroys the evidence that something else moved beside
+the thing that moved on purpose.

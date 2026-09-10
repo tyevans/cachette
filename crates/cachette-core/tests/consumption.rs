@@ -187,8 +187,18 @@ fn a_need_falls_to_zero_and_stops_there() {
     for _ in 0..64 {
         world.step(4).expect("the step must run");
     }
+    // **A unit the fixture made may not live to the end of the run.** A storm
+    // takes units caught in the open, and a dead unit answers nothing. The
+    // reader below skips one, and the count after the loop keeps the strength
+    // of the test: a run that lost every hungry unit checked nothing, and it
+    // must fail rather than pass on an empty loop.[^3]
+    //
+    // [^3]: Testing rules, section 2a. `.agents/rules/testing.md`
+    let mut checked = 0usize;
     for unit in &hungry {
-        let need = world.soldiers().need(*unit).expect("the unit lives");
+        let Some(need) = world.soldiers().need(*unit) else {
+            continue;
+        };
         assert_eq!(
             need,
             Fix32::ZERO,
@@ -199,7 +209,13 @@ fn a_need_falls_to_zero_and_stops_there() {
             deficit > Fix32::ZERO,
             "a unit at zero need must carry a deficit"
         );
+        checked += 1;
     }
+    assert!(
+        checked > 0,
+        "every hungry unit of the fixture died, so the assertions above ran \
+         on nothing"
+    );
     assert!(world.check_invariants());
 }
 

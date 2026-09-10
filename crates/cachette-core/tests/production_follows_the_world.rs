@@ -31,6 +31,8 @@
 //! [^3]: Testing rules, section 2a. `.agents/rules/testing.md`
 //! [^4]: Backlog item 0505, keep a builder on the tile it builds until the work is done. `docs/backlog/complete/0505-keep-a-builder-on-the-tile-it-builds-until-the-work-is-done.md`
 
+use std::collections::BTreeMap;
+
 use cachette_core::cohort::NeedRule;
 use cachette_core::effective::{SCALE_CEILING, SCALE_FLOOR, WET_WEIGHT};
 use cachette_core::founding::{disc, SURVEY_RADIUS};
@@ -72,6 +74,13 @@ const FOOD: CommodityId = CommodityId(0);
 /// The weather field answers for a level 1 cell. The spacing is wider than
 /// one cell, so two seats read two cells and the sample spans the world.
 const SEAT_SPACING: usize = 24;
+
+/// The fewest samples a ground run must collect before it compares anything.
+///
+/// The site of the run may fall to a rival before the run ends, and the sample
+/// stops there. The floor is far above the span the comparison needs, so a run
+/// that lost its site early fails rather than comparing a handful of ticks.
+const SAMPLE_FLOOR: usize = 400;
 
 /// The ticks the weather fixture runs.
 ///
@@ -171,13 +180,30 @@ fn sample_a_run(seed: u64, ticks: u32) -> Vec<Sample> {
     let mut samples = Vec::new();
     for _ in 0..ticks {
         world.step(THREADS).expect("the fixture steps");
+        // **A site does not always live for the whole run.** This world holds
+        // four factions and it runs for more than a thousand ticks, and a
+        // rival takes the seat before the end of it. A site that has gone
+        // answers no rate, so the sample stops there. The bound below states
+        // how many ticks the assertions need, so a run that ended early fails
+        // rather than measuring a handful of ticks.[^6]
+        //
+        // [^6]: Testing rules, section 2a. `.agents/rules/testing.md`
+        let Some(scale) = world.production_scale(site) else {
+            break;
+        };
         samples.push(Sample {
             taken: taken_over_the_disc(&world, address),
-            scale: world.production_scale(site).expect("the site is live"),
+            scale,
             wet: world.ground_is_wet(address) == Some(true),
             terraces: terraces_over_the_disc(&world, address),
         });
     }
+    assert!(
+        samples.len() > SAMPLE_FLOOR,
+        "the site lived for {} of the {ticks} ticks the fixture asked for, \
+         which is too few to compare",
+        samples.len(),
+    );
     samples
 }
 
@@ -188,10 +214,26 @@ fn production_falls_as_the_ground_is_drawn_down_and_recovers_when_it_does() {
     // Hold every other input still. Compare only the samples that agree on
     // the weather and on the terraces, so the ground is the one term left
     // that can move.
-    let last = samples.last().expect("the run has samples");
+    //
+    // **The reference is the state the run spent the most ticks in, and not
+    // the state of its last tick.** A run ends when its site falls, so the
+    // last tick reports whatever the weather happened to be at that moment. A
+    // reference taken from one arbitrary tick can name a rare state, and the
+    // span is then too short to compare. The most common state is the longest
+    // span the run offers, which is what the assertion below asks for.[^8]
+    //
+    // [^8]: Findings register, FND-727. `docs/FINDINGS.md`
+    let mut spans: BTreeMap<(bool, usize), usize> = BTreeMap::new();
+    for sample in &samples {
+        *spans.entry((sample.wet, sample.terraces)).or_default() += 1;
+    }
+    let (state, _) = spans
+        .iter()
+        .max_by_key(|(_, count)| **count)
+        .expect("the run has samples");
     let held: Vec<&Sample> = samples
         .iter()
-        .filter(|sample| sample.wet == last.wet && sample.terraces == last.terraces)
+        .filter(|sample| (sample.wet, sample.terraces) == *state)
         .collect();
     assert!(
         held.len() > 100,
@@ -248,13 +290,28 @@ fn production_rises_when_the_ground_is_wet_and_falls_when_it_dries() {
         seats.len()
     );
 
-    // No unit stands in this world. Nobody gathers, so the disc of every site
-    // keeps its whole store, and nobody builds, so no terrace stands. The
-    // ground term and the terrace term are therefore held still by
-    // construction, and the weather is the one term left that can move. The
-    // assertions below check that, rather than assume it.
-    let mut wet: Vec<Vec<Fix32>> = vec![Vec::new(); seats.len()];
-    let mut dry: Vec<Vec<Fix32>> = vec![Vec::new(); seats.len()];
+    // No unit stands in this world. Nobody gathers and nobody builds, so no
+    // terrace stands and no unit draws a disc down. The terrace term is
+    // therefore held still by construction, and the assertion inside the loop
+    // checks that rather than assuming it.
+    assert_eq!(
+        world.soldiers().len(),
+        0,
+        "the fixture must hold no unit, or the ground term moves under it"
+    );
+
+    // **A unit is not the only thing that draws the ground down.** A storm
+    // flattens a share of the food a tile carries, and the loss goes into the
+    // one ledger that records every take, which is the ledger this reader
+    // asks. The ground term therefore moves in a world that holds no unit at
+    // all. The sample carries what the disc had lost at each tick, and the
+    // comparison below pairs a wet tick against a dry tick that had lost the
+    // same amount. That holds the ground term still by comparison rather than
+    // by construction, and it keeps the exact equality the test asserts.[^7]
+    //
+    // [^7]: Findings register, FND-728. `docs/FINDINGS.md`
+    let mut wet: Vec<Vec<(Fix32, u32)>> = vec![Vec::new(); seats.len()];
+    let mut dry: Vec<Vec<(Fix32, u32)>> = vec![Vec::new(); seats.len()];
     for _ in 0..WET_TICKS {
         world.step(THREADS).expect("the fixture steps");
         for (index, (site, address)) in seats.iter().enumerate() {
@@ -262,35 +319,34 @@ fn production_rises_when_the_ground_is_wet_and_falls_when_it_dries() {
                 continue;
             };
             assert_eq!(
-                taken_over_the_disc(&world, *address),
-                0,
-                "no unit stands in this world, so nothing may draw the ground \
-                 down"
-            );
-            assert_eq!(
                 terraces_over_the_disc(&world, *address),
                 0,
                 "no unit stands in this world, so no terrace may stand"
             );
+            let taken = taken_over_the_disc(&world, *address);
             if world.ground_is_wet(*address) == Some(true) {
-                wet[index].push(scale);
+                wet[index].push((scale, taken));
             } else {
-                dry[index].push(scale);
+                dry[index].push((scale, taken));
             }
         }
     }
 
-    // A cell that holds both a wet tick and a dry tick is the case this test
-    // needs. The count is an assertion about the weather: a field that never
-    // dried anywhere would leave the assertion below with nothing to compare.
+    // A cell that holds a wet tick and a dry tick at one ground state is the
+    // case this test needs. The count is an assertion about the weather: a
+    // field that never dried anywhere would leave the assertion below with
+    // nothing to compare.
     let mut both = 0usize;
+    let mut pairs = 0usize;
     for index in 0..seats.len() {
-        if wet[index].is_empty() || dry[index].is_empty() {
-            continue;
-        }
-        both += 1;
-        for soaked in &wet[index] {
-            for parched in &dry[index] {
+        let mut compared = false;
+        for (soaked, wet_taken) in &wet[index] {
+            for (parched, dry_taken) in &dry[index] {
+                if wet_taken != dry_taken {
+                    continue;
+                }
+                compared = true;
+                pairs += 1;
                 assert_eq!(
                     *soaked,
                     sim_math::add(*parched, WET_WEIGHT),
@@ -302,12 +358,20 @@ fn production_rises_when_the_ground_is_wet_and_falls_when_it_dries() {
                 );
             }
         }
+        if compared {
+            both += 1;
+        }
     }
     assert!(
         both > 0,
-        "the weather must both wet and dry the cell of at least one site, or \
-         the assertion above measures nothing. None of {} sites saw both",
+        "the weather must both wet and dry the cell of at least one site at \
+         one ground state, or the assertion above measures nothing. None of \
+         {} sites saw both",
         seats.len()
+    );
+    assert!(
+        pairs > 0,
+        "the fixture compared no pair, so the equality above ran on nothing"
     );
 }
 
