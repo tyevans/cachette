@@ -32,7 +32,7 @@ use cachette_core::choose::{self, CarryClass};
 use cachette_core::cohort::NeedRule;
 use cachette_core::hex::Axial;
 use cachette_core::position::WORK_COMMODITY;
-use cachette_core::resource::{Amount, ResourceKind};
+use cachette_core::resource::{Amount, RecoveryRules, ResourceKind, RESOURCE_KIND_COUNT};
 use cachette_core::types::{Entity, FactionId, Fix32, TileIdx};
 use cachette_core::world::{World, WorldConfig};
 
@@ -58,7 +58,79 @@ fn demonstration() -> World {
 ///
 /// The count is above one, so an assertion that reads a laden unit reads a
 /// set of them. It bounds no measurement.
-const CARRIERS: usize = 4;
+///
+/// **A storm ends a unit that stands in the open, and this fixture runs for
+/// thousands of ticks.**[^1] The count is well above the floor the fixture
+/// states, so the storms of a long run leave a set behind rather than one
+/// unit or none.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-725. `docs/FINDINGS.md`
+const CARRIERS: usize = 16;
+
+/// How far from the patch the fixture takes the ground that a carrier loads on.
+///
+/// The spread is well inside the walk to the site, so every tile it reaches
+/// still stands a long walk from the site.
+const SEED_SPREAD: u32 = 12;
+
+/// The smallest set of carriers that the fixture hands back.
+///
+/// The fixture drops a carrier on the tick a storm takes it. A run that fell
+/// to this floor fails, and it names the storms rather than the subsystem the
+/// test measures.
+const CARRIER_FLOOR: usize = 2;
+
+/// Answers whether the storm log of the last step names the unit.
+///
+/// A storm ends a unit that stands in the open, and it obeys no rule of the
+/// carry pass.[^1] Every loop below drops the units this names, and no others.
+/// A loop that dropped every unit the world no longer holds would pass against
+/// a run that lost them all for another reason.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-725. `docs/FINDINGS.md`
+fn a_storm_took(world: &World, unit: Entity) -> bool {
+    world
+        .units_lost_to_storms()
+        .iter()
+        .any(|lost| lost.unit == unit.to_bits())
+}
+
+/// Returns the carriers that the storm log of the last step does not name.
+fn survivors_of_the_last_step(world: &World, carriers: &[Entity]) -> Vec<Entity> {
+    let taken: Vec<u64> = world
+        .units_lost_to_storms()
+        .iter()
+        .map(|lost| lost.unit)
+        .collect();
+    carriers
+        .iter()
+        .copied()
+        .filter(|unit| !taken.contains(&unit.to_bits()))
+        .collect()
+}
+
+/// Asserts that the world still holds every carrier of the set.
+///
+/// The caller drops the units the storm log names before it calls this, so a
+/// unit missing here left the world for a reason the storm log does not carry.
+fn assert_every_carrier_lives(world: &World, carriers: &[Entity], stage: &str, tick: u32) {
+    for unit in carriers {
+        assert!(
+            world.soldiers().contains(*unit),
+            "carrier {unit:?} left the world on tick {tick} of the {stage}, and no storm log \
+             names it"
+        );
+    }
+    assert!(
+        carriers.len() >= CARRIER_FLOOR,
+        "the storms left {} carriers by tick {tick} of the {stage}, so the fixture holds no set",
+        carriers.len()
+    );
+}
 
 /// The walk between the site and the ground that the carriers load on.
 ///
@@ -174,6 +246,17 @@ fn a_world_built_for_the_carry() -> Carriers {
         world.set_externally_controlled(FactionId(index), true);
     }
     world.set_carry_mark(CARRY_MARK);
+    // **The fixture states how fast a deposit recovers.** A deposit under the
+    // sky of a region returns one unit in tens of ticks, and a storm flattens
+    // a share of what a tile still holds, so the food under a carrier is a
+    // property of the weather rather than of the fixture.[^1] [^2] A period of
+    // one tick makes the ground the fixture wrote hold for the whole window.
+    //
+    // [^1]: Findings register, FND-745. `docs/FINDINGS.md`
+    // [^2]: Findings register, FND-728. `docs/FINDINGS.md`
+    world.set_recovery_rules(
+        RecoveryRules::from_ticks([Some(1); RESOURCE_KIND_COUNT]).expect("no period is zero"),
+    );
     // The threshold is zero, so no unit of this fixture is ever short and
     // nothing ends it. The decay and the ration keep the rule the world
     // holds, because the hunger of a carrier is what drives it to forage.
@@ -200,16 +283,32 @@ fn a_world_built_for_the_carry() -> Carriers {
         .set_production_rate(site, ration, Fix32::ZERO)
         .expect("the site resolves");
 
+    // **Every carrier gets ground of its own.** A deposit carries one
+    // gatherer past the carry mark and then waits tens of ticks for the next
+    // recovery, so a crowd on one deposit fills nobody. The fixture takes one
+    // tile of food for each carrier, and it states that it found them.[^1]
+    //
+    // Each tile stands a long walk from the site, so the return field still
+    // steers a carrier across more than one level 1 block.
+    //
+    // [^1]: Findings register, FND-745. `docs/FINDINGS.md`
     let patch = food_ground_at(&world, home, CARRY_SPAN);
     let seeds: Vec<Axial> = every_address(&world)
         .into_iter()
         .filter(|at| {
-            patch.distance(*at) <= 2 && world.admits_a_unit(*at) && food_on(&world, *at) >= 8
+            patch.distance(*at) <= SEED_SPREAD
+                && home.distance(*at) >= CARRY_SPAN - SEED_SPREAD
+                && world.admits_a_unit(*at)
+                && food_on(&world, *at) >= 8
         })
+        .take(CARRIERS)
         .collect();
-    assert!(
-        !seeds.is_empty(),
-        "the fixture found no ground that carries food a walk of {CARRY_SPAN} from the site"
+    assert_eq!(
+        seeds.len(),
+        CARRIERS,
+        "the fixture found {} tiles that carry food a walk of {CARRY_SPAN} from the site, and \
+         it needs one for each of the {CARRIERS} carriers",
+        seeds.len()
     );
     let spots: Vec<Axial> = every_address(&world)
         .into_iter()
@@ -244,9 +343,12 @@ fn a_world_built_for_the_carry() -> Carriers {
     // ever, so it would take no option row and it would deliver nothing.[^1]
     //
     // [^1]: Findings register, FND-576. `docs/FINDINGS.md`
+    let mut units = units;
     let mut arrived = false;
-    for _ in 0..ARRIVE_TICKS {
+    for tick in 0..ARRIVE_TICKS {
         world.step(2).expect("the step runs");
+        units = survivors_of_the_last_step(&world, &units);
+        assert_every_carrier_lives(&world, &units, "walk out", tick);
         if units
             .iter()
             .all(|unit| world.soldiers().sent(*unit) == Some(None))
@@ -264,8 +366,10 @@ fn a_world_built_for_the_carry() -> Carriers {
     // The store of the site is empty, so the need of each carrier falls and
     // the carrier forages. The patch under it carries the food.
     let mut loaded = false;
-    for _ in 0..LOAD_TICKS {
+    for tick in 0..LOAD_TICKS {
         world.step(2).expect("the step runs");
+        units = survivors_of_the_last_step(&world, &units);
+        assert_every_carrier_lives(&world, &units, "load", tick);
         if units
             .iter()
             .all(|unit| world.carry_class(*unit) == Some(CarryClass::Laden))
@@ -276,8 +380,10 @@ fn a_world_built_for_the_carry() -> Carriers {
     }
     assert!(
         loaded,
-        "a carrier stayed below the carry mark for {LOAD_TICKS} ticks, \
-         so the fixture holds no laden unit"
+        "a carrier stayed below the carry mark for {LOAD_TICKS} ticks, and the fixture holds \
+         {} carriers on {} tiles of food",
+        units.len(),
+        seeds.len()
     );
 
     // **The fixture now feeds every carrier to the full.** The row that
@@ -604,7 +710,8 @@ fn the_step_of_a_laden_unit_follows_the_return_field() {
         home: _,
         units,
     } = a_world_built_for_the_carry();
-    let mut measured = false;
+    let mut measured = 0;
+    let mut steered = 0;
     for _ in 0..HOME_TICKS {
         // The units this test is about, with the tile each of them must
         // reach.
@@ -636,20 +743,38 @@ fn the_step_of_a_laden_unit_follows_the_return_field() {
         }
         world.step(2).expect("the step runs");
         for (unit, here, there) in expected {
-            measured = true;
-            let now = world.soldiers().address(unit).expect("the unit is alive");
+            if a_storm_took(&world, unit) {
+                continue;
+            }
+            measured += 1;
+            let now = world
+                .soldiers()
+                .address(unit)
+                .expect("no storm log names this unit");
             assert!(
                 now == there || now == here,
                 "a laden unit was sent to {there:?} from {here:?} and it is at {now:?}"
             );
+            if now == there {
+                steered += 1;
+            }
         }
-        if measured {
+        if steered > 0 {
             break;
         }
     }
     assert!(
-        measured,
+        measured > 0,
         "the fixture found no laden unit that the field steers, so it measures nothing"
+    );
+    // **A unit that stayed where it was proves nothing about the field.** The
+    // admission pass may refuse a step, so a tick on which nobody moved is a
+    // fair tick. A run on which nobody ever moved is not, and a test that
+    // accepted one would stay green with the field reversed.
+    assert!(
+        steered > 0,
+        "no laden unit of the {measured} the field steered ever reached the tile the field \
+         names, so the field decides no step"
     );
 }
 
@@ -695,6 +820,18 @@ fn a_laden_unit_reaches_the_tile_of_its_home_and_not_only_the_cell() {
             ..WorldConfig::DEFAULT
         })
         .expect("the world builds");
+        // **The fixture states how fast a deposit recovers.** A deposit under
+        // the sky of a region returns one unit in tens of ticks, and a storm
+        // flattens a share of what a tile still holds, so a lone gatherer on
+        // one tile fills its carry at a rate the weather decides.[^4] [^5] A
+        // period of one tick takes the weather out of the load, and the walk
+        // is what this test measures.
+        //
+        // [^4]: Findings register, FND-745. `docs/FINDINGS.md`
+        // [^5]: Findings register, FND-728. `docs/FINDINGS.md`
+        world.set_recovery_rules(
+            RecoveryRules::from_ticks([Some(1); RESOURCE_KIND_COUNT]).expect("no period is zero"),
+        );
         // Nothing starves and nothing eats, so the test measures the walk.
         world.set_need_rule(
             NeedRule::new(
@@ -719,13 +856,25 @@ fn a_laden_unit_reaches_the_tile_of_its_home_and_not_only_the_cell() {
         // The unit gathers with no home, so it holds a load when it is given
         // one. The gather resolve runs before the delivery in a frame.
         let mark = world.carry_mark().0;
+        let mut lost_to_a_storm = false;
         for _ in 0..LAST_MILE_GATHER {
             if carried_food(&world, unit) >= mark {
                 break;
             }
             world.order_gather(unit, ResourceKind::Food);
             world.step(1).expect("the step runs");
+            if a_storm_took(&world, unit) {
+                lost_to_a_storm = true;
+                break;
+            }
         }
+        if lost_to_a_storm {
+            continue;
+        }
+        assert!(
+            world.soldiers().contains(unit),
+            "the unit of seed {seed} left the world while it gathered, and no storm log names it"
+        );
         // **A unit below the carry mark is free, and the deliver row is worth
         // nothing to it.** Such a unit roams, and a test that counted it
         // would measure the roam.[^3]
@@ -735,16 +884,32 @@ fn a_laden_unit_reaches_the_tile_of_its_home_and_not_only_the_cell() {
             continue;
         }
         assert!(world.set_home_site(unit, Some(site)), "the unit takes home");
-        laden += 1;
-        for _ in 0..LAST_MILE_WALK {
+        let mut walked_home = false;
+        for tick in 0..LAST_MILE_WALK {
             world.step(1).expect("the step runs");
-            if world.soldiers().address(unit).is_none() {
+            if a_storm_took(&world, unit) {
+                lost_to_a_storm = true;
                 break;
             }
+            assert!(
+                world.soldiers().contains(unit),
+                "the unit of seed {seed} left the world on tick {tick} of its walk home, and \
+                 no storm log names it"
+            );
             if carried_food(&world, unit) == 0 {
-                delivered += 1;
+                walked_home = true;
                 break;
             }
+        }
+        // **A storm that ends the carrier is not an open last mile.** The run
+        // counts a seed only when the carrier lived to answer, so a run that
+        // lost every carrier fails on the count below rather than passing.
+        if lost_to_a_storm {
+            continue;
+        }
+        laden += 1;
+        if walked_home {
+            delivered += 1;
         }
     }
     assert!(
