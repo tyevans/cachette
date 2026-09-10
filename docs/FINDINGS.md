@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-755**
+**Next number: FND-756**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20883,6 +20883,45 @@ from.
 failure reports a lower bound. A cheap check that runs before an expensive one
 hides the expensive one for as long as the cheap one is red.
 
+### FND-755 — A patience of the work plus four ticks measured how wet one world is
+
+**What the project believed.** A build fixture may give its run the work of the
+row and a small fixed margin. The margin covers the ticks a builder spends on a
+repair. Two tests of the upgrade table gave the work plus four ticks.
+
+**What is true.** The margin is a balance value, and the weather sets it. A
+region sky keeps the ground wet on most ticks, so a builder buys condition far
+more often than four times over one level. The engine is correct and the two
+patiences were wrong.
+
+**The evidence.** Both tests were run at the commit that made a map one region
+of a planet, and at its parent, each in its own worktree with its own target
+directory. Both passed at the parent and both failed at the child. The panic of
+the second test names the count: the level asks for 144 work, the run took the
+whole patience of 148 ticks, and the work stood at 131. The builder therefore
+bought condition on 13 ticks and no unit starved.
+
+A third test of the same file already held the repair. An earlier sweep gave it
+a patience of twice the work and made it subtract the ticks that added no work.
+The idiom reached one test of the file and not the two beside it.
+
+**What follows.** Three things.
+
+**State the rule, do not allow a margin.** A run counts the ticks that added no
+work and subtracts them. Every other tick added exactly one. The assertion is
+then stronger than the one it replaces, and no sky can move it.
+
+**A perturbation must reach the arm the test reads.** The resolution of a build
+row and the spending of a tick both read one repair price, and they do different
+jobs.[^F755A] The gate of the resolution was widened first, and the test stayed
+green. The price itself was then made to charge a whole unit for any gap, and
+the test failed. A proof that a test can fail names the arm it perturbed.
+
+**The file was on no list.** The sweep of the fixtures at risk under the new sky
+selected files by tick count, which the register already records as the wrong
+criterion.[^F755B] This file steps a world for about 150 ticks and it was red at
+the tip. The sweep item holds the remaining rows.[^F751A]
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -20920,3 +20959,5 @@ hides the expensive one for as long as the cheap one is red.
 [^F753B]: The audit of the four win readers. `docs/research/what-the-win-conditions-are-and-what-can-reach-them.md`
 [^F753C]: The measurement of every win quantity over 60 games. `docs/research/what-a-game-attains-on-every-win-quantity.md`
 [^F753D]: ADR-0204, every win path holds a bar of its own. `docs/adrs/draft/adr-0204-every-win-path-holds-a-bar-of-its-own.md`
+[^F755A]: The build advance and the repair price. `crates/cachette-core/src/upgrade.rs`
+[^F755B]: Findings register, FND-751. `docs/FINDINGS.md`

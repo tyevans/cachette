@@ -423,7 +423,15 @@ fn a_level_rises_in_place_and_the_entry_count_does_not_grow() {
 /// test and the test went red, which is the only proof that the fixture
 /// reaches the case.[^1]
 ///
+/// **The ticks that bought condition are named, not allowed for.** The
+/// patience covers the work of the row and the wear beside it, and the
+/// assertion subtracts the ticks that added no work. Every other tick added
+/// exactly one. A patience that allowed a fixed margin of repair ticks
+/// measured how wet the ground of one world is, which is a balance value that
+/// no assertion here reads.[^2]
+///
 /// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+/// [^2]: Findings register, FND-755. `docs/FINDINGS.md`
 #[test]
 fn a_level_rises_while_the_weather_wears_what_stands_there() {
     let mut field = world(SEED);
@@ -439,8 +447,12 @@ fn a_level_rises_while_the_weather_wears_what_stands_there() {
 
     let mut wet_ticks = 0u32;
     let mut worn = false;
-    for _ in 0..u64::from(second.work) + 4 {
+    let mut taken = 0u64;
+    let mut repaired = 0u64;
+    for _ in 0..u64::from(second.work) * 2 {
+        let before = field.upgrade_at(address).map(|site| site.progress.0);
         field.step(1).expect("the step must run");
+        taken += 1;
         if field.ground_is_wet(address) == Some(true) {
             wet_ticks += 1;
         }
@@ -453,6 +465,9 @@ fn a_level_rises_while_the_weather_wears_what_stands_there() {
         if field.upgrade_level(address) >= 2 {
             break;
         }
+        if field.upgrade_at(address).map(|site| site.progress.0) == before {
+            repaired += 1;
+        }
     }
     assert!(
         wet_ticks > 0,
@@ -464,8 +479,25 @@ fn a_level_rises_while_the_weather_wears_what_stands_there() {
         2,
         "the wear held the level where it was"
     );
+    assert_eq!(
+        taken - repaired,
+        u64::from(second.work),
+        "one builder adds one work on every tick it does not repair, and it \
+         repaired on {repaired} of {taken} ticks"
+    );
 }
 
+/// The second level of a category writes its own capacity, not the first.
+///
+/// **The ticks that bought condition are named, not allowed for.** The
+/// weather wears what stands on the tile, and a builder on a worn site spends
+/// its tick on the repair rather than on the level. The patience therefore
+/// covers the work of the row and the wear beside it, and the assertion
+/// subtracts the ticks that added no work. A patience that allowed a fixed
+/// margin of repair ticks measured how wet the ground of one world is, which
+/// is a balance value that no assertion here reads.[^1]
+///
+/// [^1]: Findings register, FND-755. `docs/FINDINGS.md`
 #[test]
 fn the_second_level_changes_its_own_column() {
     let mut field = world(SEED);
@@ -488,7 +520,14 @@ fn the_second_level_changes_its_own_column() {
     assert_eq!(field.tile_capacity(address), Some(first.capacity_change));
     assert!(first.capacity_change > ground);
 
-    step_until_level(&mut field, address, 2, u64::from(second.work) + 4);
+    let (to_second, repaired) =
+        step_until_level_counted(&mut field, address, 2, u64::from(second.work) * 2);
+    assert_eq!(
+        to_second - repaired,
+        u64::from(second.work),
+        "one builder adds one work on every tick it does not repair, and it \
+         repaired on {repaired} of {to_second} ticks"
+    );
     assert_eq!(
         field.tile_capacity(address),
         Some(second.capacity_change),
