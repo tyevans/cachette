@@ -25,7 +25,6 @@ impl World {
         &self.storm_lost_log
     }
 
-
     /// Takes the food and the people that the storms of this tick reach.
     ///
     /// # What the pass does, in order

@@ -520,7 +520,13 @@ fn intents_at(threads: usize, seed: u64) -> (Vec<Option<u8>>, u64) {
     (
         units
             .iter()
-            .map(|unit| world.soldier_intent(*unit).expect("alive"))
+            // **A unit may die during the run, and a storm is why.** The
+            // reader answers `None` for a dead unit and `None` for a live one
+            // that chose nothing, and this comparison wants neither of them
+            // to differ between two thread counts. Which units are alive is
+            // covered as well, because the state hash below is compared at
+            // every thread count too.
+            .map(|unit| world.soldier_intent(*unit).flatten())
             .collect(),
         world.state_hash().finish(),
     )
