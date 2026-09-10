@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-759**
+**Next number: FND-760**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -21058,6 +21058,55 @@ property of one fixture and not of the palette.
 **A palette is a declaration site.** The overlay colours and the faction
 colours are two tables that must stay apart, and no check reads both.[^F487B]
 
+**Closed.** A check now reads both tables and keeps every overlay colour a
+minimum distance from every faction colour. Most of the overlay palette moved
+to clear the bar, and the three colours this row names are among what
+moved.[^F758D]
+
+### FND-759 — The overlay readability test read a unit mark and not the ground, so most overlays were never measured
+
+**What the project believed.** The viewer test that keeps the holder readable
+under every overlay measures every registered overlay. It reads the tile where
+each overlay paints most strongly, and it stops itself when the holder changes
+no pixel there, so it cannot measure a fixture instead of a drawing.[^F759A]
+
+**What is true.** The test reads one pixel near the corner of the tile. A unit
+bead, a site mark and a holding outline all cover that pixel. The fixture puts
+a crowd and a built site on the tile that most overlays paint most strongly, so
+for those overlays the test compared a white unit bead against bare ground. The
+guard passed, because a bead against ground differs by a great deal.
+
+**The evidence.** A probe printed the ground colour, the drawn colour and the
+two readings for every registered overlay, and then walked the held tiles of
+each overlay in falling strength. The strongest held tile of six of the eleven
+overlays is one tile, and the drawn colour there is pure white in the founded
+world and the bare ground in the unfounded one. The reading was 412 of 3 times
+255. The largest reading the holder tint can produce at that tile is the
+distance from the faction colour to the ground, which is 128. A reading above
+that bound cannot come from the holder.[^F759A] [^F759B]
+
+The same probe found a clean tile at the same strength for five of those six.
+The crowding overlay has none, because it paints where units stand and a unit
+draws a bead over the tile it stands on.
+
+**What follows.** A test that draws cannot be the guard for a palette rule. It
+reports the tiles one world happens to hold, at the strengths that world
+happens to reach, through whatever the drawing painted last over the pixel it
+samples. The guard is a check that reads the two colour tables and draws
+nothing.[^F759C]
+
+The wind overlay is the case this hid. Its strongest held tile reached a
+strength of 202 against a faction colour 48 away, and the arithmetic of the
+mix puts the holder at 8 of the 49 the tint is worth there. That is worse than
+the temperature overlay, which is the one that went red. **This figure is
+derived from the mix, not measured**, because the palette repair moved the wind
+colours before anyone read that pixel.
+
+**The fixture is still blind, and that is on purpose.** The palette check
+covers every overlay without drawing, so the class is closed. Repairing the
+sampled pixel is a separate piece of work, and the crowding overlay shows that
+it cannot be done by choosing a different tile.
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -21106,3 +21155,7 @@ colours are two tables that must stay apart, and no check reads both.[^F487B]
 [^F758A]: The overlay deck of the viewer. `crates/cachette-view/src/overlay.rs`
 [^F758B]: The faction colours and the holder weight. `crates/cachette-view/src/paint.rs`
 [^F758C]: The viewer test of the overlay deck. `crates/cachette-view/tests/the_watcher_switches_the_map_between_overlays.rs`
+[^F758D]: The overlay palette check. `crates/cachette-view/tests/an_overlay_colour_never_hides_the_holder.rs`
+[^F759A]: The viewer test of the overlay deck, the readability test. `crates/cachette-view/tests/the_watcher_switches_the_map_between_overlays.rs`
+[^F759B]: The faction colours and the holder weight. `crates/cachette-view/src/paint.rs`
+[^F759C]: The overlay palette check. `crates/cachette-view/tests/an_overlay_colour_never_hides_the_holder.rs`
