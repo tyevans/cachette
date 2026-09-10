@@ -1,4 +1,4 @@
-"""Black-box tests of the unit type reads and of the five step logs.
+"""Black-box tests of the unit type reads and of the step logs.
 
 Every test here starts at the Python boundary. The core held the type table,
 the five logs and the upkeep rate before any binding read one, and their own
@@ -14,6 +14,8 @@ References
 [^3]: ADR-0152, a faction plans its roads and zones with one solver,
 decision D5.
 ``docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md``
+
+[^4]: Findings register, FND-762. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -139,11 +141,21 @@ def _short_world(seed: int) -> cachette.World:
 
 
 def _step_until(
-    world: cachette.World, read: str, threads: int = 2
+    world: cachette.World,
+    read: str,
+    threads: int = 2,
+    stormed: list[np.ndarray] | None = None,
 ) -> dict[str, np.ndarray]:
-    """Step until one named log holds an entry, and return that log."""
+    """Step until one named log holds an entry, and return that log.
+
+    A caller that passes a list gets the unit column of the storm log of every
+    step, in step order. **The storm log holds one step alone**, so only a
+    reader on every step sees each unit that a storm ended.
+    """
     for _ in range(LOG_CEILING):
         world.step(threads=threads)
+        if stormed is not None:
+            stormed.append(world.storm_log_columns()["unit"])
         columns: dict[str, np.ndarray] = getattr(world, read)()
         if len(columns["tick"]):
             return columns
@@ -266,11 +278,26 @@ def test_a_step_that_starved_nobody_gives_an_empty_starved_log(seed: int) -> Non
 
 
 def test_the_starved_log_names_the_units_a_shortage_ended(seed: int) -> None:
+    """Every unit that left is named by the starved log or by the storm log.
+
+    **A storm ends units of this world before the shortage does.** A map is
+    one region of a planet, and the sky of a region raises storms that end
+    units in the open. A count that took every unit that left for a starved
+    unit then blamed the shortage for the storm.[^4]
+
+    The fixture keeps the world that starves many units at once. The count
+    takes away the units that the storm log names, and no other unit.
+    """
     world = _short_world(seed)
     before = world.soldier_count
-    columns = _step_until(world, "starved_log_columns")
+    stormed: list[np.ndarray] = []
+    columns = _step_until(world, "starved_log_columns", stormed=stormed)
+    storm_dead = np.concatenate(stormed)
     assert len(columns["unit"]) == len(columns["tick"]) == len(columns["deficit"])
-    assert world.soldier_count == before - len(columns["unit"])
+    assert not np.isin(columns["unit"], storm_dead).any(), (
+        "the starved log and the storm log name one unit"
+    )
+    assert world.soldier_count == before - len(columns["unit"]) - storm_dead.size
     for tick in columns["tick"]:
         assert tick == world.tick
     for deficit in columns["deficit"]:
@@ -279,6 +306,27 @@ def test_the_starved_log_names_the_units_a_shortage_ended(seed: int) -> None:
         assert deficit > 0
     for unit in columns["unit"]:
         # The unit is dead, so its identity never resolves again.
+        with pytest.raises(cachette.ViewError):
+            world.soldier_tile(int(unit))
+
+
+def test_the_storm_log_names_the_units_a_storm_ended(seed: int) -> None:
+    """The storm log names each unit a storm ended on the last step.
+
+    The short world stands in the sky of a region, and that sky ends units in
+    the open inside the ceiling. Each unit the log names is dead, and the
+    starved log of the same step does not name it.
+    """
+    world = _short_world(seed)
+    columns = _step_until(world, "storm_log_columns")
+    width = len(columns["tick"])
+    for name in ("unit", "tile", "faction", "unit_type"):
+        assert len(columns[name]) == width, name
+    assert (columns["tick"] == world.tick).all()
+    assert (columns["faction"] < world.faction_count).all()
+    assert (columns["tile"] < world.width * world.height).all()
+    assert not np.isin(columns["unit"], world.starved_log_columns()["unit"]).any()
+    for unit in columns["unit"]:
         with pytest.raises(cachette.ViewError):
             world.soldier_tile(int(unit))
 

@@ -39,9 +39,34 @@ HEIGHT = 180
 """The frame that the renderer test fills."""
 
 
-def build() -> World:
-    """Give back a world with factions, units and weather on it."""
-    world = World(width=EXTENT, height=EXTENT, seed=SEED, faction_count=2)
+PLANET_CENTRE = 0
+"""The centre latitude of a whole planet, in hundredths of a degree."""
+
+PLANET_SPAN = 18000
+"""The latitude span of a whole planet, in hundredths of a degree.
+
+A world is one region of a planet unless the caller states otherwise. The
+region sky of this world blows winds that the wind overlay paints in one
+colour, so the test of that overlay states the span of the planet.
+"""
+
+
+def build(
+    latitude_centre: int | None = None, latitude_span: int | None = None
+) -> World:
+    """Give back a world with factions, units and weather on it.
+
+    A caller that states no latitudes gets the region the engine calls its
+    default.
+    """
+    world = World(
+        width=EXTENT,
+        height=EXTENT,
+        seed=SEED,
+        faction_count=2,
+        latitude_centre=latitude_centre,
+        latitude_span=latitude_span,
+    )
     world.seed_world()
     for _ in range(8):
         world.step(1)
@@ -157,8 +182,13 @@ def test_the_cloud_overlay_stands_on_the_cloud_column() -> None:
 
 
 def test_the_wind_overlay_paints_one_colour_for_one_wind() -> None:
-    """The colour follows the wind vector of the tile, and nothing else."""
-    world = build()
+    """The colour follows the wind vector of the tile, and nothing else.
+
+    The world stands under the span of the planet. The winds of the region sky
+    over this world all paint one colour, and a palette that never moves proves
+    nothing about which wind a colour follows.
+    """
+    world = build(latitude_centre=PLANET_CENTRE, latitude_span=PLANET_SPAN)
     winds = world.tile_winds()
     colour = world.overlay_paint("wind")["colour"]
     keys = winds["q"].astype(np.int64) * (1 << 20) + winds["r"].astype(np.int64)

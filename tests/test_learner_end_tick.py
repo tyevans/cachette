@@ -62,7 +62,13 @@ WORLD = EnvConfig(
 # The seed of a game that a win reader ends before the tick limit. The engine
 # fires the reader inside the interval one decision runs, so the clock of the
 # world stands past the end of this game.
-EARLY_SEED = 9
+#
+# **This seed is a fixture and it decays.** Which seed a reader ends early is a
+# property of the engine, so a change to what ends a game moves it. The seed
+# was 9 until the campaign raise took the renown weight, and that game then ran
+# to the limit. A search over seeds under this configuration finds the next
+# one. The tests assert the early ending rather than trust the number.
+EARLY_SEED = 116
 
 # The seed of a game that runs to the tick limit, where the engine compares
 # held ground and records a winner.

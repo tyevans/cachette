@@ -296,6 +296,40 @@ impl PyWorld {
         columns_of(python, world.starved_log())
     }
 
+    /// Returns the storm log of the last step, as a `dict` of NumPy arrays.
+    ///
+    /// A storm event says that a storm ended one unit. The engine writes one
+    /// entry for each unit that the storm pass of this step removed.
+    ///
+    /// **The log holds the last step alone.** The next step clears the log
+    /// before it does anything. The entries of one step are gone once another
+    /// step runs. Keep a copy of what you need. The engine holds no queue.
+    ///
+    /// **A storm and a shortage both end a unit, and each writes its own
+    /// log.** The starved log names the units a shortage ended. A caller that
+    /// accounts for every unit that left the world reads this log as well,
+    /// because the two deaths otherwise look alike.[^1]
+    ///
+    /// - `tick`, `numpy.uint64`. The step at which the storm ended the unit.
+    /// - `unit`, `numpy.uint64`. The identity of the unit that ended. It is
+    ///   not a slot index. It never resolves again, because the unit is
+    ///   dead.[^2]
+    /// - `tile`, `numpy.uint32`. The tile the unit stood on.
+    /// - `faction`, `numpy.uint16`. The faction the unit served.
+    /// - `unit_type`, `numpy.uint8`. The type the unit held.
+    ///
+    /// This method copies each column.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-762. `docs/FINDINGS.md`
+    /// [^2]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    /// [^3]: ADR-0044, what copies and what does not is declared at the call site. `docs/adrs/REGISTRY.md`
+    fn storm_log_columns<'py>(&self, python: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let world = self.lock();
+        columns_of(python, world.units_lost_to_storms())
+    }
+
     /// Returns the shortfall log of the last step, as a `dict` of NumPy
     /// arrays.
     ///

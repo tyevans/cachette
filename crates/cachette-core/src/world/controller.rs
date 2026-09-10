@@ -17,10 +17,38 @@ use crate::production::QueueOrder;
 use crate::rates::{RateError, RateSchedule};
 use crate::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use crate::stage::{self, Stage};
-use crate::trade::{Consideration, TradeRow, TRADE_OFFERED};
+use crate::trade::{Consideration, TradeError, TradeRow, TRADE_OFFERED};
 use crate::types::{Entity, FactionId, Fix32, TileIdx};
 use crate::unit_type::{UnitTypeId, UnitTypeRow, LEADER, UNIT_TYPE_COUNT};
 use crate::upgrade::UpgradeCategory;
+
+/// One negotiation step that the built-in controller chooses for a faction.
+///
+/// The step names one trade verb and the terms it takes. **The step is chosen
+/// once.** The legality answer checks the step that the verb would then take,
+/// and it holds no second statement of the choice.
+pub(super) enum TradeMove {
+    /// Restate the terms of an offer this faction answers, at the midpoint of
+    /// the two asks. The take side stands as it is, because a counteroffer
+    /// names both sides.
+    Counter {
+        other: FactionId,
+        give: Consideration,
+        take: Consideration,
+    },
+    /// Agree to a counteroffer that asks no more than this faction's board
+    /// asked.
+    Accept { other: FactionId },
+    /// Decline the terms of a live negotiation.
+    Refuse { other: FactionId },
+    /// Open a negotiation on the terms the two boards match.
+    Offer {
+        other: FactionId,
+        give: Consideration,
+        take: Consideration,
+        term: u32,
+    },
+}
 
 impl World {
     /// Returns the weight vector of one faction, or `None` when the world
@@ -448,62 +476,129 @@ impl World {
         None
     }
 
-    /// Takes the one negotiation step of one faction on one tick.
+    /// Returns the negotiation step one faction would take this tick, and
+    /// nothing when it has no step to take.
     ///
     /// An answer to a live negotiation comes before a new offer, so a faction
-    /// that owes an answer never opens a second pair while it owes one. Every
-    /// act passes the verb a Python caller calls.[^1]
+    /// that owes an answer never opens a second pair while it owes one.
     ///
     /// **The price is the integer midpoint of the two asking quantities.** No
     /// draw decides it. The faction accepts when the counteroffer asks no
-    /// more than its own board asked, and refuses otherwise.[^2]
+    /// more than its own board asked, and refuses otherwise.[^1]
+    ///
+    /// **This chooses the step and does not check it.** The verb that the
+    /// step names can still refuse it. The refusal reader below says whether
+    /// it would.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the surplus mark. `docs/reference/balance.md`
+    pub(super) fn controller_trade_move(&self, faction: FactionId) -> Option<TradeMove> {
+        if let Some((other, row)) = self.controller_answer_due(faction) {
+            let Some(own_ask) =
+                controller::asking_quantity_of(self.market.board(faction), row.take_kind)
+            else {
+                return Some(TradeMove::Refuse { other });
+            };
+            if row.status == TRADE_OFFERED {
+                let amount = controller::midpoint(row.give_amount, own_ask).max(1);
+                return Some(TradeMove::Counter {
+                    other,
+                    give: Consideration::resource(row.give_kind, amount),
+                    take: Consideration::resource(row.take_kind, row.take_amount),
+                });
+            }
+            if controller::accepts(row.give_amount, own_ask) {
+                return Some(TradeMove::Accept { other });
+            }
+            return Some(TradeMove::Refuse { other });
+        }
+        let (other, terms) = self.controller_match_due(faction)?;
+        Some(TradeMove::Offer {
+            other,
+            give: Consideration::resource(terms.give_kind, terms.give_amount),
+            take: Consideration::resource(terms.take_kind, terms.take_amount),
+            term: self.controller.contract_term(),
+        })
+    }
+
+    /// Returns the refusal that the verb of one negotiation step would give.
+    ///
+    /// **Each arm calls the check that its verb calls.** The legality answer
+    /// reads this, and the step below runs the same verbs, so the answer and
+    /// the verb cannot disagree about a trade row.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusal of the verb that the step names.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
+    pub(super) fn trade_move_refusal(
+        &self,
+        faction: FactionId,
+        step: &TradeMove,
+    ) -> Result<(), TradeError> {
+        match step {
+            TradeMove::Counter { other, give, take } => self
+                .counter_refusal(faction, *other, give.clone(), take.clone())
+                .map(|_| ()),
+            TradeMove::Accept { other } | TradeMove::Refuse { other } => {
+                self.answer_refusal(faction, *other).map(|_| ())
+            }
+            TradeMove::Offer {
+                other,
+                give,
+                take,
+                term,
+            } => self
+                .offer_refusal(faction, *other, give.clone(), take.clone(), *term)
+                .map(|_| ()),
+        }
+    }
+
+    /// Takes the one negotiation step of one faction on one tick.
+    ///
+    /// The step is the one the reader above chooses. Every act passes the
+    /// verb a Python caller calls.[^1]
     ///
     /// Returns whether a verb took the step.
     ///
     /// # References
     ///
     /// [^1]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D2. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
-    /// [^2]: Balance register, the surplus mark. `docs/reference/balance.md`
     pub(super) fn controller_trade_step(&mut self, faction: FactionId) -> bool {
-        if let Some((other, row)) = self.controller_answer_due(faction) {
-            let own_ask = controller::asking_quantity_of(self.market.board(faction), row.take_kind);
-            let Some(own_ask) = own_ask else {
-                return self.refuse_trade(faction, other).is_ok();
-            };
-            if row.status == TRADE_OFFERED {
-                // This faction answered the offer, so it restates the terms
-                // at the midpoint of the two asks. The take side is restated
-                // as it stands, because a counteroffer names both sides.
-                let amount = controller::midpoint(row.give_amount, own_ask).max(1);
-                let give = Consideration::resource(row.give_kind, amount);
-                let take = Consideration::resource(row.take_kind, row.take_amount);
-                return self
-                    .counter_consideration(faction, other, give, take)
-                    .is_ok();
-            }
-            if controller::accepts(row.give_amount, own_ask) {
-                if self.accept_trade(faction, other).is_ok() {
-                    self.controller.count_bound();
-                    return true;
-                }
-                return false;
-            }
-            return self.refuse_trade(faction, other).is_ok();
-        }
-        let Some((other, terms)) = self.controller_match_due(faction) else {
+        let Some(step) = self.controller_trade_move(faction) else {
             return false;
         };
-        let term = self.controller.contract_term();
-        let give = Consideration::resource(terms.give_kind, terms.give_amount);
-        let take = Consideration::resource(terms.take_kind, terms.take_amount);
-        if self
-            .offer_consideration(faction, other, give, take, term)
-            .is_err()
-        {
-            return false;
+        match step {
+            TradeMove::Counter { other, give, take } => self
+                .counter_consideration(faction, other, give, take)
+                .is_ok(),
+            TradeMove::Accept { other } => {
+                let bound = self.accept_trade(faction, other).is_ok();
+                if bound {
+                    self.controller.count_bound();
+                }
+                bound
+            }
+            TradeMove::Refuse { other } => self.refuse_trade(faction, other).is_ok(),
+            TradeMove::Offer {
+                other,
+                give,
+                take,
+                term,
+            } => {
+                let opened = self
+                    .offer_consideration(faction, other, give, take, term)
+                    .is_ok();
+                if opened {
+                    self.controller.count_offer();
+                }
+                opened
+            }
         }
-        self.controller.count_offer();
-        true
     }
 
     /// Returns every contract that one faction owes a carried quantity on,

@@ -37,6 +37,7 @@ use cachette_core::hex::Axial;
 use cachette_core::promotion::UnitPromoted;
 use cachette_core::rates::SiteShortfall;
 use cachette_core::relation::RelationCrossed;
+use cachette_core::storm::UnitLostToAStorm;
 use cachette_core::trade::TradeSpoken;
 use cachette_core::{TileIdx, World as CoreWorld};
 use numpy::ToPyArray;
@@ -95,6 +96,7 @@ log_registry! {
     gather_log: ResourceTaken;
     fell_log: UnitFell;
     starved_log: UnitStarved;
+    units_lost_to_storms: UnitLostToAStorm;
     shortfall_log: SiteShortfall;
     rationed_log: SiteRationed;
     promoted_log: UnitPromoted;

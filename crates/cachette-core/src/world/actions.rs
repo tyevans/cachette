@@ -306,7 +306,7 @@ impl World {
                         .is_ok()
                 }),
             Verb::Advertise => self.check_faction(faction).is_ok(),
-            Verb::Trade => self.trade_step_is_due(faction),
+            Verb::Trade => self.trade_step_would_act(faction),
             Verb::Carry => self.controller_carry_work(faction),
             Verb::Project => self.project_work(faction),
             Verb::Queue => self.controller_queue_site(faction).is_some(),
@@ -617,14 +617,20 @@ impl World {
         }
     }
 
-    /// Reports whether one faction has a negotiation step to take this tick.
+    /// Reports whether the negotiation step of one faction would act this
+    /// tick.
     ///
-    /// The two readers below are the controller's own, and the step verb
-    /// takes one branch or the other from them. A faction that neither
-    /// reader names takes no step.
-    fn trade_step_is_due(&self, faction: FactionId) -> bool {
-        self.controller_answer_due(faction).is_some()
-            || self.controller_match_due(faction).is_some()
+    /// **The answer reads the step the verb would take, and the check that
+    /// verb calls.** An answer that asked only whether a step was due allowed
+    /// a trade row that the offer verb then refused, because it never read
+    /// the presence gate.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-761. `docs/FINDINGS.md`
+    fn trade_step_would_act(&self, faction: FactionId) -> bool {
+        self.controller_trade_move(faction)
+            .is_some_and(|step| self.trade_move_refusal(faction, &step).is_ok())
     }
 
     /// Reports whether one faction has project work this tick.

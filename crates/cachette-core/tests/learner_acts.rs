@@ -32,7 +32,8 @@
 
 use cachette_core::action::{ActionSchema, ActionShape, CandidateKind, Verb, PLACE_ANYWHERE};
 use cachette_core::faction_view::Sighting;
-use cachette_core::{Axial, FactionId, World, WorldConfig};
+use cachette_core::holding::Holder;
+use cachette_core::{Advert, Axial, FactionId, World, WorldConfig, ADVERT_OFFERS, ADVERT_WANTS};
 
 const THREADS: usize = 2;
 
@@ -315,6 +316,143 @@ fn the_answer_and_the_verb_agree_over_a_seed_set() {
     // meets the case it guards.
     assert!(allowed > 0, "the fixture supplied no legal row");
     assert!(refused > 0, "the fixture supplied no refused row");
+}
+
+/// The faction whose board wants a good, and whose trade row the tests read.
+const ASKER: FactionId = FactionId(0);
+
+/// The faction whose board offers that good.
+const SELLER: FactionId = FactionId(1);
+
+/// The contract term the seller opens with.
+const TERM: u32 = 50;
+
+/// Builds a world of two seated factions that no controller plays.
+///
+/// **No controller writes a board or speaks here.** Each test writes the
+/// boards and the negotiation itself, so the trade step it reads is the one
+/// the test built.
+fn quiet_pair(seed: u64) -> World {
+    let mut world = World::new(config(2, seed)).expect("the extent describes a world");
+    seat(&mut world, 2);
+    for faction in [ASKER, SELLER] {
+        assert!(world.set_externally_controlled(faction, true));
+    }
+    for _ in 0..2 {
+        world.step(THREADS).expect("the step runs");
+    }
+    world
+}
+
+/// Writes two boards that match.
+///
+/// The asker wants the good of kind 1, and it asks the good of kind 2 in
+/// return. The seller offers the good of kind 1. The negotiation step of the
+/// asker therefore opens an offer toward the seller.
+fn match_the_boards(world: &mut World) {
+    world
+        .advertise(ASKER, &[Advert::new(1, 8, ADVERT_WANTS, 2, 8)])
+        .expect("the board takes the row");
+    world
+        .advertise(SELLER, &[Advert::new(1, 8, ADVERT_OFFERS, 0, 8)])
+        .expect("the board takes the row");
+}
+
+/// Puts one unit of a guest on ground that a host holds.
+///
+/// The unit never stands on a site tile, because a unit of one faction on the
+/// site tile of another besieges it.
+fn place_a_guest(world: &mut World, guest: FactionId, host: FactionId) {
+    let grid = world.grid();
+    let seats = world.standing_places();
+    let place = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .find(|address| {
+            world.tile_holder(*address) == Some(Holder::of(host))
+                && world.admits_a_unit(*address)
+                && !seats.contains(address)
+        })
+        .expect("the host holds a tile outside its own sites");
+    let _ = world.spawn_soldier(place, guest);
+    assert!(
+        world.stands_in_territory_of(guest, host),
+        "the guest must stand in the territory of the host"
+    );
+}
+
+/// Asserts that the answer and the verb agree on one row, and that the verb
+/// did what the fixture expects.
+///
+/// The verb runs on a copy, so the caller keeps the state it built.
+fn assert_the_trade_row_agrees(world: &World, took_expected: bool, case: &str) {
+    let trade = world
+        .action_schema()
+        .encode(Verb::Trade, &[])
+        .expect("the trade verb declares no position");
+    let says = world
+        .legal_actions(ASKER)
+        .expect("the faction is of this world")[trade as usize]
+        == 1;
+    let took = world.clone().act(ASKER, trade);
+    assert_eq!(
+        says, took,
+        "{case}: the answer said {says} and the trade verb did {took}"
+    );
+    assert_eq!(
+        took, took_expected,
+        "{case}: the fixture no longer reaches the case it is for"
+    );
+}
+
+/// The trade row is legal only where the offer verb would take it.
+///
+/// **The fixture supplies the refused case.** The two boards match, so a
+/// step is due, and no unit of the asker stands in the territory of the
+/// seller, so the offer verb refuses. An answer that asked only whether a
+/// step was due allowed this row, and a policy that chose it did nothing.[^1]
+/// The same world with one guest is the control: there the verb takes the
+/// row, so an answer that never allowed a trade fails as well.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-761. `docs/FINDINGS.md`
+#[test]
+fn a_trade_row_that_opens_an_offer_needs_a_guest_in_the_territory_of_the_seller() {
+    let mut world = quiet_pair(47);
+    match_the_boards(&mut world);
+    assert!(
+        !world.stands_in_territory_of(ASKER, SELLER),
+        "the fixture must start with no guest"
+    );
+    assert_the_trade_row_agrees(&world, false, "an offer with no guest");
+
+    place_a_guest(&mut world, ASKER, SELLER);
+    assert_the_trade_row_agrees(&world, true, "an offer with a guest");
+}
+
+/// The trade row that answers an offer reads the gates of the answer verb.
+///
+/// The seller opens an offer toward the asker, so the step of the asker is a
+/// counteroffer. **The counter verb asks for a guest of the asker in the
+/// territory of the seller, and the offer of the seller does not.** The
+/// asker has none at first, so the verb refuses and the answer must refuse
+/// too. One guest then makes the counteroffer legal, and the verb takes it.
+#[test]
+fn a_trade_row_that_answers_an_offer_needs_a_guest_as_well() {
+    let mut world = quiet_pair(47);
+    match_the_boards(&mut world);
+    place_a_guest(&mut world, SELLER, ASKER);
+    world
+        .offer_trade(SELLER, ASKER, 2, 8, 1, 8, TERM)
+        .expect("the seller stands in the territory of the asker");
+    assert!(
+        !world.stands_in_territory_of(ASKER, SELLER),
+        "the fixture must start with no guest of the asker"
+    );
+    assert_the_trade_row_agrees(&world, false, "a counteroffer with no guest");
+
+    place_a_guest(&mut world, ASKER, SELLER);
+    assert_the_trade_row_agrees(&world, true, "a counteroffer with a guest");
 }
 
 #[test]

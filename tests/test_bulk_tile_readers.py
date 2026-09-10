@@ -32,6 +32,19 @@ SEED = 2
 COASTAL_SEED = 0x0123456789ABCDEF
 """A seed that gives a world with open water. The sea lifts water on its own."""
 
+PLANET_CENTRE = 0
+"""The centre latitude of a whole planet, in hundredths of a degree."""
+
+PLANET_SPAN = 18000
+"""The latitude span of a whole planet, in hundredths of a degree.
+
+**The span decides how much of the sky a world clouds.** A world is one region
+of a planet unless the caller states otherwise. The resting sky of a region
+clouds every tile of this world, and it blows no wind at the middle of it. The
+tests that need a dry sky or a moving wind state the span of the planet, as the
+constructor documents it.
+"""
+
 
 def _index_of(q: int, r: int, width: int = EXTENT) -> int:
     """Return the row-major index of one address."""
@@ -112,13 +125,19 @@ def test_the_kind_column_holds_more_than_one_kind() -> None:
 
 
 def test_the_cloud_column_agrees_with_the_air_reader() -> None:
-    """A tile carries cloud exactly when the air over it holds water."""
+    """A tile carries cloud exactly when the air over it holds water.
+
+    The world stands under the span of the planet. The sky of a region clouds
+    every tile of it, and the test then meets no dry tile to compare.
+    """
     world = cachette.World(
         width=EXTENT,
         height=EXTENT,
         seed=COASTAL_SEED,
         faction_count=2,
         weather_cell_tiles=2,
+        latitude_centre=PLANET_CENTRE,
+        latitude_span=PLANET_SPAN,
     )
     for _ in range(40):
         world.step(2)
@@ -257,9 +276,19 @@ def test_the_storm_column_is_flat_over_one_weather_cell() -> None:
 
 
 def _a_struck_world() -> tuple[cachette.World, tuple[int, int]]:
-    """Build a dry world in which one faction holds ground, and strike it."""
+    """Build a dry world in which one faction holds ground, and strike it.
+
+    The world stands under the span of the planet. The sky of a region blows
+    no wind at the middle of this world, and a plume on still air goes nowhere.
+    """
     world = cachette.World(
-        width=EXTENT, height=EXTENT, seed=SEED, faction_count=2, weather_cell_tiles=2
+        width=EXTENT,
+        height=EXTENT,
+        seed=SEED,
+        faction_count=2,
+        weather_cell_tiles=2,
+        latitude_centre=PLANET_CENTRE,
+        latitude_span=PLANET_SPAN,
     )
     place = (EXTENT // 2, EXTENT // 2)
     world.spawn_soldiers([place], 0)

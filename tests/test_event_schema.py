@@ -40,6 +40,7 @@ METHODS = {
     "resource_taken": "gather_log_columns",
     "unit_fell": "fell_log_columns",
     "unit_starved": "starved_log_columns",
+    "unit_lost_to_a_storm": "storm_log_columns",
     "site_shortfall": "shortfall_log_columns",
     "site_rationed": "rationed_log_columns",
     "unit_promoted": "promoted_log_columns",

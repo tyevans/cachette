@@ -390,6 +390,21 @@ class UnitStarvedColumns(TypedDict):
     deficit: npt.NDArray[np.int32]
     # End of the generated block.
 
+class UnitLostToAStormColumns(TypedDict):
+    """One column for each field of the storm event.
+
+    The unit column holds the whole identity of the unit that a storm ended.
+    It is not a slot index, and it never resolves again.
+    """
+
+    # Generated from the engine by scripts/generate_event_stubs.py.
+    tick: npt.NDArray[np.uint64]
+    unit: npt.NDArray[np.uint64]
+    tile: npt.NDArray[np.uint32]
+    faction: npt.NDArray[np.uint16]
+    unit_type: npt.NDArray[np.uint8]
+    # End of the generated block.
+
 class SiteShortfallColumns(TypedDict):
     """One column for each field of the shortfall event.
 
@@ -1530,6 +1545,7 @@ class World:
         self, sites: Identities, rate: int, commodity: int = ...
     ) -> None: ...
     def starved_log_columns(self) -> UnitStarvedColumns: ...
+    def storm_log_columns(self) -> UnitLostToAStormColumns: ...
     def shortfall_log_columns(self) -> SiteShortfallColumns: ...
     def rationed_log_columns(self) -> SiteRationedColumns: ...
     def promoted_log_columns(self) -> UnitPromotedColumns: ...
