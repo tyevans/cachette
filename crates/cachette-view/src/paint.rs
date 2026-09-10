@@ -459,6 +459,67 @@ const FACTION_COLOURS: [u32; 6] = [
 /// cannot separate.
 pub const COLOURED_FACTIONS: usize = FACTION_COLOURS.len();
 
+/// The smallest distance the picture keeps between two colours a watcher must
+/// tell apart.
+///
+/// **No two faction colours sit nearer than this, and nothing else the picture
+/// draws may sit nearer to a faction colour either.** The faction table is the
+/// picture's existing statement of what a watcher tells apart, and the bar comes
+/// from it. A test measures the table against the bar and fails when a later
+/// change puts two faction colours closer, so the ground of the number cannot
+/// go away in silence.[^1]
+///
+/// The bar is a floor on the declared colours and not on the pixels. The
+/// holder takes a share of the tile rather than the whole of it, so the
+/// difference a watcher reads on the screen is a fraction of this.
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+pub const LEAST_COLOUR_DISTANCE: u32 = 124;
+
+/// Returns how far apart two colours look, on a scale that runs to 764.
+///
+/// **The measure is not a plain sum of the three channel differences.** Green
+/// carries most of the brightness an eye reads, and blue carries least, so a
+/// plain sum calls a green step and a blue step of the same size equal when a
+/// watcher does not. This weights green four times, and it weights red and
+/// blue by the mean red of the pair. Two dark reds part on the red channel,
+/// and two pale ones part on the blue channel.
+///
+/// The weights are the redmean approximation. It costs three multiplications
+/// and one square root, and it needs no conversion to a perceptual colour
+/// space.[^1]
+///
+/// The arithmetic is integer, because a colour is a byte triple and an integer
+/// answer repeats on every machine. The weights are the published fractions
+/// multiplied by 512, and the root divides that scale away again. `reds` holds
+/// the sum of the two red channels, which is twice their mean.
+///
+/// # References
+///
+/// [^1]: Thiadmer Riemersma, colour metric. `https://www.compuphase.com/cmetric.htm`
+#[must_use]
+pub fn colour_distance(one: u32, other: u32) -> u32 {
+    let (red, green, blue) = (16, 8, 0);
+    let reds = channel(one, red) + channel(other, red);
+    let weighted = (1024 + reds) * square(one, other, red)
+        + 2048 * square(one, other, green)
+        + (1534 - reds) * square(one, other, blue);
+    u32::try_from((weighted / 512).isqrt()).unwrap_or(u32::MAX)
+}
+
+/// Returns one channel of a colour.
+fn channel(colour: u32, shift: u32) -> u64 {
+    u64::from((colour >> shift) & 0xff)
+}
+
+/// Returns the square of the difference of one channel of two colours.
+fn square(one: u32, other: u32, shift: u32) -> u64 {
+    let difference = channel(one, shift).abs_diff(channel(other, shift));
+    difference * difference
+}
+
 /// How much of the holder's colour covers the ground it holds.
 ///
 /// The ground stays legible under the holding, because a watcher must read

@@ -37,6 +37,18 @@
 //! value formed from it returns to the engine, and it is a pure function of the
 //! world and the address, so two runs of one frame give one picture.[^5]
 //!
+//! # The palette stands clear of the faction table
+//!
+//! An overlay at full strength all but replaces the ground of a tile. The
+//! holder tint goes on after it, so a watcher then reads the tint against the
+//! colour of the overlay rather than against the colour of the ground. An
+//! overlay colour that sits near a faction colour hides the holder of that
+//! faction under it, and the ground it replaced no longer matters.[^7]
+//!
+//! Every colour this module declares therefore stands a minimum distance from
+//! every faction colour. The distance and the bar belong to the drawing module,
+//! and a test measures the two tables against each other.[^8]
+//!
 //! # What an overlay costs
 //!
 //! An overlay adds reads to the drawing pass. A tile overlay adds the reads its
@@ -53,6 +65,8 @@
 //! [^4]: ADR-0094, the caller owns the camera and the pixels, decision D5. `docs/adrs/draft/adr-0094-the-caller-owns-the-camera-and-the-pixels.md`
 //! [^5]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
 //! [^6]: Blockers register, BLK-007. `docs/BLOCKERS.md`
+//! [^7]: Findings register, FND-758. `docs/FINDINGS.md`
+//! [^8]: The overlay palette check. `crates/cachette-view/tests/an_overlay_colour_never_hides_the_holder.rs`
 
 use cachette_core::hex::NEIGHBOUR_COUNT;
 use cachette_core::resource::ResourceKind;
@@ -65,13 +79,28 @@ use crate::paint::faction_colour;
 
 /// The strength an overlay paints at its high value, of 255.
 ///
-/// The overlay is mixed into the ground **before** the holder colour, so this
-/// number does not compete with the holder weight. A wash over the finished
-/// pixel had to stay weak to leave the holder visible, and it did not.[^1]
+/// The overlay is mixed into the ground **before** the holder colour, so the
+/// holder always takes its share of the finished tile. A wash over the
+/// finished pixel had to stay weak to leave the holder visible, and it did
+/// not.[^1]
+///
+/// **This strength still decides how well a watcher reads the holder.** At
+/// this value the overlay all but replaces the ground, so the holder tint is
+/// read against the colour of the overlay and no longer against the colour of
+/// the ground. An overlay colour that sits near a faction colour therefore
+/// hides the holder of a tile at full strength, whatever the ground under it
+/// was. The palette keeps every overlay colour away from every faction colour
+/// for that reason, and a test checks the two tables against each other.[^2]
+///
+/// The doc of this value once said that the strength does not compete with the
+/// holder weight. That was false, and one overlay went red the first time a
+/// held tile reached the top of its span.[^3]
 ///
 /// # References
 ///
 /// [^1]: Research report 24, defect 4. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
+/// [^2]: The overlay palette check. `crates/cachette-view/tests/an_overlay_colour_never_hides_the_holder.rs`
+/// [^3]: Findings register, FND-758. `docs/FINDINGS.md`
 pub const FULL_STRENGTH: u8 = 210;
 
 /// The strength an overlay paints just above its low value, of 255.
@@ -90,7 +119,10 @@ pub const LEAST_STRENGTH: u8 = 24;
 pub const STOCK_TOP: i64 = 16;
 
 /// The colour of the moisture overlay.
-const MOISTURE_COLOUR: u32 = 0x0034_8fd8;
+///
+/// The blue is deeper than the faction blue, because water and a holding of
+/// the blue faction cover the same ground.
+const MOISTURE_COLOUR: u32 = 0x0013_72bb;
 
 /// The colour of the air overlay.
 const AIR_COLOUR: u32 = 0x00d8_e8f8;
@@ -101,16 +133,28 @@ const AIR_COLOUR: u32 = 0x00d8_e8f8;
 /// the warm band of the season reads as a bright stripe that crosses the map
 /// over a run.[^1]
 ///
+/// The hue is an amber and no longer the red-orange it was. The red-orange sat
+/// beside the first faction colour, and the warmest held cell of a map then
+/// painted that faction's ground its own colour.[^2]
+///
 /// # References
 ///
 /// [^1]: ADR-0166, the temperature of a cell is carried state that a season and the sky drive, decision D2. `docs/adrs/draft/adr-0166-the-temperature-of-a-cell-is-carried-state-that-a-season-and-the-sky-drive.md`
-const TEMPERATURE_COLOUR: u32 = 0x00ff_8c42;
+/// [^2]: Findings register, FND-758. `docs/FINDINGS.md`
+const TEMPERATURE_COLOUR: u32 = 0x00ff_9210;
 
 /// The colour of the food overlay.
-const FOOD_COLOUR: u32 = 0x008e_d94a;
+///
+/// The green is brighter and more acid than the faction green, so a stock of
+/// food on that faction's ground still shows the faction under it.
+const FOOD_COLOUR: u32 = 0x009f_eb37;
 
 /// The colour of the wood overlay.
-const WOOD_COLOUR: u32 = 0x00b8_7333;
+///
+/// The brown is more olive than the brown it was. The old brown carried the
+/// red of the first faction colour, and a wood stock on that faction's ground
+/// covered the faction under it.
+const WOOD_COLOUR: u32 = 0x00a3_7c28;
 
 /// The colour of the stone overlay.
 const STONE_COLOUR: u32 = 0x00c3_ccd4;
@@ -123,10 +167,22 @@ const HEIGHT_COLOUR: u32 = 0x00f0_e2a8;
 /// The overlay paints one colour at a strength that follows the level, so a
 /// watcher reads the level from the depth of one hue. The hue is the viewer's
 /// own, and the engine holds none.
-const UPGRADE_LEVEL_COLOUR: u32 = 0x00e8_c46a;
+///
+/// **The hue is a teal and no longer an ochre.** The ochre stood beside the
+/// fourth faction colour and beside the marks a finished upgrade draws, and a
+/// research report named that range as three things a watcher cannot
+/// separate.[^1]
+///
+/// # References
+///
+/// [^1]: Research report 25, demonstration readability, upgrades and units. `docs/research/reports/25-demonstration-readability-upgrades-and-units.md`
+const UPGRADE_LEVEL_COLOUR: u32 = 0x002f_9e94;
 
 /// The colour of the crowding overlay.
-const CROWD_COLOUR: u32 = 0x00ff_5a3c;
+///
+/// The red is hotter than the first faction colour, so a crowd on that
+/// faction's ground still shows the faction under it.
+const CROWD_COLOUR: u32 = 0x00ff_3103;
 
 /// The colour an overlay paints where it has no thing to name.
 const NOTHING_NAMED: u32 = 0x0044_5058;
@@ -254,6 +310,27 @@ pub trait Layer: Sync {
     /// names a thing rather than a quantity gives that thing its own colour.
     fn colour(&self, value: i64) -> u32;
 
+    /// Returns every colour this overlay declares for itself.
+    ///
+    /// **A check reads this and keeps each entry clear of every faction
+    /// colour.** An overlay at full strength all but replaces the ground, so a
+    /// colour near a faction colour hides the holder of a tile that faction
+    /// holds.[^1]
+    ///
+    /// This has no default answer, so the compiler asks a new overlay for one.
+    /// A list that a later contributor had to remember to extend is the defect
+    /// shape this project records first.[^2]
+    ///
+    /// An overlay that reads the faction table rather than declaring a colour
+    /// answers with nothing. It cannot hide a faction under its own colour,
+    /// because its colour is that faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-758. `docs/FINDINGS.md`
+    /// [^2]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    fn own_colours(&self) -> &[u32];
+
     /// Returns the strength a value paints at, of 255.
     ///
     /// The ramp of the span is the answer for a quantity. An overlay whose
@@ -289,6 +366,10 @@ impl Layer for Moisture {
 
     fn colour(&self, _value: i64) -> u32 {
         MOISTURE_COLOUR
+    }
+
+    fn own_colours(&self) -> &[u32] {
+        &[MOISTURE_COLOUR]
     }
 }
 
@@ -345,6 +426,10 @@ impl Layer for Cloud {
     fn colour(&self, _value: i64) -> u32 {
         AIR_COLOUR
     }
+
+    fn own_colours(&self) -> &[u32] {
+        &[AIR_COLOUR]
+    }
 }
 
 /// The temperature of the cell that covers each tile.
@@ -398,6 +483,10 @@ impl Layer for Temperature {
     fn colour(&self, _value: i64) -> u32 {
         TEMPERATURE_COLOUR
     }
+
+    fn own_colours(&self) -> &[u32] {
+        &[TEMPERATURE_COLOUR]
+    }
 }
 
 /// The colour of each of the six wind directions, in the direction order.
@@ -411,13 +500,22 @@ impl Layer for Temperature {
 /// # References
 ///
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D1. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
+///
+/// **The six are darker than the faction table, and that is what keeps them
+/// clear of it.** Six saturated hues cannot all avoid six saturated faction
+/// hues, because the two sets run around one wheel. The wheel moves as a
+/// family instead: it holds its six hues and its order, and it sits at a
+/// little over half the brightness of the faction colours. A bright faction
+/// tint over a dark wind then reads as the faction.[^2]
+///
+/// [^2]: Findings register, FND-758. `docs/FINDINGS.md`
 const WIND_COLOURS: [u32; NEIGHBOUR_COUNT] = [
-    0x00ff_6b4a,
-    0x00ff_c94a,
-    0x009b_ff4a,
-    0x004a_d8ff,
-    0x006b_4aff,
-    0x00ff_4ac9,
+    0x008c_0000,
+    0x008c_8c00,
+    0x0000_8c00,
+    0x0000_8c8c,
+    0x0000_008c,
+    0x008c_008c,
 ];
 
 /// The base the wind overlay packs a speed against.
@@ -465,6 +563,10 @@ impl Layer for WindLayer {
 
     fn colour(&self, value: i64) -> u32 {
         WIND_COLOURS[(value % WIND_PACK) as usize % NEIGHBOUR_COUNT]
+    }
+
+    fn own_colours(&self) -> &[u32] {
+        &WIND_COLOURS
     }
 
     fn strength(&self, value: i64, span: Span) -> u8 {
@@ -522,6 +624,10 @@ impl Layer for Stock {
     fn colour(&self, _value: i64) -> u32 {
         self.colour
     }
+
+    fn own_colours(&self) -> &[u32] {
+        std::slice::from_ref(&self.colour)
+    }
 }
 
 /// How high the ground of each tile stands.
@@ -549,6 +655,10 @@ impl Layer for Height {
 
     fn colour(&self, _value: i64) -> u32 {
         HEIGHT_COLOUR
+    }
+
+    fn own_colours(&self) -> &[u32] {
+        &[HEIGHT_COLOUR]
     }
 }
 
@@ -580,6 +690,15 @@ impl Layer for HolderLayer {
             return NOTHING_NAMED;
         }
         u16::try_from(value - 1).map_or(NOTHING_NAMED, |slot| faction_colour(FactionId(slot)))
+    }
+
+    /// Returns nothing, because this overlay reads the faction table.
+    ///
+    /// The colour of a tile here is the colour of the faction that holds it.
+    /// The overlay cannot hide that faction under a colour of its own, because
+    /// it declares none.
+    fn own_colours(&self) -> &[u32] {
+        &[]
     }
 
     fn strength(&self, value: i64, _span: Span) -> u8 {
@@ -632,6 +751,10 @@ impl Layer for Upgrade {
     fn colour(&self, _value: i64) -> u32 {
         UPGRADE_LEVEL_COLOUR
     }
+
+    fn own_colours(&self) -> &[u32] {
+        &[UPGRADE_LEVEL_COLOUR]
+    }
 }
 
 /// How full each tile is of the units it admits.
@@ -664,6 +787,10 @@ impl Layer for Crowding {
 
     fn colour(&self, _value: i64) -> u32 {
         CROWD_COLOUR
+    }
+
+    fn own_colours(&self) -> &[u32] {
+        &[CROWD_COLOUR]
     }
 }
 
