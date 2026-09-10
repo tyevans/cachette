@@ -21083,7 +21083,7 @@ overlays is one tile, and the drawn colour there is pure white in the founded
 world and the bare ground in the unfounded one. The reading was 412 of 3 times
 255. The largest reading the holder tint can produce at that tile is the
 distance from the faction colour to the ground, which is 128. A reading above
-that bound cannot come from the holder.[^F759A] [^F759B]
+that bound cannot come from the holder.[^F759A] [^F758B]
 
 The same probe found a clean tile at the same strength for five of those six.
 The crowding overlay has none, because it paints where units stand and a unit
@@ -21093,7 +21093,7 @@ draws a bead over the tile it stands on.
 reports the tiles one world happens to hold, at the strengths that world
 happens to reach, through whatever the drawing painted last over the pixel it
 samples. The guard is a check that reads the two colour tables and draws
-nothing.[^F759C]
+nothing.[^F758D]
 
 The wind overlay is the case this hid. Its strongest held tile reached a
 strength of 202 against a faction colour 48 away, and the arithmetic of the
@@ -21157,5 +21157,3 @@ it cannot be done by choosing a different tile.
 [^F758C]: The viewer test of the overlay deck. `crates/cachette-view/tests/the_watcher_switches_the_map_between_overlays.rs`
 [^F758D]: The overlay palette check. `crates/cachette-view/tests/an_overlay_colour_never_hides_the_holder.rs`
 [^F759A]: The viewer test of the overlay deck, the readability test. `crates/cachette-view/tests/the_watcher_switches_the_map_between_overlays.rs`
-[^F759B]: The faction colours and the holder weight. `crates/cachette-view/src/paint.rs`
-[^F759C]: The overlay palette check. `crates/cachette-view/tests/an_overlay_colour_never_hides_the_holder.rs`

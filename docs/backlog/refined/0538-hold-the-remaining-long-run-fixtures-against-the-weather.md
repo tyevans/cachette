@@ -111,8 +111,14 @@ to fail. The commit bodies hold the probes and their output.
 | `crates/cachette-core/tests/a_settler_takes_the_best_place_it_can_reach.rs` | A settler that leaves the world is named as such, and not as an open last mile |
 | `crates/cachette-core/tests/barrier_ordering.rs` | The barrier ordering, over a watched set the storms thin, with an exact population equality |
 | `crates/cachette-core/tests/passable_ground.rs` | The movement pass refuses water, over a company seated on the shoreline and sent across a lake, and thinned by the storms the log names |
+| `crates/cachette-core/tests/production_follows_the_world.rs` | The ground term moves production, over a run that states its own recovery rate and a span that holds the weather, the terraces and the people |
+| `crates/cachette-core/tests/upgrade_table.rs` | A level rises, over a patience that counts the ticks a builder spends on repair and asserts the exact work |
+| `crates/cachette-core/tests/resource.rs` | Recovery gives back no more than the units took, over a bound the storm cannot reach, on a deposit the assertion can actually exceed |
+| `crates/cachette-view/tests/the_water_draws_in_one_colour.rs` | The sea draws in one colour, over a fixture that states the span, so wet water and dry water both exist |
+| `crates/cachette-view/tests/draws_what_a_unit_suffers.rs` | The panel counts what ended, over a sky that is asserted storm-free after every step |
+| `crates/cachette-view/tests/shows_the_upgrades_the_weather_and_the_luxuries.rs` | The build glyph and the air overlay, each against a control drawn on the same tick under a stated clear sky |
 
-The last two files were not on the list below, and both were red at the tip.
+None of these files was on the list below. Every one was red at the tip.
 
 ### The rows that remain, highest risk first
 
@@ -132,12 +138,21 @@ The last two files were not on the list below, and both were red at the tip.
 | 12 | `crates/cachette-core/tests/a_step_leaves_the_world_readable.rs` | One seed founds a city inside 600 ticks |
 | 13 | `crates/cachette-core/tests/relation.rs` | A leader of one faction lives to move a relation inside 200 ticks |
 
-Every one of these thirteen passes today. None is red at the tip.
+Every one of these thirteen passes today, measured over a whole run of the
+suite that does not stop at its first failing binary. **The earlier reading of
+this line came from a run that did stop there**, so it stated a lower bound and
+read like a complete list.[^8] Nine files above were red at the tip while that
+reading stood.
 
 ## What this item does not do
 
 It changes no engine code. The engine behaves as its records state, and the
 fixtures assumed a sky that no longer exists.
+
+The cause is the span and not the latitude. A probe over a world of 64 tiles
+clouded every tile at a span of three degrees, at each latitude from thirty
+degrees south to seventy-five degrees north. The same probe at the span of a
+planet clouded few of them. The latitude decides only whether a storm forms.
 
 ## References
 
@@ -148,6 +163,7 @@ fixtures assumed a sky that no longer exists.
 [^5]: ADR-0177, the row axis of a world is a latitude that the world states. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
 [^6]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^7]: Findings register, FND-728. `docs/FINDINGS.md`
+[^8]: Findings register, FND-754. `docs/FINDINGS.md`
 [^9]: Findings register, FND-749. `docs/FINDINGS.md`
 [^10]: Findings register, FND-748. `docs/FINDINGS.md`
 [^11]: Findings register, FND-750. `docs/FINDINGS.md`
