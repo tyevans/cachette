@@ -202,7 +202,7 @@ fn the_tile_panel_names_the_upgrade_under_the_pointer() {
         .map(|column| Axial::new(column, 1))
         .find(|at| world.admits_a_unit(*at))
         .expect("the world holds open ground");
-    let builder = world
+    let mut builder = world
         .spawn_soldier(place, FactionId(0))
         .expect("the tile admits a unit");
     // A unit builds only on ground its own faction holds, and a faction
@@ -257,12 +257,26 @@ fn the_tile_panel_names_the_upgrade_under_the_pointer() {
     // The same tile once a level stands on it. The builder is put back on the
     // tile and ordered again each tick, because a unit that finished a level
     // walks away and a unit that walked away adds no work.
+    //
+    // **A storm takes a unit standing in the open, and an unfinished site
+    // shelters nobody.** The builder of this fixture stands on a terrace that
+    // is still going up, so a storm may end it partway. The fixture puts a
+    // fresh builder on the tile when that happens, because the subject here is
+    // the panel and not the weather. Every assertion below is unchanged, and
+    // the tick bound still fails a terrace that never rises.[^11]
+    //
+    // [^11]: Findings register, FND-726. `docs/FINDINGS.md`
     let mut ticks = 0;
     while world
         .upgrade_at(place)
         .is_none_or(|site| site.level < FIRST_LEVEL)
     {
         assert!(ticks < 200, "the terrace never reached its first level");
+        if world.soldiers().faction(builder).is_none() {
+            builder = world
+                .spawn_soldier(place, FactionId(0))
+                .expect("the tile admits a unit");
+        }
         world
             .place_soldier(builder, place)
             .expect("the tile admits the builder");

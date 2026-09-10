@@ -56,6 +56,14 @@ const FULL: Fix32 = Fix32::from_int(256);
 /// The mark that separates a surplus from a shortfall in these tests.
 const MARK: u32 = 8;
 
+/// The ticks the carrier test waits for a delivery.
+///
+/// This is the patience of the fixture. It is not a latency the engine
+/// promises, and no assertion reads it as one. It stays well below the
+/// contract term the test sets, so a contract that pays nothing at all still
+/// fails.
+const CARRIER_PATIENCE: usize = 2000;
+
 const ZERO: FactionId = FactionId(0);
 const ONE: FactionId = FactionId(1);
 
@@ -657,7 +665,15 @@ fn a_contract_binds_and_a_carrier_delivers() {
     let width = u32::from(world.faction_count().max(1));
     let mut assigned = false;
     let mut moved = None;
-    for _ in 0..600 {
+    // **The walk of a carrier is not the only thing the world does.** A storm
+    // wears the ways under the carriers and flattens the food they gather, so
+    // the walk to the site of the other faction takes longer than it did in a
+    // world with no weather. The bound is the patience of the fixture and not
+    // a property of the engine, and it stays far below the contract term
+    // above, so a contract that never pays still fails here.[^9]
+    //
+    // [^9]: Findings register, FND-729. `docs/FINDINGS.md`
+    for _ in 0..CARRIER_PATIENCE {
         renew_presence(&mut world, ZERO, ONE);
         // **The fixture supplies the load and nothing else.** The engine
         // assigned the carrier, the engine walks it, and the engine moves the
