@@ -86,7 +86,6 @@ fn bare_at(seed: u64, latitude_centre: i32, latitude_span: i32) -> World {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         latitude_centre,
         latitude_span,
-        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     world
