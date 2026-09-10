@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-737**
+**Next number: FND-738**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20145,7 +20145,37 @@ the stored policies takes its error from a bootstrap over worlds instead, and
 it holds a least world count for that reason, so the shape there has an answer
 already.
 
+### FND-737 — A wonder ends a game, and the comment on its claim says no reader compares it
+
+**Believed.** The doc comment on the victory claim constant of the wonder row
+states that no reader compares the claim, and that a finished wonder ends no
+game. It cites the record that took the reader away.[^F737A]
+
+**True.** The wonder reader compares that claim on every tick. It walks the
+sparse upgrade map, reads the victory claim of the row that stands at each
+improved tile, and names the first faction that holds a standing claim above
+zero.[^F737B] A later record gave the wonder a reader of its own, and the
+comment describes the state before it.[^F737C]
+
+**Evidence.** An audit of the four win paths read the reader and the constant
+in the same pass. A measured set of 3072 episodes, reported by another agent,
+ends 0.62 of its games on the wonder path. A path that ended no game could not
+produce that share.
+
+**Follows.** Two things.
+
+**Repair the comment when the file is next touched.** The comment is prose, so
+nothing fails while it is wrong. A reader who takes it for the code plans a
+change against a path it believes is inert.
+
+**A constant that carries the reasoning of a retired reader outlives the
+reader.** The comment cites a superseded record and it reads as current. The
+recurring defect rule already holds this shape.[^F562A]
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
 [^F736A]: The rating tool of the stored policies, the clearance. `scripts/policy_league.py`
+[^F737A]: The upgrade table, the wonder victory claim constant. `crates/cachette-core/src/upgrade.rs`
+[^F737B]: The win path readers. `crates/cachette-core/src/world/victory.rs`
+[^F737C]: ADR-0174, a wonder is a win path and a stock total is not. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
