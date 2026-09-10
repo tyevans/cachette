@@ -26,6 +26,7 @@ const TWO_SIDES: WorldConfig = WorldConfig {
     seed: 0x00c0_ffee_0123_4567,
     faction_count: 3,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    ..WorldConfig::DEFAULT
 };
 
 /// The faction that holds the ground in every fixture below.

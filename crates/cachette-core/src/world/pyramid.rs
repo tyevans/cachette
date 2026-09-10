@@ -553,6 +553,7 @@ mod tests {
                 seed: SEED + step,
                 faction_count,
                 unit_capacity: 64,
+                ..WorldConfig::DEFAULT
             };
             let world = World::new(config).expect("the extent must describe a world");
             if passable_tile_count(&world) >= GROUND_A_FIXTURE_NEEDS {

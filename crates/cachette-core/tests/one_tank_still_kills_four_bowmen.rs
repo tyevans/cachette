@@ -103,6 +103,7 @@ fn one_tile_world(unit_capacity: u32) -> World {
         seed: LAND_SEED,
         faction_count: 2,
         unit_capacity,
+        ..WorldConfig::DEFAULT
     })
     .expect("a world of one tile is a world");
     declare_war(&mut world);
@@ -317,6 +318,7 @@ fn the_tile_is_in_the_draw_key() {
         seed: LAND_SEED,
         faction_count: 2,
         unit_capacity: 512,
+        ..WorldConfig::DEFAULT
     })
     .expect("a world of three tiles is a world");
     declare_war(&mut world);
@@ -393,6 +395,7 @@ fn a_unit_reaches_the_tile_beside_it() {
         seed: LAND_SEED,
         faction_count: 2,
         unit_capacity: 64,
+        ..WorldConfig::DEFAULT
     })
     .expect("a world of three tiles is a world");
     declare_war(&mut world);
@@ -431,6 +434,7 @@ fn a_unit_reaches_no_tile_two_steps_away() {
         seed: LAND_SEED,
         faction_count: 2,
         unit_capacity: 64,
+        ..WorldConfig::DEFAULT
     })
     .expect("a world of three tiles is a world");
     declare_war(&mut world);

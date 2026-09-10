@@ -246,6 +246,7 @@ mod tests {
         seed: 7,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     };
 
     /// Returns the open ground of a world, in tile order.

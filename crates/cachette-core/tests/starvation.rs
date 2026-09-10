@@ -36,6 +36,7 @@ const CONFIG: WorldConfig = WorldConfig {
     seed: 42,
     faction_count: 2,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    ..WorldConfig::DEFAULT
 };
 
 /// The period of the economy in the fixtures.

@@ -45,6 +45,7 @@ fn world(seed: u64, factions: u16, reach: u32) -> World {
         seed,
         faction_count: factions,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     // The reach decides whether a taker keeps a captured city or burns it, so

@@ -75,6 +75,7 @@ const CONFIG: WorldConfig = WorldConfig {
     seed: 0x0cac_4e77_0060,
     faction_count: 2,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    ..WorldConfig::DEFAULT
 };
 
 /// Returns the first address of the world whose ground carries a unit.
@@ -309,6 +310,7 @@ fn run_a_demonstration_world(seed: u64) -> (u32, u32, Option<u32>) {
         seed,
         faction_count: RUN_FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     // The engine seeds itself, as the demonstration does. No verb of this

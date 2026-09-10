@@ -95,6 +95,7 @@ fn main() {
         seed,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     // Nothing starves and nothing eats, so the probe measures the walk.

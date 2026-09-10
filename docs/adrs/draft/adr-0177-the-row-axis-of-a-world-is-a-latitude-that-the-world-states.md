@@ -23,10 +23,18 @@ produces no climate zones at all, and the climate then comes from the ground
 and the sea alone. Across a whole globe the same geometry produces poles, a
 banded circulation, a belt of deserts and an equatorial rain belt.[^6]
 
-**The project owner ruled on 6 September 2026 that the map is a planet.** A
-world with poles, trade winds, subtropical deserts and an equatorial rain belt
-is the world the project wants. The tile edge is therefore a game unit and not
-a measurement, and the scale register must say so.
+**The project owner ruled on 9 September 2026 that a map is one region of a
+planet, and that the latitude span is configuration.** The ruling reverses an
+earlier one of 6 September 2026, which said that a map is a whole planet. The
+tile edge is therefore a measurement again, and the scale register is
+consistent with itself: a world of the target tile count is a few hundred
+kilometres across, which is about three degrees of latitude.[^5]
+
+**The symptom that prompted the reversal was the same three belts on every
+map.** A world that spanned the globe put a low at the equator, a high at
+thirty degrees and a low at sixty, at the same rows of every world, and the
+result looked unnatural. A world that wants the belts states the planet span
+and gets them.
 
 Three forces pull against each other here.
 
@@ -56,8 +64,14 @@ away from it, so no such function has that shape.[^6]
 
 **The latitudes of a world are configuration.** A world states the latitude of
 its middle row and the span from its first row to its last. A world that states
-neither is a whole planet: the middle stands at the equator and the span runs
-from pole to pole.
+neither is one region of a planet, at a span that the scale register derives
+from the tile edge at the target tile count.[^5] A world that wants a globe
+states a centre at the equator and a span from pole to pole.
+
+**The settings of the world are the one site that states the span.** The
+weather field of the world takes it from there, and so does the climate spin
+that runs before the world starts. Neither of them holds a default of its
+own, because two sites for one value fail silently when they disagree.[^12]
 
 **No weather term reads a raw row.** Every term that varies with the latitude
 takes the latitude, and the row reaches it through the span alone. So the same
@@ -97,6 +111,13 @@ diverge and the equator converges. The terrain still perturbs all of it, so the
 circulation is imposed and the weather is still emergent. That is what a
 limited-area weather model does: it takes the large scale from outside and
 computes the small scale itself.[^6]
+
+**The offset stays in the code, and the region reading needs it there.**
+Across the default span the offset runs as one steady slope, so it imposes no
+belt boundary and costs the region reading nothing. The planet reading still
+needs it, because the belts never appear on their own. A later reader who takes
+the region ruling as a reason to delete the offset removes the planet reading
+with it.
 
 **A vertical layer is rejected.** It would multiply the whole stage by the
 layer count, and it buys the same belts that one table over the row gives for
@@ -224,9 +245,14 @@ pole, because a landlocked pole holds no sky whatever the model does. The cloud
 that the earlier curve gave a polar interior came from a floor of two drops
 rather than from water that reached it.[^11]
 
-**The engine cannot be a region model without stating a span.** Nothing forces
-a caller to state one, and a world that states none is a planet. A region world
-is one call away and it costs no separate code path.
+**The engine is a region model, and a planet is one setting away.** Nothing
+forces a caller to state a span, and a world that states none is one region.
+A planet world costs no separate code path.
+
+**A change to the default span changes every world.** The weather of a world
+reads its own span, and the weather enters the state hash, so the stored hash
+of every world moves with the default. A commit that changes it says what it
+cost.
 
 **A latitude term now costs a table lookup rather than a distance.** The lookup
 is one interpolation over the latitude and one over the declination, against
@@ -248,3 +274,4 @@ pass**, against no vertical structure at all.
 [^9]: The arithmetic module, the sine table. `crates/cachette-core/src/sim_math.rs`
 [^10]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 [^11]: Findings register, FND-578. `docs/FINDINGS.md`
+[^12]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`

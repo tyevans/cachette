@@ -93,6 +93,7 @@ fn main() {
                 seed,
                 faction_count: FACTIONS,
                 unit_capacity: 1024,
+                ..WorldConfig::DEFAULT
             },
             scale,
         )

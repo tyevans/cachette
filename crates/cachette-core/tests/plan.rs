@@ -50,6 +50,7 @@ fn bare(seed: u64) -> World {
         seed,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     world
@@ -774,6 +775,7 @@ fn run_a_demonstration_world(seed: u64) -> (i64, usize) {
         seed,
         faction_count: 3,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     // The engine seeds itself, as the demonstration does. No verb of this

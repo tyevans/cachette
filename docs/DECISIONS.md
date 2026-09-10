@@ -2146,8 +2146,13 @@ reach or moves the cities closer. It does not change this rule.**
 
 ### DEC-277 — Is the map a region of a planet, or a planet?
 
-**Closed. Option B. The map is a planet, the tile edge is a game unit, and a
-world states its own latitude span.**
+**Closed. Option A. The map is one region of a planet, the tile edge is a
+measurement, and a world states its own latitude span.**
+
+**The project owner reversed an earlier ruling on 9 September 2026.** He closed
+this row on Option B on 6 September 2026, which made the map a planet and the
+tile edge a game unit. The text below keeps the earlier reasoning, because the
+options and the forces did not change. Only the answer did.
 
 The project held two readings of its own map. The scale register fixes the tile
 edge and the world extent, which make the world about three degrees of
@@ -2167,20 +2172,26 @@ circulation, and keep the season as a whole-map swing.
 **Option B. The map is a planet.** Keep the latitude, and read the tile edge as
 a game unit rather than a measurement.
 
-**Why B.** The project owner ruled on 6 September 2026. A world with real
-poles, trade winds, subtropical deserts and an equatorial rain belt is the
-interesting world, and that is the rule the owner asked the work to follow.
+**Why A.** The project owner ruled on 9 September 2026. Every map showed the
+same three horizontal bands of weather at the same latitudes, because the
+field imposes the belts and every world spanned the globe. That looked
+unnatural. A region reading also keeps the scale register consistent with
+itself.
+
+**Why B was chosen first, and why that changed.** A world with real poles,
+trade winds, subtropical deserts and an equatorial rain belt is an interesting
+world, and the owner asked for it on 6 September 2026. He saw what it made and
+reversed the ruling three days later. The planet reading stays reachable, so
+nothing is lost.
 
 **How it is held.** The report recommended a third form, and the engine takes
 it: a world states a centre latitude and a span, and a world that states
-neither spans the globe. The two readings then differ by one constant rather
-than by a model, and a narrow span flattens every latitude term at no
-cost.[^DEC277B] A record holds the constraint.[^DEC277C]
+neither is one region. The two readings differ by one constant rather than by
+a model, and the default span flattens every latitude term at no cost.[^DEC277B]
+A record holds the constraint.[^DEC277C]
 
-**What it costs.** Every crossing time, dwell and march figure in the scale
-register still derives from the tile edge, and each is still consistent with
-the others. The edge no longer says how far apart two climates stand. The scale
-register says so in place.[^SCALE]
+**What it costs.** Every world changed, because the weather of a world reads
+its own span. The commit that changed the default holds what it cost.
 
 ### DEC-273 — Does the world seeder always give a playable world, or may it refuse a seed?
 

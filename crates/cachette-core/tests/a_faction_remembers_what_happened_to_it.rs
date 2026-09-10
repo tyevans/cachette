@@ -97,6 +97,7 @@ fn battlefield(unit_capacity: u32) -> World {
         seed: LAND_SEED,
         faction_count: 3,
         unit_capacity,
+        ..WorldConfig::DEFAULT
     })
     .expect("a world of one tile is a world");
     assert!(

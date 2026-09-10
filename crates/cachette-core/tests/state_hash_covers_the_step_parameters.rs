@@ -30,6 +30,7 @@ const CONFIG: WorldConfig = WorldConfig {
     seed: 0x0123_4567_89ab_cdef,
     faction_count: 4,
     unit_capacity: 1024,
+    ..WorldConfig::DEFAULT
 };
 
 /// Builds two worlds that agree in everything.

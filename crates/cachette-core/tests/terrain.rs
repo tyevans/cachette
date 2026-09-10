@@ -230,6 +230,7 @@ fn the_ground_reaches_the_state_hash() {
         seed: SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     };
     let world = World::new(config).expect("the extent must describe a world");
     let mut other = config;
@@ -252,6 +253,7 @@ fn the_frame_is_pinned_so_the_terrain_does_not_move() {
         seed: SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     let before: Vec<TileKind> = (0..world.tile_count())
@@ -383,6 +385,7 @@ fn the_world_and_the_terrain_agree() {
         seed: SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     };
     let world = World::new(config).expect("the extent must describe a world");
     assert!(world.check_invariants());

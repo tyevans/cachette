@@ -88,6 +88,7 @@ fn world_with(seed: u64, factions: u16) -> World {
         seed,
         faction_count: factions,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world")
 }
@@ -100,6 +101,7 @@ fn crowded_world() -> World {
         seed: CROWDED_SEED,
         faction_count: CROWDED_FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world")
 }
@@ -313,6 +315,7 @@ fn the_survey_cost_does_not_grow_with_the_world() {
             seed: 0x0cac_4e77_0094,
             faction_count: FACTIONS,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         })
         .expect("the extent must describe a world")
         .survey_founding_apart(GROUP, FactionId(3), &taken)

@@ -47,6 +47,7 @@ fn a_still_world(width: u32, height: u32, seed: u64) -> World {
         seed,
         faction_count: 3,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the configuration describes a world");
     world

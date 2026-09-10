@@ -106,6 +106,7 @@ fn short_cohort_under(rule: NeedRule, fed: u32, threads: usize) -> (World, Entit
         seed: SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     world.set_need_rule(rule);

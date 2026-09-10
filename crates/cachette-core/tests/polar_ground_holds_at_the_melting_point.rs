@@ -21,7 +21,7 @@
 use cachette_core::weather::{
     frozen_hold, HEAT_CEILING, MELTING_WARMTH, MELT_COST, SEASON_PERIOD_TICKS,
 };
-use cachette_core::{TileIdx, WeatherScale, World, WorldConfig, LATITUDE_FINE};
+use cachette_core::{Latitudes, TileIdx, WeatherScale, World, WorldConfig, LATITUDE_FINE};
 
 /// The threads that one step of the world test runs on.
 const THREADS: usize = 4;
@@ -127,6 +127,10 @@ fn the_pole_of_a_stepped_world_holds_at_the_melting_point() {
     // **The engine is obliged to invoke the clamp, so the test starts at the
     // engine.** It builds a world, steps it through a whole season period, and
     // reads the poles of the world it stepped.
+    //
+    // **The world spans the globe, because the claim is about a pole.** A
+    // world that states no span is one region of a planet, and a region holds
+    // no pole for the clamp to act on.
     let mut world = World::with_weather_scale(
         WorldConfig {
             width: EXTENT,
@@ -134,6 +138,8 @@ fn the_pole_of_a_stepped_world_holds_at_the_melting_point() {
             seed: 0x2f,
             faction_count: 1,
             unit_capacity: 64,
+            latitude_centre: Latitudes::PLANET.centre(),
+            latitude_span: Latitudes::PLANET.span(),
         },
         WeatherScale::from_bits(0).expect("the scale describes a lattice"),
     )

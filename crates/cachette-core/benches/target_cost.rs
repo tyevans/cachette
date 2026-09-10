@@ -152,6 +152,7 @@ impl Extent {
             seed: SEED,
             faction_count: FACTIONS,
             unit_capacity,
+            ..WorldConfig::DEFAULT
         }
     }
 }

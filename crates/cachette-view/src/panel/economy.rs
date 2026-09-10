@@ -143,6 +143,7 @@ mod tests {
             seed: 0x0123_4567_89ab_cdef,
             faction_count: 3,
             unit_capacity: 4096,
+            ..WorldConfig::DEFAULT
         })
         .expect("a small extent describes a world")
     }

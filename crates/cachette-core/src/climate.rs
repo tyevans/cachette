@@ -61,8 +61,8 @@ use crate::sim_math;
 use crate::terrain::Terrain;
 use crate::types::{Accum, Fix32, Tick, FIX_FRACTIONAL_BITS};
 use crate::weather::{
-    cell_ground_of, ground_over_lattice, CellGround, WeatherError, WeatherField, WeatherScale,
-    HEAT_CEILING,
+    cell_ground_of, ground_over_lattice, CellGround, Latitudes, WeatherError, WeatherField,
+    WeatherScale, HEAT_CEILING,
 };
 
 /// The ticks that the climate spin runs.
@@ -224,12 +224,23 @@ impl ClimateField {
     /// The world is empty. No unit stands in it and no god inflicts weather on
     /// it, so the only water that enters the air is the water the sea lifts.
     ///
+    /// **The caller states the latitudes, and the caller is the world.** The
+    /// span decides the sun, the season and the pressure belts, so a spin
+    /// that reached for a default would run a different sky from the one the
+    /// world then runs. Nothing fails when two such copies disagree, so this
+    /// call holds no default of its own.[^1]
+    ///
     /// # Errors
     ///
     /// Returns an error when the weather refuses to build or to solve.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
     pub fn spin(
         terrain: Terrain,
         scale: WeatherScale,
+        latitudes: Latitudes,
         ticks: u64,
         threads: usize,
     ) -> Result<Self, WeatherError> {
@@ -247,7 +258,7 @@ impl ClimateField {
         let lattice = PaddedLattice::new(cell_lattice, scale.margin_cells())
             .map_err(|_| WeatherError::LatticeMismatch)?;
         let ground = ground_over_lattice(lattice, layout, terrain);
-        let mut weather = WeatherField::new(lattice, scale, 1)?;
+        let mut weather = WeatherField::with_latitudes(lattice, scale, latitudes, 1)?;
         let mut cells = vec![CellClimate::EMPTY; cell_lattice.tile_count() as usize];
         // The spin walks the ticks in ascending order, and the reading pass
         // walks the cells in ascending index order. Neither order depends on

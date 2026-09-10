@@ -493,9 +493,9 @@ const TURN_FINE: i64 = 4 * LATITUDE_POLE as i64;
 /// and one banded circulation, and the span decides how much of them the
 /// world sees.[^1]
 ///
-/// The default is a whole planet: the centre stands at the equator and the
-/// span runs from pole to pole. The project owner chose the planet reading
-/// against the region reading, and a record holds the choice.[^2]
+/// The default is one region: the centre stands at forty-five degrees north
+/// and the span runs three degrees. The project owner chose the region
+/// reading against the planet reading, and a record holds the choice.[^2]
 ///
 /// # References
 ///
@@ -515,17 +515,35 @@ impl Latitudes {
         span: 2 * LATITUDE_POLE,
     };
 
+    /// One region of a planet. The centre stands at forty-five degrees north
+    /// and the span runs three degrees.
+    ///
+    /// **A world of the target tile count is about three degrees across.**
+    /// The scale register derives a world extent of about 330 kilometres from
+    /// the tile edge at the target tile count, and that distance is about
+    /// three degrees of latitude.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
+    pub const REGION: Self = Self {
+        centre: 45 * LATITUDE_FINE,
+        span: 3 * LATITUDE_FINE,
+    };
+
     /// The latitudes a world takes when the caller states none.
     ///
-    /// **A world is a planet until somebody says otherwise.** The banded
-    /// circulation, the subtropical deserts and the equatorial rain belt are
-    /// what the project wants to see, and none of them exists inside a span
-    /// of three degrees.[^1]
+    /// **A world is one region of a planet.** The tile edge is a measurement,
+    /// so a world of the target tile count covers a few hundred kilometres
+    /// and not a globe. A world that spanned the globe put the same three
+    /// pressure belts at the same rows of every map.[^1]
+    ///
+    /// A caller that wants the belts states the planet span instead.
     ///
     /// # References
     ///
     /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
-    pub const DEFAULT: Self = Self::PLANET;
+    pub const DEFAULT: Self = Self::REGION;
 
     /// Builds a span from a centre latitude and a span, both in hundredths of
     /// a degree.
@@ -3977,10 +3995,19 @@ impl WeatherField {
     /// it.** The caller decides how wide the margin is. A margin of zero
     /// gives the field the world and nothing more.
     ///
+    /// **The field takes the latitudes a caller gets when it states none**,
+    /// which is one region of a planet. A world never builds a field this
+    /// way, because a world states the span its own settings hold. A caller
+    /// that means a planet states the planet span.[^1]
+    ///
     /// # Errors
     ///
     /// Returns an error when the faction count is above the ceiling the
     /// project supports.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
     pub fn new(
         lattice: PaddedLattice,
         scale: WeatherScale,

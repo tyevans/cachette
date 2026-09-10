@@ -53,6 +53,7 @@ fn world_of(seed: u64) -> World {
         seed,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     // The choice interval is not the subject of this file. A unit takes an
@@ -367,6 +368,7 @@ fn a_world_in_which_nothing_moves_still_answers_after_a_step() {
             seed,
             faction_count: 1,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         })
         .expect("the extent describes a world");
         if candidate.admits_a_unit(Axial::new(0, 0)) {

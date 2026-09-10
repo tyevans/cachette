@@ -76,6 +76,7 @@ fn world_after(ticks: u32) -> World {
         seed: SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     world.rebuild_bridge(1).expect("the rebuild must succeed");

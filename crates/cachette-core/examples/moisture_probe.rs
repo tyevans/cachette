@@ -16,6 +16,7 @@ fn main() {
         seed,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the settings describe a world");
     // The probe reads the ground plane of the weather and reads no

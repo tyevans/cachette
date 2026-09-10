@@ -41,6 +41,7 @@ fn world_of(seed: u64, extent: u32) -> World {
         seed,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world")
 }

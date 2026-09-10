@@ -24,6 +24,7 @@ fn world(width: u32, height: u32, seed: u64) -> World {
         seed,
         faction_count: 2,
         unit_capacity: 16,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world")
 }

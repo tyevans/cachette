@@ -70,6 +70,7 @@ fn arena(unit_capacity: u32) -> World {
         seed: LAND_SEED,
         faction_count: 3,
         unit_capacity,
+        ..WorldConfig::DEFAULT
     })
     .expect("a world of one tile is a world");
     assert!(
@@ -507,6 +508,7 @@ fn burning_wood() -> World {
         seed: FOREST_SEED,
         faction_count: 2,
         unit_capacity: 4096,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     let middle = thickest_wood(&world);

@@ -41,6 +41,7 @@ fn main() {
         seed: SEED,
         faction_count: 2,
         unit_capacity: 16,
+        ..WorldConfig::DEFAULT
     };
 
     let bare = World::new(config).expect("the world builds");

@@ -111,9 +111,21 @@ use pyo3::prelude::*;
 /// share it adds to the cost falls as the world grows. No reader sees a margin
 /// cell, and every weather array covers the world alone.
 ///
+/// **A map is one region of a planet, and `latitude_centre` and
+/// `latitude_span` say which region.** Both are in hundredths of a degree, so
+/// 4500 is forty-five degrees north and 300 is three degrees. The centre is
+/// the latitude of the middle row of the world. The span is the latitude from
+/// the first row to the last. `None` takes what the engine defaults to.
+///
+/// The span decides how much of the weather of a globe the world sees. The
+/// default span carries one prevailing wind, because no pressure belt of a
+/// planet is three degrees wide. A span of 18000 at a centre of zero makes
+/// the world a whole planet, with poles, subtropical deserts and an
+/// equatorial rain belt.
+///
 /// The constructor raises `ConfigError` when the arguments do not describe a
-/// world. A side of zero and a faction count above the ceiling are the two
-/// cases a caller meets first.
+/// world. A side of zero, a faction count above the ceiling, and a latitude
+/// span that passes a pole are the three cases a caller meets first.
 ///
 /// # References
 ///

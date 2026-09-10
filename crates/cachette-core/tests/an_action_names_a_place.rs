@@ -74,6 +74,7 @@ fn fixture(width: u32, height: u32) -> Option<World> {
         seed: SEED,
         faction_count: 3,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     for (faction, address) in SEATS.iter().enumerate() {
@@ -265,6 +266,7 @@ fn the_answer_does_not_grow_with_the_world() {
             seed: SEED,
             faction_count: 3,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         })
         .expect("the extent describes a world");
         tiles.push(world.grid().tile_count());

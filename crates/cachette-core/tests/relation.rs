@@ -54,6 +54,7 @@ fn row_world(width: u32, unit_capacity: u32) -> World {
         seed: LAND_SEED,
         faction_count: 2,
         unit_capacity,
+        ..WorldConfig::DEFAULT
     })
     .expect("a row of tiles is a world");
     for q in 0..width as i32 {
@@ -487,6 +488,7 @@ fn speaker_run(b_speaks: bool) -> SpeakerRun {
         seed: 3,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     world.seed_world().expect("the world seeds once");
@@ -723,6 +725,7 @@ fn a_leader_at_peace_converts_nobody() {
             seed: 0x0cac_4e77_0132,
             faction_count: 2,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         })
         .expect("the extent must describe a world");
         let seat = (16..(EDGE as i32 - 16))

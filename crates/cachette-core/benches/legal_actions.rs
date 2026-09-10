@@ -80,6 +80,7 @@ fn a_world(extent: u32, factions: u16, camp: i32, radius: u32) -> World {
         seed: SEED,
         faction_count: factions,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     };
     let mut world = World::new(config).expect("the configuration describes a world");
     world

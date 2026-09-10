@@ -20,6 +20,7 @@ fn main() {
         seed: 0x0123_4567_89ab_cdef,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("world");
     let _ = world.found_run_for_every_faction(group);

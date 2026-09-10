@@ -33,7 +33,7 @@
 //! [^1]: Research report 30, the published atmospheric math, section 8. `docs/research/reports/30-the-published-atmospheric-math.md`
 
 use cachette_core::hex::Axial;
-use cachette_core::{TileIdx, WeatherScale, World, WorldConfig};
+use cachette_core::{Latitudes, TileIdx, WeatherScale, World, WorldConfig};
 use cachette_core::{LATITUDE_FINE, WARMTH_FINE, WARMTH_FLOOR};
 
 /// The months that the probe divides one season period into.
@@ -317,6 +317,10 @@ fn main() {
     let settle = argument(4, 400);
     let step = argument(5, 8).max(1);
     let scale = WeatherScale::from_bits(bits).expect("the scale describes a lattice");
+    // **The probe grades a whole planet, so it states the planet span.** It
+    // splits the land at sixty degrees and reads the published shares of the
+    // climate classes over each part. A world that states no span is one
+    // region of a planet, and a region holds neither part.
     let mut world = World::with_weather_scale(
         WorldConfig {
             width: extent,
@@ -324,6 +328,8 @@ fn main() {
             seed,
             faction_count: 1,
             unit_capacity: 64,
+            latitude_centre: Latitudes::PLANET.centre(),
+            latitude_span: Latitudes::PLANET.span(),
         },
         scale,
     )

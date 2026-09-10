@@ -49,6 +49,7 @@ fn config() -> WorldConfig {
         seed: SEED,
         faction_count: 2,
         unit_capacity: 8,
+        ..WorldConfig::DEFAULT
     }
 }
 
@@ -59,7 +60,9 @@ fn terrain() -> Terrain {
 
 /// Returns a spin at a stated thread count.
 fn spin(threads: usize, ticks: u64) -> ClimateField {
-    ClimateField::spin(terrain(), WeatherScale::DEFAULT, ticks, threads).expect("the spin runs")
+    let latitudes = config().latitudes().expect("the span fits on the globe");
+    ClimateField::spin(terrain(), WeatherScale::DEFAULT, latitudes, ticks, threads)
+        .expect("the spin runs")
 }
 
 #[test]
@@ -99,6 +102,7 @@ fn the_seed_reaches_the_climate() {
     let elsewhere = ClimateField::spin(
         Terrain::new(SEED ^ 0xFFFF_FFFF, grid),
         WeatherScale::DEFAULT,
+        config().latitudes().expect("the span fits on the globe"),
         SHORT_SPIN,
         1,
     )

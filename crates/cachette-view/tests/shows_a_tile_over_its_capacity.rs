@@ -75,6 +75,7 @@ fn crowded_world() -> (World, Crowd) {
         seed: 11,
         faction_count: 1,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
 
@@ -382,6 +383,7 @@ fn a_world_with_a_road() -> (World, Axial) {
         seed: 11,
         faction_count: 1,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
 

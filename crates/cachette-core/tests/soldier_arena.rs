@@ -65,6 +65,7 @@ fn the_world_refuses_a_faction_it_does_not_hold() {
         seed: 3,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
 
@@ -87,6 +88,7 @@ fn a_world_refuses_a_faction_count_above_the_storage_ceiling() {
         seed: 1,
         faction_count: FACTION_CEILING,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .is_ok());
     assert!(World::new(WorldConfig {
@@ -95,6 +97,7 @@ fn a_world_refuses_a_faction_count_above_the_storage_ceiling() {
         seed: 1,
         faction_count: FACTION_CEILING + 1,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .is_err());
 }

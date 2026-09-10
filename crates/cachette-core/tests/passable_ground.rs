@@ -50,6 +50,7 @@ fn fixture() -> (World, Vec<Axial>, Vec<Axial>) {
         seed: SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     let grid = world.grid();

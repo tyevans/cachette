@@ -49,6 +49,7 @@ fn world(width: u32) -> World {
         seed: 1,
         faction_count: 2,
         unit_capacity: 256,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world")
 }
@@ -325,6 +326,7 @@ fn the_event_panel_names_the_units_a_fight_felled() {
         seed: 1,
         faction_count: 2,
         unit_capacity: 64,
+        ..WorldConfig::DEFAULT
     })
     .expect("a row of tiles is a world");
     // The one table row that fights. Every unit of an ordinary run carries a

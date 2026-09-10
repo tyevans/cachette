@@ -46,6 +46,7 @@ const DEMO: WorldConfig = WorldConfig {
     seed: 0x0cac_4e77_e5ee_d001,
     faction_count: 4,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+    ..WorldConfig::DEFAULT
 };
 
 /// The number of people the demonstration founds its run with.

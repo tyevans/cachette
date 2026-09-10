@@ -21,8 +21,8 @@
 
 use cachette_core::storm;
 use cachette_core::{
-    Axial, CycloneSetting, Entity, FactionId, ResourceKind, TileKind, UpgradeCategory, UpgradeRow,
-    World, WorldConfig, DEFAULT_UPGRADE_TABLE,
+    Axial, CycloneSetting, Entity, FactionId, Latitudes, ResourceKind, TileKind, UpgradeCategory,
+    UpgradeRow, WeatherScale, World, WorldConfig, DEFAULT_UPGRADE_TABLE,
 };
 
 /// The extent of the fixture world.
@@ -35,14 +35,31 @@ const EDGE: u32 = 64;
 const SEED: u64 = 11;
 
 /// Builds the fixture world.
+///
+/// **The world spans the globe, and it runs one weather cell for each tile.**
+/// Two properties of the fixture need both. A test reads a world that carries
+/// no storm of its own, and the span decides the temperature gradient that
+/// admits one: the default span puts that gradient at its floor, so the field
+/// raises fronts everywhere. A storm also drifts about one cell of its own
+/// lattice in a tick, so a coarse lattice carries the eye off the world, or
+/// onto water, before the test reads it.[^1]
+///
+/// # References
+///
+/// [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
 fn world() -> World {
-    World::new(WorldConfig {
-        width: EDGE,
-        height: EDGE,
-        seed: SEED,
-        faction_count: 2,
-        unit_capacity: 512,
-    })
+    World::with_weather_scale(
+        WorldConfig {
+            width: EDGE,
+            height: EDGE,
+            seed: SEED,
+            faction_count: 2,
+            unit_capacity: 512,
+            latitude_centre: Latitudes::PLANET.centre(),
+            latitude_span: Latitudes::PLANET.span(),
+        },
+        WeatherScale::PER_TILE,
+    )
     .expect("the extent must describe a world")
 }
 
@@ -72,9 +89,16 @@ fn a_world_under_one_storm() -> (World, Vec<Axial>, Vec<Axial>) {
     let mut field = world();
     field.step(1).expect("the step must run");
     let dry = dry_ground(&field);
-    let eye = *dry.first().expect("the world holds passable ground");
+    // **The eye starts near the middle of the world.** A storm raised on the
+    // border drifts off the world in one tick, and the fixture then reaches no
+    // tile under a storm at all.
+    let middle = Axial::new((EDGE / 2) as i32, (EDGE / 2) as i32);
+    let eye = *dry
+        .iter()
+        .min_by_key(|here| (here.q - middle.q).abs() + (here.r - middle.r).abs())
+        .expect("the world holds passable ground");
     field
-        .raise_cyclone(eye, CycloneSetting::SEVERE)
+        .raise_cyclone(eye, CycloneSetting::SEVERE.with_reach(8))
         .expect("the place lies inside the world");
     field.step(1).expect("the step must run");
     let (under, clear): (Vec<Axial>, Vec<Axial>) = dry
@@ -408,12 +432,18 @@ struct Built {
 /// Builds the road fixture, or returns `None` when the seed gives no seat
 /// with two open tiles beside it.
 fn a_world_with_one_road(seed: u64) -> Option<Built> {
+    // **The world spans the globe for the reason the fixture world does.**
+    // The default span puts the gradient that admits a storm at its floor, so
+    // the field raises fronts of its own over the road, and the road then
+    // falls to weather the test did not place.
     let mut field = World::new(WorldConfig {
         width: EDGE,
         height: EDGE,
         seed,
         faction_count: 2,
         unit_capacity: 512,
+        latitude_centre: Latitudes::PLANET.centre(),
+        latitude_span: Latitudes::PLANET.span(),
     })
     .expect("the extent must describe a world");
     // **The road admits a crowd, because the test needs one.** A bare tile of

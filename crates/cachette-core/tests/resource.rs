@@ -67,6 +67,7 @@ fn world(seed: u64) -> World {
         seed,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     hold_the_choice(&mut world);
@@ -1268,6 +1269,7 @@ fn the_recovery_work_does_not_grow_with_the_extent() {
             seed: SEED,
             faction_count: 4,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
         })
         .expect("the extent must describe a world");
         hold_the_choice(&mut field);
@@ -1576,6 +1578,7 @@ fn the_engine_reads_the_improvement_when_it_recovers_a_deposit() {
         seed: SEED,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
     })
     .expect("the settings describe a world");
     let outcomes = field.found_run_for_every_faction(30);

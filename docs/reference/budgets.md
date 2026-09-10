@@ -90,16 +90,14 @@ that held it and says how the value was reached.
 | World shape | Rhombus | BLK-014 | Owner decision. A tile index is a raw axial pair |
 | Maximum factions | 63 | BLK-013 | Owner decision. One bit for each faction in a 64-bit mask, with one value reserved for no faction |
 
-**The tile edge is a game unit and the weather does not read it.** The row axis
-of a world carries a latitude, the world states the span from its first row to
-its last, and a world that states none spans the globe from pole to pole. So a
-world of 16.7 million tiles is a planet, and the 330 km above is not the
-distance between its two poles. The two rows stay, because every crossing time,
-dwell and march figure in this table is derived from the tile edge and each of
-them is still consistent with the others. **Read the tile edge as the unit that
-fixes how long a unit takes to walk a tile, and never as the distance that
-carries a climate.** The project owner ruled on 6 September 2026, against a
-report that found the two readings and could not settle them.[^20] [^21]
+**The tile edge is a measurement, and the world extent follows from it.** The
+row axis of a world carries a latitude, and the world states the span from its
+first row to its last. A world that states none spans about three degrees,
+which is what 330 km of ground is worth. So a map is one region of a planet,
+and every row of this table agrees with every other. A world that wants poles,
+subtropical deserts and an equatorial rain belt states a span from pole to pole
+instead. The project owner ruled on 9 September 2026, and that ruling reverses
+one of 6 September 2026 which made a map a whole planet.[^20] [^21]
 
 The tile upgrade fraction picks sparse storage over dense storage. The
 character layer figure is derived by scaling, not measured. BLK-007 holds every
