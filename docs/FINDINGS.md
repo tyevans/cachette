@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-716**
+**Next number: FND-717**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19376,3 +19376,59 @@ and for how many ticks it holds each one.
 
 [^F715A]: The weather cell probe. `crates/cachette-core/examples/weather_cell_probe.rs`
 [^F715B]: The demonstration sky shader. `python/cachette/demo/sketch_shader.py`
+
+### FND-716 — One trainer process cannot use more than about seven cores, because a seventh of each decision is serial
+
+**Believed.** A measurement pass parallelises across worlds. It builds a
+vectorised environment over many worlds and hands it a worker count, so a pass
+given the whole machine was assumed to use the whole machine. When a baseline
+pass over 256 worlds showed 14 busy cores of 64, the reading was that the pass
+had been given too few workers, or that a launcher had overridden the count.
+
+**True.** The worker count was never small. The baseline pass receives the
+whole core count and the validation and held-out passes receive the cores
+divided by the strategy count. **The ceiling is Amdahl's law inside one
+process, and the passes were already at it.**
+
+Measured over a fixed set of 16 worlds at extent 128, five decisions each,
+with the matrix libraries pinned to one thread:
+
+| workers | ticks a second |
+|---|---|
+| 1 | 49.5 |
+| 2 | 89.9 |
+| 4 | 125.3 |
+| 8 | 207.0 |
+| 16 | 263.0 |
+
+Sixteen times the workers returns 5.3 times the rate, and the last doubling
+returns 1.27. Repeated points agree inside one percent.
+
+Timing the sections of one decision at extent 128 over 32 worlds gives the
+reason: the engine takes 85.5 percent, the policy matrix product 8.1 percent,
+the settle step 6.2 percent, and everything else together under 0.3 percent.
+**The serial share is 14.5 percent, so one process cannot exceed 6.9
+concurrent cores.**
+
+**The prediction and the observation agree.** A running instance showed 14.2
+busy cores over two trainer processes, which is 7.1 for each process against a
+predicted 6.9. The mechanism is settled rather than argued.
+
+**A baseline pays the serial section for an answer nothing reads.** The
+controller holds the seat of a baseline world, so the apply step discards the
+action, and the pass still spends 4.7 milliseconds of a 4819 by 180 matrix
+product for each world-decision choosing it.
+
+**Two costs sit inside the 85.5 percent, so the ceiling above is an upper
+bound.** The engine batch stripes its worlds statically over its workers and
+joins every worker on each of the ten inner ticks, so each tick waits for the
+heaviest stripe. The batch is also rebuilt whenever one world finishes, and a
+pass that reports 198 live worlds of 256 has already rebuilt it dozens of
+times.
+
+**Follows.** More processes, not more workers in a process. A pool of
+single-threaded worker processes taking one episode each has no shared
+interpreter and therefore no shared serial section, which is the same repair
+that a training generation received. **Read a worker count as a request and
+not as a capability**: this project has now twice read a configured number as
+though it described what the machine would do.
