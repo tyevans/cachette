@@ -1,0 +1,12 @@
+  2 strategies queue their episodes over 64 worker processes, one episode in each task
+=== controller baseline ===
+  conquer baseline working  episodes    41 live  215/256  ticks    137400 rate   4441.2 t/s [31s]
+  conquer baseline working  episodes   256 live    0/256  ticks    857600 rate   3213.4 t/s [253s]
+  controller {'return': 12184.2, 'won': 0.34}
+  the controller baseline was measured
+=== conquer (linear) ===
+=== expand (linear) ===
+  conquer generation  0 working  episodes    88 live   56/144  ticks    281600 rate   9013.1 t/s [62s]
+  expand generation  0 working  episodes    72 live   72/144  ticks    230400 rate   7411.6 t/s [62s]
+  conquer validation  0 working  episodes    97 live   31/128  ticks    310400 rate   9932.8 t/s [93s]
+  expand validation  0 working  episodes   104 live   24/128  ticks    332800 rate  10098.2 t/s [93s]

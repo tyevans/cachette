@@ -102,11 +102,18 @@ FIELD = re.compile(r"(?P<key>[a-z][a-z-]*)\s+(?P<value>-?[\d.]+|-)")
 # The strategy name is absent on the shared controller baseline, which one
 # process measures for every strategy. The shard is absent on a pass that
 # one process scores whole.
+#
+# **A pass counts decisions or episodes, and this reads either word into the
+# same field.** A pass in one process steps every world of a batch together,
+# so it counts the decisions it has taken. A queued pass plays one episode in
+# each task, so it counts the episodes that have finished. Both are the
+# progress of one pass, and a screen that read only the first word went blank
+# for every pass the queue splits.
 WORKING = re.compile(
     r"^\s+(?:(?P<name>\S+) )?(?P<what>generation\s+\d+|yardstick|baseline"
     r"|validation\s+\d+|holdout\s+\d+)"
     r"(?: shard (?P<shard>\d+)/(?P<shards>\d+))?"
-    r" working\s+decisions\s+(?P<decisions>\d+)\s+"
+    r" working\s+(?:decisions|episodes)\s+(?P<decisions>\d+)\s+"
     r"live\s+(?P<live>\d+)/(?P<worlds>\d+)\s+"
     r"ticks\s+(?P<ticks>\d+)\s+rate\s+(?P<rate>[\d.]+) t/s\s+"
     r"\[(?P<seconds>[\d.]+)s\]"

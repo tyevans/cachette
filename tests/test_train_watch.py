@@ -66,6 +66,12 @@ IN_FLIGHT = (LOGS / "sharded-in-flight.log").read_text(encoding="utf-8")
 # reported an idle machine, so it is the moment the tests read.
 MID_GENERATION = "\n".join(IN_FLIGHT.splitlines()[:88]) + "\n"
 
+# A queued run, which counts the episodes that have finished rather than
+# the decisions it has taken. One task is one episode there, so the count
+# of a pass is a count of episodes. The log holds a baseline that names one
+# strategy, two generations and two validation passes.
+QUEUED = (LOGS / "queued-in-flight.log").read_text(encoding="utf-8")
+
 ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
 
 
@@ -573,3 +579,31 @@ def test_an_unnamed_controller_return_says_that_it_names_nothing() -> None:
     reading = watch.read(log)
     assert reading.controller_weighting == ""
     assert "does not name the weighting" in screen(log)
+
+
+def test_the_screen_reads_a_pass_that_counts_episodes() -> None:
+    """A queued pass counts episodes, and the screen must read that word.
+
+    A pass in one process steps every world of a batch together, so it counts
+    the decisions it has taken. A pass that the queue splits plays one episode
+    in each task, so it counts the episodes that have finished. **Both are the
+    progress of one pass**, and a reader that took only the first word went
+    blank for every pass the queue splits.
+
+    The fixture holds the line shapes a queued run prints: a baseline that
+    names one strategy, a generation, and a validation pass. The screen must
+    find every one of them.
+    """
+    for line in QUEUED.splitlines():
+        assert watch.in_flight(line) == progress_module.in_flight(line), line
+
+    reading = watch.read(QUEUED)
+    assert sorted(reading.strategies) == ["conquer", "expand"]
+    for strategy in reading.strategies.values():
+        work = strategy.last_working
+        assert work is not None
+        assert work.worlds == 128
+        assert work.what == "validation 0"
+    rendered = screen(QUEUED)
+    assert "working shards of 2 strategies" in rendered
+    assert "0 ticks/s" not in rendered

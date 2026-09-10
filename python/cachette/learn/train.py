@@ -86,6 +86,7 @@ import numpy as np
 
 from .config import TrainConfig
 from .env import Env, EnvConfig, viable_seeds
+from .measure import SOLE, queued_population, queued_repeats, start_measurement
 from .normalize import reference_normalizer
 from .policy import (
     FeatureNormalizer,
@@ -132,6 +133,8 @@ from .structured import layout_of
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Mapping, Sequence
     from pathlib import Path
+
+    from .measure import MeasurementPass
 
 
 class TrainResult(TypedDict):
@@ -497,9 +500,18 @@ class Validator:
     holdout_seeds: list[int] = field(default_factory=list)
     held_out: ValidationScore | None = None
     held_out_generation: int = -1
+    # The queue this judge plays its episodes in. **A pass of one policy over
+    # many seeds is many episodes and the queue splits it**, in the way the
+    # queue splits a generation. A judge that holds none steps one batch of
+    # worlds in this process, which is what a run of one core does.
+    pool: ShardPool | None = None
+    # The yardstick pass this judge has started and not yet read. **Nothing
+    # that trains a weight reads a yardstick**, so the pass runs beside the
+    # generations rather than in front of them.
+    started_yardstick: MeasurementPass | None = field(default=None, repr=False)
 
     def measure_controller(self) -> None:
-        """Play the built-in controller in the learner's own seat.
+        """Start the built-in controller in the learner's own seat.
 
         **A relative score is zero on average by construction**, so it cannot
         tell a population that improved from one that got worse together. The
@@ -507,14 +519,50 @@ class Validator:
         run reports every validation score against that number. The
         controller does not learn, so the yardstick is measured once and
         holds for the whole run.
+
+        **This does not wait for the pass when the judge holds a queue.** The
+        yardstick is a reporting quantity: the run keeps the centre that won
+        most on the validation seeds, and it compares a candidate against
+        another candidate and never against the controller. A run that waited
+        here spent minutes with the queue empty for a number no generation
+        reads. The pass submits its episodes into the same queue the
+        generations use, and the judge reads the answer when it is there.
         """
         if not self.seeds:
             return
-        self.yardstick = self.score(
-            self.best_policy,
-            f"{self.name} yardstick",
-            replace(self.env_config, controlled=False),
+        watching = replace(self.env_config, controlled=False)
+        if self.pool is None:
+            self.yardstick = self.score(
+                self.best_policy, f"{self.name} yardstick", watching
+            )
+            self._say_yardstick()
+            return
+        self.started_yardstick = start_measurement(
+            self.pool, watching, {SOLE: self.scoring}, [self.best_policy], self.seeds
         )
+
+    def collect_controller(self, wait: bool = False) -> None:
+        """Take the yardstick when its episodes have finished, and say it.
+
+        A caller reads this between two generations. It returns at once while
+        the pass runs, so the loop never waits on it.
+
+        A caller that names the wait takes the answer whatever state the pass
+        is in. The end of a run does that, so the report of the run holds the
+        bar even for a run that a wall clock cap ended early.
+        """
+        pending = self.started_yardstick
+        if pending is None or not (wait or pending.done):
+            return
+        self.started_yardstick = None
+        label = f"{self.name} yardstick" if wait else ""
+        self.yardstick = ValidationScore.of_record(pending.records(label)[SOLE][0])
+        self._say_yardstick()
+
+    def _say_yardstick(self) -> None:
+        """Print the bar this judge measured, in the shape two readers parse."""
+        if self.yardstick is None:  # pragma: no cover - the caller sets it first
+            return
         # **The shaped return stays the first field of this line.** Two
         # dashboards read it there by position, so the win share goes after
         # it rather than in front of it.
@@ -546,18 +594,33 @@ class Validator:
         The seeds entry names the set to play. The validation seeds are the
         default, and the held-out seeds are the other set a caller asks for.
 
+        **One episode is one task of the queue when the judge holds a pool.**
+        A pass over 256 seeds in one process reaches about a seventh of a
+        machine of 64 cores, because the section that one interpreter runs
+        between two decisions holds every engine worker of the process. The
+        queue plays each episode in a worker process of its own, and the
+        combination orders the answers on the policy and the seed rather than
+        on which worker finished.[^2]
+
         References
         ----------
         [^1]: What is wrong with training and evaluation, items 1 and 2.
         ``docs/research/what-is-wrong-with-training-and-evaluation.md``
+
+        [^2]: ADR-0194, a generation is scored one episode at a time, and
+        combined in candidate order, decisions D1 and D3.
+        ``docs/adrs/draft/adr-0194-a-generation-is-scored-in-shards.md``
         """
+        config = env_config or self.env_config
+        playing = list(self.seeds if seeds is None else seeds)
+        if self.pool is not None:
+            return ValidationScore.of_record(
+                queued_population(
+                    self.pool, config, self.scoring, [current], playing, label
+                )
+            )
         played = run_population(
-            env_config or self.env_config,
-            self.scoring,
-            [current],
-            list(self.seeds if seeds is None else seeds),
-            self.workers,
-            label,
+            config, self.scoring, [current], playing, self.workers, label
         )
         return ValidationScore.of_record(played)
 
@@ -739,18 +802,6 @@ def train(
         if rebuilt is not None:
             print(f"  {name} {rebuilt}", flush=True)
 
-    judge = Validator(
-        name=name,
-        env_config=env_config,
-        scoring=fixed,
-        workers=train_config.workers,
-        seeds=list(validation or []),
-        best_policy=policy,
-        best=resumed_best,
-        holdout_seeds=list(holdout or []),
-    )
-    judge.measure_controller()
-
     history: list[dict[str, float | None]] = []
     records: list[GenerationRecord] = []
     # The generations whose candidates all scored the same number. **A run
@@ -788,6 +839,23 @@ def train(
         opened = nullcontext(None)
 
     with opened as pool:
+        # **The judge plays its passes in the same queue the generations use.**
+        # It is built here rather than above, because it needs the pool, and a
+        # judge that held none would step one batch of many worlds in this
+        # process while the queue stood empty.
+        judge = Validator(
+            name=name,
+            env_config=env_config,
+            scoring=fixed,
+            workers=train_config.workers,
+            seeds=list(validation or []),
+            best_policy=policy,
+            best=resumed_best,
+            holdout_seeds=list(holdout or []),
+            pool=pool,
+        )
+        judge.measure_controller()
+
         for generation in range(first_generation, train_config.generations):
             seeds = generation_seeds(
                 seed_pool, generation, train_config.seeds_per_generation
@@ -839,6 +907,13 @@ def train(
             measuring = measures_holdout(generation, holdout_every)
             held = judge.measure_holdout(policy, generation) if measuring else None
 
+            # **The yardstick pass runs beside the generations, so the row
+            # of a generation holds it only after it lands.** The bar reaches
+            # a report row and a printed line, and nothing that trains a
+            # weight reads it, so an early row that names no bar costs the
+            # run nothing.
+            judge.collect_controller()
+
             store_centres(checkpoint, policy, judge, record, checked)
             history.append(
                 record.summary(
@@ -862,6 +937,12 @@ def train(
                 + f"[{history[-1]['seconds']:.0f}s]",
                 flush=True,
             )
+
+        # **The run states its bar before it ends.** A wall clock cap may end
+        # the loop at any generation, and a pass left in the queue would then
+        # reach no report at all. This waits for the yardstick while the pool
+        # is still open, which is the last moment it can be read.
+        judge.collect_controller(wait=True)
 
     return {
         "name": name,
@@ -1162,6 +1243,7 @@ def evaluate(
     workers: int,
     repeats: int = 1,
     label: str = "",
+    pool: ShardPool | None = None,
 ) -> dict[str, float]:
     """Play one policy on a seed set, and average what it ended with.
 
@@ -1180,7 +1262,25 @@ def evaluate(
     The summary holds one entry for each quantity the engine publishes about
     the seat, and the refusal figures beside them. **The set of quantities
     comes from the schema of the engine and never from a tuple written here.**
+
+    The pool entry is the queue this pass plays its episodes in. **Every
+    repeat of every seed is one task of it**, so the pass fills the machine
+    and no repeat waits for the one before it. A pass that holds no pool
+    steps one batch of worlds in this process, which is what a run of one
+    core does.
+
+    A queued pass gives each episode its own stream of draws, keyed on the
+    repeat and the seed position. A pass in one process gives every world of
+    one batch a shared stream and carries it across the repeats. The two
+    therefore report different numbers for a policy that draws, and each of
+    them repeats on its own terms. No policy this project trains draws.
     """
+    if pool is not None:
+        return summarise(
+            queued_repeats(
+                pool, env_config, scoring, policy, seeds, max(1, repeats), label
+            )
+        )
     played = [
         run_population(env_config, scoring, [policy], seeds, workers, label=label)
         for _ in range(max(1, repeats))

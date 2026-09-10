@@ -76,6 +76,24 @@ variable says otherwise. Five processes on a 64 core machine then start 320
 threads, and those threads fight for the cores the engine needs. The pool sets
 the four variables before it starts a process, so a worker inherits them.
 
+# The pool carries a task of any shape, and a caller may read it later
+
+The pool began as the queue of a generation. A measurement pass submits into
+the same queue now, because a measured episode is the same shape without the
+candidate dimension.[^5] So the pool takes a task of any shape and gives back
+a result of any shape, and it holds no opinion about either one. A result only
+has to say how many ticks it paid for, because the progress line reads that
+and nothing else.
+
+**A caller may submit work and read it later.** The controller baseline needs
+that: it produces the bar a report states, and nothing that trains a weight
+reads it, so a run that waited for it left the queue empty for as long as the
+pass took.
+
+A task names a large value rather than carrying it. The pool writes the value
+once, and it never writes two values to one name inside one pool, so the name
+is the value and a reader needs no digest.
+
 # References
 
 [^1]: Target platform costs, the trainer process measurement.
@@ -86,16 +104,22 @@ candidate order, decision D2.
 ``docs/adrs/draft/adr-0194-a-generation-is-scored-in-shards.md``
 [^4]: ADR-0001, one binary gives one answer at any thread count, decision D2.
 ``docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md``
+[^5]: The measurement pass. ``python/cachette/learn/measure.py``
 """
 
 from __future__ import annotations
 
 import os
+import pickle
 import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, replace
 from multiprocessing import get_context
-from typing import TYPE_CHECKING
+from pathlib import Path
+from shutil import rmtree
+from tempfile import mkdtemp
+from threading import Lock
+from typing import TYPE_CHECKING, Generic, Protocol, TypeVar
 
 import numpy as np
 
@@ -105,7 +129,7 @@ from .rollout import HEARTBEAT_SECONDS, Generation, score_generation
 from .search import generation_noise, pair_candidates, shell_policy
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
     from concurrent.futures import Future
     from types import TracebackType
 
@@ -113,6 +137,25 @@ if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from .env import EnvConfig
     from .policy import FeatureNormalizer
     from .reward import Scoring
+
+
+class Scored(Protocol):
+    """What every result of a pool reports, whatever else it holds.
+
+    The tick count is the simulated cost of the task. The progress line reads
+    it and nothing else, so one progress line serves a generation and a
+    measurement pass alike.
+    """
+
+    @property
+    def ticks(self) -> int:
+        """How many world ticks this result paid for."""
+
+
+# The task a pool takes and the result it gives back. A pool holds no opinion
+# about either one: it carries a task to a worker and a result back.
+Task = TypeVar("Task")
+Held = TypeVar("Held", bound=Scored)
 
 # The variables that hold a matrix library to one thread. Each library reads
 # its own, and a library that reads none starts one thread for each core.
@@ -477,17 +520,57 @@ class ShardPool:
         self._processes = processes
         self._executor: ProcessPoolExecutor | None = None
         self._restore: dict[str, str | None] = {}
+        self._holding: Path | None = None
+        self._held = 0
+        self._lock = Lock()
 
     @property
     def processes(self) -> int:
         """How many worker processes the pool holds."""
         return self._processes
 
+    def share(self, value: object) -> SharedValue:
+        """Write one value where every worker reads it, and name it once.
+
+        **A measurement task names its policy rather than carrying it.** The
+        policy of a wide world holds one weight for each action row and each
+        feature, and a pass that sent it with every task would push that
+        array through the queue once for each episode. A pass of 256 episodes
+        over such a policy sends nearly two gigabytes to say one thing.
+
+        A name is never reused inside one pool, so the name is the value. A
+        worker therefore needs no check that the file it opens holds what the
+        task meant, and no cache that could answer with a stale value.
+
+        A worker reads the file once for each task it takes. That is a read
+        of a few milliseconds against an episode of seconds, and it holds no
+        value between two tasks, so the memory of a worker does not grow with
+        the passes a run plays.
+        """
+        if self._holding is None:
+            message = "the pool is not open. Use it as a context manager."
+            raise RuntimeError(message)
+        with self._lock:
+            self._held += 1
+            path = self._holding / f"{self._held}.pickle"
+        path.write_bytes(pickle.dumps(value))
+        return SharedValue(path=str(path))
+
+    def release(self, shared: SharedValue) -> None:
+        """Forget one shared value. A pass calls this when its tasks are done.
+
+        The pool removes what it holds when it closes, so this only keeps a
+        long run from holding every policy it ever measured.
+        """
+        Path(shared.path).unlink(missing_ok=True)
+
     def __enter__(self) -> ShardPool:
         """Pin the matrix libraries, then start the worker processes."""
         self._restore = {name: os.environ.get(name) for name in MATRIX_THREAD_VARS}
         for name in MATRIX_THREAD_VARS:
             os.environ[name] = "1"
+        self._holding = Path(mkdtemp(prefix="cachette-shared-"))
+        self._held = 0
         # A spawned process starts a fresh interpreter and imports the
         # package again, so it reads the environment as it stands here. That
         # is why the variables are set before this line: a matrix library
@@ -509,6 +592,9 @@ class ShardPool:
         if self._executor is not None:
             self._executor.shutdown(wait=True)
             self._executor = None
+        if self._holding is not None:
+            rmtree(self._holding, ignore_errors=True)
+            self._holding = None
         for name, held in self._restore.items():
             if held is None:
                 os.environ.pop(name, None)
@@ -527,16 +613,96 @@ class ShardPool:
         Two callers may hold one pool at once, because a submission takes the
         lock of the executor and a caller waits only on futures of its own.
         """
+        return self.start(play_episode, tasks).results(label)
+
+    def start(
+        self, work: Callable[[Task], Held], tasks: Sequence[Task]
+    ) -> Pending[Held]:
+        """Submit every task at once, and give back what the pool now holds.
+
+        **This returns before any task runs.** A caller that must have the
+        answer asks the result for it. A caller whose work does not depend on
+        the answer submits here, does its own work, and reads the answer
+        later. The controller baseline is the second kind: nothing that
+        trains a weight reads it.
+
+        The tasks of one call reach the one queue that every strategy of the
+        run submits into, so a pass that overlaps training takes the workers
+        that training leaves free and needs no pool of its own.
+        """
         if self._executor is None:
             message = "the pool is not open. Use it as a context manager."
             raise RuntimeError(message)
-        futures = [self._executor.submit(play_episode, task) for task in tasks]
+        return Pending([self._executor.submit(work, task) for task in tasks])
+
+
+@dataclass(frozen=True)
+class SharedValue:
+    """Where one value of a pool sits, so that a task names it and no more.
+
+    The path is unique inside the pool that wrote it, and the pool never
+    writes two values to one path. **So the path is the value**, and a reader
+    needs no digest to know what it opened.
+    """
+
+    path: str
+
+
+def shared_value(shared: SharedValue) -> object:
+    """Read back what a pool shared. This runs in a worker process.
+
+    The caller states what it shared. **The pool holds no opinion about the
+    value**, so it gives back what the file held and the caller names the
+    type it asked for.
+    """
+    with Path(shared.path).open("rb") as file:
+        return pickle.load(file)
+
+
+class Pending(Generic[Held]):
+    """Work that a pool holds, and the results it will give back.
+
+    **The results keep the order the tasks were submitted in**, whatever
+    order the workers answered in. Every combination in this project sorts on
+    its own stable key as well, so neither this list nor the completion order
+    that filled it can reach a score.
+    """
+
+    def __init__(self, futures: Sequence[Future[Held]]) -> None:
+        """Hold the futures of one submission."""
+        self._futures = list(futures)
+
+    def __len__(self) -> int:
+        """How many tasks this submission holds."""
+        return len(self._futures)
+
+    @property
+    def done(self) -> bool:
+        """Whether every task of this submission has finished.
+
+        A caller that overlaps a pass with its own work reads this to learn
+        whether the answer is ready, and it never has to read it: the results
+        wait for what is left.
+        """
+        return all(future.done() for future in self._futures)
+
+    def results(self, label: str = "") -> list[Held]:
+        """Wait for every task, and give back what each one returned.
+
+        A task that raised carries its failure here. **The caller sees the
+        first failure in submission order**, so two runs that lose the same
+        episode report the same message.
+
+        The label names the pass in a progress line. A call that gives one
+        reports what has finished while it waits, and a call that gives none
+        stays silent.
+        """
         if label:
-            _report_progress(futures, label)
-        return [future.result() for future in futures]
+            _report_progress(self._futures, label)
+        return [future.result() for future in self._futures]
 
 
-def _report_progress(futures: Sequence[Future[EpisodeScore]], label: str) -> None:
+def _report_progress(futures: Sequence[Future[Held]], label: str) -> None:
     """Print what a generation has finished, while it runs.
 
     **A generation says it is working while it works.** A generation of the
@@ -624,10 +790,14 @@ __all__ = [
     "THREADS_FOR_ONE_EPISODE",
     "EpisodeScore",
     "EpisodeTask",
+    "Pending",
+    "Scored",
     "ShardPool",
+    "SharedValue",
     "candidate_stride",
     "combine_episodes",
     "episode_tasks",
     "play_episode",
     "run_sharded_generation",
+    "shared_value",
 ]
