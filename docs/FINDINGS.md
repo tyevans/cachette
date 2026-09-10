@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-733**
+**Next number: FND-734**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19982,3 +19982,50 @@ looks like their own work.
 correct here only because the difference was accounted for first. A re-record
 made without that step destroys the evidence that something else moved beside
 the thing that moved on purpose.
+
+### FND-733 — A commit that removed a duplicate world declaration also raised the tick limit, and called the new value measured
+
+**Believed.** The training world ran to a tick limit of 2500, and the median
+game took about 1300 ticks. A run that suddenly cost more for each episode had
+to have become more expensive for a reason inside the trainer or inside the
+policy.
+
+**True.** The limit is 6000. One commit raised it from 2500 on 9 September
+2026.[^F733A] The subject of that commit says it declares the training world
+once. The body names the new limit in a clause about where the world is
+declared, and it calls the value measured. **The commit cites no
+measurement.**
+
+**Evidence.** The constant is `TICK_LIMIT` in the trainer.[^F733B] Its history
+holds one change of value:
+
+    git log -L '/^TICK_LIMIT/,+1:python/cachette/learn/__main__.py'
+
+The commit before it set 2500. The commit named above set 6000. The subject
+line of that commit names neither number. A reader who looks for the reason
+that an episode became dearer reads the log and does not stop on it.
+
+The horizon of the run is the limit divided by the decision interval, so the
+change also multiplied the decisions of one episode by 2.4. A later run
+measured 3424 to 4322 ticks for each episode against a league median of 2100
+to 2450 taken before the raise.
+
+**Follows.** Three things.
+
+**A change of value does not belong in a commit that removes a duplicate.**
+The two changes have different reasons and different risks. A reader who
+accepts the de-duplication accepts the new limit without reading it.
+
+**A commit body must not call a figure measured without naming the
+measurement.** A commit message is the one document of this project that never
+decays, so a reader trusts it more than a record. The word measured, with no
+seed set and no figure, spends that trust on nothing.
+
+**Size a run against the world the run will play, not the world it played
+last.** The sizing of a later run took the cost of an episode from a run made
+before the raise, so it planned against a world that was 2.4 times cheaper
+than the one it bought.[^F733C]
+
+[^F733A]: Commit `d1524f55`, 9 September 2026.
+[^F733B]: The trainer entry point. `python/cachette/learn/__main__.py`
+[^F733C]: Run sizing. `python/cachette/learn/sizing.py`
