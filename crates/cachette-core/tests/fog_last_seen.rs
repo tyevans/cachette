@@ -78,7 +78,7 @@ fn two_far_cells(world: &World) -> (Axial, Axial) {
     let near = dry[0];
     let far = *dry.last().expect("the fixture world holds passable ground");
     assert!(
-        near.distance(far) > u32::from(world.sight_rules().ceiling()) * 2,
+        near.distance(far) > world.sight_rules().ceiling() * 2,
         "the two addresses must share no sight at any admitted radius"
     );
     assert_ne!(

@@ -144,7 +144,7 @@ fn say_belt(world: &World) {
     let mut deviation: Vec<i64> = Vec::new();
     for row in 0..height {
         let latitude = field.latitudes().of_row(row, height).abs();
-        if latitude < BELT_LOW || latitude > BELT_HIGH {
+        if !(BELT_LOW..=BELT_HIGH).contains(&latitude) {
             continue;
         }
         let air: Vec<i64> = lattice

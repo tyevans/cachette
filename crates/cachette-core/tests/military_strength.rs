@@ -223,7 +223,7 @@ fn a_faction_reads_no_rival_strength_on_ground_it_cannot_see() {
     let mine = dry[0];
     let far = *dry.last().expect("the fixture world holds passable ground");
     assert!(
-        mine.distance(far) > u32::from(world.sight_rules().ceiling()),
+        mine.distance(far) > world.sight_rules().ceiling(),
         "the fixture must place the rival outside every sight the rules admit"
     );
     let watcher = world

@@ -364,7 +364,7 @@ fn the_published_ring_geometry_fills_the_ring_stack() {
         "the cells and the channels fill the block"
     );
     assert_eq!(
-        counts.as_ref(),
+        counts,
         ring_cell_counts(),
         "the schema publishes the cell counts the frame derives"
     );
