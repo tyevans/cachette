@@ -7,6 +7,18 @@
 //! by a very small amount for each tick, and a fixture that copied it would
 //! measure the fixture.[^1]
 //!
+//! **The region stands where the only wear is the one under test.** The wear
+//! pass sums four terms over a tile. It names the collapse after the heaviest
+//! term of the tick that ended it. Rain and travelling storms pass over every
+//! tile of a temperate region, so a collapse there carries the name of the
+//! weather. It carries that name however long an army stood on the ground.
+//!
+//! The world these tests build therefore stands in a polar region, and it
+//! spreads thirty degrees of latitude over its rows. Cold air carries little
+//! water, so the ground stays dry. The wide span raises the front mark above
+//! the temperature gradient of a polar region, so no storm forms. The army is
+//! the only term left, and the cause column says so.[^1]
+//!
 //! Both tests drive the engine and then read the log. Neither builds the log
 //! by hand. A capability that nothing reaches passes its own test and ships
 //! inert.[^2]
@@ -17,10 +29,12 @@
 //! [^2]: Testing Rules, section 5. `.agents/rules/testing.md`
 
 use cachette_core::cohort::NeedRule;
-use cachette_core::event::{WEAR_CAUSE_ARMY, WEAR_CAUSE_BOTH, WEAR_CAUSE_WEATHER};
+use cachette_core::event::WEAR_CAUSE_ARMY;
 use cachette_core::holding::ReachRules;
 use cachette_core::rates::RateSchedule;
-use cachette_core::upgrade::{UpgradeCategory, CONDITION_FULL, LODGING_FIT, LODGING_LEVEL_1_WORK};
+use cachette_core::upgrade::{
+    UpgradeCategory, ARMY_WEAR_FOR_EACH_UNIT, CONDITION_FULL, LODGING_FIT, LODGING_LEVEL_1_WORK,
+};
 use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
 
 /// The extent of every world under test.
@@ -30,6 +44,47 @@ const HEIGHT: u32 = 96;
 
 /// The seed that these tests read.
 const SEED: u64 = 0x0cac_4e77_10d6;
+
+/// The latitude of the middle row of every world under test, in hundredths of
+/// a degree.
+///
+/// **Seventy degrees south is half of what makes the army the only wear
+/// term.** Cold air carries little water. The air over a polar region
+/// therefore holds almost none, and the ground under the site stays dry. The
+/// span below is the other half.
+const LATITUDE_CENTRE: i32 = -7000;
+
+/// The latitude from the first row of every world under test to the last, in
+/// hundredths of a degree.
+///
+/// **Thirty degrees is what keeps a storm off the site.** A front rises where
+/// the temperature across one weather cell passes a mark. The engine takes
+/// that mark from the latitude that one row of the world covers. A world that
+/// spreads thirty degrees over its rows sets a high mark. The gradient of a
+/// polar region never reaches it, so no front forms over the site.
+///
+/// **This is not the span of a region of the target world, and it is not
+/// meant to be.** A fixture states the world that produces the case it
+/// measures. It does not copy the world the demonstration binary shows.[^1]
+///
+/// The wear test asserts on every tick that the ground is dry and that no
+/// hazard stands over the site. A world that stops holding either therefore
+/// fails the test, rather than measuring the weather. The centre and the span
+/// stand inside a wide range of settings that hold both, and not on an edge
+/// of one. The commit that chose them holds the survey.[^2]
+///
+/// # References
+///
+/// [^1]: Testing Rules, section 2a. `.agents/rules/testing.md`
+/// [^2]: Commit Message Rules. `.agents/rules/commits.md`
+const LATITUDE_SPAN: i32 = 3000;
+
+/// The chance that lightning starts a fire on one tick.
+///
+/// Ground that burns wears far faster than an army does, and the wear pass
+/// names the fire first, so a fixture that measures an army must state that
+/// nothing catches.
+const LIGHTNING_CHANCE: u64 = 0;
 
 /// How many people the founding seats.
 const GROUP: u32 = 2;
@@ -56,8 +111,21 @@ const BUILD_PATIENCE: u64 = (LODGING_LEVEL_1_WORK as u64) * 4;
 /// How many ticks a collapse is given before a test gives up.
 ///
 /// The full condition divided by the wear one hostile unit takes in a tick,
-/// with room for a fixture that seats fewer units than it asked for.
-const WEAR_PATIENCE: u64 = (CONDITION_FULL as u64) / 2000 * 4;
+/// with room for a fixture that seats fewer units than it asked for. The rate
+/// is read from the module that states it, so this holds no second copy of
+/// it.[^1]
+///
+/// The test proves the slack rather than trusting this derivation. It counts
+/// the ticks the wear of the fixture it built actually needs, and it asserts
+/// that this budget stands above that count with room to spare.
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+const WEAR_PATIENCE: u64 = (CONDITION_FULL as u64) / (ARMY_WEAR_FOR_EACH_UNIT as u64) * 4;
+
+/// The room that the wear budget must hold above the wear it waits for.
+const WEAR_SLACK: u64 = 2;
 
 /// A relation value deep inside the war band.
 const AT_WAR: i32 = i32::MIN / 2;
@@ -83,17 +151,35 @@ struct Ground {
     builder: Entity,
 }
 
-/// Builds a world with one site and one finished lodging beside it.
-fn ground_with_a_finished_lodging() -> Ground {
-    let mut world = World::new(WorldConfig {
+/// The settings that every world under test is built from.
+///
+/// **This is the one site that states them.** Both tests build a world. A
+/// second literal would let one of them stand in a region the other does
+/// not.[^1]
+///
+/// Every field carries a value, and none comes from the default settings. A
+/// field that the settings gain therefore breaks this file, and the fixture
+/// states what it wants rather than taking what a default gives it.
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+fn settings() -> WorldConfig {
+    WorldConfig {
         width: WIDTH,
         height: HEIGHT,
         seed: SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
-        ..WorldConfig::DEFAULT
-    })
-    .expect("the extent must describe a world");
+        latitude_centre: LATITUDE_CENTRE,
+        latitude_span: LATITUDE_SPAN,
+    }
+}
+
+/// Builds a world with one site and one finished lodging beside it.
+fn ground_with_a_finished_lodging() -> Ground {
+    let mut world = World::new(settings()).expect("the extent must describe a world");
+    world.set_lightning_chance(LIGHTNING_CHANCE);
     world
         .set_choice_schedule(CHOICE_EXPONENT)
         .expect("the exponent is inside the range");
@@ -232,15 +318,7 @@ fn a_founded_settlement_reaches_the_log() {
         "a log holds only what happened since the last step began"
     );
 
-    let mut fresh = World::new(WorldConfig {
-        width: WIDTH,
-        height: HEIGHT,
-        seed: SEED,
-        faction_count: 2,
-        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
-        ..WorldConfig::DEFAULT
-    })
-    .expect("the extent must describe a world");
+    let mut fresh = World::new(settings()).expect("the extent must describe a world");
     let (seat, _) = seat_with_a_neighbour(&fresh);
     fresh
         .found_group_at(seat, GROUP, OWNER)
@@ -267,8 +345,49 @@ fn a_founded_settlement_reaches_the_log() {
 // The collapse
 // ---------------------------------------------------------------------------
 
+/// Returns the ticks that a count of hostile units needs to end one level.
+///
+/// The polar region leaves no other wear term over the tile, so the whole of
+/// a tick is the army term. The count of ticks that a full level needs then
+/// follows from the rate that the upgrade module states.
+fn ticks_the_army_needs(hostiles: usize) -> u64 {
+    let each_tick = (hostiles as u64) * (ARMY_WEAR_FOR_EACH_UNIT as u64);
+    (CONDITION_FULL as u64).div_ceil(each_tick)
+}
+
+/// Asserts that the next step charges the tile for the army and for nothing
+/// else.
+///
+/// The wear pass reads the weather and the fire that the previous step left.
+/// What the tile carries now is therefore what the next step charges it. A
+/// tile that carried rain, a storm or a fire would give the collapse row a
+/// cause that this fixture did not arrange.
+fn assert_the_army_is_the_only_wear(world: &World, address: Axial) {
+    assert_eq!(
+        world.ground_is_wet(address),
+        Some(false),
+        "the polar region must leave the ground dry, or the weather wears the site"
+    );
+    assert_eq!(
+        world.tile_under_a_hazard(address),
+        Some(false),
+        "no storm and no fire may stand over the site, or one of them names the cause"
+    );
+}
+
 /// An upgrade that an army wears away reaches the collapse log, and the row
-/// says where it stood, what it was and what took it.
+/// says where it stood, what it was and that an army took it.
+///
+/// **The cause column is pinned to the army and not to a set of causes.** The
+/// wear pass names the collapse after the heaviest term of the tick that
+/// ended it, so a row that named the weather or a storm would say that the
+/// fixture stopped reaching the case it was built for. The world stands in a
+/// polar region for that reason, and the loop below asserts on every tick
+/// that no other term stands over the tile.[^1]
+///
+/// # References
+///
+/// [^1]: Testing Rules, section 2a. `.agents/rules/testing.md`
 #[test]
 fn an_upgrade_worn_away_reaches_the_log() {
     let mut ground = ground_with_a_finished_lodging();
@@ -304,7 +423,16 @@ fn an_upgrade_worn_away_reaches_the_log() {
     }
     assert!(!hostiles.is_empty(), "the ground admits no hostile unit");
 
-    for _ in 1..=WEAR_PATIENCE {
+    let needed = ticks_the_army_needs(hostiles.len());
+    assert!(
+        WEAR_PATIENCE >= needed.saturating_mul(WEAR_SLACK),
+        "the budget of {WEAR_PATIENCE} ticks must hold {WEAR_SLACK} times the {needed} ticks \
+         that {} hostile units need",
+        hostiles.len()
+    );
+
+    for spent in 1..=WEAR_PATIENCE {
+        assert_the_army_is_the_only_wear(world, beside);
         // The hostile units stay on the tile. A unit that walked off would
         // make the test measure the walk rather than the wear.
         for unit in &hostiles {
@@ -319,10 +447,14 @@ fn an_upgrade_worn_away_reaches_the_log() {
             assert_eq!(row.tile, tile, "the row names the tile it stood on");
             assert_eq!(row.category, UpgradeCategory::LODGING.0);
             assert_eq!(row.level, 1, "a level stood there, so it is not zero");
-            assert!(
-                [WEAR_CAUSE_ARMY, WEAR_CAUSE_BOTH, WEAR_CAUSE_WEATHER].contains(&row.cause),
-                "the row names a cause: {}",
-                row.cause
+            assert_eq!(
+                row.cause, WEAR_CAUSE_ARMY,
+                "an army wore this site away, so the row names the army"
+            );
+            assert_eq!(
+                spent, needed,
+                "the army is the only wear over the tile, so the collapse lands on the tick \
+                 the army rate says"
             );
             assert_eq!(
                 world.upgrade_level(beside),
