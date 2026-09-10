@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 from typing import cast
 
 import numpy as np
@@ -64,28 +65,27 @@ TOLERANCE = 2
 
 # The share of pixels that must agree exactly. The rest may differ by up to
 # the tolerance above. This is measured, not chosen: the two renderers agree
-# exactly on about 99.8 percent of a frame.
-EXACT_SHARE = 0.99
+# exactly on about 99.99 percent of a flat frame.
+EXACT_SHARE = 0.998
 
 # The share of pixels that may differ by more than the tolerance.
 #
 # **The page holds one place where the drawing itself is a step.** The line
 # function divides the room left inside a line by the weight of that line. At
-# the edge of a cloud the weight falls to nearly nothing, and the function
-# then turns a whole line on or off across a change of one part in ten
-# million. The two renderers hold the direction of the wind at different
-# widths, so the phase of the cloud hatch differs in its last bit, and at that
-# edge the last bit decides a whole line.
+# the edge of a set of hatching the weight falls to nearly nothing, and the
+# function then turns a whole line on or off across a change of one part in
+# ten million. The two renderers hold that weight at different widths, so the
+# last bit decides a whole line.
 #
-# This was measured rather than assumed. Every pixel that differs by more than
-# the tolerance carries a cloud line weight under 0.02, with a median of
-# nought, against a median of 0.167 where the two agree. A frame drawn with
-# the cloud layer off agrees everywhere within one band value.
+# This was measured rather than assumed. A flat frame carries a handful of
+# such pixels, and the same pixels appear when the cloud layer is off, so the
+# sky does not explain them. The cloud itself is a smooth field, and it agrees
+# within the tolerance everywhere.
 #
 # The share is therefore allowed, and it is kept small enough that a real
 # fault cannot hide under it. A defect in any stage of the page reaches far
 # more than this share of the frame.
-LOUD_SHARE = 0.0015
+LOUD_SHARE = 0.0002
 
 
 def build() -> tuple[World, Camera]:
@@ -333,7 +333,7 @@ def assert_agree(on_processor: np.ndarray, on_device: np.ndarray) -> None:
     )
     assert loud <= LOUD_SHARE, (
         f"{loud:.4%} of pixels differ by more than {TOLERANCE} band values, "
-        f"and {LOUD_SHARE:.4%} is the share the cloud hatch explains; the "
+        f"and {LOUD_SHARE:.4%} is the share the line function explains; the "
         f"worst difference is {worst.max()}"
     )
 
@@ -789,6 +789,19 @@ def test_a_shader_cannot_read_the_unit_the_device_builds_textures_on() -> None:
         device.close()
 
 
+def _shader_bodies() -> str:
+    """Give back every shader source that the module holds.
+
+    **The list is read from the module and not typed here.** A list of shader
+    names would go stale the first time somebody added a pass.
+    """
+    return "".join(
+        body
+        for name, body in vars(source).items()
+        if not name.startswith("_") and isinstance(body, str)
+    )
+
+
 def test_the_shader_takes_every_constant_from_the_module_that_declares_it() -> None:
     """One value is declared once, and the shader is given it.
 
@@ -797,16 +810,42 @@ def test_the_shader_takes_every_constant_from_the_module_that_declares_it() -> N
     different page, and only the comparison above would notice. This checks
     the mechanism that stops it: the definitions the shader is built with come
     from the module the array renderer reads.
+
+    **The check derives its list from the tree.** It reads every definition
+    the builder writes and holds each one against the module. A list typed
+    here would be a third site, and it would go stale the first time somebody
+    added a constant.[^1]
+
+    [^1]: Recurring Defect Shapes, shape 2. `.agents/rules/recurring-defects.md`
     """
     written = sketch_gl._defines()
-    for name in ("CONTOUR_STEP", "HATCH_SPACING", "CLOUD_FLOOR", "WASH_GAIN"):
-        assert f"{name} = {float(getattr(ink, name))!r};" in written, (
-            f"the shader does not take {name} from the sketch module"
+    bodies = _shader_bodies()
+    numbers = re.findall(r"^const float (\w+) = ([^;]+);$", written, re.MULTILINE)
+    assert len(numbers) > 10, "the builder wrote almost no definition"
+    for name, value in numbers:
+        assert value == repr(float(getattr(ink, name))), (
+            f"the shader is given {name} as {value}, and the sketch module "
+            f"declares {getattr(ink, name)!r}"
         )
-    # No number of the page is typed into the shader sources themselves.
-    for body in (source.HATCH, source.COMPOSITE):
-        assert "CONTOUR_STEP =" not in body
-        assert "HATCH_SPACING =" not in body
+        assert f"float {name} =" not in bodies, (
+            f"the shader declares {name} itself, so the number is in two places"
+        )
+        assert name in bodies, (
+            f"nothing in the shader reads {name}, so the definition is inert"
+        )
+    colours = re.findall(
+        r"^const vec3 (\w+) = vec3\(([^)]+)\);$", written, re.MULTILINE
+    )
+    assert len(colours) > 2, "the builder wrote almost no colour"
+    for name, bands in colours:
+        given = tuple(float(band) for band in bands.split(", "))
+        assert given == tuple(float(band) for band in getattr(ink, name)), (
+            f"the shader is given {name} as {given}, and the sketch module "
+            f"declares {tuple(getattr(ink, name))}"
+        )
+        assert name in bodies, (
+            f"nothing in the shader reads {name}, so the definition is inert"
+        )
 
 
 def test_the_window_keeps_its_own_frame_buffer_after_a_page() -> None:

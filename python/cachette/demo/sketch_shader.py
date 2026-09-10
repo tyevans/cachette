@@ -372,8 +372,9 @@ float way_ink_at(ivec2 at) {
 
 COMPOSITE = """
 uniform sampler2D tile_cloud;
-uniform sampler2D tile_across_x;
-uniform sampler2D tile_across_y;
+uniform sampler2D tile_along_x;
+uniform sampler2D tile_along_y;
+uniform sampler2D cloud_table;
 uniform isampler2D tile_holder;
 uniform sampler2D tile_hue;
 uniform sampler2D wash_blurred;
@@ -385,6 +386,8 @@ uniform int draws_sky;
 uniform int draws_wash;
 uniform int cloud_step;
 uniform int cloud_lift;
+uniform float cloud_clock;
+uniform float cloud_lean;
 uniform ivec2 fit_size;
 uniform isampler2D fit_x;
 uniform isampler2D fit_y;
@@ -394,13 +397,142 @@ float share_at(ivec2 at) {
     return (take >= 0) ? texelFetch(tile_cloud, tile_of(take), 0).r : 0.0;
 }
 
-vec2 across_at(ivec2 at) {
+vec2 along_at(ivec2 at) {
     int take = take_at(at);
     if (take < 0) { return vec2(0.0); }
     ivec2 tile = tile_of(take);
     return vec2(
-        texelFetch(tile_across_x, tile, 0).r,
-        texelFetch(tile_across_y, tile, 0).r
+        texelFetch(tile_along_x, tile, 0).r,
+        texelFetch(tile_along_y, tile, 0).r
+    );
+}
+
+// One value of the cloud lattice.
+//
+// **The array renderer built this table and the device is given it.** The
+// value comes from an integer hash of the two cell numbers. A hash built on a
+// sine gives one answer here and another there, and the two renderers would
+// draw two skies. The cell number folds into the table with one mask, so the
+// field repeats over a distance no page reaches.
+float cloud_value(int cell_x, int cell_y) {
+    return texelFetch(
+        cloud_table,
+        ivec2(cell_x & (CLOUD_TABLE - 1), cell_y & (CLOUD_TABLE - 1)),
+        0
+    ).r;
+}
+
+// The value of the cloud field at a place on its lattice, from none to one.
+//
+// The answer is smooth across a cell edge, so a last bit of difference in the
+// place gives a last bit of difference in the answer.
+float cloud_noise(vec2 at) {
+    vec2 base = floor(at);
+    vec2 part = at - base;
+    vec2 ease = part * part * (3.0 - 2.0 * part);
+    int cell_x = int(base.x);
+    int cell_y = int(base.y);
+    float here = cloud_value(cell_x, cell_y);
+    float right = cloud_value(cell_x + 1, cell_y);
+    float under = cloud_value(cell_x, cell_y + 1);
+    float across = cloud_value(cell_x + 1, cell_y + 1);
+    float near = here + (right - here) * ease.x;
+    float far = under + (across - under) * ease.x;
+    return near + (far - near) * ease.y;
+}
+
+// How much of the sky closes, from nothing to all of it.
+float cloud_cover(float share) {
+    return clamp((share - CLOUD_FLOOR) / (1.0 - CLOUD_FLOOR), 0.0, 1.0);
+}
+
+// What the cloud field must reach for a cloud to stand at a place.
+float cloud_mark(float cover) {
+    return CLOUD_MARK_HIGH + (CLOUD_MARK_LOW - CLOUD_MARK_HIGH) * cover;
+}
+
+// How much cloud stands at a place, from none to all of it.
+//
+// **The cover sets a mark and the mass stands over it.** A cover share and an
+// opacity are two quantities, and the engine carries one. A renderer that
+// turned the share into a weight painted thin cloud everywhere, and a broken
+// sky cannot be drawn that way.[^1] A cover of a third paints cloud over a
+// third of the sky and open sky beside it.
+//
+// [^1]: Findings register, FND-715. `docs/FINDINGS.md`
+float cloud_mass_of(float density, float share) {
+    float cover = cloud_cover(share);
+    float raw = clamp((density - cloud_mark(cover)) / CLOUD_EDGE + 1.0, 0.0, 1.0);
+    float eased = raw * raw * (3.0 - 2.0 * raw);
+    return eased * clamp(cover / CLOUD_OPEN, 0.0, 1.0);
+}
+
+// The cloud field at a place on the page, and where it read.
+//
+// The answer holds the density of the whole field, the value of its coarsest
+// octave, and the two numbers of the place on the cloud lattice that the
+// drift and the swirl carried the reading to.
+//
+// **The motion belongs to the renderer.** The sky over a place holds one
+// narrow band and does not leave it, so a picture that waited for the engine
+// to move the weather would stand still.[^1] The drift carries the field
+// along the wind. The swirl is a second field that crosses the page more
+// slowly, so a mass runs through it and deforms as it goes.
+//
+// [^1]: Findings register, FND-715. `docs/FINDINGS.md`
+vec4 cloud_body(vec2 place, vec2 along) {
+    float tall = CLOUD_GRAIN * max(cloud_lean, 1e-3);
+    float run = cloud_clock * CLOUD_DRIFT;
+    float gust = run * CLOUD_GUST;
+    vec2 swirl = vec2(
+        (place.x - along.x * gust) / (CLOUD_GRAIN * CLOUD_SWIRL_GRAIN),
+        (place.y - along.y * gust) / (tall * CLOUD_SWIRL_GRAIN)
+    );
+    float turn_u = cloud_noise(swirl) - 0.5;
+    float turn_v = cloud_noise(
+        swirl + vec2(CLOUD_SWIRL_APART, CLOUD_SWIRL_APART)
+    ) - 0.5;
+    vec2 at = vec2(
+        (place.x - along.x * run) / CLOUD_GRAIN + turn_u * CLOUD_SWIRL,
+        (place.y - along.y * run) / tall + turn_v * CLOUD_SWIRL
+    );
+    float total = 0.0;
+    float coarse = 0.0;
+    float weight = 0.0;
+    float scale = 1.0;
+    float part = 1.0;
+    for (int octave = 0; octave < CLOUD_OCTAVES; octave += 1) {
+        float shift = float(octave) * CLOUD_OCTAVE_SHIFT;
+        float value = cloud_noise(at * scale + vec2(shift, shift));
+        if (octave == 0) { coarse = value; }
+        total = total + value * part;
+        weight = weight + part;
+        scale = scale * 2.0;
+        part = part * CLOUD_OCTAVE_FALL;
+    }
+    return vec4(total / weight, coarse, at.x, at.y);
+}
+
+// The mass of cloud drawn at one point of the page, and its face to the light.
+//
+// **The cloud is a layer above the ground**, so the cover it draws from is
+// read a lift below the point, and a point whose reading leaves the page
+// carries no cloud.
+//
+// **A mass has a lit side and a shaded side.** The page reads the coarsest
+// octave again a short step toward the light, and the difference is the face.
+// The light is the light of the ground, so a cloud and a hill cannot be lit
+// from two places.
+vec2 cloud_at(ivec2 at) {
+    ivec2 above_at = at + ivec2(0, cloud_lift);
+    if (!on_page(above_at)) { return vec2(0.0); }
+    float share = share_at(above_at);
+    if (share <= CLOUD_FLOOR) { return vec2(0.0); }
+    vec4 body = cloud_body(vec2(float(at.x), float(at.y)), along_at(above_at));
+    float ahead = cloud_noise(body.zw + normalize(light.xy) * CLOUD_LIGHT_STEP);
+    return vec2(
+        cloud_mass_of(body.x, share),
+        clamp(0.5 - (body.y - ahead) * CLOUD_RELIEF, 0.0, 1.0)
     );
 }
 
@@ -409,26 +541,28 @@ vec3 sky_over(vec3 page, ivec2 at) {
     // so it crosses bare paper, and a shadow that crossed the paper with it
     // drew a grey copy of the ground beside the ground.
     float lands_on = drawn_at(at) ? 1.0 : 0.0;
-    // The cloud casts its shadow a step ahead of itself across the page. A
+    // **The shadow of a mass is that mass, moved.** The cloud drawn at a
+    // point stands over the ground a lift below it, so the shadow at a point
+    // of the ground is the mass drawn a lift above it and a step across it. A
     // step that leaves the page casts nothing, because nothing stands there.
-    ivec2 shadow_from = at - ivec2(cloud_step, 0);
-    float under = on_page(shadow_from)
-        ? clamp(share_at(shadow_from) - CLOUD_FLOOR, 0.0, 1.0)
+    ivec2 shadow_from = at - ivec2(cloud_step, cloud_lift);
+    float under = (lands_on > 0.0 && on_page(shadow_from))
+        ? cloud_at(shadow_from).x
         : 0.0;
     page = page * (1.0 - under * lands_on * CLOUD_SHADOW_DEPTH);
 
-    // The cloud layer stands above the tallest ground, so a mass crosses the
-    // paper over a mountain rather than behind it. A point that reaches past
-    // the top of the page reaches past the sky, and it carries no cloud.
+    // **The deep of the sky is the top of the cover range.** A sky that
+    // stands there darkens the whole of itself and closes its cloud over.
     ivec2 above_at = at + ivec2(0, cloud_lift);
-    bool overhead = on_page(above_at);
-    float above = overhead ? share_at(above_at) : 0.0;
-    vec2 turn = overhead ? across_at(above_at) : vec2(0.0);
-    float thick = clamp((above - CLOUD_FLOOR) / (1.0 - CLOUD_FLOOR), 0.0, 1.0);
-    float phase = float(at.x) * turn.x + float(at.y) * turn.y;
-    float along = lines(phase, CLOUD_SPACING, thick * 0.42);
-    float marks = along * 0.50;
-    return page * (1.0 - marks) + SKY_INK * marks;
+    float share = on_page(above_at) ? share_at(above_at) : 0.0;
+    float deep = clamp((share - SKY_DEEP_MARK) / (1.0 - SKY_DEEP_MARK), 0.0, 1.0);
+    vec3 sky = SKY_INK + (STORM_INK - SKY_INK) * deep;
+    float gloom = deep * SKY_GLOOM;
+    page = page * (1.0 - gloom) + sky * gloom;
+
+    vec2 body = cloud_at(at);
+    float ink = body.x * (CLOUD_FACE_LIT + (CLOUD_FACE_DARK - CLOUD_FACE_LIT) * body.y);
+    return page * (1.0 - ink) + sky * ink;
 }
 
 vec3 shade(ivec2 at) {
