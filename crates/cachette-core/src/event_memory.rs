@@ -499,7 +499,9 @@ impl EventMemory {
     pub fn advance(&mut self) {
         for (counters, arrivals) in self
             .totals
-            .chunks_exact_mut(DECAY_COUNT)
+            .as_chunks_mut::<DECAY_COUNT>()
+            .0
+            .iter_mut()
             .zip(self.arrivals.iter())
         {
             for length in Decay::ALL {
@@ -509,7 +511,9 @@ impl EventMemory {
         }
         for (counters, arrivals) in self
             .blamed
-            .chunks_exact_mut(DECAY_COUNT)
+            .as_chunks_mut::<DECAY_COUNT>()
+            .0
+            .iter_mut()
             .zip(self.blamed_arrivals.iter())
         {
             for length in Decay::ALL {

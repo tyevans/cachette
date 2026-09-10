@@ -490,6 +490,7 @@ pub struct SoldierArena {
     ///
     /// # References
     ///
+    /// [^3]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
     /// [^4]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D1. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
     /// [^5]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D5. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
     by_faction_type: [[u32; UNIT_TYPE_COUNT]; FACTION_CEILING as usize],

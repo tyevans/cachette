@@ -325,11 +325,11 @@ macro_rules! column_reader {
                 field.width,
                 $width
             );
+            let end = field.offset + $width;
             assert!(
-                field.offset + $width <= size,
-                "the field `{name}` covers bytes {} to {} of a record of {size} bytes",
-                field.offset,
-                field.offset + $width
+                end <= size,
+                "the field `{name}` covers bytes {} to {end} of a record of {size} bytes",
+                field.offset
             );
             let mut column = Vec::with_capacity(log.len());
             for event in log {
