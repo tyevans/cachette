@@ -315,22 +315,17 @@ CLOUD_RELIEF = 3.2
 CLOUD_FACE_LIT = 0.20
 CLOUD_FACE_DARK = 0.74
 
-# The cover at which the sky begins to go deep, and how far a deep sky darkens
-# the whole of itself.
+# How far a deep sky darkens the whole of itself.
 #
-# **A deep sky is the top of the cover range, and it is measured.** Over four
-# hundred ticks, 522 cells of 9216 stood overcast at every tick and the set of
-# overcast cells turned over.[^1] The deep of the sky is therefore a real
-# thing that moves, and not a mark this module invented.
+# **The deep of the sky is the storm, and the engine publishes it.** A storm
+# puts a pressure deficit on the cells it reaches, and the boundary reports
+# that deficit for each tile. The page reads it and scales it by the ceiling
+# the engine declares, so this module holds no mark of its own.
 #
-# **The engine holds a storm as an object, and this is not that object.** A
-# storm puts a pressure deficit on the cells it reaches. The engine holds that
-# deficit and the Python boundary does not publish it for each tile, so this
-# module cannot read it. When it does, the deep of the sky reads the deficit
-# and this mark goes.
+# **The cover cannot stand in for the deficit.** A storm rains its own sky
+# out, so the cover under a storm measures lower than the cover beside it.[^1]
 #
-# [^1]: Findings register, FND-715. `docs/FINDINGS.md`
-SKY_DEEP_MARK = 0.84
+# [^1]: Findings register, FND-721. `docs/FINDINGS.md`
 SKY_GLOOM = 0.46
 
 # How far the height of the ground is smoothed before it is lifted, in tiles.
@@ -886,6 +881,7 @@ class Sketch:
         "_sky",
         "_water",
         "_whole_sky",
+        "_whole_storm",
         "_world",
         "view",
     )
@@ -922,11 +918,14 @@ class Sketch:
 
         Raises ``BoundaryGap`` when the engine publishes no bulk reader for
         the fields the page draws.
+
+        [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
         """
         for name in (
             "tile_heights",
             "tile_kinds",
             "cloud_shares",
+            "storm_depths",
             "tile_winds",
             "weather_cell_tiles",
             "tick",
@@ -950,6 +949,10 @@ class Sketch:
         self._kinds = world.tile_kinds().reshape(rows, columns)
         self._water = self._kinds == WATER_KIND
         self._whole_sky = float(world.cloud_share_whole)
+        # **The engine declares each ceiling, and the page reads it.** A ramp
+        # against a number typed here would be a second declaration of it, and
+        # nothing would fail when the engine moved its own.[^1]
+        self._whole_storm = float(world.storm_depth_whole)
         # **The water stands at one level, and the land starts there.** The
         # engine reports the height of the ground over the whole range it
         # generates, and the water covers the lower part of that range. A page
@@ -1788,13 +1791,19 @@ class Sketch:
         )
         return glazed
 
-    def sky_fields(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Give back the cover and the heading of the wind, for every tile.
+    def sky_fields(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """Give back the cover, the storm and the wind heading, for every tile.
 
-        The answer is three arrays shaped like the world. The first is how
-        much of the sky the engine reports as cloud, from nothing to one. The
-        second and the third are the direction the wind blows on the page, as
-        a vector of length one.
+        The answer is four arrays shaped like the world. The first is how much
+        of the sky the engine reports as cloud, from nothing to one. The second
+        is the pressure deficit the storms put on the tile, from nothing to
+        one. The third and the fourth are the direction the wind blows on the
+        page, as a vector of length one.
+
+        **The cover and the storm are two channels, and neither derives the
+        other.** A storm rains its own sky out, so the cover under a storm
+        measures lower than the cover beside it. A page that read a storm from
+        the top of the cover range would darken the wrong tiles.[^2]
 
         **This is the one reader of the sky, and both renderers call it.** The
         array renderer gathers these at the pixel. The device renderer uploads
@@ -1814,11 +1823,14 @@ class Sketch:
         and cannot part company.
 
         [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+        [^2]: Findings register, FND-721. `docs/FINDINGS.md`
         """
         rows, columns = self._world.height, self._world.width
         reach = max(int(self._world.weather_cell_tiles * SKY_SMOOTHING), 1)
         raw = self._world.cloud_shares().reshape(rows, columns).astype(np.float32)
         cover = _smooth(raw / max(self._whole_sky, 1.0), reach)
+        deep = self._world.storm_depths().reshape(rows, columns).astype(np.float32)
+        storm = _smooth(deep / max(self._whole_storm, 1.0), reach)
         winds = self._world.tile_winds()
         wind_q = _smooth(winds["q"].reshape(rows, columns).astype(np.float32), reach)
         wind_r = _smooth(winds["r"].reshape(rows, columns).astype(np.float32), reach)
@@ -1833,6 +1845,7 @@ class Sketch:
         held = np.where(moving, length, 1.0)
         return (
             cover.astype(np.float32),
+            storm.astype(np.float32),
             np.where(moving, page_dx / held, 1.0).astype(np.float32),
             np.where(moving, page_dy / held, 0.0).astype(np.float32),
         )
@@ -1958,11 +1971,11 @@ class Sketch:
         coarsest octave again a short step toward the light, and the
         difference is the face. That is what gives a mass body.
 
-        **The deep of the sky is the top of the cover range.** A sky that
-        stands there darkens the whole of itself and closes its cloud over.
-        The engine holds a storm as an object with a pressure deficit, and the
-        Python boundary does not publish that deficit for each tile, so this
-        reads the cover instead.[^3]
+        **The deep of the sky is the storm.** The engine holds a storm as an
+        object with a pressure deficit, the boundary publishes that deficit
+        for each tile, and a sky under it darkens the whole of itself. The
+        page reads the deficit and never the cover, because a storm rains its
+        own sky out and measures clearer than the sky beside it.[^3]
 
         **The shadow of a mass is that mass, moved.** The cloud drawn at a
         point of the page stands over the ground a lift below it, so the
@@ -1982,12 +1995,13 @@ class Sketch:
         decision D2.
         `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`
         [^2]: Findings register, FND-627. `docs/FINDINGS.md`
-        [^3]: Findings register, FND-715. `docs/FINDINGS.md`
+        [^3]: Findings register, FND-721. `docs/FINDINGS.md`
         """
-        cover, heading_x, heading_y = self.sky_fields()
+        cover, storm, heading_x, heading_y = self.sky_fields()
         clock = self.sky_clock(phase)
         lean = float(self.view.lean)
         share = self._gather(ground, cover)
+        deficit = self._gather(ground, storm)
         along_x = self._gather(ground, heading_x)
         along_y = self._gather(ground, heading_y)
         # **The page has an edge, and the sky stops at it.** A field rolled
@@ -1997,6 +2011,7 @@ class Sketch:
         lift = int(rise * CLOUD_HEIGHT)
         step = max(int(ground.drawn.shape[1] * CLOUD_SHADOW_STEP), 1)
         above = _slid(share, -lift, 0)
+        deep = _slid(deficit, -lift, 0)
         heads_x = _slid(along_x, -lift, 0)
         heads_y = _slid(along_y, -lift, 0)
         stands = above > CLOUD_FLOOR
@@ -2026,7 +2041,6 @@ class Sketch:
         # place.[^2]
         under = _slid(_slid(mass, lift, 0), step, 1) * ground.drawn
         page = page * (1.0 - under[..., None] * CLOUD_SHADOW_DEPTH)
-        deep = np.clip((above - SKY_DEEP_MARK) / (1.0 - SKY_DEEP_MARK), 0.0, 1.0)
         sky = SKY_INK + (STORM_INK - SKY_INK) * deep[..., None]
         gloom = (deep * SKY_GLOOM)[..., None]
         page = page * (1.0 - gloom) + sky * gloom

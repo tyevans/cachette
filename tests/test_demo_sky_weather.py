@@ -67,14 +67,15 @@ WARMING_STEPS = 30
 # A wider world and a second seed, for the test that needs the deep of the
 # sky.
 #
-# **A fixture supplies the input, and this fixture was chosen against the
-# field.** The world above holds a broken sky and barely reaches the top of
-# the cover range. This one holds cover above the deep mark over a real share
-# of itself, which is the case that the test is about.[^1]
+# **A fixture supplies the input, and this fixture states the case.** The deep
+# of the sky is the pressure deficit of a storm. The world makes storms of its
+# own, but where it puts them follows the seed, so the test raises one rather
+# than waiting for one.[^1]
 #
 # [^1]: Testing Rules, section 2a. `.agents/rules/testing.md`
 DEEP_SIDE = 128
 DEEP_SEED = 0x0123_4567_89AB_CDEF
+DEEP_PITCH = 8
 
 
 def _world(side: int = SIDE, steps: int = WARMING_STEPS, seed: int = SEED) -> World:
@@ -323,13 +324,44 @@ def _bare(world: World, camera: Camera) -> np.ndarray:
     return on_page & ~shows_ground
 
 
-def test_the_deep_of_the_sky_reaches_the_page() -> None:
-    """A sky at the top of the cover range draws darker than a fair sky can.
+def _stormed() -> World:
+    """Give back a world that carries a raised storm over a wide footprint.
 
-    **The deep of the sky is the top of the cover range.** Over a measured
-    window, 522 cells of 9216 stood overcast at every tick, and the set of
-    overcast cells turned over, so the deep of the sky is a real thing that
-    moves.
+    The storm is raised over the middle of the world, at the deepest depth and
+    the widest reach the engine carries, so the deficit covers a real share of
+    the page. One step stamps the deficit onto the cells, because the verb
+    puts a storm in the list and the solve writes the plane.
+
+    **The pitch is stated and it is not the engine default.** The default puts
+    four cells across a world this wide, the lattice then carries almost no
+    margin, and a storm raised near the border walks off it on the first step.
+    A finer pitch gives the storm somewhere to stand.[^1]
+
+    [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
+    """
+    world = World(
+        width=DEEP_SIDE,
+        height=DEEP_SIDE,
+        seed=DEEP_SEED,
+        faction_count=3,
+        weather_cell_tiles=DEEP_PITCH,
+    )
+    world.seed_world()
+    for _ in range(WARMING_STEPS):
+        world.step(1)
+    middle = (DEEP_SIDE // 2, DEEP_SIDE // 2)
+    world.raise_cyclone(middle, depth=world.storm_depth_whole, radius=8, life=320)
+    world.step(1)
+    return world
+
+
+def test_the_deep_of_the_sky_reaches_the_page() -> None:
+    """A sky under a storm draws darker than a fair sky can.
+
+    **The deep of the sky is the pressure deficit of a storm.** The engine
+    publishes that deficit for each tile, and the page reads it. The cover
+    cannot stand in for it, because a storm rains its own sky out and measures
+    clearer than the sky beside it.[^3]
 
     The test states two things. The fixture must reach the deep band, or the
     assertion below measures nothing. The drawing must then put ink on the
@@ -340,10 +372,12 @@ def test_the_deep_of_the_sky_reaches_the_page() -> None:
     shaded face, and nothing else marks the pixel. That is the darkest a fair
     sky reaches there. A deep sky goes below it, because it lays a gloom over
     the whole of itself first and then lays the ink of a deep sky.
+
+    [^3]: Findings register, FND-721. ``docs/FINDINGS.md``
     """
-    world = _world(side=DEEP_SIDE, seed=DEEP_SEED)
-    cover = Sketch(world, view=View()).sky_fields()[0]
-    deep = float((cover > ink.SKY_DEEP_MARK).mean())
+    world = _stormed()
+    storm = Sketch(world, view=View()).sky_fields()[1]
+    deep = float((storm > 0.5).mean())
     assert deep > 0.05, (
         f"only {deep:.4f} of this world stands in the deep of the sky, so "
         f"this test asserts nothing"

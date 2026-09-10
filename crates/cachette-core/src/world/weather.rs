@@ -197,11 +197,13 @@ impl World {
         Some(self.weather.cell_is_wet(self.weather_cell_of(tile)?))
     }
 
-    /// Reports whether a storm stands over one tile.
+    /// Returns the pressure deficit that the storms put on one tile.
     ///
-    /// A storm puts a pressure deficit on the cells it reaches, and the
-    /// deficit falls to nothing one cell beyond its radius. A tile is under a
-    /// storm when the cell that covers it carries a deficit above zero.
+    /// **The unit is the depth of a storm, and the ceiling is
+    /// [`crate::weather::CYCLONE_DEPTH_CEILING`].** The deficit of a storm stands at its depth
+    /// over the eye and falls to nothing one cell beyond its radius, so a tile
+    /// that no storm reaches reads zero. Two storms that overlap add, and the
+    /// sum is held at the ceiling.
     ///
     /// The answer is the coarseness of the weather lattice, which is coarser
     /// than the tile field, so two tiles of one weather cell answer alike.[^1]
@@ -215,9 +217,26 @@ impl World {
     ///
     /// [^1]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
     #[must_use]
-    pub fn tile_under_a_storm(&self, address: Axial) -> Option<bool> {
+    pub fn storm_depth_at(&self, address: Axial) -> Option<i32> {
         let tile = self.grid.index_of(address)?;
-        Some(self.weather.depression_at(self.weather_cell_of(tile)?) > 0)
+        Some(self.weather.depression_at(self.weather_cell_of(tile)?))
+    }
+
+    /// Reports whether a storm stands over one tile.
+    ///
+    /// A tile is under a storm when the cell that covers it carries a pressure
+    /// deficit above zero. **This reads the depth and thresholds it**, so the
+    /// bool and the graded reader cannot disagree about where a storm
+    /// stands.[^1]
+    ///
+    /// Returns `None` when the address lies outside the world.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn tile_under_a_storm(&self, address: Axial) -> Option<bool> {
+        Some(self.storm_depth_at(address)? > 0)
     }
 
     /// Reports whether any hazard the engine holds stands over one tile.

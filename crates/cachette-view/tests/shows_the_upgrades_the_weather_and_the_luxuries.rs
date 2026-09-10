@@ -1378,3 +1378,54 @@ fn the_upgrade_overlay_reads_the_level_and_not_the_category() {
         "the overlay paints a tile that carries no upgrade"
     );
 }
+
+#[test]
+fn the_sky_darkens_by_the_depth_of_the_storm_and_not_by_a_switch() {
+    // **A storm is graded and the picture follows it.** The colour and the
+    // mass floor once switched on any deficit above zero, so the edge of a
+    // storm met the sky beside it at a hard step. Both now rise with the
+    // deficit.
+    //
+    // **The cover cannot stand in for the deficit.** A storm rains its own
+    // sky out, so the cover under a storm reads lower than the cover beside
+    // it. The two inputs are therefore tested apart.[^5]
+    //
+    // [^5]: Findings register, FND-721. `docs/FINDINGS.md`
+    let whole = cachette_core::CYCLONE_DEPTH_CEILING;
+    let clear = paint::sky_colour(0, 0);
+    let shallow = paint::sky_colour(0, whole / 4);
+    let deep = paint::sky_colour(0, whole);
+    assert_ne!(
+        clear, shallow,
+        "a shallow deficit draws the colour of no storm at all"
+    );
+    assert_ne!(
+        shallow, deep,
+        "a shallow deficit and the deepest one draw one colour, so the \
+         picture switches rather than grades"
+    );
+    assert_eq!(
+        deep,
+        paint::storm_colour(),
+        "the deepest deficit must reach the storm colour"
+    );
+
+    // The mass floor grades the same way, and it is zero where no storm
+    // stands.
+    assert_eq!(paint::storm_floor(0), 0);
+    let part = paint::storm_floor(whole / 4);
+    let full = paint::storm_floor(whole);
+    assert!(
+        part > 0 && part < full,
+        "the mass floor is {part} at a quarter of the depth and {full} at the \
+         whole, so it switches rather than grades"
+    );
+
+    // A deficit below the floor of the cone must not darken the sky past a
+    // full cover on its own.
+    assert_eq!(
+        paint::sky_colour(cachette_core::weather::CLOUD_SHARE_WHOLE, 0),
+        paint::storm_colour(),
+        "a whole cover must still reach the storm colour"
+    );
+}

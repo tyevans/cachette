@@ -16,7 +16,9 @@
 //! [^1]: Testing rules, section 2a. `.agents/rules/testing.md`
 //! [^2]: Testing rules, section 5. `.agents/rules/testing.md`
 
-use cachette_core::{Axial, CycloneSetting, TileKind, World, WorldConfig};
+use cachette_core::{
+    Axial, CycloneSetting, TileKind, WeatherScale, World, WorldConfig, CYCLONE_DEPTH_CEILING,
+};
 
 /// The extent of the fixture world.
 ///
@@ -157,4 +159,83 @@ fn an_address_outside_the_world_reports_nothing() {
     let outside = Axial::new(EDGE as i32, EDGE as i32);
     assert_eq!(world.tile_under_a_storm(outside), None);
     assert_eq!(world.tile_under_a_hazard(outside), None);
+}
+
+#[test]
+fn the_storm_depth_grades_the_cone_and_the_bool_thresholds_it() {
+    // **A bool and a graded reader must not disagree about where a storm
+    // stands.** The bool reads the depth and thresholds it, so this states
+    // that one rule reaches both readers.
+    //
+    // It also states that the depth is graded. A cone that answered one value
+    // everywhere would pass a test that only asked for a value above zero,
+    // and a picture drawn from it would draw a flat disc.[^1]
+    //
+    // [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    // **The fixture puts one weather cell on each tile.** The world above
+    // runs at the engine default pitch, so its whole extent covers a few
+    // cells and one storm reaches every one of them at one depth. A test on
+    // that world would measure the fixture and not the cone.[^2]
+    //
+    // [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
+    let mut world = World::with_weather_scale(
+        WorldConfig {
+            width: EDGE,
+            height: EDGE,
+            seed: 11,
+            faction_count: 2,
+            unit_capacity: 16,
+        },
+        WeatherScale::from_bits(0).expect("one tile is a lattice pitch"),
+    )
+    .expect("the extent must describe a world");
+    world.step(1).expect("the step must run");
+    let dry = dry_ground(&world);
+    let eye = *dry.first().expect("the world holds passable ground");
+    // The setting carries a radius, and a storm on one cell grades nothing.
+    // This one reaches several cells, which is what a cone needs to show.
+    world
+        .raise_cyclone(eye, CycloneSetting::TROPICAL)
+        .expect("the place lies inside the world");
+    world.step(1).expect("the step must run");
+    let (under, clear): (Vec<Axial>, Vec<Axial>) = dry
+        .into_iter()
+        .partition(|here| world.tile_under_a_storm(*here) == Some(true));
+    assert!(
+        !under.is_empty(),
+        "the fixture must reach a tile the storm carries"
+    );
+    assert!(
+        !clear.is_empty(),
+        "the fixture must reach a tile the storm does not carry"
+    );
+    let mut depths: Vec<i32> = Vec::new();
+    for here in &under {
+        let depth = world
+            .storm_depth_at(*here)
+            .expect("the address is inside the world");
+        assert!(depth > 0, "a tile the bool calls stormed reads {depth}");
+        depths.push(depth);
+    }
+    for here in &clear {
+        assert_eq!(world.storm_depth_at(*here), Some(0));
+    }
+    depths.sort_unstable();
+    depths.dedup();
+    assert!(
+        depths.len() > 1,
+        "the cone answers one value everywhere, so nothing grades it: {depths:?}"
+    );
+    let deepest = *depths.last().expect("the fixture reaches a stormed tile");
+    assert!(
+        deepest <= CYCLONE_DEPTH_CEILING,
+        "the deficit {deepest} passes the ceiling the engine declares"
+    );
+}
+
+#[test]
+fn an_address_outside_the_world_reports_no_storm_depth() {
+    let world = world();
+    let outside = Axial::new(EDGE as i32, EDGE as i32);
+    assert_eq!(world.storm_depth_at(outside), None);
 }
