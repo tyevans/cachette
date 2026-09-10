@@ -56,8 +56,8 @@ absent token.
 **The scalar tower** is a dense trainable layer, and it is the one place
 this policy pays position by position. The scalar blocks hold no structure to
 share a weight across, so no kernel and no pool applies to them. Its width is
-therefore the largest single term in the trainable count, and it is the knob
-that buys reading power against alignment.[^2]
+therefore the largest single term of the three towers, and it is the knob that
+buys reading power against alignment.[^2]
 
 **No layer of this policy is frozen.** A layer the trainer never moves states
 a rule the run cannot revise, and this project rejects that shape. Every layer
@@ -137,27 +137,34 @@ class StructuredShape:
     generation takes and the direction it looks for is near the square root of
     the pair count divided by the trainable count.[^1]
 
-    **The scalar width is the dominant term.** The scalar tower holds one
-    weight for each unstructured position and each feature, and every other
-    tower shares its weights. A caller that wants a better aligned step lowers
-    this width first.
+    **The scalar width is the dominant term of the three towers.** The scalar
+    tower holds one weight for each unstructured position and each feature, and
+    every other tower shares its weights. A caller that wants a better aligned
+    step lowers this width first. The readout is larger still, and the action
+    table sets it.
 
-    **The default holds the whole trainable count below the length of the
-    observation.** That is the claim this architecture makes against a dense
-    layer, and a wider scalar tower breaks it. A test asserts it against the
-    layout the engine publishes.
+    **The default holds the whole trainable count below a dense read of the
+    observation.** A dense policy holds one weight for each position of the
+    observation and each row of the action table. A test asserts this policy
+    stays under that product, against the layout the engine publishes.
+
+    The observation length alone was that bound once. It stopped being the
+    bound when the action table gained one row for each cell of the frame,
+    because the readout carries one weight for each row it scores.[^2]
 
     References
     ----------
     [^1]: Findings register, FND-668. ``docs/FINDINGS.md``
+
+    [^2]: Findings register, FND-721. ``docs/FINDINGS.md``
     """
 
-    scalar_width: int = 4
-    ring_width: int = 4
+    scalar_width: int = 8
+    ring_width: int = 8
     ring_bands: int = 3
     sector_kernel: int = 3
-    token_width: int = 4
-    trunk_width: int = 12
+    token_width: int = 8
+    trunk_width: int = 20
 
     def __post_init__(self) -> None:
         """Refuse a width that cannot describe a network."""

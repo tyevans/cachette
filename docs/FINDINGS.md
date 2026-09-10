@@ -19551,3 +19551,35 @@ one.
 
 **A worktree that predates a deletion re-adds the deleted file.** An agent that
 stages every change in its worktree stages the resurrection with them.
+
+### FND-721 — The structured policy stated a bound on its trainable count that no test asserted
+
+**Believed.** The widths of the structured policy hold the whole trainable
+count below the length of the observation. The class that declares those widths
+stated this claim, and it stated that a test asserts the claim against the
+layout the engine publishes.
+
+**True.** No test asserts that bound. The test that exists asserts that the
+trainable count stays below the observation length times the action row count.
+That product is a dense read of the observation for each action row, and it is
+about 180 times the observation length.
+
+The observation length was the bound once. It stopped being the bound when a
+place argument gave the action table one row for each cell of the frame. The
+readout carries one weight for each row it scores, so the readout grew with the
+table while the observation did not move. The test file of the strategy table
+already carried the corrected reading, and the class did not.
+
+**Evidence.** The engine publishes an observation of 4,819 positions and an
+action table of 180 rows at the world the tests play. The structured policy
+trains 10,622 weights at the widths the project now defaults to, which is above
+the observation length and far below the product.
+
+**Follows.** Two things.
+
+**A docstring that names the test which checks it must name the right test.**
+The claim above was checkable and wrong, and it read as authoritative for as
+long as nobody opened the test.
+
+**A bound that a change to another subsystem can move is not a bound.** State
+the bound the test asserts, and state what the test compares.

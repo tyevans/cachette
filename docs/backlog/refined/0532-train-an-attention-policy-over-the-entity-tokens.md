@@ -37,11 +37,18 @@ The cosine between the step one generation takes and the direction it looks for
 is near the square root of the pair count divided by the trainable count.[^law]
 One generation holds two candidates for each pair.
 
-The present structured policy trains 5,354 weights. At population 64 it holds
-32 pairs, and the law gives 0.0773. To hold at least that alignment, a design
+**Every count in this item is arithmetic at the widths this item was written
+against.** Those widths are a scalar width of 4, a ring width of 4, 3 ring
+bands, a sector kernel of 3, a token width of 4 and a trunk width of 12. The
+structured policy trained 5,354 weights at them. At population 64 it holds 32
+pairs, and the law gives 0.0773. To hold at least that alignment, a design
 needs a population of at least its trainable count divided by 83.66.
 
-### Where the trainable count sits today
+The project has widened the default since. The implementer must read the
+trainable count from the policy, and must redo the two tables below at the
+widths the run holds.
+
+### Where the trainable count sat at those widths
 
 | Part | Weights | Formula |
 |---|---|---|

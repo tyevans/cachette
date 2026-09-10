@@ -23,8 +23,12 @@ towers costs nothing that twelve held-out worlds can measure.
 
 ## 1. The split of the trainable weights, and a correction
 
-The policy reports its own weight count, and the run measured it on the current
-tree.
+The policy reports its own weight count, and the run measured it on the tree of
+that day. **Every figure in this note is a measurement at those widths**: a
+scalar width of 4, a ring width of 4, 3 ring bands, a sector kernel of 3, a
+token width of 4 and a trunk width of 12. The project has widened the default
+since, so the counts below no longer describe the policy a run builds today.
+The measurement stands, and the arithmetic that produced it is unchanged.
 
 | block | weights | share | root mean square per weight at the start |
 |---|---|---|---|
