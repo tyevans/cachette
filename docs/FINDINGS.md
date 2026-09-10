@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-752**
+**Next number: FND-753**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20755,6 +20755,65 @@ destination plane is how a fixture puts a unit against the ground it must be
 refused by. A fixture that seats units and waits measures the steering, and the
 steering avoids the case.
 
+### FND-752 — A region of a planet drowns its food, so a stripped disc never grows back, and a span that holds the weather still lets the people sweep
+
+**Believed.** Two things. A founding group of fifteen times the default strips
+the disc of a site, and that supplies the extreme the ground term of the
+production pipeline needs. Samples that agree on the weather and on the
+terraces leave the ground as the one term that can move the production scale.
+
+**True.** Neither holds.
+
+A map is one region of a planet, so rain reaches every tile of it.[^F744A] The
+tile of the site stands in the wettest of the seven moisture bands. Food grows
+slowest of all in that band, and the moisture curve multiplies the recovery
+period by sixteen there.[^F752A] The group strips the whole disc inside the
+settling ticks, and the disc then regains nothing for the rest of the run. The
+ground term holds one value from the first sample to the last, and the fixture
+refuses to compare a term that does not move.
+
+The second belief is the worse one. A site gains and loses residents across a
+run, and the people term of the pipeline moves the scale on its own.[^F752B] A
+span that held the weather and the terraces still let the people sweep.
+
+**Evidence.** The ground test of the production pipeline failed on its own
+precondition. A probe read the disc of the site on every tick of a run of 1200
+ticks: the disc holds 39 units of food over 37 tiles, the group takes all 39 by
+tick 17 of the 30 settling ticks, and the reader answers 39 on every later tick.
+The recovery period at the tile reads 3840 ticks for one unit, against a balance
+value of 240. The tile is wet from tick 10 to the end of the run.
+
+The same probe at the commit before the map became a region reads the same site,
+the same disc and the same 39 units. The take there falls to 21 and rises again,
+and the recovery period swings between 240 and 3840 as the tile dries and wets.
+The world returned 1718 units of food over that run, against 12 over the run
+after the change.
+
+The test file did not change between the two commits, beside one line that the
+change itself added. The test passes at the parent commit and fails at the
+change, at the merge that followed it, and at the tip.
+
+The second belief was caught by putting the mechanism back broken. The ground
+term of the pipeline was made to answer zero, which is the defect the whole file
+exists to catch. The first repair still passed. With the people in the span key
+the test fails, and it names two ticks of 29 and 39 taken that give one scale.
+
+**Follows.** Three things.
+
+**A fixture that measures one term of a pipeline states every rate that term
+depends on.** The ground fixture now states the recovery period of a deposit.
+The site stands in the slowest moisture band, so no weather can slow the stated
+rate further, and the fixture no longer waits on the sky. A fixture that holds a
+term still by comparison must put every other term in the key, not the terms
+that broke it last time.[^F745A]
+
+**Put the term back broken before you believe the repair.** The first repair
+made the ground move again and went green. It also went green with the ground
+term deleted from the engine. Nothing in the text of the test showed that.
+
+**A region world may leave foraged food unable to grow back at all.** A blocker
+holds that question.[^F752C]
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -20785,3 +20844,6 @@ steering avoids the case.
 [^F748A]: Findings register, FND-747. `docs/FINDINGS.md`
 [^F750A]: Findings register, FND-745. `docs/FINDINGS.md`
 [^F751A]: Backlog item 0538, hold the remaining long-run fixtures against the weather. `docs/backlog/refined/0538-hold-the-remaining-long-run-fixtures-against-the-weather.md`
+[^F752A]: The recovery rule, the moisture curve of a period. `crates/cachette-core/src/resource.rs`
+[^F752B]: The production pipeline, the resident term. `crates/cachette-core/src/effective.rs`
+[^F752C]: Blockers register, BLK-162. `docs/BLOCKERS.md`

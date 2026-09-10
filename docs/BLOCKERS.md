@@ -25,11 +25,40 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: BLK-162**
+**Next number: BLK-163**
 
 [^ALLOC]: Findings register, FND-038. `docs/FINDINGS.md`
 
 ## Open
+
+### BLK-162 — Does a region world leave foraged food unable to grow back?
+
+**Blocks.** Any balance statement about foraging, about how long a faction can
+live off unimproved ground, and about what a terrace is worth against waiting.
+
+**Owner.** Whoever next works on the balance of the ground.
+
+**Status.** Open.
+
+**What is not known.** Whether food that is stripped from unimproved ground
+should grow back inside a run of a world that states the default latitude span.
+
+**What follows from that today.** A map is one region of a planet, so rain
+reaches every tile of it. The tile of a founded site stands in the wettest of
+the seven moisture bands. The moisture curve multiplies the recovery period of
+food by sixteen at that band, because food grows badly on drowned ground. A
+group that strips the disc of its site regains nothing over the following
+twelve hundred ticks. The rate that the recovery rule states is set against the
+price of a terrace, and that comparison assumes the ground returns a unit while
+a faction waits. The findings register holds the measurement.[^BLK162A]
+
+**What the project does meanwhile.** The rate stays as it is. The ground
+fixture of the production tests states a recovery period of its own, so that it
+measures the pipeline and not the sky.
+
+## References
+
+[^BLK162A]: Findings register, FND-752. `docs/FINDINGS.md`
 
 ### BLK-161 — Does a storm take its size and its threshold from the world or from the globe?
 
