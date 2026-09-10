@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-734**
+**Next number: FND-735**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20029,3 +20029,53 @@ than the one it bought.[^F733C]
 [^F733A]: Commit `d1524f55`, 9 September 2026.
 [^F733B]: The trainer entry point. `python/cachette/learn/__main__.py`
 [^F733C]: Run sizing. `python/cachette/learn/sizing.py`
+
+### FND-734 — The built-in controller wins an even share, and the games it plays reach an end
+
+**Believed.** A trained policy reached a held-out win share near 0.07 against
+the built-in controller. Two readings competed for that number. The first said
+the controller had become too strong, because a rule that hunts the weakest
+faction had landed. The second said the games no longer reach an end, so no
+seat wins and the win share is a broken measure for every player.
+
+**True.** Neither. The controller wins about one third of the games it plays,
+which is the even share of a world of three factions. **Three even seats
+account for the whole of a resolved game, so the games reach an end.** The
+learner is behind an even player. It does not face a strong one, and it does
+not play in a world that refuses to end.
+
+**Evidence.** One pass measured the controller alone on the current engine.
+The world is the training world: 128 columns, three factions, a tick limit of
+6000 and a decision every 10 ticks. The weighting is the wealth objective.
+
+    uv run --no-sync python -m cachette.learn --baseline-only \
+        --only wealth-structured --holdout 64 --pool 8
+
+    controller measured return 1153.8  won 0.33
+
+The pass played 64 episodes and 218360 ticks, so a game took 3412 ticks of the
+6000 it was allowed. The standard error of a share near one third over 64
+episodes is 0.059.
+
+An earlier pass measured the controller in the same seat before the hunting
+rule landed, over 64 seeds, at 0.406. The difference of 0.076 sits under the
+standard error of the difference, which is 0.085, so **the measurement does
+not separate the two controllers.**
+
+**Follows.** Three things.
+
+**Name the bar before naming a cause.** The bar is 0.333. A policy at 0.070 is
+a fifth of an even seat. Two causes were proposed for that gap and one pass of
+64 episodes refused both. The pass cost about ten minutes.
+
+**A yardstick of six episodes cannot answer this.** The run reports a
+six-episode yardstick while it trains, and that yardstick read 0.17. The
+standard error of a share over six episodes is near 0.15, so the reading is
+consistent with 0.02 and with 0.45 at once. A number that cannot separate the
+answers is not evidence for either.
+
+**The effect of the hunting rule on the length of a game is not measured.** A
+league median of 2100 to 2450 ticks exists for the engine before the rule, and
+it mixes trained policies with the controller and states a median. The figure
+above is a mean over controller games alone. The two do not compare, and a
+controller-only pass on the earlier engine would be needed to compare them.
