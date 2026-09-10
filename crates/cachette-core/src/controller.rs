@@ -157,13 +157,24 @@ pub const OVERMATCH_RATIO_DEFAULT: i32 = 2 << 16;
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Pod, Zeroable)]
 pub struct FactionWeights {
-    /// How much the faction wants a campaign.
+    /// How much the faction wants war with a rival.
+    ///
+    /// It biases the relation move alone. The campaign raise takes the
+    /// renown weight below.
     pub war: u8,
     /// How much the faction wants a contract.
     pub trade: u8,
     /// How much the faction wants an upgrade.
     pub build: u8,
-    /// How much the faction wants a famous character.
+    /// How much the faction wants a campaign.
+    ///
+    /// Renown comes from felling an enemy unit, and a campaign is the one
+    /// order that fells one, so this weight is what a faction steers the
+    /// renown win path with.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: The renown award and the champion rule. `crates/cachette-core/src/world/character.rs`
     pub renown: u8,
     /// How much the faction wants a new city.
     ///

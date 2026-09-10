@@ -508,8 +508,8 @@ class Announcer:
         **Only a wonder gets a line.** A road, a terrace, a store, a wall and
         a lodging finish every few ticks in a mature world, which is a rate
         and not a moment. A wonder is the largest thing a faction builds, so
-        it is the one level worth a line. **It ends no game**, because the
-        wealth-or-wonder path has no reader.
+        it is the one level worth a line. **It ends the game**, because the
+        wonder reader names the faction that holds its ground.
 
         **The line names the nation, and it does not print the index.** A
         wonder that nobody holds takes the word "A" instead, because the

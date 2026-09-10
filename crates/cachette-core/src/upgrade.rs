@@ -96,13 +96,13 @@ impl UpgradeCategory {
     pub const ROAD: Self = Self(0);
     /// Worked ground. A unit takes more from the tile in one tick.
     pub const TERRACE: Self = Self(1);
-    /// A great work. **Its completion ends no game.** The wealth-or-wonder
-    /// path has no reader, so a finished wonder grants a claim that nothing
-    /// compares.[^1]
+    /// A great work. **Its completion ends the game.** The wonder reader
+    /// names the faction that holds the ground a finished wonder stands
+    /// on.[^1]
     ///
     /// # References
     ///
-    /// [^1]: ADR-0173, the wealth or wonder path has no reader, decisions D1 and D3. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
+    /// [^1]: ADR-0174, a wonder is a win path and a stock total is not, decisions D1 and D3. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
     pub const WONDER: Self = Self(2);
     /// A storehouse. It raises the store capacity of the settlement on or
     /// beside its tile.
@@ -337,18 +337,19 @@ declare_upgrade_row! {
     /// [^1]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
     /// [^2]: Findings register, FND-539. `docs/FINDINGS.md`
     housing_change: u32,
-    /// The claim toward the wealth-or-wonder end that the finished row
-    /// grants the faction that holds its ground.[^1]
+    /// The claim toward the wonder end that the finished row grants the
+    /// faction that holds its ground.[^1]
     ///
-    /// **No reader compares this column.** The wealth-or-wonder path has no
-    /// reader, so the column is reported and decides no game.[^2]
+    /// **The wonder reader compares this column.** It names the first
+    /// faction that holds ground on which a standing row carries a claim
+    /// above zero, and that faction wins.[^2]
     ///
     /// Zero means that the row grants no claim.
     ///
     /// # References
     ///
     /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
-    /// [^2]: ADR-0173, the wealth or wonder path has no reader, decisions D1 and D3. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
+    /// [^2]: ADR-0174, a wonder is a win path and a stock total is not, decisions D1 and D3. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
     victory_claim: u32,
     /// Whether the builder must stand on ground its own faction holds.
     ///
@@ -745,16 +746,17 @@ pub const TERRACE_LEVEL_2_RECOVERY: u32 = TERRACE_LEVEL_1_RECOVERY * 2;
 /// [^1]: Balance register, the store capacity raise. `docs/reference/balance.md`
 pub const STORE_CAPACITY_RAISE: u32 = 64 << 16;
 
-/// The claim toward the wealth-or-wonder end that one finished wonder
-/// grants.[^1]
+/// The claim toward the wonder end that one finished wonder grants.[^1]
 ///
-/// **No reader compares it.** The wealth-or-wonder path has no reader, so a
-/// finished wonder ends no game.[^2]
+/// **The wonder reader compares it on every tick.** The reader names the
+/// first faction that holds ground on which a standing upgrade carries a
+/// claim above zero, so a finished wonder ends the game.[^2] A value of zero
+/// takes the path out of the game.
 ///
 /// # References
 ///
 /// [^1]: Balance register, the wonder victory claim. `docs/reference/balance.md`
-/// [^2]: ADR-0173, the wealth or wonder path has no reader, decisions D1 and D3. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
+/// [^2]: ADR-0174, a wonder is a win path and a stock total is not, decisions D1 and D3. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
 pub const WONDER_VICTORY_CLAIM: u32 = 1;
 
 /// The level of the upgrade table row that holds the wonder.

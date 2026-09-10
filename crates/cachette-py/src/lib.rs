@@ -132,11 +132,11 @@ fn version() -> &'static str {
 /// settlement: the ceiling of a fixed-point store times the commodity count.
 /// A faction that holds one settlement never reports more than this. The
 /// ceiling is the reason no bar could put the wealth path out of reach, and
-/// the reason the path has no reader today.[^1]
+/// the reason no reader compares a stock total today.[^1]
 ///
 /// # References
 ///
-/// [^1]: ADR-0173, the wealth or wonder path has no reader, decision D1. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
+/// [^1]: ADR-0174, a wonder is a win path and a stock total is not, decision D2. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
 #[pyfunction]
 fn stock_ceiling_of_one_settlement() -> i64 {
     cachette_core::STOCK_CEILING_OF_ONE_SETTLEMENT

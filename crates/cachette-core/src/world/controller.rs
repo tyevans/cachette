@@ -959,7 +959,7 @@ impl World {
                     // A faction with a march to make marches. The campaign
                     // and the project order take the same idle units and the
                     // same destination plane, so one of the two must yield,
-                    // and the campaign is the one the war weight asked
+                    // and the campaign is the one the renown weight asked
                     // for.[^9]
                     //
                     // [^9]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`

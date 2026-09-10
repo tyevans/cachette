@@ -791,8 +791,11 @@ impl PyWorld {
     /// when the world is built, so two worlds with one seed start on one
     /// vector. `set_faction_weights` writes it after that.
     ///
-    /// The renown weight is the one weight that no pass reads today. Every
-    /// other weight biases one controller evaluation.
+    /// Every weight biases one controller draw. The war weight biases the
+    /// relation move, the renown weight biases the campaign raise, the build
+    /// weight splits an evaluation between a gather order and a build order,
+    /// the settle weight biases the founding draw, and the trade weight
+    /// biases the negotiation step.
     ///
     /// **The vector is the policy of the faction, and it is simulated
     /// state.**[^2] It enters the state hash, so two worlds that differ in a

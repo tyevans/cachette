@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-738**
+**Next number: FND-739**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20166,11 +20166,44 @@ produce that share.
 
 **Repair the comment when the file is next touched.** The comment is prose, so
 nothing fails while it is wrong. A reader who takes it for the code plans a
-change against a path it believes is inert.
+change against a path it believes is inert. **The comment is repaired**, and so
+is every other prose site that stated the same thing.
 
 **A constant that carries the reasoning of a retired reader outlives the
 reader.** The comment cites a superseded record and it reads as current. The
 recurring defect rule already holds this shape.[^F562A]
+
+### FND-738 — One weight decided two war choices, and a second weight decided nothing
+
+**Believed.** The five option weights of a faction each say how much that
+faction wants one thing. The war weight says how much it wants war, and the
+renown weight says how much it wants a famous character.[^F738A]
+
+**True.** The war weight decided two choices and the renown weight decided
+none. The war weight biased the relation move toward a rival, and it biased
+the campaign raise as well. No controller could therefore declare war often
+and march rarely, or the reverse.[^F738B] The renown weight was drawn, stored,
+hashed and published, and no pass read it to decide anything.[^F738C]
+
+**Evidence.** An audit of the four win paths read every weight against every
+draw of the controller stage.[^F738D] The probe that ranks versions of the
+built-in controller had already left the renown weight out of its steering
+key, because a pair that differed only there played one game twice.[^F738E]
+
+**Follows.** The campaign raise now takes the renown weight, and the relation
+move keeps the war weight. The two defects cancel: the raise gains a weight of
+its own, and the renown weight gains a decision. A campaign is the one order
+that fells enemy units, and a felled unit is the one source of renown, so the
+weight steers the win path it is named for.
+
+**The two draws share one formula and one range**, so a faction whose war
+weight equals its renown weight raises exactly as it did before. The seeding
+draws the two weights apart, so a seeded world does not.
+
+**A weight that nothing reads is shape 3 of the recurring defect rule, and a
+weight that two decisions read is shape 1.** The two shapes sat beside each
+other in one struct for as long as the struct existed, and each was the cure
+for the other.[^F738F]
 
 ## References
 
@@ -20179,3 +20212,9 @@ recurring defect rule already holds this shape.[^F562A]
 [^F737A]: The upgrade table, the wonder victory claim constant. `crates/cachette-core/src/upgrade.rs`
 [^F737B]: The win path readers. `crates/cachette-core/src/world/victory.rs`
 [^F737C]: ADR-0174, a wonder is a win path and a stock total is not. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
+[^F738A]: The controller, the weight vector of a faction. `crates/cachette-core/src/controller.rs`
+[^F738B]: The campaign draw. `crates/cachette-core/src/campaign.rs`
+[^F738C]: The faction bindings, the weight verb. `crates/cachette-py/src/world/faction_view.rs`
+[^F738D]: What the win conditions are, and what can reach them. `docs/research/what-the-win-conditions-are-and-what-can-reach-them.md`
+[^F738E]: The controller version probe, the steering key. `scripts/controller_versions.py`
+[^F738F]: Recurring defect shapes, shapes 1 and 3. `.agents/rules/recurring-defects.md`
