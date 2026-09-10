@@ -32,7 +32,7 @@
 //! [^2]: Testing Rules, sections 5 and 6. `.agents/rules/testing.md`
 //! [^3]: Testing Rules, section 2a. `.agents/rules/testing.md`
 
-use cachette_core::controller::prey_of;
+use cachette_core::controller::{prey_of, FactionWeights, WEIGHT_HIGH};
 use cachette_core::{Axial, FactionId, Fix32, World, WorldConfig};
 
 const THREADS: usize = 2;
@@ -190,6 +190,35 @@ fn a_ratio_of_zero_leaves_an_idle_faction_at_peace() {
     );
 }
 
+/// Gives every faction of the world the highest campaign weight.
+///
+/// The controller raises a campaign on a draw against the renown weight, and
+/// the seeding draws that weight apart from the war weight. A hunter that
+/// draws a low renown weight marches rarely, loses its units to the faction
+/// that marches on it, and holds no speaker. A faction with no speaker names
+/// no prey, so it stops moving the relation and the drift walks the relation
+/// back out of the war band.
+///
+/// **The campaign weight is an input of this test, not a subject of it.** The
+/// test reads which faction hunts, and the seeded draw of one unrelated
+/// weight must not decide that. The fixture therefore states the weight.[^1]
+///
+/// # References
+///
+/// [^1]: Testing Rules, section 2a. `.agents/rules/testing.md`
+fn raise_campaigns_often(world: &mut World, seated: u16) {
+    for faction in 0..seated {
+        let drawn = world
+            .faction_weights(FactionId(faction))
+            .expect("the world holds the faction");
+        let weights = FactionWeights {
+            renown: WEIGHT_HIGH,
+            ..drawn
+        };
+        assert!(world.set_faction_weights(FactionId(faction), weights));
+    }
+}
+
 /// Builds the same world and gives each faction the ratio the list names.
 ///
 /// The list holds one raw Q16.16 value for each faction, in faction order.
@@ -201,6 +230,7 @@ fn seated_ratios(seed: u64, ratios: [i32; 3]) -> World {
     for (index, ratio) in ratios.iter().enumerate() {
         assert!(world.set_faction_overmatch_ratio(FactionId(index as u16), *ratio));
     }
+    raise_campaigns_often(&mut world, 3);
     assert!(world.set_externally_controlled(FactionId(0), true));
     world
 }
