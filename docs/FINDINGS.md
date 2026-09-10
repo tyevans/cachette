@@ -21219,7 +21219,7 @@ ended a unit before the scan, and the scan ended one unit.
 
 The Python boundary published no reader for the storm log. The core held it,
 and a Rust fixture could subtract it. A Python fixture could not tell a storm
-death from a starvation. The cyclone reader does not stand in for the log: two
+death from a starvation. The cyclone reader does not stand in for the log. Two
 of the three storm deaths fell on a step after which no cyclone stood.
 
 **Evidence.** A bisect over the one test gives 31eb8769 green and 6120e0db
@@ -21238,7 +21238,7 @@ the Python run exactly.
 **Follows.** The boundary now publishes the storm log, through a named reader
 and through the general reader. Both read the layout that the engine
 declares.[^F762B] [^F762C] The starved test subtracts the units that the storm
-log names, and it keeps the world that starves ten at once.[^F762D] A test of
+log names. It keeps the world that starves ten at once.[^F762D] A test of
 the new reader drives the same world.
 
 **A calm latitude belongs to one world.** A fixture that avoids the weather by
@@ -21247,7 +21247,7 @@ fixture can now make that assertion through the storm log.
 
 **The count also rests on the production queue.** In this world a queue swaps
 one resident for one new unit, so the count of units holds. A queue row that
-took more people than it made would break the count, and the failure would
+took more people than it made would break the count. The failure would then
 name neither log.
 
 ## References
