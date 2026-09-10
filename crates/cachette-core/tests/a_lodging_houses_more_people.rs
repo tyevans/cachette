@@ -690,7 +690,7 @@ fn a_lodging_on_ground_that_does_not_fit_is_refused() {
 ///
 /// # References
 ///
-/// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D2. `docs/adrs/draft/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
+/// [^1]: ADR-0152, a faction plans its roads and zones with one solver, decision D2. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 /// [^2]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
 /// [^3]: Testing Rules, section 2a. `.agents/rules/testing.md`
 #[test]
