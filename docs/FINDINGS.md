@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-735**
+**Next number: FND-737**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20079,3 +20079,73 @@ league median of 2100 to 2450 ticks exists for the engine before the rule, and
 it mixes trained policies with the controller and states a median. The figure
 above is a mean over controller games alone. The two do not compare, and a
 controller-only pass on the earlier engine would be needed to compare them.
+
+### FND-735 — Every member of the controller family seats today, and the probe stated that only one setting could part two seats
+
+**Believed.** The probe that plays versions of the built-in controller against
+each other stated in its own text that the hunting ratio was the one setting
+that parts one version of the controller from another. A design report written
+beside it predicted a family of seven members and stated that six of them
+could be seated, because the seventh needed a hunting ratio held for each
+faction.[^F735A]
+
+**True.** Three per-faction settings part two seats of one world, and all
+three are bound to Python. The engine holds the five option weights of a
+faction in the faction row, it holds the external control flag there, and the
+hunting ratio landed as a per-faction value while the report was being read.
+**Every member of the family therefore seats today, and the probe named one
+third of what it could write.**
+
+**Evidence.** One world of three factions was built, seeded and written to.
+Each seat took a different weight vector, a different hunting ratio and a
+different control flag, and each seat read every value back.
+
+    uv run --no-sync python -m pytest tests/test_controller_versions.py
+
+Three of those games were then played to an end. The passive member won none
+of them, and the two members that play won the rest.
+
+**Follows.** Two things.
+
+**A tool that seats a player must name every setting it could write.** The
+probe now takes a whole seat configuration, and it holds the family by name,
+so a caller seats a member rather than spelling settings out.
+
+**Two of the five weights reach no decision that changes the world.** No
+decision reads the renown weight. The trade weight biases one draw, and that
+draw reaches a subsystem that records no offer and no contract over a whole
+run. Two versions that differ only in those two weights are one player twice,
+so the probe refuses such a pair rather than ranking it.
+
+### FND-736 — A gap of twice its error separates nothing over a handful of decided games
+
+**Believed.** Two players are separated when the difference of their win
+shares exceeds twice the error of that difference. The design report states
+the rule that way, and the rating tool of the stored policies holds the same
+clearance.[^F735A] [^F736A]
+
+**True.** The rule holds only where the normal approximation behind the error
+holds. A first run of the probe played three games between three versions. Two
+of those games were decided between one pair, the gap was 0.667, the error was
+0.272, and the rule declared the pair separated. **A run made to prove the
+tool would have read as a ranking of the family.**
+
+**Evidence.** The run is the three-game run of the probe. The pair was the
+passive member against the member with the highest war weight. The passive
+member cannot win, so the sign of that gap is right and the confidence in it
+is not.
+
+**Follows.** The probe now states no separation for a pair that decided fewer
+games between them than a least count it holds. A pair below that count is
+reported with its gap and its error, and without a verdict.
+
+**The shape generalises past this tool.** Any rule that reads a gap against a
+normal error needs a floor on the count that produced it. The rating tool of
+the stored policies takes its error from a bootstrap over worlds instead, and
+it holds a least world count for that reason, so the shape there has an answer
+already.
+
+## References
+
+[^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
+[^F736A]: The rating tool of the stored policies, the clearance. `scripts/policy_league.py`

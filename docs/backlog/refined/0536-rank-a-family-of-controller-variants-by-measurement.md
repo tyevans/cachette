@@ -18,12 +18,12 @@ the trained policy wins 0.070. **A policy that loses almost every game receives
 almost no win signal.** A set of opponents ordered by strength gives a run an
 opponent it can beat early and a stronger one to cross later.
 
-The built-in controller is already tunable. Two of its settings are held for
-each faction and both are bound to Python, so several seat configurations can
-be seated in one world today. Nothing in the control plane calls either setter,
-and no run has ever used one. A design report enumerates every setting, says
-which of them steer anything, and proposes six seat configurations with a
-predicted order.[^report]
+The built-in controller is already tunable. Three of its settings are held for
+each faction and all three are bound to Python, so several seat configurations
+can be seated in one world today. The five option weights, the hunting ratio
+and the external control flag all sit in the faction row. A design report
+enumerates every setting, says which of them steer anything, and proposes
+seven seat configurations with a predicted order.[^report]
 
 This item builds the harness that seats them and runs the measurement that
 puts them in order.
@@ -59,9 +59,10 @@ whose members all play the same way measures the seat and not the player, so
 the balance check of this item is the seat share the rating tool already
 reports.
 
-**What is in flight elsewhere.** Another worker is making the overmatch ratio a
-per-faction value. One member of the family needs it. This item runs without
-that member and adds it when the work lands, so it is not blocked by it.
+**What is in flight elsewhere.** Nothing. The per-faction hunting ratio has
+landed, so the member of the family that needs it seats beside the others. The
+report was written while that work was in flight and it states six members for
+that reason. A finding records the correction.[^fnd735]
 
 ## What the work does
 
@@ -71,11 +72,10 @@ defaults.[^league] Add a third case: a named set of per-faction settings that
 the tool writes to the faction of that seat before the world runs. The setters
 are already bound to Python.[^bindings]
 
-**Run the screen.** Seat the six members that need no engine change over 4
-world seeds. That is 240 games and 120 games for each member. The standard
-error of one win share is 0.043, derived. Adding the seventh member when the
-per-faction overmatch ratio lands makes it 420 games and 180 games for each
-member, at a standard error of 0.035.
+**Run the screen.** Seat all seven members over 4 world seeds. That is 420
+games and 180 games for each member. The standard error of one win share is
+0.035, derived. Six members over the same seeds would be 240 games and 120
+games for each member, at a standard error of 0.043.
 
 **Run the ranking.** Drop to five members and play 32 world seeds. That is 960
 games and 576 games for each member. The standard error of one win share is
@@ -152,3 +152,4 @@ Filled in when the item moves to `complete/`.
 [^endings]: The endings instrument. `python/cachette/learn/endings.py`
 [^adr175]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D2. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
 [^item181]: Backlog item 0181, give a kind of work the commodity it fills. `docs/backlog/proposed/0181-give-a-kind-of-work-the-commodity-it-fills.md`
+[^fnd735]: Findings register, FND-735. `docs/FINDINGS.md`
