@@ -136,7 +136,7 @@ that record is about the ground under a place, so this item answers none of
 them.[^19]
 
 **Conflict surface.** `crates/cachette-core/src/site.rs` at the founding path
-and at the error type. `crates/cachette-core/src/world.rs` where the world
+and at the error type. `crates/cachette-core/src/world/` where the world
 founds a settlement and where it founds a run.
 `crates/cachette-core/src/terrain.rs` is read and not changed.
 `crates/cachette-core/tests/settlement_arena.rs` and

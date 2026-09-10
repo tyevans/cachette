@@ -57,4 +57,4 @@ to Python.
 [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^2]: Backlog priority index, item 0319. `docs/backlog/PRIORITY.md`
 [^3]: The conversion verb, its log and its count in the bindings. `crates/cachette-py/src/lib.rs`
-[^4]: The conversion verb and its log in the core. `crates/cachette-core/src/world.rs`
+[^4]: The conversion verb and its log in the core. `crates/cachette-core/src/world/conversion.rs`

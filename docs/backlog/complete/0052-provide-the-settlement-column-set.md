@@ -69,7 +69,7 @@ value. A store of zero is a real state and must be representable.[^4]
 item builds the place. It gives it neither residents nor positions.
 
 **Conflict surface.** `crates/cachette-core/src/site.rs` is new.
-`crates/cachette-core/src/lib.rs`, and `crates/cachette-core/src/world.rs` at
+`crates/cachette-core/src/lib.rs`, and `crates/cachette-core/src/world/` at
 the constructor, the state hash and the invariant check. **No other item in
 this plan may merge before this one**, because every item that adds a site
 field rebases on this file.

@@ -2029,7 +2029,7 @@ work is, and sections 6 and 7 say what to change in each.
 [^8]: The upgrade table and its work constants. `crates/cachette-core/src/upgrade.rs`
 [^9]: The contest pass and the renown it pays for one felled unit. `crates/cachette-core/src/contest.rs`
 [^10]: The reward of a faction, and the rule that a term names a single-position field. `python/cachette/learn/reward.py`
-[^11]: The legality reader and the win readers. `crates/cachette-core/src/world.rs`
+[^11]: The legality reader and the win readers. `crates/cachette-core/src/world/actions.rs`, `crates/cachette-core/src/world/victory.rs`
 [^12]: The unit type table and its rows. `crates/cachette-core/src/unit_type.rs`
 [^13]: The stored behaviour report of six policies. `runs/learn/behaviour.json`
 [^14]: The observation array of a faction and its schema. `crates/cachette-core/src/faction_observation.rs`

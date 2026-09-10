@@ -74,7 +74,7 @@ recurring defect rule governs the position count against the tile capacity.[^2]
 **Serves.** PRD-0017.
 
 **Conflict surface.** `crates/cachette-core/src/site.rs` and
-`crates/cachette-core/src/world.rs` at the state hash and the invariant check.
+`crates/cachette-core/src/world/` at the state hash and the invariant check.
 `crates/cachette-py` gains the set-valued preference command. It shares
 `site.rs` with items 0055, 0056 and 0059, so it merges after whichever of them
 is in flight.

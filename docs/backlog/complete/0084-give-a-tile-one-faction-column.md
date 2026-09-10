@@ -153,7 +153,7 @@ worker who takes this item checks before it starts.
 
 | File | What changes |
 |---|---|
-| `crates/cachette-core/src/world.rs` | The column field, the construction loop, the step, the stamping pass, the state hash, the invariant check, and the unit tests of that check |
+| `crates/cachette-core/src/world/` | The column field, the construction loop, the step, the stamping pass, the state hash, the invariant check, and the unit tests of that check |
 | `crates/cachette-core/src/event.rs` | The field type of the tile event, and its doc comment |
 | `crates/cachette-core/src/holding.rs` | Read only, if the holder slice reader is enough |
 | `crates/cachette-core/tests/event_layout.rs` | The constructor calls that pass a faction |

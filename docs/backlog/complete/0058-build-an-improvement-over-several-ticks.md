@@ -71,7 +71,7 @@ sends that to production and upkeep, and item 0055 holds the rate mechanism
 that would carry it.
 
 **Conflict surface.** `crates/cachette-core/src/upgrade.rs` is new.
-`crates/cachette-core/src/world.rs` at the step, the state hash and the
+`crates/cachette-core/src/world/` at the step, the state hash and the
 invariant check; `crates/cachette-core/src/terrain.rs` at the crossing cost
 read; `crates/cachette-view` gains an upgrade layer. **It touches the terrain
 read that movement uses**, so it does not run beside any item that changes

@@ -34,6 +34,6 @@ it. The scoring pass exists as its own module.[^3]
 
 ## References
 
-[^1]: The movement draw and its key. `crates/cachette-core/src/world.rs`
+[^1]: The movement draw and its key. `crates/cachette-core/src/world/movement.rs`
 [^2]: The counter-based generator and its system constants. `crates/cachette-core/src/rng.rs`
 [^3]: ADR-0064, a unit chooses by scoring a small fixed option set. `docs/adrs/accepted/adr-0064-a-unit-chooses-by-scoring-a-small-fixed-option-set.md`

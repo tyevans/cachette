@@ -369,12 +369,12 @@ structural change. It is a list of the instances.
 
 [^1]: Decision Record Scope, section 4.3. `.claude/rules/adr-scope.md`
 [^2]: Movement timing note. `docs/research/movement-timing.md`
-[^3]: The movement intent pass. `crates/cachette-core/src/world.rs`
-[^4]: The tile value pass. `crates/cachette-core/src/world.rs`
+[^3]: The movement intent pass. `crates/cachette-core/src/world/movement.rs`
+[^4]: The tile value pass. `crates/cachette-core/src/world/tiles.rs`
 [^5]: The cell summary. `crates/cachette-core/src/pyramid.rs`
 [^6]: The option table. `crates/cachette-core/src/choose.rs`
-[^7]: The founding provisions a site from the survey. `crates/cachette-core/src/world.rs`
-[^8]: The step. `crates/cachette-core/src/world.rs`
+[^7]: The founding provisions a site from the survey. `crates/cachette-core/src/world/founding.rs`
+[^8]: The step. `crates/cachette-core/src/world/step.rs`
 [^9]: Commit 910dec0, feed a founded group from the ground its survey measured.
 [^10]: PRD-0009, a unit acts on the world it can see. `docs/product/accepted/prd-0009-a-unit-acts-on-the-world-it-can-see.md`
 [^11]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
@@ -382,11 +382,11 @@ structural change. It is a list of the instances.
 [^13]: Backlog item 0068, give a faction a ruler and a succession. `docs/backlog/refined/0068-give-a-faction-a-ruler-and-a-succession.md`
 [^14]: Backlog item 0104, carry the writ of a ruler in the influence field. `docs/backlog/complete/0104-carry-the-writ-of-a-ruler-in-the-influence-field.md`
 [^15]: Backlog item 0169, choose the cadence of the influence solve. `docs/backlog/proposed/0169-choose-the-cadence-of-the-influence-solve.md`
-[^16]: The carry ledger invariant. `crates/cachette-core/src/world.rs`
+[^16]: The carry ledger invariant. `crates/cachette-core/src/world/invariants.rs`
 [^17]: Testing Rules, section 5. `.claude/rules/testing.md`
 [^18]: The character arena. `crates/cachette-core/src/character.rs`
 [^19]: Backlog item 0088, promotion into the character tier. `docs/backlog/PRIORITY.md`
-[^20]: The choice explanation. `crates/cachette-core/src/world.rs`
+[^20]: The choice explanation. `crates/cachette-core/src/world/choose.rs`
 [^21]: ADR-0023, an aggregate combines exactly, in any order, decision D3. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
 [^22]: Project orientation, the design principles. `CLAUDE.md`
 [^23]: Backlog item 0064, choose an action by scoring a fixed option set. `docs/backlog/complete/0064-choose-an-action-by-scoring-a-fixed-option-set.md`

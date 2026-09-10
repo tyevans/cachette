@@ -261,7 +261,7 @@ another owner.[^21]
 
 [^1]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
 [^2]: ADR Registry. `docs/adrs/REGISTRY.md`
-[^3]: The choice pass of the world. `crates/cachette-core/src/world.rs`
+[^3]: The choice pass of the world. `crates/cachette-core/src/world/choose.rs`
 [^4]: ADR-0009, parallel stages write disjoint outputs, decision D1. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 [^5]: ADR-0009, parallel stages write disjoint outputs, decision D2. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
 [^6]: ADR-0009, parallel stages write disjoint outputs, decision D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`

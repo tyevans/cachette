@@ -106,6 +106,6 @@ answers in the tree, point for point.
 [^6]: Design: the living world game layer, section 10.1. `docs/superpowers/specs/2026-09-05-living-world-game-layer-design.md`
 [^7]: Backlog item 0472, run a faction controller inside the step and end the game on territory. `docs/backlog/complete/0472-run-a-faction-controller-inside-the-step-and-end-the-game-on-territory.md`
 [^8]: Balance register. `docs/reference/balance.md`
-[^9]: The subsystem census reader and its table. `crates/cachette-core/src/world.rs`
+[^9]: The subsystem census reader and its table. `crates/cachette-core/src/world/census.rs`
 [^10]: The demonstration census printer. `python/cachette/demo/app.py`
 [^11]: The balance harness. `python/cachette/balance/__init__.py`

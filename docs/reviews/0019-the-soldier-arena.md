@@ -19,7 +19,7 @@ Files read at that commit:
 |---|---|
 | `crates/cachette-core/src/soldier.rs` | New |
 | `crates/cachette-core/src/types.rs` | Changed |
-| `crates/cachette-core/src/world.rs` | Changed |
+| `crates/cachette-core/src/world/` | Changed |
 | `crates/cachette-core/src/lib.rs` | Changed |
 | `crates/cachette-core/src/hex.rs` | Read for context |
 | `crates/cachette-core/tests/soldier_arena.rs` | New |

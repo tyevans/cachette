@@ -426,6 +426,6 @@ that the seeding built.
 [^16]: The painting module, `on_an_edge`, and backlog item 0209. `crates/cachette-view/src/paint.rs`, `docs/backlog/proposed/0209-tell-a-frontier-from-the-edge-of-the-claimed-ground.md`
 [^17]: The painting module, `close_run` and `OVER_CAPACITY`. `crates/cachette-view/src/paint.rs`
 [^18]: The event panel, module documentation and `lines`. `crates/cachette-view/src/panel/events.rs`
-[^19]: The fallen log, `World::fell_log` and `fell_log_columns`. `crates/cachette-core/src/world.rs`, `python/cachette/_core.pyi`
+[^19]: The fallen log, `World::fell_log` and `fell_log_columns`. `crates/cachette-core/src/world/contest.rs`, `python/cachette/_core.pyi`
 [^20]: The painting module, `KIND_COLOURS` and `FACTION_COLOURS`. `crates/cachette-view/src/paint.rs`
 [^21]: Balance register, the wonder work. `docs/reference/balance.md`

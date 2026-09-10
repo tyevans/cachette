@@ -76,7 +76,7 @@ PRD-0008 asks that effort accumulate. This item holds the accumulation. It
 builds no improvement; item 0058 does that.
 
 **Conflict surface.** `crates/cachette-core/src/site.rs`, which item 0052
-creates, and `crates/cachette-core/src/world.rs` at the step. **It cannot run
+creates, and `crates/cachette-core/src/world/` at the step. **It cannot run
 beside item 0056**, because both add a stage to the site pass and both edit
 the same reduction.
 

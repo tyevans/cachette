@@ -86,7 +86,7 @@ long path; PRD-0009 excludes both.
 
 **Conflict surface.** `crates/cachette-core/src/choose.rs` is new.
 `crates/cachette-core/src/soldier.rs` gains an intent column;
-`crates/cachette-core/src/world.rs` at the step, before movement.
+`crates/cachette-core/src/world/` at the step, before movement.
 `crates/cachette-core/src/pyramid.rs` is read and not written. **It cannot run
 beside item 0065**, which changes what the option set is, and it changes the
 step stage that movement reads, so it does not run beside any movement work.

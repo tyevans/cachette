@@ -27,7 +27,7 @@ The verb `inflict_weather` gains one refusal. It refuses when the faction holds
 no unit whose type has weather reach above zero. The signature does not
 change, and the controller calls the same verb.
 
-**This pass touches `fn step` in `world.rs`. Only one worker may hold it at a
+**This pass touches `fn step` in `crates/cachette-core/src/world/step.rs`. Only one worker may hold it at a
 time.** It waits for pass 4 to merge, because the wear step it adds writes the
 condition that pass 4 creates.
 

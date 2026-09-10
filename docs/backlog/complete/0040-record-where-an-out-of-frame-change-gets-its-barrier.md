@@ -130,6 +130,6 @@ who needs the proof must remove the call again.
 [^3]: Backlog item 0030. `docs/backlog/complete/0030-enforce-the-barrier-ordering.md`
 [^4]: Testing Rules, section 5. `.claude/rules/testing.md`
 [^5]: Testing Rules, section 2a. `.claude/rules/testing.md`
-[^6]: The two bridge refresh call sites. `crates/cachette-core/src/world.rs`
+[^6]: The two bridge refresh call sites. `crates/cachette-core/src/world/movement.rs`
 [^7]: The two bridge refresh stages. `crates/cachette-core/src/stage.rs`
 [^8]: The barrier ordering tests. `crates/cachette-core/tests/barrier_ordering.rs`
