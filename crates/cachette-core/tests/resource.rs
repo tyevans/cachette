@@ -1603,7 +1603,7 @@ fn the_engine_reads_the_improvement_when_it_recovers_a_deposit() {
     field
         .zone_project(faction, chosen, UpgradeCategory::TERRACE)
         .expect("a terrace fits a tile the faction holds");
-    let builder = field
+    let mut builder = field
         .spawn_soldier(chosen, faction)
         .expect("the chosen tile takes a unit");
     field
@@ -1611,10 +1611,21 @@ fn the_engine_reads_the_improvement_when_it_recovers_a_deposit() {
         .expect("the plan names a terrace on the tile the builder stands on");
     // The order is placed again on every tick, because a builder does not
     // stay on the tile it builds.
+    //
+    // **The fixture also replaces a builder that the world ends.** A storm
+    // takes units that stand in the open, and a run of this length reaches
+    // one, so a fixture that kept one identity would wait out its whole
+    // limit beside a dead worker.
     let mut waited = 0u32;
     while field.upgrade_level(chosen) == 0 && waited < 3000 {
         field.step(2).expect("the step must run");
         waited += 1;
+        if !field.soldiers().contains(builder) {
+            let Ok(fresh) = field.spawn_soldier(chosen, faction) else {
+                continue;
+            };
+            builder = fresh;
+        }
         let _ = field.order_build(builder, UpgradeCategory::TERRACE);
     }
     assert!(

@@ -44,6 +44,7 @@ impl World {
         self.fire_started_log.clear();
         self.fire_ended_log.clear();
         self.burned_log.clear();
+        self.storm_lost_log.clear();
         self.eliminated_log.clear();
         self.fold_relations_into_the_census();
         self.relations.clear_log();
@@ -505,6 +506,28 @@ impl World {
         // [^40]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
         // [^41]: ADR-0140, weather is a field over the level 1 cell lattice, decision D3. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
         // [^42]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+        // **The storm damage runs beside the fire, and for the same
+        // reasons.** It ends units of its own, and the refresh below the
+        // growth is the barrier of that structural change, in the way it is
+        // the barrier of the reap above.[^43]
+        //
+        // It reads the weather field that the previous step left, because the
+        // weather solve runs later in this step. That is the order the fire
+        // and the upgrade wear read it in.[^44]
+        //
+        // The stage takes no thread count. It walks the cells of the weather
+        // lattice and the tiles of the cells the storms reach, and it walks
+        // nothing at all in a world that carries no storm. A pass that takes
+        // no thread count also cannot take a thread completion order.[^45]
+        //
+        // [^43]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D3. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+        // [^44]: ADR-0140, weather is a field over the level 1 cell lattice, decision D3. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+        // [^45]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+        {
+            let _span = stage::open(Stage::StormDamage);
+            self.take_what_the_storms_reach();
+        }
+
         {
             let _span = stage::open(Stage::Fire);
             self.burn();

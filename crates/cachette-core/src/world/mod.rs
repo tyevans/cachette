@@ -73,6 +73,7 @@ use crate::relation::RelationMatrix;
 use crate::resource::{Amount, DepletionLedger, ResourceField, RESOURCE_KIND_COUNT};
 use crate::site::{SettlementArena, SiegeRules, COMMODITY_COUNT};
 use crate::soldier::SoldierArena;
+use crate::storm::UnitLostToAStorm;
 use crate::terrain::Terrain;
 use crate::tile_value::TileValues;
 use crate::trade::{MarketTable, TradeSpoken, TradeTable};
@@ -119,6 +120,7 @@ mod resources;
 mod seeding;
 mod sites;
 mod step;
+mod storm;
 mod tiles;
 mod trade;
 mod unit_types;
@@ -190,11 +192,13 @@ pub struct World {
     resources: ResourceField,
     /// What has been taken from each tile that somebody gathered from.
     depletion: DepletionLedger,
-    /// What left the world in the hands of a dead unit.
+    /// What left the world, for each kind.
     ///
-    /// A unit that dies takes its load out of the world. Conservation must
-    /// still balance, so the world records where the load went rather than
-    /// letting it disappear.[^1]
+    /// Two things put a quantity here. A unit that dies takes its load out of
+    /// the world. A storm flattens the food a tile carries, and that food
+    /// goes nowhere. Conservation must still balance in both cases, so the
+    /// world records where the quantity went rather than letting it
+    /// disappear.[^1]
     ///
     /// # References
     ///
@@ -1019,6 +1023,12 @@ pub struct World {
     fire_ended_log: Vec<FireEnded>,
     /// The units the fire ended since the last step began.
     burned_log: Vec<UnitBurned>,
+    /// The units a storm ended since the last step began.
+    ///
+    /// The log holds what happened since the last step began, in the way
+    /// every other log of this world does. A reader that misses a step misses
+    /// the events.
+    storm_lost_log: Vec<UnitLostToAStorm>,
     /// The mean standing water of the climate field, folded once.
     ///
     /// A terrain reader asks the climate over one address, and the climate of

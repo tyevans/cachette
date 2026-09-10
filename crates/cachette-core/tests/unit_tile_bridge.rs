@@ -668,3 +668,45 @@ proptest! {
         }
     }
 }
+
+/// The key of a tile and the tile of a key are inverses.
+///
+/// **The bridge derives the key by shifts and masks, and the inverse repeats
+/// that layout.** Two derivations of one layout is the shape this project
+/// records, so a check must fail when the two disagree.[^1]
+///
+/// The world is not a multiple of the block edge, so the fixture reaches the
+/// case of a block that hangs over the right and the bottom edge. Every key
+/// of such a block that names no tile must answer nothing.
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[test]
+fn the_key_of_a_tile_and_the_tile_of_a_key_are_inverses() {
+    let layout = BlockLayout::new(grid(), BLOCK_BITS).expect("the exponent is inside the ceiling");
+    for ordinal in 0..grid().tile_count() {
+        let tile = cachette_core::TileIdx(ordinal);
+        let key = layout.key_of(tile).expect("the tile is inside the world");
+        assert_eq!(
+            layout.tile_of_key(key),
+            Some(tile),
+            "the key of tile {ordinal} does not name it back"
+        );
+    }
+    let edge = u64::from(layout.block_edge());
+    let mut outside = 0usize;
+    for block in 0..layout.block_count() {
+        for offset in 0..(edge * edge) {
+            let key = (u64::from(block) << (2 * layout.block_bits())) | offset;
+            match layout.tile_of_key(key) {
+                Some(tile) => assert_eq!(layout.key_of(tile), Some(key)),
+                None => outside += 1,
+            }
+        }
+    }
+    assert!(
+        outside > 0,
+        "every key named a tile, so the fixture never reached a block that hangs over an edge"
+    );
+}

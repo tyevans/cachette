@@ -188,6 +188,7 @@ declare_stages! {
     ApplyRates,               "apply_rates",                true,  1, false;
     Consume,                  "consume",                    true,  1, false;
     Reap,                     "reap",                       true,  1, false;
+    StormDamage,              "storm_damage",               false, 1, false;
     Fire,                     "fire",                       false, 1, false;
     Grow,                     "grow",                       false, 1, false;
     QueueAdvance,             "queue_advance",              false, 1, false;

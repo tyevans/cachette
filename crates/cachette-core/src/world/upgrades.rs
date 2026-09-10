@@ -9,7 +9,7 @@ use super::errors::StepError;
 use super::World;
 use crate::event::{
     SettlementFounded, UpgradeCollapsed, UpgradeFinished, WEAR_CAUSE_ARMY, WEAR_CAUSE_BOTH,
-    WEAR_CAUSE_FIRE, WEAR_CAUSE_ORDERED, WEAR_CAUSE_WEATHER,
+    WEAR_CAUSE_FIRE, WEAR_CAUSE_ORDERED, WEAR_CAUSE_STORM, WEAR_CAUSE_WEATHER,
 };
 use crate::fire::FireField;
 use crate::hex::Axial;
@@ -964,16 +964,24 @@ impl World {
         self.finished_log.extend_from_slice(&written);
     }
 
-    /// Takes condition from every upgrade that the weather or an army wears.
+    /// Takes condition from every upgrade that a storm, the weather, an army
+    /// or a fire wears.
     ///
     /// **This is the only sink an upgrade has that a caller does not drive by
     /// hand.** Before it existed the engine removed no upgrade and damaged
     /// none, so every road, terrace, store and wall ever built stood for the
     /// rest of the run and the built world only accumulated.
     ///
-    /// Two causes take condition, and the pass sums them.
+    /// Four causes take condition, and the pass sums them.
     ///
-    /// A storm over the tile takes a fixed amount for each tick. The pass
+    /// A storm over the tile takes an amount that follows the pressure
+    /// deficit the weather field carries over the cell. The storm module
+    /// states that rate and this pass applies it, so the deficit becomes
+    /// condition at one site.[^1] **A storm destroys a site only by driving
+    /// its condition to nothing.** No severity destroys a site outright, so a
+    /// site kept in repair survives a storm that breaks a neglected one.[^8]
+    ///
+    /// Wet ground under the tile takes a fixed amount for each tick. The pass
     /// reads the wetness of the level 1 cell that holds the tile, which is
     /// the reader the gather resolve already uses, so the weather is read in
     /// one way and not two.[^1] [^2] The weather solve runs later in the
@@ -1001,6 +1009,7 @@ impl World {
     /// [^3]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
     /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     /// [^5]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    /// [^8]: ADR-0203, a storm destroys a site only by driving its condition to nothing, decisions D1 and D2. `docs/adrs/draft/adr-0203-a-storm-destroys-a-site-only-by-driving-its-condition-to-nothing.md`
     pub(super) fn wear_upgrades(&mut self) {
         if self.upgrades.is_empty() {
             return;
@@ -1016,11 +1025,25 @@ impl World {
             .filter(|site| site.is_complete())
             .map(|site| {
                 let tile = site.tile;
-                let storm = match self.weather_cell_of(tile) {
+                // **Wet ground and a storm are two causes and not one.** The
+                // first reads the water on the ground of the cell and the
+                // second reads the pressure deficit over it. A cell can carry
+                // either without the other, and the pass sums them in the way
+                // it sums the army term.
+                let cell = self.weather_cell_of(tile);
+                let wet = match cell {
                     Some(cell) if self.weather.cell_is_wet(cell) => {
                         upgrade::WEATHER_WEAR_FOR_EACH_TICK
                     }
                     _ => 0,
+                };
+                // **The storm module states the rate and this pass applies
+                // it.** No second site turns a deficit into condition.[^9]
+                //
+                // [^9]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+                let gale = match cell {
+                    Some(cell) => crate::storm::wear_at(self.weather.depression_at(cell)),
+                    None => 0,
                 };
                 let holder = holders
                     .get(tile.0 as usize)
@@ -1059,8 +1082,10 @@ impl World {
                 };
                 let cause = if burns > 0 {
                     WEAR_CAUSE_FIRE
+                } else if gale > 0 {
+                    WEAR_CAUSE_STORM
                 } else {
-                    match (storm > 0, army > 0) {
+                    match (wet > 0, army > 0) {
                         (true, true) => WEAR_CAUSE_BOTH,
                         (true, false) => WEAR_CAUSE_WEATHER,
                         (false, true) => WEAR_CAUSE_ARMY,
@@ -1069,7 +1094,9 @@ impl World {
                 };
                 (
                     tile,
-                    storm.saturating_add(army).saturating_add(burns),
+                    wet.saturating_add(gale)
+                        .saturating_add(army)
+                        .saturating_add(burns),
                     cause,
                     holder,
                 )
