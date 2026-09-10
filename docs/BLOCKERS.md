@@ -52,6 +52,19 @@ twelve hundred ticks. The rate that the recovery rule states is set against the
 price of a terrace, and that comparison assumes the ground returns a unit while
 a faction waits. The findings register holds the measurement.[^BLK162A]
 
+**What is known beside that.** A tile of a region world does not stand in the
+wettest band for ever. A probe of the resource suite read the period the engine
+acts on over one worked tile on every tick of a short run. It ran 24, 9, 3, 6,
+18, 30 and 48 ticks over 22 ticks, against a stated 3, so the tile crossed five
+of the seven bands. A deposit under that sky does grow back, and the rate swings
+by sixteen while it does.[^BLK162B]
+
+Two things follow, and neither settles the question. The measurement that opened
+this row read one tile, and that tile is the tile of a founded site. A second
+measurement reads a different world and a different tile and finds the bands
+moving. The row stays open until somebody measures how long a stripped tile
+holds the slowest band over a run, over many tiles.
+
 **What the project does meanwhile.** The rate stays as it is. The ground
 fixture of the production tests states a recovery period of its own, so that it
 measures the pipeline and not the sky.
@@ -59,6 +72,7 @@ measures the pipeline and not the sky.
 ## References
 
 [^BLK162A]: Findings register, FND-752. `docs/FINDINGS.md`
+[^BLK162B]: Findings register, FND-756. `docs/FINDINGS.md`
 
 ### BLK-161 — Does a storm take its size and its threshold from the world or from the globe?
 

@@ -853,11 +853,38 @@ fn quick_rules() -> RecoveryRules {
         .expect("no period is zero")
 }
 
+/// The ticks that a recovery test of this file steps a world for.
+///
+/// The window is fixed and each test that reads it states that the window
+/// covered the longest period the engine read over the tile under test. A
+/// window stated against a period read once would be too short whenever the
+/// weather wets the tile after that reading.[^1]
+///
+/// The window stays inside the frames that the choice schedule is held over,
+/// so no cell replaces a gather order inside a run.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-752. `docs/FINDINGS.md`
+const RECOVERY_WINDOW: u32 = 128;
+
 /// A world in which units have worked some deposits, and the cases it holds.
 ///
 /// The fixture drives the engine. It empties one deposit with a crowd, and it
-/// reduces others with single gatherers. It then stops every gatherer, so
-/// nothing takes anything more and recovery is the only thing that moves.
+/// reduces others with single gatherers. It then stops every gatherer, so no
+/// unit takes anything more.
+///
+/// **A unit is not the only thing that takes.** A storm flattens a share of
+/// the food a tile carries, and the loss goes into the same ledger that a
+/// gather writes.[^1] Recovery is therefore not the only thing that moves a
+/// food stock in a run, and every test below accounts for the storm rather
+/// than assuming a still world. A storm takes food and takes nothing else, so
+/// wood and stone reach the ledger through a gather and through no other
+/// pass.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-728. `docs/FINDINGS.md`
 struct Worked {
     /// The world.
     field: World,
@@ -989,28 +1016,53 @@ fn the_fixture_holds_the_cases_that_the_tests_need() {
 }
 
 #[test]
-fn a_depleted_deposit_holds_more_at_a_later_tick() {
-    // The need this work answers. A deposit that a unit took from must hold
-    // more later, when nothing takes from it again.
+fn a_depleted_deposit_grows_back_over_a_window() {
+    // The need this work answers. A deposit that a unit took from grows back.
+    //
+    // **The stock at two ticks does not measure that.** A storm flattens the
+    // food of a tile into the same ledger, so a reading of the stock before
+    // and after carries the storm as well as the recovery.[^1] The test adds
+    // up what the tile regained tick by tick instead. A regain is a fall in
+    // what the tile is owed, and a storm only raises that, so a storm cannot
+    // hide a recovery inside this sum.
+    //
+    // The moisture over the tile stretches the declared period, and the
+    // weather moves the moisture between one tick and the next.[^2] The
+    // window is fixed and the assertion below states that it covered the
+    // longest period the engine read.
+    //
+    // [^1]: Findings register, FND-728. `docs/FINDINGS.md`
+    // [^2]: Findings register, FND-752. `docs/FINDINGS.md`
     let mut worked = worked();
     worked.field.set_recovery_rules(quick_rules());
     let (address, kind) = worked.partial;
-    let before = worked.field.tile_stock(address, kind).expect("inside");
-    // The moisture over the tile stretches the declared period, so the test
-    // reads the period the engine will act on rather than assuming it.
-    let period = worked
-        .field
-        .recovery_period_at(address, kind)
-        .expect("the kind recovers");
-    for _ in 0..period {
-        worked.field.step(2).expect("the step must run");
-    }
-    let after = worked.field.tile_stock(address, kind).expect("inside");
+    let mut owed = worked.field.taken_from(address, kind).expect("inside").0;
     assert!(
-        after > before,
-        "the deposit held {} and now holds {}",
-        before.0,
-        after.0
+        owed > 0,
+        "the fixture took nothing from the deposit, so nothing can grow back"
+    );
+    let mut regained = 0u32;
+    let mut longest = 0u32;
+    for _ in 0..RECOVERY_WINDOW {
+        longest = longest.max(
+            worked
+                .field
+                .recovery_period_at(address, kind)
+                .expect("the kind recovers"),
+        );
+        worked.field.step(2).expect("the step must run");
+        let now = worked.field.taken_from(address, kind).expect("inside").0;
+        regained += owed.saturating_sub(now);
+        owed = now;
+    }
+    assert!(
+        RECOVERY_WINDOW > longest.saturating_mul(2),
+        "the window of {RECOVERY_WINDOW} ticks is shorter than twice the \
+         longest period the engine read, which is {longest}"
+    );
+    assert!(
+        regained > 0,
+        "the deposit regained nothing over {RECOVERY_WINDOW} ticks"
     );
     assert!(worked.field.check_invariants());
 }
@@ -1117,11 +1169,35 @@ fn recovery_waits_for_the_whole_period_over_still_ground() {
 fn a_deposit_never_holds_more_than_it_started_with() {
     // Recovery returns a deposit toward what the generator gave it, and never
     // past it.
+    //
+    // **The assertion reads the ledger and not the stock.** The stock reader
+    // takes the stored take off what the tile started with and stops at zero,
+    // so it cannot answer above the start whatever the ledger holds. An
+    // assertion on the stock therefore cannot fail, and a run against a
+    // recovery that overshot proved it cannot.[^1]
+    //
+    // What can fail is the ledger. A deposit owes what units and storms took
+    // off it, and recovery gives that back. A recovery that gave back more
+    // than the deposit owed would leave it owing a number below zero, and the
+    // stored take is unsigned, so it would leave a very large one.
+    //
+    // **The ceiling must be reached, or the assertion measures nothing.** A
+    // deposit that reaches nothing owed stands at what it started with, and
+    // recovery keeps running over it. The count below is what proves the run
+    // pressed against the ceiling. A named tile cannot prove it, because a
+    // storm strips the food of a tile back after it has grown.[^2]
+    //
+    // [^1]: Findings register, FND-756. `docs/FINDINGS.md`
+    // [^2]: Findings register, FND-728. `docs/FINDINGS.md`
     let mut worked = worked();
     worked.field.set_recovery_rules(quick_rules());
-    for _ in 0..64 {
+    let mut restored = 0usize;
+    for _ in 0..RECOVERY_WINDOW {
         worked.field.step(2).expect("the step must run");
         for entry in worked.field.depletion().entries() {
+            if entry.taken == 0 {
+                restored += 1;
+            }
             let kind =
                 ResourceKind::from_u8((entry.key & 0b11) as u8).expect("the key names a kind");
             let tile = TileIdx((entry.key >> 2) as u32);
@@ -1135,27 +1211,41 @@ fn a_deposit_never_holds_more_than_it_started_with() {
                 .original_stock(address, kind)
                 .expect("inside")
                 .0;
-            let stock = worked.field.tile_stock(address, kind).expect("inside").0;
             assert!(
-                stock <= original,
-                "the deposit holds {stock} against a start of {original}"
+                entry.taken <= original,
+                "the deposit at ({}, {}) owes {} against a start of {original}",
+                address.q,
+                address.r,
+                entry.taken
             );
         }
     }
-    // Every deposit that recovers has returned to what it started with, and a
-    // recovered deposit is not different from one that nobody touched.
-    let (address, kind) = worked.partial;
-    assert_eq!(
-        worked.field.tile_stock(address, kind),
-        worked.field.original_stock(address, kind)
+    assert!(
+        restored > 0,
+        "no deposit returned to what it started with, so the ceiling above \
+         was never reached"
     );
     assert!(worked.field.check_invariants());
 }
 
 #[test]
-fn recovery_never_gives_back_more_than_units_took() {
-    // Recovery creates nothing. The total it returns is bounded by the total
-    // the units took, for each kind on its own.
+fn recovery_never_gives_back_more_than_was_taken() {
+    // Recovery creates nothing. Two statements say so here, and the test
+    // needs both, because a storm takes food into the same ledger a gather
+    // writes and takes nothing else.[^1]
+    //
+    // The first statement is exact over a kind that only a gather reaches.
+    // Wood and stone enter the ledger through the gather pass and through no
+    // other pass, so the total that recovery returns of them is bounded by
+    // the total that the gather log reports.
+    //
+    // The second statement holds over every kind, food included. A stock
+    // rises only when recovery gives something back. The rise of every stock
+    // over one tick therefore cannot exceed what recovery says it returned
+    // over that tick. A storm lowers a stock and never raises one, so it
+    // cannot hide inside this bound.
+    //
+    // [^1]: Findings register, FND-728. `docs/FINDINGS.md`
     let mut worked = worked();
     worked.field.set_recovery_rules(quick_rules());
     let mut took = [0i64; RESOURCE_KIND_COUNT];
@@ -1163,13 +1253,30 @@ fn recovery_never_gives_back_more_than_units_took() {
         let kind = ResourceKind::from_u8(event.kind).expect("the event names a kind");
         took[kind.index()] += i64::from(event.amount);
     }
-    for _ in 0..64 {
+    let mut owed = owed_by_key(&worked.field);
+    let mut given_before = [0i64; RESOURCE_KIND_COUNT];
+    let mut rose = [0i64; RESOURCE_KIND_COUNT];
+    for _ in 0..RECOVERY_WINDOW {
         worked.field.step(2).expect("the step must run");
         for event in worked.field.gather_log() {
             let kind = ResourceKind::from_u8(event.kind).expect("the event names a kind");
             took[kind.index()] += i64::from(event.amount);
         }
+        let now = owed_by_key(&worked.field);
+        let rise = rise_by_kind(&owed, &now);
         for kind in ResourceKind::ALL {
+            let index = kind.index();
+            let given = worked.field.depletion().returned(kind).0;
+            assert!(
+                rise[index] <= given - given_before[index],
+                "the stocks of {kind:?} rose by {} against a return of {}",
+                rise[index],
+                given - given_before[index]
+            );
+            given_before[index] = given;
+            rose[index] += rise[index];
+        }
+        for kind in [ResourceKind::Wood, ResourceKind::Stone] {
             let given = worked.field.depletion().returned(kind).0;
             assert!(
                 given <= took[kind.index()],
@@ -1178,12 +1285,48 @@ fn recovery_never_gives_back_more_than_units_took() {
             );
         }
         assert!(worked.field.check_invariants());
+        owed = now;
     }
     assert!(
-        worked.field.depletion().returned(ResourceKind::Food).0 > 0
-            || worked.field.depletion().returned(ResourceKind::Wood).0 > 0,
-        "nothing recovered, so the bound was never tested"
+        worked.field.depletion().returned(ResourceKind::Wood).0 > 0,
+        "no wood recovered, so the exact bound was never tested"
     );
+    assert!(
+        rose[ResourceKind::Food.index()] > 0,
+        "no food stock rose, so the bound over the kind a storm takes was never tested"
+    );
+}
+
+/// Returns what each stored deposit is owed, by ledger key, in key order.
+fn owed_by_key(field: &World) -> Vec<(u64, u32)> {
+    field
+        .depletion()
+        .entries()
+        .iter()
+        .map(|entry| (entry.key, entry.taken))
+        .collect()
+}
+
+/// Returns how far the stocks of each kind rose between two readings.
+///
+/// A deposit is owed less than it was when it has grown back, so a fall in
+/// what a key is owed is a rise in what its tile holds. Both readings are in
+/// ascending key order, and the ledger only ever gains a key, so one walk
+/// pairs them.
+fn rise_by_kind(before: &[(u64, u32)], after: &[(u64, u32)]) -> [i64; RESOURCE_KIND_COUNT] {
+    let mut rise = [0i64; RESOURCE_KIND_COUNT];
+    let mut there = 0usize;
+    for (key, then) in before {
+        while there < after.len() && after[there].0 < *key {
+            there += 1;
+        }
+        if there >= after.len() || after[there].0 != *key {
+            continue;
+        }
+        let kind = ResourceKind::from_u8((key & 0b11) as u8).expect("the key names a kind");
+        rise[kind.index()] += i64::from(then.saturating_sub(after[there].1));
+    }
+    rise
 }
 
 #[test]
