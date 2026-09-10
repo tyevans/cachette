@@ -655,6 +655,21 @@ pub const fn air_least_tile() -> f32 {
     AIR_LEAST_TILE
 }
 
+/// Returns the smallest tile width at which the viewer draws a site glyph and
+/// a way ribbon, in pixels.
+///
+/// Below this width a site tints its tile at the weight its work gives, and
+/// the tint is the only mark the tile carries. A test reads this rather than
+/// a literal, so the width has one declaration site.[^1]
+///
+/// # References
+///
+/// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[must_use]
+pub const fn site_least_tile() -> f32 {
+    SITE_LEAST_TILE
+}
+
 /// Returns the colour the viewer mixes over a tile for the water in the air.
 ///
 /// A test reads this rather than a literal, so the colour has one

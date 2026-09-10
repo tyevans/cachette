@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-717**
+**Next number: FND-721**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19432,3 +19432,122 @@ interpreter and therefore no shared serial section, which is the same repair
 that a training generation received. **Read a worker count as a request and
 not as a capability**: this project has now twice read a configured number as
 though it described what the machine would do.
+
+### FND-717 — A viewer fixture took a build order from the faction solver, and the solver stopped zoning that tile
+
+**Believed.** A sweep zoned a project in four viewer fixtures, because a road
+asks for no held ground and the plan of the faction is the bound on it.[^F717A]
+The sweep was read as complete. Every viewer fixture that ordered a road was
+believed to zone its own project.
+
+**True.** A fifth site ordered a road and zoned nothing. It passed because the
+faction solver had zoned that tile for it. The solver now plans a way between
+two settlements of the faction, so it no longer zones the tile the fixture
+picks. The engine refuses every order with `NoProject`, the fixture builds
+nothing, and five tests of one file fail on one shared assertion.
+
+**Evidence.** A probe of the fixture world at extent 128 and seed 7 reports
+`project_at` of the tile as `None`, `build_refusal` as `NoProject`, and
+`order_build_set` refusing all 8188 orders. The commit body holds the probe.
+
+**Follows.** Three things.
+
+**A fixture states its own precondition.** A precondition that the engine
+happens to satisfy is not a precondition. It is a coincidence that a later
+engine change removes.
+
+**Read the count a set verb returns.** The set build verb reports how many
+orders the engine refused, and the fixture dropped that number. A fixture that
+had asserted the count was zero would have failed at the order and not four
+steps later.
+
+**A sweep over fixtures is not done when the named files pass.** Search for the
+verb, not for the tests that were red.
+
+[^F717A]: The commit that zoned a project in four viewer fixtures, `b2876818`.
+
+### FND-718 — The world makes its own weather, so a fixture that waits a fixed count loses its dry control
+
+**Believed.** A wet ground fixture stormed one tile, stepped both a stormed
+world and a dry clone for sixty ticks, and then looked for a tile wet in the
+stormed world alone. The count of sixty was chosen so that the sky over the
+cell would fall under the mark at which the air overlay draws.
+
+**True.** The engine gained travelling storms and a rain model, and the clone
+now rains on every cell of a 64 tile world well inside sixty ticks. At tick 19
+the fixture holds 3697 candidate tiles. At tick 29 it holds none, because every
+one of the 4096 tiles is wet in both worlds. The fixture then finds nothing and
+the test fails on its own search.
+
+**Evidence.** A probe stepped both worlds and counted the candidates every ten
+ticks, at extent 64 and seed 7. It ran on 9 September 2026 on one development
+machine (x86-64). The commit body holds the figures and the probe.
+
+**Follows.** Two things.
+
+**Step until the case appears, and bound the loop.** A fixed count states a
+belief about the engine that decays. A search states the case the assertion
+needs.
+
+**A control world is only a control while it differs.** A clone that the engine
+drives toward the same state as the world under test stops being a control, and
+nothing fails when it does.
+
+### FND-719 — The overlay strength cap does not keep the holder readable, because the colour distance decides it
+
+**Believed.** An overlay is mixed into the ground before the holder takes its
+share of the tile, and the overlay paints at a capped strength of 210 of 255.
+The cap is documented as the reason the overlay does not compete with the
+holder. The project therefore believed the holder survives at every overlay
+strength.
+
+**True.** The holder difference between a held tile and an unheld one is the
+holder weight times the distance between the faction colour and the ground
+colour. An overlay replaces most of the ground colour with its own. When the
+overlay colour lies near the faction colour, the difference collapses, and the
+cap does not bound that. The first faction paints in a red-orange, and the wind
+and the temperature overlays paint in colours near it.
+
+**Evidence.** At the strongest tile of each overlay, in the fixture world at
+extent 128 and seed 7, the wind overlay leaves 13 of the 94 the holder tint is
+worth and the temperature overlay leaves 47 of 116. The test bound is half. The
+test fixture reports the temperature overlay leaving 20 of 49. The figures are
+derived on one development machine (x86-64) and the commit body holds the
+probe.
+
+**Follows.** Three things.
+
+**A strength cap is the wrong mechanism for this property.** The property needs
+a bound on the distance between the overlay palette and the faction palette, or
+a holder mark that an overlay cannot approach.
+
+**The test is right and it stays red.** The picture does not deliver the
+property, and a test relaxed to match a picture that fails its own readability
+rule would state something false.
+
+**A colour table and another colour table are two declaration sites of one
+picture.** Nothing fails when a colour is added to one that collides with the
+other.
+
+### FND-720 — A commit re-added a file that an earlier commit deleted, and the tree stopped compiling
+
+**Believed.** The world module was split into one file for each subject, and
+the single file it replaced was deleted. Later commits were believed to build.
+
+**True.** A later commit re-added that single file, at a much older revision of
+its contents, beside the directory that replaced it. The compiler refuses a
+module that it finds at both paths, so the core crate does not compile at that
+commit and nothing in the workspace builds.
+
+**Evidence.** The build reports error E0761 for the world module, naming both
+paths. The file the commit added holds 15423 lines against the 18502 the split
+removed, so it is not the revision that was deleted.
+
+**Follows.** Two things.
+
+**Read the file table of a commit before it lands.** The change was a drawing
+change, and a file of fifteen thousand lines in the core crate is not part of
+one.
+
+**A worktree that predates a deletion re-adds the deleted file.** An agent that
+stages every change in its worktree stages the resurrection with them.

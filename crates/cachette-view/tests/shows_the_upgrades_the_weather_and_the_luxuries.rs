@@ -47,22 +47,15 @@ const HOLDING_TICKS: u32 = 4;
 /// inside this radius are held, because the city reaches further than it.
 const QUIET_RADIUS: u32 = 3;
 
-/// The ticks a storm is given to fall out of the air onto the ground.
+/// The most ticks a storm is given to fall out of the air onto the ground.
 ///
-/// After this many ticks the sky over the cell stands below the mark at which
-/// the overlay changes a pixel, and the ground is wet. The wet ground test
-/// therefore sees the wet layer alone.
+/// **This is a bound and not a wait.** The wet ground fixture steps until it
+/// finds a tile that the storm wet and the dry clone did not, and it stops
+/// there. The bound only stops a loop that finds nothing.
 ///
-/// **The count rose when the capacity of the air became the published
-/// curve.** The engine pours out whatever stands above the capacity of a cell
-/// within one step, and the cell then drizzles the rest away a share at a
-/// time. The share is the same, and the sky it empties is measured against a
-/// capacity that follows the temperature, so a warm cell takes longer to fall
-/// under the mark than it did against one ceiling for the whole plane.[^1]
-///
-/// # References
-///
-/// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D4. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+/// The fixture waited the whole count once. It cannot any more, because the
+/// world makes its own weather and the clone rains on every cell of this
+/// world well inside the count.
 const FALLING_TICKS: u32 = 60;
 
 /// The ticks the rest test gives a stormed sky to fall under the mark at which
@@ -174,6 +167,39 @@ fn a_held_tile(world: &World) -> Axial {
         .expect("the faction holds an empty tile away from the edge of its holding")
 }
 
+/// Returns a tile that is wet in the first world and dry in the second.
+///
+/// The tile carries no holder and no unit in either world, so the wet layer
+/// is the one thing that can move its colour. Every tile of the world is a
+/// candidate, and the first that fits is the one returned.
+///
+/// Returns `None` when no tile fits.
+fn a_tile_wet_in_one_world(wet: &World, other: &World) -> Option<Axial> {
+    (0..wet.grid().tile_count())
+        .map(|index| address_of(wet, index))
+        .find(|address| {
+            let address = *address;
+            if other.ground_is_wet(address) != Some(false) {
+                return false;
+            }
+            if wet.ground_is_wet(address) != Some(true) {
+                return false;
+            }
+            let held = |world: &World| {
+                world
+                    .tile_holder(address)
+                    .is_some_and(|holder| !holder.is_nobody())
+            };
+            if held(wet) || held(other) {
+                return false;
+            }
+            let stood_on = |world: &World| {
+                TileReadout::of(world, address).and_then(|tile| tile.units()) != Some(0)
+            };
+            !stood_on(wet) && !stood_on(other)
+        })
+}
+
 fn address_of(world: &World, index: u32) -> Axial {
     let width = world.grid().width();
     Axial::new((index % width) as i32, (index / width) as i32)
@@ -268,52 +294,23 @@ fn wet_ground_gains_blue_and_holds_its_brightness() {
     stormy
         .inflict_weather(FactionId(0), &[place], STRENGTH)
         .expect("the faction holds the ground it storms");
-    for _ in 0..FALLING_TICKS {
+    // **The world makes its own weather, so the dry clone rains too.** The
+    // fixture steps both worlds together and stops at the first tick that
+    // holds a tile wet in the stormed world alone. A fixed count cannot do
+    // this any more: the clone now rains on every cell of this world within
+    // about thirty ticks, and after that no tile is wet in one world only.
+    let mut compared = None;
+    let mut ticks = 0;
+    while compared.is_none() && ticks < FALLING_TICKS {
         stormy.step(1).expect("the step must run");
         dry.step(1).expect("the step must run");
+        ticks += 1;
+        compared = a_tile_wet_in_one_world(&stormy, &dry);
     }
     assert!(
         stormy.weather().wet_cells() > 0,
         "no cell is wet after the storm fell, so the fixture supplies no wet ground",
     );
-
-    // A wet tile that nobody holds and nobody stands on, in a cell whose air
-    // holds too few drops for the overlay to show. Every tile of the world is
-    // a candidate, and the first that fits is the one compared.
-    let grid = stormy.grid();
-    let mut compared = None;
-    for index in 0..grid.tile_count() {
-        let address = address_of(&stormy, index);
-        // **The world makes its own weather, so the dry clone rains too.** A
-        // tile that is wet in both worlds shows no difference at all, and the
-        // longer the fixture runs the more of them there are.
-        if dry.ground_is_wet(address) != Some(false) {
-            continue;
-        }
-        if stormy.ground_is_wet(address) != Some(true) {
-            continue;
-        }
-        if stormy
-            .tile_holder(address)
-            .is_some_and(|holder| !holder.is_nobody())
-        {
-            continue;
-        }
-        if dry
-            .tile_holder(address)
-            .is_some_and(|holder| !holder.is_nobody())
-        {
-            continue;
-        }
-        let stood_on = |world: &World| {
-            TileReadout::of(world, address).and_then(|tile| tile.units()) != Some(0)
-        };
-        if stood_on(&stormy) || stood_on(&dry) {
-            continue;
-        }
-        compared = Some(address);
-        break;
-    }
     let address = compared.expect("the world holds a wet tile nobody holds or stands on");
     same_ground(&dry, &stormy, address);
 
@@ -707,6 +704,13 @@ fn a_site_under_work_marks_the_middle_and_a_finished_site_washes_the_tile() {
     assert!(!site.is_complete(), "one tick finished the site");
     let address = address_of(&begun, site.tile.0);
 
+    // **A builder stands on the tile and takes the order each tick.** A unit
+    // of this fixture can die of what the band does to it, and a dead builder
+    // adds no work. The fixture ordered once and waited, and the work then
+    // stopped part way and never moved again. A category that stands costs
+    // more work than a road, so the wait is long enough for the builder to
+    // die inside it.
+    let mut worker = builder;
     let mut ticks = 0;
     while finished
         .upgrade_at(address)
@@ -715,9 +719,21 @@ fn a_site_under_work_marks_the_middle_and_a_finished_site_washes_the_tile() {
         // A category that stands costs more work than a road does, so the
         // bound is generous. It bounds the loop; it is not a measurement.
         assert!(ticks < 2000, "the site was never finished");
+        worker = press_a_builder(&mut finished, worker, address, kind);
         finished.step(1).expect("the step must run");
         ticks += 1;
     }
+    // The disc of a unit is wider than the mark of a site, so the builder
+    // leaves the tile before the picture is drawn.
+    finished.stop_build(worker);
+    let aside = (0..EXTENT as i32)
+        .map(|column| Axial::new(column, 0))
+        .find(|at| finished.admits_a_unit(*at))
+        .expect("the world holds open ground outside the band");
+    finished
+        .place_soldier(worker, aside)
+        .expect("the tile aside admits the unit");
+    finished.rebuild_bridge(1).expect("the bridge rebuilds");
 
     // Each world is drawn as it is and again with the site destroyed, so the
     // difference is the mark of the site and never the tick.
@@ -1096,21 +1112,27 @@ fn tile_block(canvas: &Canvas, camera: Camera, address: Axial) -> Vec<u32> {
 /// The second half is what makes the first half mean something. Two worlds
 /// that differ anywhere else at that tile would draw it apart whatever the
 /// site did.
-fn the_site_is_the_only_difference(one: &World, other: &World, address: Axial, why: &str) {
-    let camera = camera_at(one, address, SITE_TILE);
+fn the_site_is_the_only_difference(
+    one: &World,
+    other: &World,
+    address: Axial,
+    tile: f32,
+    why: &str,
+) {
+    let camera = camera_at(one, address, tile);
     let mut bare_one = one.clone();
     let mut bare_other = other.clone();
     assert!(bare_one.destroy_upgrade(address));
     assert!(bare_other.destroy_upgrade(address));
     assert_eq!(
-        tile_block(&drawn_at(&bare_one, address, SITE_TILE), camera, address),
-        tile_block(&drawn_at(&bare_other, address, SITE_TILE), camera, address),
+        tile_block(&drawn_at(&bare_one, address, tile), camera, address),
+        tile_block(&drawn_at(&bare_other, address, tile), camera, address),
         "the two worlds differ at {address:?} in more than the site, so {why} \
          proves nothing"
     );
     assert_ne!(
-        tile_block(&drawn_at(one, address, SITE_TILE), camera, address),
-        tile_block(&drawn_at(other, address, SITE_TILE), camera, address),
+        tile_block(&drawn_at(one, address, tile), camera, address),
+        tile_block(&drawn_at(other, address, tile), camera, address),
         "{why}"
     );
 }
@@ -1141,6 +1163,7 @@ fn two_levels_of_one_category_draw_apart() {
         &lower,
         &higher,
         address,
+        SITE_TILE,
         "a level 1 road draws as a level 2 road",
     );
 }
@@ -1167,6 +1190,7 @@ fn two_categories_at_one_level_draw_apart() {
         &road,
         &terrace,
         address,
+        SITE_TILE,
         "a level 1 road draws as a level 1 terrace",
     );
 }
@@ -1200,10 +1224,20 @@ fn a_site_under_work_draws_apart_from_one_that_stands_at_the_same_level() {
             .is_some_and(|site| site.level == 1 && site.progress.0 >= WORK_UNDER_WAY),
         "the rising world does not hold a level 1 road under work"
     );
+    // **A road under work is read below the width at which a ribbon
+    // draws.** Above that width a road draws as a ribbon, and the width of
+    // the ribbon carries the level and not the work. So a road under work
+    // and a road that stands draw one picture there, and the picture gives
+    // that up on purpose: a way runs through the ground and washes no
+    // tile.[^7] Below that width the tint is the only mark the tile carries,
+    // and the weight of the tint is what the work bought.
+    //
+    // [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D5. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
     the_site_is_the_only_difference(
         &resting,
         &rising,
         address,
+        paint::site_least_tile() - 1.0,
         "a road nobody is raising draws as a road somebody is raising",
     );
 }
