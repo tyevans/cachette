@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-740**
+**Next number: FND-741**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20262,6 +20262,41 @@ weight that two decisions read is shape 1.** The two shapes sat beside each
 other in one struct for as long as the struct existed, and each was the cure
 for the other.[^F739F]
 
+### FND-740 — A hunter that marches rarely loses its speaker, and the drift then walks its relation back out of the war band
+
+**Believed.** A faction that overmatches another moves its relation toward war
+on every tick and draws nothing for that move.[^F740A] A test of the hunt
+therefore reads only the ratio, and no weight of the faction reaches the
+answer.
+
+**True.** The move needs a speaker as well. The stage names a prey only for a
+faction whose lowest-slot live unit has command reach, because the relation
+verb would refuse a faction with none.[^F740B] A hunter that loses every such
+unit names no prey, stops moving the relation, and the drift then returns the
+relation to zero at one step every ten ticks.[^F740C] A test that reads the
+relation after a long run therefore reads the war weight, the campaign weight
+and the fortunes of every other faction as well as the ratio.
+
+**Evidence.** One test seats three factions, leaves the first idle, gives the
+second the default ratio and takes the rule from the third. The third then has
+no prey, so it names the second as its rival and marches on it. The second was
+felled repeatedly, held no unit with command reach from about tick 200, and
+its relation toward the idle faction drifted from the war band back to zero
+before tick 400. The test read tick 400 and failed. Restoring the war weight
+to the campaign draw made the same test pass, which settles the cause.
+
+**Follows.** The fixture states the campaign weight rather than drawing it.
+The campaign raise reads the renown weight, and the seeding draws that weight
+apart from the war weight, so a hunter can draw a weight that leaves it unable
+to hold the field.[^F740D] The hunter of that test drew the lowest renown
+weight of the world. The test now writes the highest campaign weight for every
+faction, which is an input of the test and not a subject of it.[^F740E]
+
+**A relation that decays makes a late read a weaker assertion than an early
+one.** The relation of the test reached the war band and left it again, so the
+rule under test worked and the assertion still failed. Read a decaying value
+against the span it is read over, or fix the inputs that govern the span.
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -20275,3 +20310,8 @@ for the other.[^F739F]
 [^F739D]: What the win conditions are, and what can reach them. `docs/research/what-the-win-conditions-are-and-what-can-reach-them.md`
 [^F739E]: The controller version probe, the steering key. `scripts/controller_versions.py`
 [^F739F]: Recurring defect shapes, shapes 1 and 3. `.agents/rules/recurring-defects.md`
+[^F740A]: The controller, the plan of one tick. `crates/cachette-core/src/controller.rs`
+[^F740B]: The controller stage of the world, the speaker scan. `crates/cachette-core/src/world/controller.rs`
+[^F740C]: The relation matrix, the drift. `crates/cachette-core/src/relation.rs`
+[^F740D]: Findings register, FND-739. `docs/FINDINGS.md`
+[^F740E]: Testing Rules, section 2a. `.agents/rules/testing.md`

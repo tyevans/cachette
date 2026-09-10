@@ -194,4 +194,4 @@ Before you claim work is done, check each line.
 [^11]: Findings register, FND-581. `docs/FINDINGS.md`
 [^12]: Findings register, FND-628. `docs/FINDINGS.md`
 [^13]: Findings register, FND-701. `docs/FINDINGS.md`
-[^14]: Findings register, FND-738. `docs/FINDINGS.md`
+[^14]: Findings register, FND-739. `docs/FINDINGS.md`
