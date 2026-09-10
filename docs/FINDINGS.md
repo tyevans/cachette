@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-755**
+**Next number: FND-757**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20883,6 +20883,79 @@ from.
 failure reports a lower bound. A cheap check that runs before an expensive one
 hides the expensive one for as long as the cheap one is red.
 
+### FND-755 — A world of one region rests under a whole sky, and a sweep that repaired the engine fixtures left the viewer fixtures behind
+
+**What the project believed.** A map became one region of a planet, and the
+sweep that landed the change repaired every fixture the change reached. The
+latitude of a world decides how wet it is.
+
+**What is true.** The span decides the sky, and the latitude does not. A world
+that spans three degrees carries one pressure belt over every cell. No gradient
+carries the water away, so the picture washes every tile of the map at rest, at
+every latitude a probe tried. Only a world that spans the planet leaves any
+tile open.
+
+The latitude still decides whether a storm forms. A run of one viewer fixture
+lost a fed unit to a storm at forty-five degrees north and lost none at
+twenty-five degrees north.
+
+**The evidence.** Five viewer tests in three files failed. Each file was run at
+the commit that made a map one region and at its parent, in two worktrees with
+two target directories. All five passed at the parent and all five failed at
+the commit. The commit repaired the weather fixtures of the engine crate and
+gave every viewer test file one line, which added the new settings fields to a
+struct literal and changed no fixture.
+
+A probe over a world of sixty-four tiles a side counted the tiles the picture
+clouds. A world of one region clouded every tile. A world that spans the planet
+clouded a small share of them and left the tile the fixture reads open.
+
+**What follows.** A viewer fixture that needs a clear sky states the planet
+span, and asserts that the sky over its tile draws nothing. A fixture that
+needs a sea of wet water and dry water states the planet span for the same
+reason. A fixture that must not lose a unit to a storm states a latitude, and
+asserts that no storm ended a unit.[^F755A] [^F755B] [^F755C]
+
+**A sweep that repairs one crate is not done.** The engine fixtures and the
+viewer fixtures read the same settings. A count of repaired files is not a
+count of repaired fixtures.[^F554B]
+
+### FND-756 — An overlay colour near a faction colour hides the holder, and only the tile at full strength shows it
+
+**What the project believed.** An overlay mixes into the ground before the
+holder tint, so the strength of an overlay does not compete with the weight of
+the holder. A watcher therefore reads the holder under every overlay.
+
+**What is true.** The order does not settle it. The holder tint moves the pixel
+of a held tile toward the colour of its faction by a fixed weight. The gap a
+watcher reads is the distance between the faction colour and the ground under
+it. An overlay at full strength replaces that ground with the colour of the
+overlay. The gap then becomes the distance between the faction colour and the
+overlay colour, and an overlay whose colour sits near a faction colour leaves
+almost no gap.
+
+**The evidence.** A viewer test asserts that every overlay leaves the holder at
+least half of the contrast it carries with no overlay. The temperature overlay
+leaves less than half at the tile where it paints most strongly. A probe walked
+every registered overlay and printed the strength, the ground and the two
+contrast readings. The temperature overlay is the only one whose strongest held
+tile reaches full strength beside a faction colour of its own hue.[^F756A]
+[^F756B]
+
+The test passed until a commit changed which tiles a faction holds after a
+siege. That commit moved the strongest held tile of the temperature overlay
+onto a cell at the top of the span. The overlay reached full strength there for
+the first time.[^F756C]
+
+**What follows.** The separation between the overlay palette and the faction
+palette is a constraint that nothing checks. Three more overlay colours sit
+nearer a faction colour than the temperature colour does. They pass today
+because their strongest held tile does not reach full strength, which is a
+property of one fixture and not of the palette.
+
+**A palette is a declaration site.** The overlay colours and the faction
+colours are two tables that must stay apart, and no check reads both.[^F487B]
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -20920,3 +20993,9 @@ hides the expensive one for as long as the cheap one is red.
 [^F753B]: The audit of the four win readers. `docs/research/what-the-win-conditions-are-and-what-can-reach-them.md`
 [^F753C]: The measurement of every win quantity over 60 games. `docs/research/what-a-game-attains-on-every-win-quantity.md`
 [^F753D]: ADR-0204, every win path holds a bar of its own. `docs/adrs/draft/adr-0204-every-win-path-holds-a-bar-of-its-own.md`
+[^F755A]: The viewer test of the water colour. `crates/cachette-view/tests/the_water_draws_in_one_colour.rs`
+[^F755B]: The viewer test of the upgrades, the weather and the luxuries. `crates/cachette-view/tests/shows_the_upgrades_the_weather_and_the_luxuries.rs`
+[^F755C]: The viewer test of what a unit suffers. `crates/cachette-view/tests/draws_what_a_unit_suffers.rs`
+[^F756A]: The overlay deck of the viewer. `crates/cachette-view/src/overlay.rs`
+[^F756B]: The faction colours and the holder weight. `crates/cachette-view/src/paint.rs`
+[^F756C]: The viewer test of the overlay deck. `crates/cachette-view/tests/the_watcher_switches_the_map_between_overlays.rs`

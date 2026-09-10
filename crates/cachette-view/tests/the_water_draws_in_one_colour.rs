@@ -39,6 +39,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cachette_core::terrain::{TileKind, NO_WATER_CROSSING};
+use cachette_core::weather::Latitudes;
 use cachette_core::{Axial, World, WorldConfig};
 use cachette_view::paint::kind_colour;
 use cachette_view::{paint, Camera, Canvas};
@@ -69,6 +70,14 @@ const TILE: f32 = 4.0;
 const DEPTHS_NEEDED: usize = 8;
 
 /// Builds the fixture world and runs it for the given number of ticks.
+///
+/// **The world spans the planet, and it states that span itself.** A world
+/// takes one region of a planet when the caller states no span, and the
+/// weather field then puts one pressure belt over every tile of it. Every
+/// tile of such a world is wet at once, or dry at once, so a sea of it cannot
+/// show that the wet field stops at the water line. A world that spans the
+/// planet carries every belt, so its sea holds wet water and dry water at the
+/// same tick. A test below asserts that the fixture supplies both.
 fn world_after(ticks: u32) -> World {
     let mut world = World::new(WorldConfig {
         width: EXTENT,
@@ -76,7 +85,8 @@ fn world_after(ticks: u32) -> World {
         seed: SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
-        ..WorldConfig::DEFAULT
+        latitude_centre: Latitudes::PLANET.centre(),
+        latitude_span: Latitudes::PLANET.span(),
     })
     .expect("the extent describes a world");
     world.rebuild_bridge(1).expect("the rebuild must succeed");
