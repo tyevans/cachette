@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-741**
+**Next number: FND-743**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20317,6 +20317,71 @@ bounds from the schema of the world and from the win weight.
 
 **A correlation over five wins is a direction and not a result.** A pass that
 answers this properly needs the training world and a few thousand episodes.
+### FND-741 — The shaped training reward weighs the one quantity no reader compares
+
+**Believed.** The shaped reward of a training run scores play. A policy that
+raises its return therefore plays better, and a low win share beside a high
+return states that the run needs more generations.
+
+**True.** The dominant term of the wealth weighting is the store total, and no
+win reader compares a store total. The engine says so in its own source, and a
+record holds the decision.[^F564B] The weighting scores the store total at 1.0
+and the held tiles at 0.5. The held tile term reaches one path, and the reader
+of that path fires only at the tick limit.
+
+**Evidence.** Sixty whole games of the training world, played by two fields of
+the built-in controller, with every faction sampled every 100 ticks.[^F741B]
+The report holds the distributions.[^F741C]
+
+    python scripts/win_quantity_trajectories.py --fields calm \
+        --worlds 12 --chunk 6 --workers 6 --threads 1 --out calm.json
+
+The store total of the leading faction rose at 0.63 of its moving steps in the
+calm field and at 0.58 in the aggressive field. **Wealth therefore falls at
+about four steps in ten.** The renown share, the wonder share and the finished
+upgrade count never fell in any game. The path the held tile term reaches ended
+0.056 of the 36 calm games, with a standard error of 0.038, and none of the 24
+aggressive games.
+
+**Follows.** Two things.
+
+**A return over a quantity no reader compares is not a measure of play.** The
+project already holds that a run must select on the win share, and this states
+the reason in the quantities themselves.
+
+**Name the reader before weighing a signal.** A weighting that names a
+published signal looks grounded, because the engine publishes the signal. What
+the engine publishes and what a reader compares are two different sets.
+
+### FND-742 — A circulating cost figure for one game understates it by three times
+
+**Believed.** A game of the training world costs about 45.2 processor-seconds
+at roughly 3,660 ticks. A dispatch brief carried that figure and sized a
+measurement run against it. **No register of this project holds it**, so
+nothing in the tree could be checked against the measurement below.
+
+**True.** A calm game of that world costs more than 147 processor-seconds on
+one development machine on x86-64. The cost of one tick also rises with the
+unit count and the settlement count, so a long game costs more than the product
+of its ticks and a short game's rate.
+
+**Evidence.** One timed run played three short calm games of 7,682 ticks in
+total and spent 111.13 processor-seconds, which is 37.0 processor-seconds a
+game at a mean of 2,561 ticks. A second run played 12 worlds of the calm field.
+It spent 10,566 processor-seconds and had not finished its 72 games when it was
+stopped, so 72 games cost more than that. The machine ran a gate, a training
+run and other agents throughout.
+
+**Follows.** Two things.
+
+**A cost taken from short games understates a run of whole games.** The three
+timed games ended on the wonder path at a mean of 2,561 ticks. The median game
+of the whole measurement ran 3,504 ticks, and the longest ran 6,000.
+
+**A probe that writes its file only at the end loses everything when it is
+stopped.** The run above spent 10,566 processor-seconds and produced no data. A
+probe that plays a long schedule must write each chunk as it finishes.
+
 
 ## References
 
@@ -20332,3 +20397,5 @@ answers this properly needs the training world and a few thousand episodes.
 [^F739E]: The controller version probe, the steering key. `scripts/controller_versions.py`
 [^F739F]: Recurring defect shapes, shapes 1 and 3. `.agents/rules/recurring-defects.md`
 [^F740A]: Research, what the win conditions are and what can reach them. `docs/research/what-the-win-conditions-are-and-what-can-reach-them.md`
+[^F741B]: The trajectory probe. `scripts/win_quantity_trajectories.py`
+[^F741C]: What a game attains on every win quantity. `docs/research/what-a-game-attains-on-every-win-quantity.md`
