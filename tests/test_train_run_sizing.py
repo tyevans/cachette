@@ -422,18 +422,24 @@ def test_the_launcher_names_the_pool_after_the_arguments_of_the_run() -> None:
     a run could pass as well, so a run that named a worker count of its own
     overrode it and that pass played a handful of worlds at a time.
 
-    Both passes now name the pool after the arguments of the run, and neither
-    names a worker count at all.
+    The run names the pool after the arguments of the run, and it names no
+    worker count at all.
+
+    **The launcher no longer starts a pass of its own for the baseline.** The
+    bar reaches a report row and a printed line, and nothing that trains a
+    weight reads it, so the run submits its baseline episodes into the same
+    queue its generations use. The launcher therefore holds one invocation,
+    and this reads that one.
     """
     script = LAUNCHER.read_text(encoding="utf-8")
-    starts = (script.index("--baseline-only"), script.index('--only "$all_names"'))
+    assert "--baseline-only" not in script
 
-    for start in starts:
-        command = script[start : script.index("| tee", start)]
-        assert "$TRAIN_ARGS" in command
-        assert command.index("$TRAIN_ARGS") < command.index("--pool")
-        assert '--pool "$cores"' in command
-        assert "--workers" not in command
+    start = script.index('--only "$all_names"')
+    command = script[start : script.index("| tee", start)]
+    assert "$TRAIN_ARGS" in command
+    assert command.index("$TRAIN_ARGS") < command.index("--pool")
+    assert '--pool "$cores"' in command
+    assert "--workers" not in command
 
 
 def test_the_launcher_trains_every_strategy_in_one_process() -> None:

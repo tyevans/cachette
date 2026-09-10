@@ -99,14 +99,18 @@ import subprocess
 import time
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from threading import Lock
+from typing import TYPE_CHECKING, Any, cast
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     from collections.abc import Callable, Mapping, Sequence
 
     from .env import EnvConfig
+    from .measure import MeasurementPass
     from .policy import Policy
+    from .record import PopulationRecord
     from .reward import Scoring
+    from .shard import ShardPool
 
 # Where a measurement is kept. The wheel cache of the remote runner keeps its
 # files under the same root, so this follows that convention rather than
@@ -408,12 +412,47 @@ def controller_baselines(
     schema_version: int,
     label: str,
     cache: BaselineCache | None = None,
+    pool: ShardPool | None = None,
 ) -> dict[str, tuple[dict[str, float], str]]:
-    """Return the controller baseline of each objective, and where each came from.
+    """Return the controller baseline of each objective, and wait for it.
 
-    The result holds one entry for each name the caller gave, under that name.
-    Each entry holds the summary and the word ``cached`` or ``measured``, so a
-    reader of a log knows which pass paid for the figure.
+    This starts the pass and reads it at once. A caller whose own work does
+    not depend on the answer starts the pass itself and reads it later, and
+    the queue then holds the baseline beside whatever else the run plays.
+    """
+    return start_controller_baselines(
+        config,
+        scorings,
+        policy,
+        seeds,
+        workers,
+        schema_version,
+        label,
+        cache,
+        pool,
+    ).results()
+
+
+def start_controller_baselines(
+    config: EnvConfig,
+    scorings: Mapping[str, Scoring],
+    policy: Policy,
+    seeds: Sequence[int],
+    workers: int,
+    schema_version: int,
+    label: str,
+    cache: BaselineCache | None = None,
+    pool: ShardPool | None = None,
+) -> BaselinePass:
+    """Start the controller baseline of each objective, and return before it ends.
+
+    The pass reads the cache now, and it submits only the objectives the
+    cache does not hold. **A caller that finds every number stored therefore
+    enqueues nothing**, and the pass answers at once.
+
+    The result of the pass holds one entry for each name the caller gave,
+    under that name. Each entry holds the summary and the word ``cached`` or
+    ``measured``, so a reader of a log knows which pass paid for the figure.
 
     **One set of episodes answers for every objective.** The episodes are the
     games the seat plays, and they come from the world, the seed set and the
@@ -434,6 +473,11 @@ def controller_baselines(
     policy is not part of the key, so a stored number would answer for a
     policy that never played. This refuses such a world rather than storing a
     number nobody can trust.
+
+    The pool entry is the queue the pass plays its episodes in. **One episode
+    is one task of it**, so a pass over 256 seeds fills a machine rather than
+    reaching about a seventh of it. A pass that holds no pool steps one batch
+    of worlds in this process.
     """
     if config.controlled:
         message = (
@@ -475,29 +519,164 @@ def controller_baselines(
             continue
         measuring[first] = scorings[first]
 
-    if measuring:
+    return BaselinePass(
+        config=config,
+        scorings=scorings,
+        policy=policy,
+        seeds=list(seeds),
+        workers=workers,
+        label=label,
+        cache=held,
+        inputs=inputs,
+        groups=groups,
+        cached=results,
+        measuring=measuring,
+        owned=owned,
+        pool=pool,
+    )
+
+
+class BaselinePass:
+    """The controller baseline of each objective, and where each one came from.
+
+    **A caller may start this pass and read it later.** The bar is a
+    reporting quantity: a run ranks its candidates against each other by win
+    share, and nothing that trains a weight reads a baseline. A run that
+    waited for this pass therefore spent minutes with an empty queue before
+    its first generation, and it spent them for a number no generation needs.
+
+    A pass whose numbers the cache holds is already finished. It submits
+    nothing, and it answers at once.
+
+    A pass with no pool plays its episodes when it starts, in the process
+    that started it. That is what a run of one core does, and it is what
+    every run did before the queue existed.
+    """
+
+    def __init__(
+        self,
+        config: EnvConfig,
+        scorings: Mapping[str, Scoring],
+        policy: Policy,
+        seeds: list[int],
+        workers: int,
+        label: str,
+        cache: BaselineCache,
+        inputs: Mapping[str, dict[str, Any] | None],
+        groups: Mapping[str, list[str]],
+        cached: Mapping[str, tuple[dict[str, float], str]],
+        measuring: Mapping[str, Scoring],
+        owned: set[str],
+        pool: ShardPool | None,
+    ) -> None:
+        """Resolve what the cache holds, and start what it does not.
+
+        The pass takes the right to measure each number it owns, so it holds
+        that right until it gives its results back. A second process that
+        wants the same number waits for the file this pass will write.
+        """
+        from .measure import start_measurement
         from .rollout import run_objectives
+
+        self._scorings = scorings
+        self._cache = cache
+        self._inputs = inputs
+        self._groups = groups
+        self._results = dict(cached)
+        self._measuring = dict(measuring)
+        self._owned = owned
+        self._label = label
+        self._pending: object | None = None
+        self._played: dict[str, PopulationRecord] | None = None
+        # **Several strategies of one run read one pass.** Each of them runs
+        # in a thread of the trainer process and asks for the bar when its
+        # own training ends. The first one waits and writes the cache, and
+        # the others read what it kept, so the games are played once.
+        self._lock = Lock()
+        if not self._measuring:
+            self._release()
+            return
+        if pool is None:
+            try:
+                self._played = run_objectives(
+                    config, self._measuring, [policy], seeds, workers, label
+                )
+            except BaseException:
+                self._release()
+                raise
+        else:
+            self._pending = start_measurement(
+                pool, config, self._measuring, [policy], seeds
+            )
+
+    @property
+    def measuring(self) -> tuple[str, ...]:
+        """The objectives this pass measures, in the order the caller gave."""
+        return tuple(self._measuring)
+
+    @property
+    def done(self) -> bool:
+        """Whether every episode of this pass has finished.
+
+        A pass that the cache answered is done at once, and so is a pass that
+        played its episodes when it started.
+        """
+        if self._pending is None:
+            return True
+        pending = cast("MeasurementPass", self._pending)
+        return pending.done
+
+    def results(self) -> dict[str, tuple[dict[str, float], str]]:
+        """Wait for the episodes, and return the baseline of each objective.
+
+        The result holds one entry for each name the caller gave, under that
+        name. Each entry holds the summary and the word ``cached`` or
+        ``measured``, so a reader of a log knows which pass paid for the
+        figure.
+
+        **Two callers may read one pass.** The first one waits, writes the
+        cache and keeps the answer. Every caller after it reads what the
+        first kept, so a run of several strategies plays one set of games.
+        """
         from .train import summarise
 
-        try:
-            played = run_objectives(
-                config, measuring, [policy], list(seeds), workers, label
-            )
-            for first in measuring:
-                summary = summarise([played[first]])
-                request = inputs[first]
-                if first in owned and request is not None:
-                    held.write(request, summary)
-                results[first] = (summary, "measured")
-                for name in groups[first][1:]:
-                    results[name] = _answered(held, inputs[name], summary)
-        finally:
-            for first in owned:
-                request = inputs[first]
-                if request is not None:
-                    held.release(request)
+        with self._lock:
+            if self._measuring:
+                try:
+                    played = self._take()
+                    for first in self._measuring:
+                        summary = summarise([played[first]])
+                        request = self._inputs[first]
+                        if first in self._owned and request is not None:
+                            self._cache.write(request, summary)
+                        self._results[first] = (summary, "measured")
+                        for name in self._groups[first][1:]:
+                            self._results[name] = _answered(
+                                self._cache, self._inputs[name], summary
+                            )
+                finally:
+                    self._release()
+                    self._measuring = {}
+            return {name: self._results[name] for name in self._scorings}
 
-    return {name: results[name] for name in scorings}
+    def _take(self) -> dict[str, PopulationRecord]:
+        """Return the records of this pass, waiting for the queue if it holds them."""
+        if self._played is not None:
+            return self._played
+        pending = cast("MeasurementPass", self._pending)
+        self._played = {
+            name: held[0] for name, held in pending.records(self._label).items()
+        }
+        self._pending = None
+        return self._played
+
+    def _release(self) -> None:
+        """Give up the right to measure each number this pass owns."""
+        for first in self._owned:
+            request = self._inputs[first]
+            if request is not None:
+                self._cache.release(request)
+        self._owned = set()
 
 
 def controller_baseline(
@@ -509,6 +688,7 @@ def controller_baseline(
     schema_version: int,
     label: str,
     cache: BaselineCache | None = None,
+    pool: ShardPool | None = None,
 ) -> tuple[dict[str, float], str]:
     """Return the controller baseline of one objective, and where it came from.
 
@@ -528,7 +708,15 @@ def controller_baseline(
     still says which number the pass waits for.
     """
     found = controller_baselines(
-        config, {label: scoring}, policy, seeds, workers, schema_version, label, cache
+        config,
+        {label: scoring},
+        policy,
+        seeds,
+        workers,
+        schema_version,
+        label,
+        cache,
+        pool,
     )
     return found[label]
 
@@ -604,9 +792,11 @@ __all__ = [
     "DEFAULT_CACHE",
     "WAIT_SECONDS",
     "BaselineCache",
+    "BaselinePass",
     "available_workers",
     "controller_baseline",
     "controller_baselines",
     "engine_key",
     "key_of",
+    "start_controller_baselines",
 ]

@@ -764,6 +764,17 @@ class VectorEnv:
         """The environments, in index order."""
         return self._envs
 
+    @property
+    def controlled(self) -> bool:
+        """Whether the learner holds the seat of every world of this vector.
+
+        A vector holds one configuration, so one answer covers every world.
+        **A vector that answers false sends no action to any seat**, because
+        the built-in controller holds it, and a caller that scored an action
+        for such a world would pay for an answer no world reads.
+        """
+        return self._config.controlled
+
     def reset(self, seeds: Sequence[int]) -> np.ndarray:
         """Start one episode in each environment, and stack the observations.
 

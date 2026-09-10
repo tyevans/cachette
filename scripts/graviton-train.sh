@@ -1012,34 +1012,20 @@ fi
 
 # ---------------------------------------------- the bar every strategy needs
 #
-# **One number sets the bar for the whole run, and every process needed it.**
-# The trainer reports each policy against the built-in controller playing the
-# learner's own seat, and it measures that by playing the controller over the
-# whole held-out seed set. One process for each strategy measured it before
-# training and again after, so a run of six strategies played the same worlds
-# twelve times, each at a sixth of the cores.
+# **The bar no longer runs as a pass of its own.** One number sets the bar for
+# the whole run: the trainer reports each policy against the built-in
+# controller playing the learner's own seat, over the whole held-out seed set.
+# This script measured that number in an invocation of its own, before any
+# trainer started, and the machine played nothing else for as long as it took.
+# A run of 256 held-out worlds spent about twenty minutes there.
 #
-# This pass measures it once, before any trainer starts, and it may hold every
-# core. It writes each number into the cache under a key that holds the engine
-# build, the world, the seeds and the objective, so each trainer reads it. Two
-# strategies that hold the same objective share one number.
-#
-# **A failure here must not end the run.** The cache is an optimisation, and
-# each trainer measures the number itself when the cache does not hold it.
-# Ending the run over a missing optimisation would cost the whole run.
-#
-# **A later argument wins, so the pool of this pass comes after the arguments
-# of the run.** The trainer parses the whole line and takes the last value of
-# each flag. This pass named its core count before `$TRAIN_ARGS`, under a flag
-# that a run could pass as well, so a run that named a worker count of its own
-# overrode it and the pass that may hold the whole machine played a handful of
-# worlds at a time. A pass that no queue splits now takes the cores this
-# script gives it, and nothing else can name them.
-mark baseline
-uv run python -u -m cachette.learn --baseline-only \
-    --only "$(printf '%s' "$names" | tr ' ' ',')" \
-    --out runs/learn/baseline $TRAIN_ARGS --pool "$cores" 2>&1 \
-    | tee -a runs/learn/train.log || true
+# Nothing that trains a weight reads the bar. The search ranks the candidates
+# of a generation against each other by win share, and the bar reaches a
+# report row and a printed line. So the run submits the baseline episodes into
+# the same queue its generations use, and it reads the answer when each
+# strategy ends. The cache still holds every number under a key that names the
+# engine build, the world, the seeds and the objective, so a repeated run
+# enqueues nothing at all.
 
 # ------------------------------------------------------------- the training
 #

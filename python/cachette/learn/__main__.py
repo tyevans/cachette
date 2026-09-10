@@ -89,7 +89,11 @@ from contextlib import ExitStack
 from dataclasses import asdict, replace
 from pathlib import Path
 
-from .baseline import available_workers, controller_baseline, controller_baselines
+from .baseline import (
+    available_workers,
+    controller_baselines,
+    start_controller_baselines,
+)
 from .env import Env, EnvConfig, viable_seeds
 from .journal import ThreadJournal, strategy_log, strategy_logs
 from .policy import (
@@ -592,7 +596,11 @@ def report_behaviour(names: list[str], out: Path, holdout: int, workers: int) ->
 
 
 def fill_baseline_cache(
-    names: list[str], holdout: list[int], workers: int, probe: Env
+    names: list[str],
+    holdout: list[int],
+    workers: int,
+    probe: Env,
+    pool: ShardPool | None = None,
 ) -> int:
     """Measure the controller baseline of each named strategy into the cache.
 
@@ -616,6 +624,9 @@ def fill_baseline_cache(
     world for each strategy, and a table that gave two strategies two
     different worlds could not share one batch between them. This refuses
     such a table rather than reporting one world under the name of another.
+
+    The pool entry is the queue the pass plays its episodes in. One episode
+    is one task of it, so the pass fills the machine it was given.
     """
     world = replace(STRATEGIES[names[0]][0], controlled=False)
     other = [
@@ -637,6 +648,8 @@ def fill_baseline_cache(
         workers,
         probe.observation_version,
         "baseline",
+        None,
+        pool,
     )
     for name in names:
         summary, source = measured[name]
@@ -1045,12 +1058,18 @@ def main() -> int:
     # before every trainer of a run starts, and every second it takes is a
     # second the training does not get.
     if arguments.baseline_only:
-        return fill_baseline_cache(
-            names,
-            holdout,
-            pool_size,
-            Env(WORLD, first_scoring(STRATEGIES[names[0]][1])),
-        )
+        # **This pass is many episodes and the queue splits it.** One process
+        # that stepped every world of the seed set reached about a seventh of
+        # a machine of 64 cores, because the section it runs between two
+        # decisions holds every engine worker of the process.
+        with ExitStack() as filling:
+            return fill_baseline_cache(
+                names,
+                holdout,
+                pool_size,
+                Env(WORLD, first_scoring(STRATEGIES[names[0]][1])),
+                filling.enter_context(ShardPool(pool_size)) if pool_size > 1 else None,
+            )
 
     pool = viable_seeds(WORLD, arguments.generations * arguments.seeds + 8, 1000)
     # The validation seeds pick the checkpoint. They share nothing with the
@@ -1099,165 +1118,6 @@ def main() -> int:
             return StructuredPolicy.of_catalogue(actions, probe.signals)
         return LinearPolicy.zeros(actions, features)
 
-    # **The controller baseline is one number for the whole run, and one
-    # process measured it once for every strategy it trained.** The play is a
-    # function of the engine, the world, the seeds and the objective, and of
-    # nothing a run trains. The launcher starts one process for each
-    # strategy, so a run of six strategies paid for the same number twelve
-    # times: once before each strategy and once after it. A cache holds it
-    # now, keyed on every input, and a process that finds it pays nothing.
-    #
-    # The weighting reaches the key because the reading is weighted. The play
-    # does not change with the weighting, and the return does.
-    controller_scoring = first_scoring(STRATEGIES[names[0]][1])
-    print("\n=== controller baseline ===", flush=True)
-    report["controller"], source = controller_baseline(
-        CONTROLLER_WORLD,
-        controller_scoring,
-        no_op("linear"),
-        holdout,
-        pool_size,
-        probe.observation_version,
-        f"{names[0]} baseline",
-    )
-    # **The return of this bar answers for one weighting and the win share
-    # answers for the run.** The play does not change with the weighting and
-    # the reading of it does, so a run of four strategies holds one run-level
-    # return that four strategies later contradict with their own. The name
-    # goes in the report and on its own line, so no reader meets the figure
-    # without it.
-    report["controller_weighting"] = names[0]
-    # **The line below is the interface the dashboard reads.** Two readers
-    # match it by shape, so the source of the number goes on its own line
-    # rather than inside this one.
-    print(f"  controller {report['controller']}", flush=True)
-    print(controller_weighting_line(names[0]), flush=True)
-    print(f"  the controller baseline was {source}", flush=True)
-    write_report(out / "report.json", report)
-
-    # **One queue holds the episodes of every strategy of a run.** A strategy
-    # that is between two generations, or waiting on its last episode, would
-    # otherwise leave its share of the machine idle while another strategy
-    # had work to queue. Every strategy of this process submits into one
-    # pool of worker processes.
-    #
-    # **The dependency is inside a strategy, and no barrier crosses two of
-    # them.** Generation N+1 of one strategy needs every episode of its own
-    # generation N, and it needs no episode of another strategy. So a
-    # strategy that finishes first queues its next generation while another
-    # is still finishing, and the queue empties only when no strategy holds
-    # work.
-    #
-    # Each strategy runs in a thread of this process and waits on the results
-    # of its own episodes. The episodes run in the worker processes, so a
-    # thread here holds the interpreter only while it reads a result.
-    #
-    # The report is one document for the whole run, so the lock holds while a
-    # strategy writes into it.
-    lock = threading.Lock()
-
-    def train_strategy(
-        index: int,
-        name: str,
-        shard_pool: ShardPool | None,
-        journal: ThreadJournal | None,
-    ) -> None:
-        """Train one strategy, measure it on the held-out seeds, report it.
-
-        The journal entry sends the lines of this thread to the log file of
-        this strategy, as well as to the standard output. A caller that
-        trains one strategy passes none, because the log of the process is
-        already the log of the strategy.
-        """
-        with strategy_log(journal, out / f"{name}.log"):
-            env_config, scoring, kind = STRATEGIES[name]
-            print(f"\n=== {name} ({kind}) ===", flush=True)
-            train_config = TrainConfig(
-                generations=arguments.generations,
-                population=arguments.population,
-                seeds_per_generation=arguments.seeds,
-                sigma=arguments.sigma,
-                learning_rate=arguments.learning_rate,
-                workers=batch_workers,
-                pool=pool_size,
-                seed=index,
-                learner_seats=learner_seats,
-                relative=not arguments.absolute_scoring,
-                validate_candidate=arguments.validate_candidate,
-            )
-            result = train(
-                name,
-                env_config,
-                scoring,
-                train_config,
-                out,
-                pool,
-                kind=kind,
-                resume=arguments.resume,
-                validation=validation,
-                validate_every=validate_every,
-                holdout=holdout,
-                holdout_every=arguments.holdout_every,
-                shard_pool=shard_pool,
-            )
-            trained, _ = load_policy(Path(result["weights"]))
-            untrained = no_op(kind)
-            # **The holdout measurement holds one objective for the whole
-            # strategy.** A schedule moves the objective between generations, and
-            # two numbers taken under two objectives cannot be compared. The pass
-            # therefore takes the first scoring, which is what the run started
-            # under and what the validation pass held.
-            fixed = first_scoring(scoring)
-            measured = {
-                "trained": evaluate(env_config, fixed, trained, holdout, batch_workers),
-                "untrained": evaluate(
-                    env_config, fixed, untrained, holdout, batch_workers
-                ),
-                "random": evaluate(
-                    env_config,
-                    fixed,
-                    RandomPolicy(seed=index),
-                    holdout,
-                    batch_workers,
-                    repeats=3,
-                ),
-                "controller": controller_baseline(
-                    CONTROLLER_WORLD,
-                    fixed,
-                    untrained,
-                    holdout,
-                    batch_workers,
-                    probe.observation_version,
-                    f"{name} baseline",
-                )[0],
-            }
-            result["holdout"] = measured
-            with lock:
-                report["strategies"][name] = result  # type: ignore[index]
-            # **A generation that carried no information hides inside a mean and a
-            # best.** Every candidate scored the same number, so the mean equals
-            # the best, and that reads like a population which agreed. The trainer
-            # names each one as it happens, and this line names them again beside
-            # the held-out figures, where a reader who reads only the end of a
-            # strategy still meets them.
-            wasted = result["degenerate_generations"]
-            if wasted:
-                print(
-                    f"  {len(wasted)} of {arguments.generations} generations carried "
-                    f"no information and moved no centre: {wasted}",
-                    flush=True,
-                )
-            for label in ("trained", "untrained", "random", "controller"):
-                row = measured[label]
-                print(
-                    f"  {label:11s} return {row['return']:10.1f} "
-                    f"tiles {row['held_tiles']:7.1f} won {row['won']:5.2f} "
-                    f"lost {row['lost']:5.2f}",
-                    flush=True,
-                )
-            with lock:
-                write_report(out / "report.json", report)
-
     # **A pool of one process is no pool.** A machine of one core scores each
     # generation in this process, which is the path every run took before the
     # queue existed, and the strategies then run one after another.
@@ -1274,6 +1134,190 @@ def main() -> int:
                 f"{pool_processes} worker processes, one episode in each task",
                 flush=True,
             )
+
+        # **The controller baseline is one number for the whole run, and one
+        # process measured it once for every strategy it trained.** The play is a
+        # function of the engine, the world, the seeds and the objective, and of
+        # nothing a run trains. The launcher starts one process for each
+        # strategy, so a run of six strategies paid for the same number twelve
+        # times: once before each strategy and once after it. A cache holds it
+        # now, keyed on every input, and a process that finds it pays nothing.
+        #
+        # The weighting reaches the key because the reading is weighted. The play
+        # does not change with the weighting, and the return does.
+        #
+        # **The bar does not block the start of training.** Nothing that
+        # trains a weight reads a baseline: the search ranks the candidates
+        # of a generation against each other by win share, and the bar
+        # reaches a report row and a printed line. A run therefore submits
+        # the baseline episodes into the same queue the generations use, and
+        # reads the answer when each strategy ends.
+        #
+        # **One pass answers for every strategy.** The episodes are the games
+        # the controller plays, and they come from the world and the seed set.
+        # Each objective weights the readings of those games. A run of six
+        # strategies used to play the same games seven times.
+        print("\n=== controller baseline ===", flush=True)
+        baseline = start_controller_baselines(
+            CONTROLLER_WORLD,
+            {name: first_scoring(STRATEGIES[name][1]) for name in names},
+            no_op("linear"),
+            holdout,
+            pool_size,
+            probe.observation_version,
+            f"{names[0]} baseline",
+            None,
+            shard_pool,
+        )
+        # **The return of this bar answers for one weighting and the win share
+        # answers for the run.** The play does not change with the weighting and
+        # the reading of it does, so a run of four strategies holds one run-level
+        # return that four strategies later contradict with their own. The name
+        # goes in the report and on its own line, so no reader meets the figure
+        # without it.
+        report["controller_weighting"] = names[0]
+        if baseline.measuring:
+            print(
+                "  the controller baseline plays beside the training, so the "
+                "bar reaches the report when its episodes finish",
+                flush=True,
+            )
+        write_report(out / "report.json", report)
+
+        # **One queue holds the episodes of every strategy of a run.** A strategy
+        # that is between two generations, or waiting on its last episode, would
+        # otherwise leave its share of the machine idle while another strategy
+        # had work to queue. Every strategy of this process submits into one
+        # pool of worker processes.
+        #
+        # **The dependency is inside a strategy, and no barrier crosses two of
+        # them.** Generation N+1 of one strategy needs every episode of its own
+        # generation N, and it needs no episode of another strategy. So a
+        # strategy that finishes first queues its next generation while another
+        # is still finishing, and the queue empties only when no strategy holds
+        # work.
+        #
+        # Each strategy runs in a thread of this process and waits on the results
+        # of its own episodes. The episodes run in the worker processes, so a
+        # thread here holds the interpreter only while it reads a result.
+        #
+        # The report is one document for the whole run, so the lock holds while a
+        # strategy writes into it.
+        lock = threading.Lock()
+
+        def train_strategy(
+            index: int,
+            name: str,
+            shard_pool: ShardPool | None,
+            journal: ThreadJournal | None,
+        ) -> None:
+            """Train one strategy, measure it on the held-out seeds, report it.
+
+            The journal entry sends the lines of this thread to the log file of
+            this strategy, as well as to the standard output. A caller that
+            trains one strategy passes none, because the log of the process is
+            already the log of the strategy.
+            """
+            with strategy_log(journal, out / f"{name}.log"):
+                env_config, scoring, kind = STRATEGIES[name]
+                print(f"\n=== {name} ({kind}) ===", flush=True)
+                train_config = TrainConfig(
+                    generations=arguments.generations,
+                    population=arguments.population,
+                    seeds_per_generation=arguments.seeds,
+                    sigma=arguments.sigma,
+                    learning_rate=arguments.learning_rate,
+                    workers=batch_workers,
+                    pool=pool_size,
+                    seed=index,
+                    learner_seats=learner_seats,
+                    relative=not arguments.absolute_scoring,
+                    validate_candidate=arguments.validate_candidate,
+                )
+                result = train(
+                    name,
+                    env_config,
+                    scoring,
+                    train_config,
+                    out,
+                    pool,
+                    kind=kind,
+                    resume=arguments.resume,
+                    validation=validation,
+                    validate_every=validate_every,
+                    holdout=holdout,
+                    holdout_every=arguments.holdout_every,
+                    shard_pool=shard_pool,
+                )
+                trained, _ = load_policy(Path(result["weights"]))
+                untrained = no_op(kind)
+                # **The holdout measurement holds one objective for the whole
+                # strategy.** A schedule moves the objective between generations, and
+                # two numbers taken under two objectives cannot be compared. The pass
+                # therefore takes the first scoring, which is what the run started
+                # under and what the validation pass held.
+                fixed = first_scoring(scoring)
+                measured = {
+                    "trained": evaluate(
+                        env_config,
+                        fixed,
+                        trained,
+                        holdout,
+                        batch_workers,
+                        pool=shard_pool,
+                    ),
+                    "untrained": evaluate(
+                        env_config,
+                        fixed,
+                        untrained,
+                        holdout,
+                        batch_workers,
+                        pool=shard_pool,
+                    ),
+                    "random": evaluate(
+                        env_config,
+                        fixed,
+                        RandomPolicy(seed=index),
+                        holdout,
+                        batch_workers,
+                        repeats=3,
+                        pool=shard_pool,
+                    ),
+                    # **The bar comes from the pass the run started before
+                    # its first generation.** That pass plays the games once
+                    # and scores them for every strategy, and it queued its
+                    # episodes beside the training rather than in front of
+                    # it. This is where the strategy needs the answer, and by
+                    # here the pass has long finished.
+                    "controller": baseline.results()[name][0],
+                }
+                result["holdout"] = measured
+                with lock:
+                    report["strategies"][name] = result  # type: ignore[index]
+                # **A generation that carried no information hides inside a mean and a
+                # best.** Every candidate scored the same number, so the mean equals
+                # the best, and that reads like a population which agreed. The trainer
+                # names each one as it happens, and this line names them again beside
+                # the held-out figures, where a reader who reads only the end of a
+                # strategy still meets them.
+                wasted = result["degenerate_generations"]
+                if wasted:
+                    print(
+                        f"  {len(wasted)} of {arguments.generations} generations "
+                        f"carried no information and moved no centre: {wasted}",
+                        flush=True,
+                    )
+                for label in ("trained", "untrained", "random", "controller"):
+                    row = measured[label]
+                    print(
+                        f"  {label:11s} return {row['return']:10.1f} "
+                        f"tiles {row['held_tiles']:7.1f} won {row['won']:5.2f} "
+                        f"lost {row['lost']:5.2f}",
+                        flush=True,
+                    )
+                with lock:
+                    write_report(out / "report.json", report)
+
         if shard_pool is None or len(names) == 1:
             for index, name in enumerate(names):
                 train_strategy(index, name, shard_pool, None)
@@ -1289,6 +1333,20 @@ def main() -> int:
                 # the run said that it finished.
                 for future in running:
                     future.result()
+
+        # **The run states its bar while the pool is still open.** The pass
+        # played beside the training, so this reads what it kept rather than
+        # measuring anything, and a run whose strategies all ended has
+        # already read it.
+        found = baseline.results()
+        report["controller"], source = found[names[0]]
+        # **The line below is the interface the dashboard reads.** Two readers
+        # match it by shape, so the source of the number goes on its own line
+        # rather than inside this one.
+        print(f"  controller {report['controller']}", flush=True)
+        print(controller_weighting_line(names[0]), flush=True)
+        print(f"  the controller baseline was {source}", flush=True)
+        write_report(out / "report.json", report)
 
     report["seconds"] = round(time.time() - started, 1)
     write_report(out / "report.json", report)

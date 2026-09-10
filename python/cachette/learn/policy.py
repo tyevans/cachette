@@ -1492,9 +1492,36 @@ class RandomPolicy:
     reading the world, and it is the harder of the two to beat.
     """
 
-    def __init__(self, seed: int = 0) -> None:
-        """Build the policy over one stream of draws."""
-        self._rng = np.random.default_rng(seed)
+    def __init__(self, seed: int = 0, key: tuple[int, ...] = ()) -> None:
+        """Build the policy over one stream of draws.
+
+        The key names the episode this stream belongs to. A policy built with
+        no key holds the one stream every world of one batch draws from,
+        which is what a pass in one process gives it.
+        """
+        self._seed = int(seed)
+        self._key = tuple(int(part) for part in key)
+        self._rng = np.random.default_rng((self._seed, *self._key))
+
+    def reseed(self, *key: int) -> RandomPolicy:
+        """Return this policy on the stream that one episode owns.
+
+        **A queued pass plays each episode in a worker process**, and every
+        one of them would otherwise start from the same state and draw the
+        same actions. A repeat of the seed set would then report the first
+        repeat again, and the repeat exists to narrow a drawing baseline.
+
+        The stream is a function of the seed of this policy and the key, so
+        the pass gives the same answer at any pool size. Nothing here reads
+        which worker took the episode.[^1]
+
+        References
+        ----------
+        [^1]: ADR-0001, one binary gives one answer at any thread count,
+        decision D2.
+        ``docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md``
+        """
+        return RandomPolicy(self._seed, key)
 
     def choose_many(self, observations: np.ndarray, masks: np.ndarray) -> list[int]:
         """Return one legal action for each row, drawn uniformly."""
