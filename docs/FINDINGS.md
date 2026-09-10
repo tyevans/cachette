@@ -19752,7 +19752,7 @@ skips the units the storm log names, and nothing else.
 **Skip the named casualty, not every dead unit.** A repair that skipped any
 unit with no need would pass against a run in which starvation ended them all,
 and the test would then measure the fixture rather than the saturating
-subtract.[^F725C] The test counts the units it read, and it refuses a count of
+subtract.[^F492B] The test counts the units it read, and it refuses a count of
 zero.
 
 **A fixture that reads a unit at the end of a long run needs the casualty
@@ -19762,4 +19762,3 @@ whenever the weather of a seed changes.
 
 [^F725A]: The consumption tests. `crates/cachette-core/tests/consumption.rs`
 [^F725B]: The choice tests. `crates/cachette-core/tests/choice.rs`
-[^F725C]: Testing rules, section 2a. `.agents/rules/testing.md`
