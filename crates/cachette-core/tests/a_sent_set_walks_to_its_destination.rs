@@ -141,6 +141,23 @@ fn world(extent: u32) -> World {
     world
 }
 
+/// Answers whether the storm log of the last step names the unit.
+///
+/// A storm ends a unit that stands in the open, and it obeys no rule of the
+/// destination field.[^1] Each loop below drops the units this names, and no
+/// others. A loop that dropped every unit the world no longer holds would pass
+/// against a run that lost them all for another reason.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-725. `docs/FINDINGS.md`
+fn a_storm_took(world: &World, unit: Entity) -> bool {
+    world
+        .units_lost_to_storms()
+        .iter()
+        .any(|lost| lost.unit == unit.to_bits())
+}
+
 /// Returns the level 1 cell that covers one address.
 fn cell_of(world: &World, address: Axial) -> u32 {
     let layout = world.pyramid().layout();
@@ -356,28 +373,37 @@ fn a_sent_set_walks_to_the_place_the_caller_named() {
     send(&mut world, &units, destination);
 
     let mut arrived = vec![false; units.len()];
-    for _ in 0..ARRIVAL_FRAMES {
+    let mut live: Vec<usize> = (0..units.len()).collect();
+    for frame in 0..ARRIVAL_FRAMES {
         world.step(1).expect("the step must run");
-        for (index, unit) in units.iter().enumerate() {
-            let here = world
-                .soldiers()
-                .address(*unit)
-                .expect("the unit is still alive");
+        live.retain(|index| !a_storm_took(&world, units[*index]));
+        assert!(
+            !live.is_empty(),
+            "the storms took every sent unit by frame {frame}, so the run reads no arrival"
+        );
+        for index in &live {
+            let here = world.soldiers().address(units[*index]).unwrap_or_else(|| {
+                panic!(
+                    "the unit that started at {:?} left the world on frame {frame}, and no \
+                         storm log names it",
+                    starts[*index]
+                )
+            });
             if cell_of(&world, here) == seed_cell {
-                arrived[index] = true;
+                arrived[*index] = true;
             }
         }
-        if arrived.iter().all(|reached| *reached) {
+        if live.iter().all(|index| arrived[*index]) {
             break;
         }
     }
 
-    for (index, reached) in arrived.iter().enumerate() {
+    for index in &live {
         assert!(
-            *reached,
+            arrived[*index],
             "the unit that started at {:?} did not reach the destination cell \
              in {ARRIVAL_FRAMES} frames",
-            starts[index]
+            starts[*index]
         );
     }
 }
@@ -423,17 +449,26 @@ fn a_sent_set_walks_to_the_tile_the_caller_named() {
     let mut arrived: Option<u64> = None;
     let mut entered = vec![None; units.len()];
     let mut inside = vec![0u64; units.len()];
+    let mut live: Vec<usize> = (0..units.len()).collect();
     for frame in 0..ARRIVAL_FRAMES {
         world.step(1).expect("the step must run");
-        for (index, unit) in units.iter().enumerate() {
-            let here = world
-                .soldiers()
-                .address(*unit)
-                .expect("the unit is still alive");
+        live.retain(|index| !a_storm_took(&world, units[*index]));
+        assert!(
+            !live.is_empty(),
+            "the storms took every sent unit by frame {frame}, so the run reads no arrival"
+        );
+        for index in &live {
+            let here = world.soldiers().address(units[*index]).unwrap_or_else(|| {
+                panic!(
+                    "the unit that started at {:?} left the world on frame {frame}, and no \
+                         storm log names it",
+                    starts[*index]
+                )
+            });
             if cell_of(&world, here) == seed_cell {
-                inside[index] += 1;
-                if entered[index].is_none() {
-                    entered[index] = Some(frame);
+                inside[*index] += 1;
+                if entered[*index].is_none() {
+                    entered[*index] = Some(frame);
                 }
             }
             if here == destination && arrived.is_none() {
