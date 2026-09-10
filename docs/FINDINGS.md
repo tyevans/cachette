@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-721**
+**Next number: FND-722**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19550,3 +19550,61 @@ one.
 
 **A worktree that predates a deletion re-adds the deleted file.** An agent that
 stages every change in its worktree stages the resurrection with them.
+
+### FND-721 — A storm rains its own sky out, so the cover falls where a storm stands
+
+**Believed.** Three things. A worker reported that raising a storm on a 96-tile
+world changed the published cloud cover not at all over ten ticks, against an
+identical control world. The same report said that no cyclone forms on its own
+in forty ticks of the demonstration world. Both renderers of the demonstration
+inferred a storm from the top of the cover range, on the belief that a storm
+fills the sky it stands in.
+
+**True.** All three are wrong.
+
+**Raising a storm moves the published cover, on the first tick.** At an extent
+of 96 at six seeds, one tick after the storm moved between 170 and 333 tiles of
+9216 against the control, and the widest gap on one tile ran from 58 to 168 of
+a whole sky of 255. At the demonstration extent of 256 at the demonstration
+pitch, one tick moved 12224 tiles and ten ticks moved 28544.
+
+**The engine raises storms on its own.** A genesis pass inside the solve places
+a tropical storm over a warm wet sea and a frontal storm on a temperature
+gradient. In forty settling ticks the control world raised 1, 3, 5, 6, 7 and 8
+storms at six seeds, and 6 at the demonstration extent and pitch.
+
+**A storm lowers the cover over its own footprint.** At every seed and at every
+tick measured, the mean cover over the cells the deficit reaches stands below
+the cover of the control on the same cells. At one seed the two read 78 and 156
+of 255 after one tick.
+
+**The mechanism is rain, and it is the model working.** The settle pass reduces
+the capacity of a cell under a storm and moves the water above that bound onto
+the ground. One tick after the storm, the water in the air of the whole world
+fell by 40658, 42966 and 14030 drops against the control at three seeds, and
+the water on the ground rose by 34980, 38872 and 12682.
+
+**Evidence.** One probe built two worlds from one set of settings, settled both,
+raised one storm on the first, and stepped both.[^F721A] It ran on 9 September
+2026 on one development machine (x86-64). Every figure is derived and none is
+measured on the target platform. The commit body holds the commands. A second
+reading at the Python boundary reproduced the cover movement through the
+published readers.
+
+**Follows.** Three things.
+
+**Publish a channel rather than let a caller guess one.** The boundary
+published a bool for one tile and an eye in lattice coordinates, and no bulk
+reader. Both renderers guessed, and both guessed a rule that names the wrong
+tiles.
+
+**A control world is only a control while nothing drives it toward the world
+under test.** The engine makes storms of its own, so a long run against a clone
+compares two stormed worlds. Measure at the first tick, where the two have not
+yet parted.
+
+**Do not accept a null result that a mechanism explains.** The report of no
+change had an innocent reading available, and the innocent reading is also
+wrong. The storm does change the cover, and it changes it downward.
+
+[^F721A]: The storm cover probe. `crates/cachette-core/examples/storm_cover_probe.rs`
