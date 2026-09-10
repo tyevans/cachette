@@ -94,6 +94,29 @@ fn faction_colours() -> Vec<u32> {
     cachette_view::paint::faction_colours().to_vec()
 }
 
+/// Returns the name of every win path, as a `list` of `str`, in the order the
+/// engine numbers them.
+///
+/// The names are `domination`, `territory`, `wonder` and `renown`. The list
+/// comes from the reader that turns a stored number into a path, so it holds
+/// every path the engine knows and no other. A caller that reports the share
+/// of games each path ended reads this rather than a list of its own, because
+/// a list of its own would drop a path the engine later added and nothing
+/// would fail.[^1]
+///
+/// The `path` entry of `World.game_end` carries one of these names.
+///
+/// # References
+///
+/// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[pyfunction]
+fn win_paths() -> Vec<&'static str> {
+    (0u8..)
+        .map_while(cachette_core::WinPath::from_u8)
+        .map(cachette_core::WinPath::name)
+        .collect()
+}
+
 /// Returns the version of the `cachette` package, as a `str`.
 ///
 /// The value is the version of the compiled extension module. The package
@@ -245,6 +268,7 @@ fn cachette_core_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(stock_ceiling_of_one_settlement, module)?)?;
     module.add_function(wrap_pyfunction!(event_schema, module)?)?;
     module.add_function(wrap_pyfunction!(faction_colours, module)?)?;
+    module.add_function(wrap_pyfunction!(win_paths, module)?)?;
     add_error::<CachetteError>(module, "CachetteError")?;
     add_error::<StepError>(module, "StepError")?;
     add_error::<FrameError>(module, "FrameError")?;

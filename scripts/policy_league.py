@@ -137,7 +137,7 @@ from cachette._core import Batch
 from cachette.learn.env import Env, EnvConfig, viable_seeds
 from cachette.learn.league import SeatAssignment, SeatedGame, seat_counts
 from cachette.learn.policy import PolicyFit, load_policy
-from cachette.learn.record import end_tick_of
+from cachette.learn.record import end_path_of, end_tick_of
 from cachette.learn.reward import Weighting
 
 if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
@@ -467,7 +467,7 @@ def read_game(
         rotation=seating.rotation,
         players=seating.players,
         winner=None if winner_seat is None else seating.players[winner_seat],
-        path=NO_PATH if end is None else str(end["path"]),
+        path=end_path_of(world),
         end_tick=end_tick,
         reached_limit=reached_the_limit(world, end_tick),
         decisions=decisions,

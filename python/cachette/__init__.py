@@ -55,6 +55,7 @@ from cachette._core import (
     faction_colours,
     stock_ceiling_of_one_settlement,
     version,
+    win_paths,
 )
 
 __all__ = [
@@ -75,6 +76,7 @@ __all__ = [
     "faction_colours",
     "stock_ceiling_of_one_settlement",
     "version",
+    "win_paths",
 ]
 
 __version__: str = version()

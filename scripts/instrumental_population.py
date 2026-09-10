@@ -134,6 +134,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from cachette.learn.endings import UNFINISHED
 from cachette.learn.env import Env, EnvConfig, VectorEnv, viable_seeds
 from cachette.learn.policy import (
     LinearPolicy,
@@ -142,7 +143,7 @@ from cachette.learn.policy import (
     RandomPolicy,
     load_policy,
 )
-from cachette.learn.record import end_tick_of
+from cachette.learn.record import end_path_of, end_tick_of
 from cachette.learn.reward import Weighting
 from cachette.learn.structured import STRUCTURED_KIND, StructuredPolicy
 
@@ -163,7 +164,15 @@ SURVIVAL_SIGNALS: tuple[str, ...] = (POPULATION_SIGNAL, SETTLEMENT_SIGNAL)
 
 # The name the report gives an episode that no win reader ended. The engine
 # records no path for such a game, and the report needs a column for it.
-NO_PATH = "none"
+#
+# **The learner package declares the name, and this is one alias of it.** The
+# rule was declared twice here and once there, and two copies of one name are
+# the defect shape this project names first.[^1]
+#
+# References
+# ----------
+# [^1]: Recurring defect shapes, shape 1. ``.agents/rules/recurring-defects.md``
+NO_PATH = UNFINISHED
 
 # Where the held-out seed search starts. The behaviour report of the training
 # run reads from the same start, so the two measurements share worlds.
@@ -438,12 +447,10 @@ def read_episode(arm: str, seed: int, env: Env) -> Reading:
     The signals come from the catalogue the environment built out of the
     schema of the engine, so this names no position and no field.
 
-    The path comes from the game end record. A game that no reader ended
-    holds no record, so the path is the absent-path name.
-
-    **The end tick comes from the one reader the record module holds for
-    it.** The rule was declared twice, and the two copies disagreed until one
-    of them was removed.[^1]
+    **The path and the end tick each come from the one reader the record
+    module holds for them.** A game that no reader ended holds no record, and
+    that reader names the absent path. The end tick rule was declared twice,
+    and the two copies disagreed until one of them was removed.[^1]
 
     References
     ----------
@@ -458,7 +465,7 @@ def read_episode(arm: str, seed: int, env: Env) -> Reading:
         seed=seed,
         outcome=env.outcome,
         decisions=env.decisions,
-        path=NO_PATH if end is None else str(end["path"]),
+        path=end_path_of(world),
         end_tick=end_tick,
         winner=None if end is None else int(end["winner"]),
         reached_limit=limit > 0 and end_tick >= limit,
