@@ -160,7 +160,21 @@ fn a_stormed_world() -> (World, Axial) {
         !crowd.is_empty(),
         "the fixture put nobody on the tile, so the crowding overlay finds nothing",
     );
-    world.order_build_set(&crowd, UpgradeCategory::ALL[0]);
+    // A road asks for no held ground, so the plan of the faction is the bound
+    // on it, and the engine refuses an order on a tile nobody zoned. The
+    // fixture zones this tile as it zones the unheld one above. It relied on
+    // the faction solver to zone this tile for it, and the solver now plans a
+    // way between two settlements of the faction instead.
+    world
+        .zone_project(FactionId(0), place, UpgradeCategory::ALL[0])
+        .expect("the plan takes the project on held ground");
+    let refused = world.order_build_set(&crowd, UpgradeCategory::ALL[0]);
+    assert_eq!(
+        refused,
+        0,
+        "the engine refused {refused} of the {} build orders the fixture gave",
+        crowd.len(),
+    );
     for _ in 0..BUILDING_TICKS {
         world.step(1).expect("the step must run");
     }
@@ -334,7 +348,13 @@ fn a_cell_value_paints_as_a_field_and_not_as_a_block() {
     //
     // [^1]: Research report 24, defect 6. `docs/research/reports/24-demonstration-readability-resources-and-weather.md`
     let (stormy, _, _) = the_two_worlds();
-    let layout = stormy.pyramid().layout();
+    // **The overlay interpolates on the weather lattice.** A test that took
+    // the level 1 pitch would name a cell the overlay never reads, and the
+    // two pitches agree only when the world takes the level 1 weather
+    // pitch.[^2]
+    //
+    // [^2]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    let layout = stormy.weather_layout();
     let edge = layout.block_edge();
     assert!(
         edge >= 4,
@@ -358,21 +378,36 @@ fn a_cell_value_paints_as_a_field_and_not_as_a_block() {
             if before == after {
                 continue;
             }
-            let column = cell_column * edge;
-            let row = cell_row * edge;
-            let near = Axial::new((column + 1) as i32, (row + 1) as i32);
-            let far = Axial::new((column + edge - 2) as i32, (row + 1) as i32);
-            assert_eq!(
-                stormy.air_at(near),
-                stormy.air_at(far),
-                "the two tiles must sit in one cell, so a flat read would give \
-                 them one value",
+            // **The test reads every tile of the cell and never two of
+            // them.** The field runs across the cell, so two tiles chosen by
+            // hand can carry one value and the cell is still a field. A cell
+            // whose tiles all carry one value is a block, and that is the
+            // defect. This test named two tiles once, and it failed on a
+            // world in which those two agreed by chance.
+            let tiles: Vec<Axial> = (0..edge)
+                .flat_map(|down| {
+                    (0..edge).map(move |across| {
+                        Axial::new(
+                            (cell_column * edge + across) as i32,
+                            (cell_row * edge + down) as i32,
+                        )
+                    })
+                })
+                .collect();
+            let flat = stormy.air_at(tiles[0]);
+            assert!(
+                tiles.iter().all(|at| stormy.air_at(*at) == flat),
+                "the tiles of the cell at ({cell_column}, {cell_row}) hold more \
+                 than one air value, so a flat read would not give them one \
+                 value",
             );
-            assert_ne!(
-                overlay::value_of(cloud, &stormy, near, None),
-                overlay::value_of(cloud, &stormy, far, None),
-                "two tiles far apart in one cell painted one value at \
-                 {near:?} and {far:?}, so the cell still paints as a rectangle",
+            let first = overlay::value_of(cloud, &stormy, tiles[0], None);
+            assert!(
+                tiles
+                    .iter()
+                    .any(|at| overlay::value_of(cloud, &stormy, *at, None) != first),
+                "every tile of the cell at ({cell_column}, {cell_row}) painted \
+                 the one value {first}, so the cell still paints as a rectangle",
             );
             found = true;
         }
