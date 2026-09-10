@@ -138,15 +138,20 @@ impl World {
         self.controller.set_surplus_mark(mark);
     }
 
-    /// Returns the held ground a faction must have over another before it
-    /// hunts it, as a raw Q16.16 factor.
+    /// Returns the ratio of one faction as a raw Q16.16 factor, or `None`
+    /// when the world has no such faction.
+    ///
+    /// The ratio is the held ground that faction must have over another
+    /// before it hunts it.
     #[must_use]
-    pub const fn overmatch_ratio(&self) -> i32 {
-        self.controller.overmatch_ratio().0
+    pub fn faction_overmatch_ratio(&self, faction: FactionId) -> Option<i32> {
+        self.controller
+            .overmatch_ratio(faction)
+            .map(|ratio| ratio.0)
     }
 
-    /// Sets the held ground a faction must have over another before it hunts
-    /// it, as a raw Q16.16 factor.
+    /// Sets the held ground every faction must have over another before it
+    /// hunts it, as a raw Q16.16 factor.
     ///
     /// A faction that reaches this multiple of the held ground of another
     /// moves its relation toward war against that faction on every tick, and
@@ -154,13 +159,35 @@ impl World {
     /// reaches the war band. A ratio at or below zero takes the rule out of
     /// the game.
     ///
+    /// **This writes every faction.** A caller that wants two versions of the
+    /// controller in one world writes each faction on its own verb below.
+    ///
     /// The ratio is a balance value, and the register holds the row.[^1]
     ///
     /// # References
     ///
     /// [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
-    pub const fn set_overmatch_ratio(&mut self, raw: i32) {
+    pub fn set_overmatch_ratio(&mut self, raw: i32) {
         self.controller.set_overmatch_ratio(Fix32(raw));
+    }
+
+    /// Sets the ratio of one faction, and leaves every other faction where it
+    /// is.
+    ///
+    /// **The ratio is the one setting that parts one version of the built-in
+    /// controller from another.** Two factions of one world may hold two
+    /// values, so a measurement of the two is free of the world they played.
+    ///
+    /// The value is simulated state and it enters the state hash, so a write
+    /// parts two worlds on the next tick.[^1] Returns `false` and changes
+    /// nothing when the world has no such faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    pub fn set_faction_overmatch_ratio(&mut self, faction: FactionId, raw: i32) -> bool {
+        self.controller
+            .set_faction_overmatch_ratio(faction, Fix32(raw))
     }
 
     /// Returns how many carriers one faction assigns to one contract.
@@ -774,6 +801,12 @@ impl World {
     /// the population, as the verb it feeds does when a Python caller names
     /// the same set.
     ///
+    /// **Each faction reads its own overmatch ratio when the stage names its
+    /// prey.** Two versions of the built-in controller therefore play one
+    /// world. The scan walks the factions in ascending order, so nothing in
+    /// it depends on a thread or on a hash. A faction the controller holds no
+    /// row for names no prey.
+    ///
     /// # References
     ///
     /// [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D4. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
@@ -847,11 +880,12 @@ impl World {
         // would refuse it. **The prey is chosen from the same held ground
         // list the rival is chosen from**, so the two never read different
         // counts of one tick.
-        let ratio = self.controller.overmatch_ratio();
         let prey: Vec<Option<FactionId>> = (0..factions)
             .map(|index| {
                 speakers[index]?;
-                controller::prey_of(FactionId(index as u16), ratio, held.iter().copied())
+                let faction = FactionId(index as u16);
+                let ratio = self.controller.overmatch_ratio(faction)?;
+                controller::prey_of(faction, ratio, held.iter().copied())
             })
             .collect();
         // A faction that holds a carrier raises no campaign, because the

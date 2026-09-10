@@ -244,21 +244,50 @@ impl PyWorld {
         self.lock().set_campaign_cohort_size(cohort);
     }
 
-    /// The held ground a faction must have over another before it hunts it,
-    /// as a raw Q16.16 factor. The value is a row of the balance
+    /// Returns the ratio of one faction, as a raw Q16.16 factor.
+    ///
+    /// The ratio is the held ground that faction must have over another
+    /// before it hunts it. **Each faction holds its own value**, so two
+    /// versions of the built-in controller play one world and a comparison
+    /// between them is free of the world. The value is a row of the balance
     /// register.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world.
     ///
     /// # References
     ///
     /// [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
-    #[getter]
-    fn overmatch_ratio(&self) -> i32 {
-        self.lock().overmatch_ratio()
+    fn faction_overmatch_ratio(&self, faction: u16) -> PyResult<i32> {
+        self.lock()
+            .faction_overmatch_ratio(FactionId(faction))
+            .ok_or_else(|| VerbError::new_err(format!("{faction} names no faction of this world")))
     }
 
-    /// Sets the held ground a faction must have over another before it hunts
-    /// it, as a raw Q16.16 factor. A ratio at or below zero takes the rule
-    /// out of the game. Returns `None`.
+    /// Sets the ratio of one faction, as a raw Q16.16 factor, and leaves
+    /// every other faction where it is. A ratio at or below zero takes the
+    /// rule out of the game for that faction. Returns `None`.
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the number names no faction of this world. A
+    /// refused write changes nothing.
+    fn set_faction_overmatch_ratio(&self, faction: u16, raw: i32) -> PyResult<()> {
+        if self
+            .lock()
+            .set_faction_overmatch_ratio(FactionId(faction), raw)
+        {
+            Ok(())
+        } else {
+            Err(VerbError::new_err(format!(
+                "{faction} names no faction of this world"
+            )))
+        }
+    }
+
+    /// Sets the ratio of every faction, as a raw Q16.16 factor. A ratio at or
+    /// below zero takes the rule out of the game. Returns `None`.
     fn set_overmatch_ratio(&self, raw: i32) {
         self.lock().set_overmatch_ratio(raw);
     }
