@@ -248,15 +248,16 @@ impl UpgradeCollapsed {
 /// A level one event says that the first level of the category finished, so
 /// something stands on ground that carried nothing. A higher level says that
 /// what stood there grew. A watcher reads a wonder from the category column and
-/// needs no second reader for it. **A finished wonder ends no game**, because
-/// the wealth-or-wonder path has no reader.
+/// needs no second reader for it. **A finished wonder ends the game**,
+/// because the wonder reader names the faction that holds its ground.[^1]
 ///
 /// The layout is 8 + 4 + 2 + 1 + 1 bytes, which is 16 bytes at an alignment
-/// of 8. The type needs no padding byte, and it holds none.[^1]
+/// of 8. The type needs no padding byte, and it holds none.[^2]
 ///
 /// # References
 ///
-/// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+/// [^1]: ADR-0174, a wonder is a win path and a stock total is not, decision D1. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
+/// [^2]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 pub struct UpgradeFinished {

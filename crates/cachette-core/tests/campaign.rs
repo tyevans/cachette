@@ -33,7 +33,7 @@ const B: FactionId = FactionId(1);
 /// The people each founding settles. Small, so a step is cheap.
 const GROUP: u32 = 8;
 
-/// The most ticks a test waits for the war weight to roll a raise. The
+/// The most ticks a test waits for the renown weight to roll a raise. The
 /// weight is at least one in nine, so the wait is generous.
 const PATIENCE: usize = 400;
 
@@ -181,15 +181,106 @@ fn the_seed_is_in_the_campaign_draw_key() {
 }
 
 #[test]
-fn the_war_weight_biases_the_campaign_draw() {
-    let count = |war: u8| {
+fn the_renown_weight_biases_the_campaign_draw() {
+    let count = |renown: u8| {
         (0..512u64)
             .filter(|tick| {
-                wants_campaign(9, Tick(*tick), A, 3, FactionWeights { war, ..middling() })
+                wants_campaign(
+                    9,
+                    Tick(*tick),
+                    A,
+                    3,
+                    FactionWeights {
+                        renown,
+                        ..middling()
+                    },
+                )
             })
             .count()
     };
-    assert!(count(8) > count(1), "a higher war weight raises more often");
+    assert!(
+        count(8) > count(1),
+        "a higher renown weight raises more often"
+    );
+}
+
+#[test]
+fn the_war_weight_does_not_reach_the_campaign_draw() {
+    let draws = |war: u8| {
+        (0..512u64)
+            .map(|tick| wants_campaign(9, Tick(tick), A, 3, FactionWeights { war, ..middling() }))
+            .collect::<Vec<bool>>()
+    };
+    assert!(
+        draws(1) == draws(8),
+        "the war weight decides the relation move and not the raise"
+    );
+}
+
+/// The campaign raise read the war weight until the engine split the two
+/// decisions. The two draws share one formula and one range, so a faction
+/// whose war weight equals its renown weight raises as it did before the
+/// split.
+#[test]
+fn an_equal_pair_of_weights_raises_as_the_war_weight_alone_did() {
+    for weight in cachette_core::WEIGHT_LOW..=cachette_core::WEIGHT_HIGH {
+        let weights = FactionWeights {
+            war: weight,
+            renown: weight,
+            ..middling()
+        };
+        let campaign: Vec<bool> = (0..256u64)
+            .map(|tick| wants_campaign(9, Tick(tick), A, 3, weights))
+            .collect();
+        let relation: Vec<bool> = (0..256u64)
+            .map(|tick| {
+                cachette_core::controller::wants_relation_move(9, Tick(tick), A, 3, weights)
+            })
+            .collect();
+        assert_eq!(
+            campaign, relation,
+            "one formula and one range, so an equal pair gives one answer"
+        );
+    }
+}
+
+/// Counts the campaigns faction A raises over a fixed window, under one
+/// weight vector. The engine drives the draw, so this starts at the step.
+fn raises_over_the_window(seed: u64, weights: FactionWeights) -> usize {
+    let mut world = World::new(config(seed)).expect("the extent describes a world");
+    seat_two(&mut world);
+    declare_war(&mut world);
+    assert!(world.set_faction_weights(A, weights));
+    let mut raised = 0usize;
+    for _ in 0..PATIENCE {
+        world.step(2).expect("the step runs");
+        raised += world
+            .campaign_log()
+            .iter()
+            .filter(|event| event.kind == EVENT_RAISED && event.faction == A)
+            .count();
+    }
+    raised
+}
+
+#[test]
+fn the_renown_weight_reaches_the_raise_through_the_step() {
+    let eager = FactionWeights {
+        war: 4,
+        renown: cachette_core::WEIGHT_HIGH,
+        ..middling()
+    };
+    let idle = FactionWeights {
+        war: 4,
+        renown: cachette_core::WEIGHT_LOW,
+        ..middling()
+    };
+    let many = raises_over_the_window(35, eager);
+    let few = raises_over_the_window(35, idle);
+    assert!(
+        many > few,
+        "the engine raised {many} campaigns at the high renown weight and {few} at the low one"
+    );
 }
 
 #[test]

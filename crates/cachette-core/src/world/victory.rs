@@ -58,7 +58,7 @@ pub struct Standing {
     ///
     /// # References
     ///
-    /// [^1]: ADR-0173, the wealth or wonder path has no reader, decision D1. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
+    /// [^1]: ADR-0174, a wonder is a win path and a stock total is not, decision D1. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
     pub wonder_progress: i64,
 }
 

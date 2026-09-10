@@ -220,12 +220,26 @@ pub struct CampaignEvent {
 ///
 /// **This draws exactly once.** The key is the controller system, the tick,
 /// the faction and the draw index, and the index is the one past the relation
-/// draw so it collides with no other.[^1] The war weight biases the draw: the
-/// answer is yes with probability `war / (WEIGHT_HIGH + war)`.
+/// draw so it collides with no other.[^1] The renown weight biases the draw:
+/// the answer is yes with probability `renown / (WEIGHT_HIGH + renown)`.
+///
+/// **The renown weight and not the war weight decides this.** The war weight
+/// decides whether a faction moves its relation toward war, and this decides
+/// how often it marches once it is at war. One number for both welded the two
+/// together, so no controller could declare war often and campaign rarely.[^2]
+/// A campaign is also the one order that fells enemy units, and a felled unit
+/// is the one source of renown, so this weight is what a faction steers the
+/// renown win path with.[^3]
+///
+/// The two draws share one formula and one range, so a faction whose war
+/// weight equals its renown weight raises exactly as it did when the war
+/// weight decided this.
 ///
 /// # References
 ///
 /// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+/// [^2]: Findings register, FND-738. `docs/FINDINGS.md`
+/// [^3]: The renown award and the champion rule. `crates/cachette-core/src/world/character.rs`
 #[must_use]
 pub fn wants_campaign(
     seed: u64,
@@ -235,9 +249,9 @@ pub fn wants_campaign(
     weights: FactionWeights,
 ) -> bool {
     let raw = rng::draw(seed, rng::SYSTEM_CONTROLLER, tick.0, faction.0 as u64, draw);
-    let bound = u64::from(WEIGHT_HIGH) + u64::from(weights.war);
+    let bound = u64::from(WEIGHT_HIGH) + u64::from(weights.renown);
     let roll = ((u128::from(raw) * u128::from(bound)) >> 64) as u64;
-    roll < u64::from(weights.war)
+    roll < u64::from(weights.renown)
 }
 
 /// Picks the objective among candidate sites: the nearest by distance, and a

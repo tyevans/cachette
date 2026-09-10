@@ -55,6 +55,12 @@ its copy to a value the engine had already compressed, so a term over a
 population measured the logarithm of a logarithm. Eight times the people moved
 that term by one part in a hundred of its range.[^13]
 
+Local instance. One number decided two choices of the built-in controller. The
+war weight biased the relation move toward a rival, and it biased the campaign
+raise as well, so no controller could declare war often and march rarely. The
+renown weight sat beside it and decided nothing. The campaign raise now takes
+the renown weight.[^14]
+
 **Rule.** Declare a value once. When a second site must exist, add a check that
 fails when the copies disagree. Do not add a comment that names the winner. A
 comment that explains which copy loses is evidence that the second copy should
@@ -106,6 +112,11 @@ Imported evidence. One reference project shipped nine inert capabilities in one
 wave. It later wrote a record about a list of telemetry keys that nothing
 emitted, after an earlier record had claimed the list described real
 behaviour.[^1]
+
+Local instance. The renown weight of a faction was drawn, stored, hashed and
+published, and no decision read it. A tool that ranks versions of the
+controller had to leave the weight out of its key, because two versions that
+differed only there played one game twice.[^14]
 
 **Rule.** Ask who is obligated to invoke this: the user, or the engine. If the
 engine, the test must start at the engine.[^6]
@@ -183,3 +194,4 @@ Before you claim work is done, check each line.
 [^11]: Findings register, FND-581. `docs/FINDINGS.md`
 [^12]: Findings register, FND-628. `docs/FINDINGS.md`
 [^13]: Findings register, FND-701. `docs/FINDINGS.md`
+[^14]: Findings register, FND-738. `docs/FINDINGS.md`

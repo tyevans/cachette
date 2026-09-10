@@ -205,14 +205,14 @@ def test_the_seating_check_refuses_a_world_that_nothing_wrote_to() -> None:
 def test_a_pair_that_differs_only_in_an_inert_weight_is_refused() -> None:
     """Two versions that steer alike are one player twice, and the tool says so.
 
-    No decision that changes the world reads the trade weight or the renown
-    weight. A ranking that parted two such versions would measure noise.
+    No decision that changes the world reads the trade weight. A ranking that
+    parted two such versions would measure noise.
     """
     one = tool.Version(
-        name="one", weights=tool.Weights(war=4, trade=1, build=4, renown=1, settle=4)
+        name="one", weights=tool.Weights(war=4, trade=1, build=4, renown=4, settle=4)
     )
     other = tool.Version(
-        name="other", weights=tool.Weights(war=4, trade=8, build=4, renown=8, settle=4)
+        name="other", weights=tool.Weights(war=4, trade=8, build=4, renown=4, settle=4)
     )
     with pytest.raises(ValueError, match="steers the world exactly as"):
         tool.require_steering_apart([one, other])
@@ -225,6 +225,22 @@ def test_a_pair_that_differs_in_a_steering_weight_is_allowed() -> None:
     )
     other = tool.Version(
         name="other", weights=tool.Weights(war=4, trade=1, build=8, renown=1, settle=4)
+    )
+    tool.require_steering_apart([one, other])
+
+
+def test_a_pair_that_differs_only_in_the_renown_weight_is_allowed() -> None:
+    """The renown weight biases the campaign raise, so it parts two players.
+
+    The tool left this weight out of the steering key while no decision read
+    it. The engine now takes the campaign raise from it, so a pair that
+    differs only here plays two different games.
+    """
+    one = tool.Version(
+        name="one", weights=tool.Weights(war=4, trade=1, build=4, renown=1, settle=4)
+    )
+    other = tool.Version(
+        name="other", weights=tool.Weights(war=4, trade=1, build=4, renown=8, settle=4)
     )
     tool.require_steering_apart([one, other])
 

@@ -11,17 +11,19 @@ A design report proposes a family of such versions and predicts an order for
 them.[^1] This tool holds that family by name, so a caller seats a member
 rather than spelling its settings out.
 
-# Two of the weights steer nothing, and the tool refuses a pair that ties
+# One weight steers nothing, and the tool refuses a pair that ties
 
 The trade weight biases one draw, and that draw reaches a subsystem that
-records no offer, no contract and no carrier over a whole run.[^1] **No
-decision reads the renown weight at all.** The engine draws it, stores it,
-hashes it and publishes it, and nothing else reads it.
+records no offer, no contract and no carrier over a whole run.[^1]
 
-Two versions that differ only in those two weights are therefore one player
+Two versions that differ only in the trade weight are therefore one player
 twice. A ranking that ordered them would report noise as a result. The tool
 reads the steering part of each version and refuses a schedule that holds one
 of them twice.
+
+**The renown weight now steers the campaign raise.** It reached no decision
+until the engine split the raise away from the war weight, so a version that
+names it is a version of its own.[^5]
 
 # One world, and not two
 
@@ -115,6 +117,8 @@ References
 
 [^4]: The rating tool of the stored policies.
 ``scripts/policy_league.py``
+
+[^5]: Findings register, FND-738. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -228,10 +232,10 @@ class Weights:
     between one and eight. The verb that writes the vector refuses a weight
     outside that bound, so this holds no copy of the bound.[^1]
 
-    The war weight biases the relation move and the campaign raise. The build
-    weight splits an evaluation between a gather order and a build order. The
-    settle weight biases the founding draw. **The trade weight and the renown
-    weight reach no decision that changes the world today.**[^2]
+    The war weight biases the relation move. The renown weight biases the
+    campaign raise. The build weight splits an evaluation between a gather
+    order and a build order. The settle weight biases the founding draw.
+    **The trade weight reaches no decision that changes the world today.**[^2]
 
     References
     ----------
@@ -280,9 +284,10 @@ class Version:
         """Return the part of this version that reaches a decision.
 
         Two versions with one steering value are one player twice. The trade
-        weight and the renown weight are out of the answer, because no
-        decision that changes the world reads them. A version under external
-        control makes no decision at all, so its whole configuration is out.
+        weight is out of the answer, because no decision that changes the
+        world reads it. The renown weight is in the answer, because it biases
+        the campaign raise. A version under external control makes no
+        decision at all, so its whole configuration is out.
         """
         drawn = self.weights
         if self.external:
@@ -291,6 +296,7 @@ class Version:
             "played",
             None if drawn is None else drawn.war,
             None if drawn is None else drawn.build,
+            None if drawn is None else drawn.renown,
             None if drawn is None else drawn.settle,
             self.ratio,
         )
@@ -310,8 +316,16 @@ class Version:
 # member writes, so a member with no weight vector plays the vector the seed
 # drew for its seat.
 #
+# **Every member carries its war weight in its renown weight as well.** The
+# war weight decided the relation move and the campaign raise together when
+# the report wrote this family. The engine now takes the campaign raise from
+# the renown weight, so an equal pair keeps each member playing as the report
+# describes it.[^2]
+#
 # [^1]: Report 44, the proposed variants.
 # ``docs/research/reports/44-a-family-of-tunable-controllers.md``
+#
+# [^2]: Findings register, FND-738. ``docs/FINDINGS.md``
 FAMILY: dict[str, Version] = {
     "mute": Version(name="mute", external=True),
     "quietist": Version(
@@ -329,11 +343,11 @@ FAMILY: dict[str, Version] = {
     "default": Version(name="default"),
     "warlord": Version(
         name="warlord",
-        weights=Weights(war=8, trade=1, build=3, renown=1, settle=4),
+        weights=Weights(war=8, trade=1, build=3, renown=8, settle=4),
     ),
     "hunter": Version(
         name="hunter",
-        weights=Weights(war=8, trade=1, build=1, renown=1, settle=1),
+        weights=Weights(war=8, trade=1, build=1, renown=8, settle=1),
         ratio=RATIO_ONE,
     ),
 }
@@ -451,9 +465,8 @@ def require_steering_apart(versions: Sequence[Version]) -> None:
     """Refuse a schedule that holds one player twice under two names.
 
     **A ranking that parts two identical players measures noise.** Two
-    versions that differ only in the trade weight or in the renown weight
-    reach the world alike, because no decision that changes the world reads
-    either weight.
+    versions that differ only in the trade weight reach the world alike,
+    because no decision that changes the world reads that weight.
 
     **One tie stays outside this check.** A version that leaves the hunting
     ratio alone and a version that spells the engine default out hold two
