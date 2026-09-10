@@ -320,7 +320,8 @@ def _bare(world: World, camera: Camera) -> np.ndarray:
     shows_ground = (
         ground.drawn[np.clip(take_y, 0, None)][:, np.clip(take_x, 0, None)] & on_page
     )
-    return on_page & ~shows_ground
+    bare: np.ndarray = on_page & ~shows_ground
+    return bare
 
 
 def test_the_deep_of_the_sky_reaches_the_page() -> None:
