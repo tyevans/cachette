@@ -234,6 +234,10 @@ def _drive(
     policy that publishes none reports no preference, and the tally then says
     that the preference was never read.
 
+    **A pass whose seat the built-in controller holds asks no policy for a
+    choice.** The environment of such a world discards an action, so every
+    number this loop reports is the same without one.
+
     References
     ----------
     [^1]: Findings register, FND-707. ``docs/FINDINGS.md``
@@ -251,22 +255,7 @@ def _drive(
     told = 0
     decisions = 0
     while not vector.done:
-        masks = vector.action_masks()
-        actions = [0] * len(pairs)
-        rows = [-1] * len(pairs)
-        # Each candidate scores its own worlds. The rows of one candidate are
-        # contiguous, so one matrix product answers for all of them.
-        for candidate, policy in enumerate(policies):
-            first = candidate * len(seeds)
-            last = first + len(seeds)
-            scores = _score_matrix(policy, observations[first:last])
-            if scores is None:
-                actions[first:last] = policy.choose_many(
-                    observations[first:last], masks[first:last]
-                )
-            else:
-                actions[first:last] = masked_choices(scores, masks[first:last])
-                rows[first:last] = preferred_rows(scores)
+        actions, rows = _choices(vector, policies, len(seeds), observations)
         results = vector.step(actions)
         observations = np.stack([result.observation for result in results])
         for index, result in enumerate(results):
@@ -326,6 +315,51 @@ def _drive(
             for index in range(len(pairs))
         ],
     )
+
+
+def _choices(
+    vector: VectorEnv,
+    policies: Sequence[Policy],
+    seeds: int,
+    observations: np.ndarray,
+) -> tuple[list[int], list[int]]:
+    """Return the action of each world, and the row each policy preferred.
+
+    **A world whose seat the built-in controller holds reads no action**, so
+    this asks no policy for one. The environment of such a world answers
+    nothing from its apply step, the loop counts no decision for it, and the
+    instrument reports no preference. Every one of those answers is the same
+    answer this gives, and the pass no longer pays for the choice behind it.
+
+    The choice is the largest term of the section that one interpreter runs
+    between two decisions, and every engine worker of the process waits for
+    that section. A controller pass over a wide world spent about a twelfth
+    of its wall clock building a score matrix that no seat read.
+
+    A row of minus one says that nothing read the preference of that world.
+    A policy that publishes no score matrix reports the same, because a
+    uniform draw and a fixed no-op prefer no row.
+    """
+    count = len(vector)
+    actions = [0] * count
+    rows = [-1] * count
+    if not vector.controlled:
+        return actions, rows
+    masks = vector.action_masks()
+    # Each candidate scores its own worlds. The rows of one candidate are
+    # contiguous, so one matrix product answers for all of them.
+    for candidate, policy in enumerate(policies):
+        first = candidate * seeds
+        last = first + seeds
+        scores = _score_matrix(policy, observations[first:last])
+        if scores is None:
+            actions[first:last] = policy.choose_many(
+                observations[first:last], masks[first:last]
+            )
+        else:
+            actions[first:last] = masked_choices(scores, masks[first:last])
+            rows[first:last] = preferred_rows(scores)
+    return actions, rows
 
 
 def _score_matrix(policy: Policy, observations: np.ndarray) -> np.ndarray | None:
