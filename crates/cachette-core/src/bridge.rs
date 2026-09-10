@@ -267,6 +267,34 @@ impl BlockLayout {
         Some((u64::from(block) << (2 * self.block_bits)) | u64::from(inside))
     }
 
+    /// Returns the tile that a key names.
+    ///
+    /// **This is the inverse of the key, and it stands beside it.** A caller
+    /// that walks the tiles of one block builds each key from the block and
+    /// an offset, and it must not restate the bit layout to read the address
+    /// back.[^1]
+    ///
+    /// Returns `None` when the key names no tile of this world. A block on
+    /// the right or the bottom edge of the world holds offsets that lie
+    /// outside it, and every one of those answers `None`.
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[must_use]
+    pub fn tile_of_key(self, key: u64) -> Option<TileIdx> {
+        let block = self.block_of_key(key);
+        let inside = self.offset_of_key(key);
+        let wide = self.blocks_wide();
+        if wide == 0 || block >= self.block_count() {
+            return None;
+        }
+        let mask = self.block_edge() - 1;
+        let column = (block % wide) * self.block_edge() + (inside & mask);
+        let row = (block / wide) * self.block_edge() + (inside >> self.block_bits);
+        self.grid.index_of(Axial::new(column as i32, row as i32))
+    }
+
     /// Returns the block that a key names.
     #[must_use]
     pub const fn block_of_key(self, key: u64) -> u32 {

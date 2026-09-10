@@ -67,6 +67,7 @@ pub mod soldier;
 pub mod sort;
 pub mod stage;
 mod stock;
+pub mod storm;
 pub mod terrain;
 pub mod tier;
 pub mod tile_value;

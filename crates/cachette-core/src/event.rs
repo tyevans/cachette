@@ -175,6 +175,12 @@ pub const WEAR_CAUSE_ORDERED: WearCause = 4;
 /// tick than either of them. A tile that burns and also carries a hostile
 /// army reports the fire.
 pub const WEAR_CAUSE_FIRE: WearCause = 5;
+/// A storm stood over the upgrade.
+///
+/// The storm outranks the weather and the army causes, because it takes far
+/// more in one tick than either of them, and it is a passing thing that a
+/// reader wants named. It ranks under the fire, which takes more still.
+pub const WEAR_CAUSE_STORM: WearCause = 6;
 
 /// An upgrade is gone from its tile.
 ///

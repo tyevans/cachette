@@ -212,3 +212,21 @@ pub const SYSTEM_GROWTH: SystemId = 13;
 /// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D6. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 pub const SYSTEM_FIRE: SystemId = 14;
+
+/// The system identifier of the storm damage pass.
+///
+/// The storm damage pass owns this identifier alone. It does not share the
+/// identifier of the weather field, because two systems that share an
+/// identifier draw the same value from the same frame, entity and draw
+/// index. A unit would then fall exactly where the storm that stands over it
+/// wandered.[^1]
+///
+/// A loss draw keys the whole identity of the unit into the entity slot, so a
+/// unit spawned into the slot of a unit the storm took draws its own
+/// answer.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+/// [^2]: ADR-0014, entity identity is an index plus a generation, decision D6. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+pub const SYSTEM_STORM: SystemId = 15;

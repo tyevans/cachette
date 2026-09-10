@@ -285,6 +285,7 @@ impl World {
             fire_started_log: Vec::new(),
             fire_ended_log: Vec::new(),
             burned_log: Vec::new(),
+            storm_lost_log: Vec::new(),
             climate_reference: 0,
             controller: Controller::new(config.seed, config.faction_count),
             balance: Balance::default(),
