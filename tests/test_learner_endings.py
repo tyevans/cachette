@@ -94,7 +94,12 @@ TRAINED = EnvConfig(
 # One seed whose game a win reader ends before the tick limit, and three whose
 # games run to the limit. The early ending is the case that separates the end
 # path from a constant.
-EARLY_SEED = 9
+#
+# **The early seed is a fixture and it decays.** Which seed a reader ends early
+# is a property of the engine. The seed was 9 until the campaign raise took the
+# renown weight, and that game then ran to the limit. The test of the early
+# ending asserts it, so a seed that stops ending early fails there first.
+EARLY_SEED = 116
 SEEDS = [0, EARLY_SEED, 3, 7]
 
 WEIGHTING = Weighting(terms={"held_tiles": 1.0}, won=100.0, lost=-100.0, drawn=0.0)
