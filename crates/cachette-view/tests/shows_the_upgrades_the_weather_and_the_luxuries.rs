@@ -19,6 +19,7 @@
 use cachette_core::luxury::LuxuryId;
 use cachette_core::resource::ResourceKind;
 use cachette_core::upgrade::{UpgradeCategory, UPGRADE_LEVEL_COUNT};
+use cachette_core::weather::Latitudes;
 use cachette_core::{Axial, Entity, FactionId, Holder, World, WorldConfig};
 use cachette_view::hud::TileReadout;
 use cachette_view::overlay;
@@ -91,6 +92,28 @@ fn settings() -> WorldConfig {
     }
 }
 
+/// Returns the settings of a world whose resting sky draws nothing.
+///
+/// **A world that spans one region rests under a whole sky.** A world takes
+/// the span of a region when the caller states none. The weather field then
+/// puts one pressure belt over every cell of it. No gradient carries the
+/// water away, and the picture washes every tile of the map at rest.
+///
+/// The air overlay is the one layer that follows the zoom. A resting wash
+/// therefore puts that layer over the stormed world and the settled world
+/// alike, and a test of the overlay measures the sky instead of the storm.
+///
+/// A world that spans the planet carries the belts, and it leaves the sky
+/// over the tile this fixture reads open. The test asserts that, so a later
+/// change that clouds the tile names the sky.
+fn clear_sky_settings() -> WorldConfig {
+    WorldConfig {
+        latitude_centre: Latitudes::PLANET.centre(),
+        latitude_span: Latitudes::PLANET.span(),
+        ..settings()
+    }
+}
+
 /// Builds a world in which one faction holds a band of ground.
 ///
 /// A faction holds the ground within reach of a city it owns, and a unit
@@ -107,7 +130,15 @@ fn settings() -> WorldConfig {
 /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 /// [^2]: Findings register, FND-487. `docs/FINDINGS.md`
 fn a_held_band() -> (World, Vec<(Entity, Axial)>) {
-    let mut world = World::new(settings()).expect("the extent describes a world");
+    a_held_band_under(settings())
+}
+
+/// Builds the held band in a world of the given settings.
+///
+/// One test needs a resting sky that draws nothing, and the settings are the
+/// only place a caller states the sky of a world.
+fn a_held_band_under(settings: WorldConfig) -> (World, Vec<(Entity, Axial)>) {
+    let mut world = World::new(settings).expect("the extent describes a world");
     let middle = (BAND.0 + BAND.1) / 2;
     let seat = (BAND.0..BAND.1)
         .flat_map(|row| (BAND.0..BAND.1).map(move |column| Axial::new(column, row)))
@@ -441,7 +472,7 @@ fn the_air_overlay_is_off_below_eight_pixels_a_tile() {
     // and costs contrast, so the overlay is off at the region scale.[^4]
     //
     // [^4]: Research report 23, defect 2. `docs/research/reports/23-demonstration-readability-review-1.md`
-    let (mut stormy, _) = a_held_band();
+    let (mut stormy, _) = a_held_band_under(clear_sky_settings());
     let mut settled = stormy.clone();
     let place = a_held_tile(&stormy);
     stormy
@@ -449,6 +480,16 @@ fn the_air_overlay_is_off_below_eight_pixels_a_tile() {
         .expect("the faction holds the ground it storms");
     stormy.step(1).expect("the step must run");
     settled.step(1).expect("the step must run");
+    assert_eq!(
+        paint::air_weight(paint::cloud_mass_at(
+            &settled,
+            place,
+            paint::cloud_drift(&settled)
+        )),
+        0,
+        "the resting sky already draws over the tile, so the fixture cannot \
+         isolate the storm"
+    );
     assert!(
         paint::air_weight(paint::cloud_mass_at(
             &stormy,
@@ -607,6 +648,26 @@ fn a_building_site_changes_the_tile_it_stands_on() {
 /// of a unit. A tile this wide leaves a corner of the glyph outside the
 /// disc, so a test reads the mark and not the builder standing on it.
 const SITE_TILE: f32 = 32.0;
+
+/// Returns the world a build test compares its built world against.
+///
+/// **The control takes every step the built world takes.** A built world
+/// steps once to put work into its site, and a step moves the sky over the
+/// whole map. A control drawn one tick earlier therefore differs at the
+/// corner of the tile for a reason the site had no part in, and a test of
+/// the mark would then measure the weather. The control moves the builder
+/// aside and rebuilds the bridge for the same reason.
+///
+/// The control orders no build. The mark of a site is therefore the one
+/// thing that stands between it and the built world.
+fn the_control_for_a_build(world: &World, builder: Entity, aside: Axial) -> World {
+    let mut bare = world.clone();
+    bare.step(1).expect("the step must run");
+    bare.place_soldier(builder, aside)
+        .expect("the tile aside admits the unit");
+    bare.rebuild_bridge(1).expect("the bridge rebuilds");
+    bare
+}
 
 /// Returns a pixel inside the glyph of a build site.
 ///
@@ -784,8 +845,9 @@ fn each_kind_of_build_site_draws_its_own_glyph() {
         .find(|at| world.admits_a_unit(*at))
         .expect("the world holds open ground outside the band");
 
-    let bare_camera = camera_at(&world, address, SITE_TILE);
-    let bare_corner = corner_of(&drawn_at(&world, address, SITE_TILE), bare_camera, address);
+    let bare = the_control_for_a_build(&world, builder, aside);
+    let bare_camera = camera_at(&bare, address, SITE_TILE);
+    let bare_corner = corner_of(&drawn_at(&bare, address, SITE_TILE), bare_camera, address);
 
     // The table holds no row for every category on every ground. A category
     // the ground under the builder does not fit is refused by the engine, and

@@ -33,6 +33,7 @@ use std::time::Duration;
 
 use cachette_core::cohort::{NeedCondition, NeedRule, NEED_FULL};
 use cachette_core::site::CommodityId;
+use cachette_core::weather::{Latitudes, LATITUDE_FINE};
 use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
 use cachette_view::{draw_frame, paint, Camera, Canvas, Metrics, Overlay};
 
@@ -73,6 +74,19 @@ const ENDING_STEPS: usize = 18;
 /// The threads the fixture steps at.
 const THREADS: usize = 4;
 
+/// The latitude the fixture world stands at, in hundredths of a degree.
+///
+/// **These tests are about a food shortage, so the sky must end nobody.** A
+/// storm ends a unit where it lands. A unit the sky ended is gone, and a unit
+/// a shortage ended is gone as well, so the two read back alike.
+///
+/// A world takes forty-five degrees north when the caller states no latitude.
+/// A storm ends a unit of the group that eats at that latitude, and the
+/// fixture then cannot tell the two deaths apart. No storm reaches the run at
+/// this latitude. The runner below asserts that, so a later change that
+/// storms this latitude names the weather.
+const CALM_LATITUDE: i32 = 25 * LATITUDE_FINE;
+
 /// What the fixture built.
 struct Fixture {
     /// The units of a site that feeds them.
@@ -92,7 +106,8 @@ fn hungry_world() -> (World, Fixture) {
         seed: 7,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
-        ..WorldConfig::DEFAULT
+        latitude_centre: CALM_LATITUDE,
+        latitude_span: Latitudes::REGION.span(),
     })
     .expect("the extent describes a world");
     world
@@ -165,15 +180,32 @@ fn open_ground(world: &World) -> Vec<Axial> {
         .collect()
 }
 
+/// Steps the world, and asserts that no storm ended a unit.
+///
+/// The world holds the log of the units that the last step lost to a storm.
+/// This fixture is about a food shortage, so a storm inside the run is an
+/// uncontrolled quantity inside the sample. The assertion names the weather,
+/// so nothing tells the reader that the shortage reached a group it did not
+/// reach.
+fn step_without_a_storm(world: &mut World, steps: usize) {
+    for _ in 0..steps {
+        world.step(THREADS).expect("the step must run");
+        assert!(
+            world.units_lost_to_storms().is_empty(),
+            "a storm ended {} units, so the fixture cannot tell a death by a \
+             shortage from a death by the weather",
+            world.units_lost_to_storms().len(),
+        );
+    }
+}
+
 /// Runs the fixture until the shortage bites, and returns what it produced.
 ///
 /// The fixture asserts its own outcome. A run in which nobody went short
 /// would pass every test below without drawing anything.
 fn bitten() -> (World, Fixture) {
     let (mut world, fixture) = hungry_world();
-    for _ in 0..SHORT_STEPS {
-        world.step(THREADS).expect("the step must run");
-    }
+    step_without_a_storm(&mut world, SHORT_STEPS);
     let short = fixture
         .hungry
         .iter()
@@ -436,9 +468,7 @@ fn a_drawn_frame_leaves_the_hungry_world_where_it_found_it() {
 /// test of the row that states the deaths.
 fn ended() -> World {
     let (mut world, fixture) = hungry_world();
-    for _ in 0..ENDING_STEPS {
-        world.step(THREADS).expect("the step must run");
-    }
+    step_without_a_storm(&mut world, ENDING_STEPS);
     assert!(
         !world.starved_log().is_empty(),
         "the scan ended nobody in {ENDING_STEPS} steps, so the fixture \
