@@ -253,8 +253,27 @@ fn order_a_lodging(world: &mut World, address: Axial) -> Entity {
 }
 
 /// Steps until the level on a tile reaches one value.
+///
+/// **The loop states that the builder is alive on every tick.** A builder that
+/// left the world takes no build order, and the loop would then run out its
+/// budget and report a slow world. The polar region of this fixture forms no
+/// storm, so a builder that goes names the storm log that did not name it.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-744. `docs/FINDINGS.md`
 fn step_until_level(world: &mut World, unit: Entity, address: Axial, level: u8) {
-    for _ in 1..=BUILD_PATIENCE {
+    for tick in 1..=BUILD_PATIENCE {
+        assert!(
+            world.soldiers().contains(unit),
+            "the world ended the builder on tick {tick}, and the storm log of that tick names \
+             {:?}",
+            world
+                .units_lost_to_storms()
+                .iter()
+                .map(|lost| lost.unit)
+                .collect::<Vec<u64>>()
+        );
         let here = world
             .soldiers_on(address)
             .map(|units| units.contains(&unit))
@@ -264,7 +283,9 @@ fn step_until_level(world: &mut World, unit: Entity, address: Axial, level: u8) 
                 .place_soldier(unit, address)
                 .expect("the ground admits the builder");
         }
-        let _ = world.order_build(unit, UpgradeCategory::LODGING);
+        world
+            .order_build(unit, UpgradeCategory::LODGING)
+            .expect("the builder stands on ground that fits a lodging");
         world.step(1).expect("the step must run");
         if world.upgrade_level(address) >= level {
             return;
