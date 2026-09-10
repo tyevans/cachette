@@ -23,7 +23,7 @@
 
 use cachette_core::holding::ReachRules;
 use cachette_core::plan::PlanRules;
-use cachette_core::upgrade::{BuildRefusal, UpgradeCategory};
+use cachette_core::upgrade::{BuildRefusal, UpgradeCategory, ROAD_LEVEL_1_WORK};
 use cachette_core::{Axial, Entity, FactionId, Project, World, WorldConfig, SUBSYSTEM_CENSUS};
 
 /// The extent that these tests read.
@@ -44,12 +44,48 @@ const ZERO: FactionId = FactionId(0);
 
 /// Builds a world with no city and no plan.
 fn bare(seed: u64) -> World {
+    let default = WorldConfig::DEFAULT;
+    bare_at(seed, default.latitude_centre, default.latitude_span)
+}
+
+/// The latitude centre of the sky that the join fixture stands under.
+///
+/// **A polar region with a wide latitude span leaves the ground dry.** Cold
+/// air carries little water, so no rain reaches the ground. Every centre from
+/// 75 south to 62 south holds a tile dry for four thousand ticks at this
+/// span.[^1] A storm still forms over a world of this extent, and it ended no
+/// unit of this fixture, so the fixture reads what it needs rather than
+/// claiming a sky with no storm in it.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-747. `docs/FINDINGS.md`
+const QUIET_CENTRE: i32 = -7000;
+
+/// The latitude span of the sky that the join fixture stands under.[^1]
+///
+/// # References
+///
+/// [^1]: Findings register, FND-747. `docs/FINDINGS.md`
+const QUIET_SPAN: i32 = 3000;
+
+/// Builds an empty world under the sky that the caller names.
+///
+/// The latitude centre and the span decide the rain and the storms of a
+/// world, so they are the arguments a caller varies.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
+fn bare_at(seed: u64, latitude_centre: i32, latitude_span: i32) -> World {
     let mut world = World::new(WorldConfig {
         width: WIDTH,
         height: HEIGHT,
         seed,
         faction_count: 4,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        latitude_centre,
+        latitude_span,
         ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
@@ -910,12 +946,35 @@ fn a_project_refuses_a_build_order_that_names_another_category() {
 /// [^1]: The founding distance. `crates/cachette-core/src/founding.rs`
 const JOIN_GAP: u32 = 16;
 
-/// How many ticks the join fixture runs.
+/// How many ticks of work a way of the gap asks for.
 ///
-/// A way of the gap above holds about that many tiles, and each tile takes
-/// the work of one road. The count is the ticks the builders need, with room
-/// for the ground that sends the way round.
-const JOIN_TICKS: u32 = 900;
+/// A way of the gap holds about as many tiles as the gap has steps, and each
+/// tile takes the work of the first level of a road before a road stands on
+/// it.[^1] The builders of the fixture each add one work in a tick, so the
+/// work of the way divided by the builders is the ticks the work costs. The
+/// figure reads the work from the engine, so a change to what a road costs
+/// flows into this file.
+///
+/// # References
+///
+/// [^1]: Balance register, the road work by level. `docs/reference/balance.md`
+const JOIN_WORK_TICKS: u32 = JOIN_GAP * ROAD_LEVEL_1_WORK / JOIN_BUILDERS;
+
+/// The slack that the join budget carries above the work it waits for.
+///
+/// **A budget equal to the work it waits for is a defect even when it is
+/// green.**[^1] A builder walks between the tiles of the way, the ground sends
+/// the way round, and neither cost is in the work table. The budget is the
+/// work times this multiple, and the test asserts that the join holds inside
+/// half of the budget, so the run proves the slack rather than stating it.
+///
+/// # References
+///
+/// [^1]: Findings register, FND-745. `docs/FINDINGS.md`
+const JOIN_SLACK: u32 = 4;
+
+/// How many ticks the join fixture runs.
+const JOIN_TICKS: u32 = JOIN_WORK_TICKS * JOIN_SLACK;
 
 /// How many builders the join fixture founds.
 ///
@@ -931,7 +990,15 @@ const JOIN_BUILDERS: u32 = 8;
 /// search radius, so no single window holds both, and the solver reaches it
 /// only by chaining windows.
 fn two_far_cities(seed: u64) -> (World, Axial, Axial) {
-    let mut world = bare(seed);
+    two_far_cities_under(bare(seed))
+}
+
+/// Builds the two far cities under the sky the caller already chose.
+///
+/// The join fixture needs a dry sky and no storms, and every other test of
+/// this file needs the sky a world of this project has. The world is therefore
+/// the argument, and one function seats the cities in either.
+fn two_far_cities_under(mut world: World) -> (World, Axial, Axial) {
     let seat = open_from(&world, Axial::new(20, 40));
     let other = open_from(&world, Axial::new(20 + JOIN_GAP as i32, 40));
     assert_ne!(seat, other, "the fixture needs two places");
@@ -1119,25 +1186,83 @@ fn the_chain_takes_a_hop_count_the_world_cannot_change() {
 /// controller sends the idle units, the build pass raises each road, and the
 /// walk at the end reads the ground rather than the plan.[^1]
 ///
+/// **The fixture states the sky it needs, and it reads the sky on every
+/// tick.** Rain and a storm wear a level that stands, and a builder pays the
+/// whole repair price before it advances the level, so the ticks a long build
+/// takes are a property of the sky.[^2] Under the sky of a region of this
+/// project the way stops two tiles short of the far city and stays there, at
+/// four thousand ticks as at nine hundred. The fixture therefore stands under
+/// a polar region, where cold air carries little water and no rain reaches the
+/// ground.[^3] The run reads two things on every tick: the ground of the
+/// corridor the way runs in is dry, and no storm ended a unit. A storm still
+/// forms over a world this wide at this latitude, so the run does not claim a
+/// sky with no storm in it.
+///
+/// **The budget is derived and the run proves its slack.** The join must hold
+/// inside half of the budget, so a build that slows down fails rather than
+/// landing on the boundary.[^4]
+///
 /// # References
 ///
 /// [^1]: Testing rules, sections 5 and 6. `.agents/rules/testing.md`
+/// [^2]: Findings register, FND-744. `docs/FINDINGS.md`
+/// [^3]: Findings register, FND-747. `docs/FINDINGS.md`
+/// [^4]: Findings register, FND-745. `docs/FINDINGS.md`
 #[test]
 fn two_settlements_of_one_faction_end_joined_by_a_road() {
-    let (mut world, seat, other) = two_far_cities(SEED);
-    for _ in 0..JOIN_TICKS {
+    let (mut world, seat, other) = two_far_cities_under(bare_at(SEED, QUIET_CENTRE, QUIET_SPAN));
+    let corridor: Vec<Axial> = addresses()
+        .into_iter()
+        .filter(|address| address.distance(seat) + address.distance(other) <= JOIN_GAP + 4)
+        .collect();
+    assert!(
+        corridor.len() > JOIN_GAP as usize,
+        "the corridor holds only {} tiles",
+        corridor.len()
+    );
+
+    let mut joined_at = None;
+    for tick in 1..=JOIN_TICKS {
         world.step(1).expect("the step runs");
+        assert!(
+            world.units_lost_to_storms().is_empty(),
+            "a storm ended a unit on tick {tick}, so the sky of this fixture is not the quiet \
+             sky it states"
+        );
+        for address in &corridor {
+            assert_eq!(
+                world.ground_is_wet(*address),
+                Some(false),
+                "the ground at {address:?} was wet on tick {tick}, so the sky of this fixture \
+                 is not the quiet sky it states"
+            );
+        }
+        if joined_at.is_none() && a_road_joins(&world, seat, other) {
+            joined_at = Some(tick);
+        }
     }
     assert!(world.check_invariants());
+
     let standing = addresses()
         .into_iter()
         .filter(|address| world.finished_upgrade(*address) == Some(UpgradeCategory::ROAD))
         .count();
+    let Some(joined_at) = joined_at else {
+        panic!(
+            "no road joins the two cities inside {JOIN_TICKS} ticks, \
+             with {standing} roads standing and {} projects left.\n{}",
+            plan_of(&world).len(),
+            join_report(&world, seat, other)
+        );
+    };
+    assert!(
+        joined_at * 2 <= JOIN_TICKS,
+        "the join held on tick {joined_at} of {JOIN_TICKS}, so the budget carries no slack"
+    );
     assert!(
         a_road_joins(&world, seat, other),
-        "no road joins the two cities after {JOIN_TICKS} ticks, \
-         with {standing} roads standing and {} projects left.\n{}",
-        plan_of(&world).len(),
+        "the road that joined the two cities on tick {joined_at} no longer stands at tick \
+         {JOIN_TICKS}, with {standing} roads standing.\n{}",
         join_report(&world, seat, other)
     );
 }
