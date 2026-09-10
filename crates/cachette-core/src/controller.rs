@@ -131,7 +131,8 @@ pub const CONTRACT_CARRIERS_DEFAULT: u32 = 2;
 pub const CONTRACT_TERM_DEFAULT: u32 = 200;
 
 /// The held ground a faction must have over another before it hunts it, as a
-/// raw Q16.16 factor.
+/// raw Q16.16 factor. Every faction of a new world starts on this value, and
+/// a caller may then give one faction a value of its own.
 ///
 /// A faction overmatches another when its own held ground reaches this
 /// multiple of the held ground of the other. An overmatched faction is prey:
@@ -272,10 +273,27 @@ pub struct FactionRow {
     pub externally_controlled: u8,
     /// Declared padding, always zero.
     ///
-    /// The row is 4 bytes of seat, the weight vector, one flag and this
-    /// array, at an alignment of four. The assertion below fails to compile
-    /// when the array stops filling the row.
-    pub padding: [u8; 6],
+    /// The row is 4 bytes of seat, the weight vector, one flag, this array
+    /// and the ratio below, at an alignment of four. The assertion below
+    /// fails to compile when the array stops filling the row.
+    pub padding: [u8; 2],
+    /// The held ground this faction must have over another before it hunts
+    /// it, as a raw Q16.16 factor.
+    ///
+    /// **The ratio belongs to one faction and not to the world.** Each
+    /// faction reads its own value when the stage names its prey, so two
+    /// versions of the built-in controller play one world and a comparison
+    /// between them is free of the world. A ratio at or below zero takes the
+    /// rule out of the game for that faction alone.
+    ///
+    /// The value is a balance row, and the register holds it.[^1] It is
+    /// simulated state, and the row enters the state hash, so a write parts
+    /// two worlds on the next tick.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
+    pub overmatch_ratio: i32,
 }
 
 /// The size of one controller row, in bytes.
@@ -1150,7 +1168,6 @@ pub struct Controller {
     surplus_mark: u32,
     contract_carriers: u32,
     contract_term: u32,
-    overmatch_ratio: Fix32,
     carriers: Vec<CarrierAssignment>,
     boards_written: u32,
     offers_made: u32,
@@ -1168,7 +1185,8 @@ impl Controller {
                 seat: NO_SEAT,
                 weights: FactionWeights::from_seed(seed, FactionId(index)),
                 externally_controlled: 0,
-                padding: [0; 6],
+                padding: [0; 2],
+                overmatch_ratio: OVERMATCH_RATIO_DEFAULT,
             })
             .collect();
         Self {
@@ -1184,7 +1202,6 @@ impl Controller {
             surplus_mark: SURPLUS_MARK_DEFAULT,
             contract_carriers: CONTRACT_CARRIERS_DEFAULT,
             contract_term: CONTRACT_TERM_DEFAULT,
-            overmatch_ratio: Fix32(OVERMATCH_RATIO_DEFAULT),
             carriers: Vec::new(),
             boards_written: 0,
             offers_made: 0,
@@ -1385,26 +1402,46 @@ impl Controller {
         self.contract_term = term;
     }
 
-    /// Returns the held ground a faction must have over another before it
-    /// hunts it, as a raw Q16.16 factor.
+    /// Returns the ratio of one faction, or `None` when the world has no such
+    /// faction.
+    ///
+    /// The ratio is the held ground that faction must have over another
+    /// before it hunts it, as a Q16.16 factor.
     #[must_use]
-    pub const fn overmatch_ratio(&self) -> Fix32 {
-        self.overmatch_ratio
+    pub fn overmatch_ratio(&self, faction: FactionId) -> Option<Fix32> {
+        self.rows
+            .get(usize::from(faction.0))
+            .map(|row| Fix32(row.overmatch_ratio))
     }
 
-    /// Sets the held ground a faction must have over another before it hunts
-    /// it, as a raw Q16.16 factor.
+    /// Writes the ratio of every faction.
     ///
-    /// A ratio at or below zero takes the rule out of the game: no faction
-    /// then overmatches any other, and every relation move goes back to the
-    /// war weight draw. The value is a balance value, and the register holds
-    /// the row.[^1]
+    /// The write walks the rows in ascending faction order, so it visits no
+    /// hash and no thread. A ratio at or below zero takes the rule out of the
+    /// game: no faction then overmatches any other, and every relation move
+    /// goes back to the war weight draw. The value is a balance value, and
+    /// the register holds the row.[^1]
     ///
     /// # References
     ///
     /// [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
-    pub const fn set_overmatch_ratio(&mut self, ratio: Fix32) {
-        self.overmatch_ratio = ratio;
+    pub fn set_overmatch_ratio(&mut self, ratio: Fix32) {
+        for row in &mut self.rows {
+            row.overmatch_ratio = ratio.0;
+        }
+    }
+
+    /// Writes the ratio of one faction, and leaves every other faction where
+    /// it is.
+    ///
+    /// Returns `false` and changes nothing when the world has no such
+    /// faction.
+    pub fn set_faction_overmatch_ratio(&mut self, faction: FactionId, ratio: Fix32) -> bool {
+        let Some(row) = self.rows.get_mut(usize::from(faction.0)) else {
+            return false;
+        };
+        row.overmatch_ratio = ratio.0;
+        true
     }
 
     /// Returns every carrier the controller has assigned, in faction order
@@ -1751,7 +1788,6 @@ impl Controller {
             .write_u64(u64::from(self.surplus_mark))
             .write_u64(u64::from(self.contract_carriers))
             .write_u64(u64::from(self.contract_term))
-            .write_u64(i64::from(self.overmatch_ratio.0) as u64)
             .write_u64(self.carriers.len() as u64)
             .write(bytemuck::cast_slice(&self.carriers))
     }

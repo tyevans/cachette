@@ -17,8 +17,14 @@
 //!
 //! **The ratio is the switch that proves the test can fail.** A ratio of zero
 //! takes the rule out of the game and restores the rule that shipped before
-//! it. The last test asserts that the same world then leaves the idle faction
-//! at peace.
+//! it. One test asserts that the same world then leaves the idle faction at
+//! peace.
+//!
+//! **The ratio belongs to one faction and not to the world.** Two factions of
+//! one world hold two values, so a measurement of two versions of the
+//! built-in controller is free of the world they played. The last test seats
+//! one faction that keeps the rule beside one that gives it up, and reads the
+//! two relations apart.
 //!
 //! # References
 //!
@@ -180,5 +186,85 @@ fn a_ratio_of_zero_leaves_an_idle_faction_at_peace() {
     assert!(
         !hunted(&world),
         "the rule that shipped before the hunt left an idle faction alone"
+    );
+}
+
+/// Builds the same world and gives each faction the ratio the list names.
+///
+/// The list holds one raw Q16.16 value for each faction, in faction order.
+/// The world writes them one faction at a time, so nothing here sets a value
+/// for every faction at once.
+fn seated_ratios(seed: u64, ratios: [i32; 3]) -> World {
+    let mut world = World::new(config(3, seed)).expect("the extent describes a world");
+    seat(&mut world, 3);
+    for (index, ratio) in ratios.iter().enumerate() {
+        assert!(world.set_faction_overmatch_ratio(FactionId(index as u16), *ratio));
+    }
+    assert!(world.set_externally_controlled(FactionId(0), true));
+    world
+}
+
+/// A new world gives every faction the default, and names no fourth faction.
+#[test]
+fn every_faction_of_a_new_world_starts_on_the_default_ratio() {
+    let world = World::new(config(3, 21)).expect("the extent describes a world");
+    for faction in 0..3 {
+        assert_eq!(
+            world.faction_overmatch_ratio(FactionId(faction)),
+            Some(RATIO)
+        );
+    }
+    assert_eq!(world.faction_overmatch_ratio(FactionId(3)), None);
+}
+
+/// A write to one faction moves that faction alone.
+#[test]
+fn a_write_to_one_faction_leaves_every_other_faction_where_it_is() {
+    let mut world = World::new(config(3, 21)).expect("the extent describes a world");
+    assert!(world.set_faction_overmatch_ratio(FactionId(1), 0));
+    assert_eq!(world.faction_overmatch_ratio(FactionId(0)), Some(RATIO));
+    assert_eq!(world.faction_overmatch_ratio(FactionId(1)), Some(0));
+    assert_eq!(world.faction_overmatch_ratio(FactionId(2)), Some(RATIO));
+    assert!(!world.set_faction_overmatch_ratio(FactionId(3), 0));
+}
+
+/// The verb that takes no faction writes every faction, which is the path
+/// every caller that shipped before this one takes.
+#[test]
+fn the_whole_world_verb_writes_every_faction() {
+    let mut world = World::new(config(3, 21)).expect("the extent describes a world");
+    assert!(world.set_faction_overmatch_ratio(FactionId(1), 0));
+    world.set_overmatch_ratio(RATIO * 3);
+    for faction in 0..3 {
+        assert_eq!(
+            world.faction_overmatch_ratio(FactionId(faction)),
+            Some(RATIO * 3)
+        );
+    }
+}
+
+/// Two versions of the built-in controller part in one world.
+///
+/// Faction 1 keeps the hunting rule and faction 2 gives it up. Both play the
+/// world that leaves faction 0 idle, so the ratio each one holds is the only
+/// thing that parts them. The idle faction hunts nobody, so its own ratio
+/// decides nothing.
+///
+/// **This is the test that a shared ratio cannot pass.** A world that read one
+/// ratio for every faction would put both hunters at war with the idle seat,
+/// or neither.
+#[test]
+fn two_versions_of_the_controller_hunt_differently_in_one_world() {
+    let mut world = seated_ratios(21, [RATIO, RATIO, 0]);
+    for _ in 0..TICKS {
+        world.step(THREADS).expect("the step runs");
+    }
+    assert!(
+        world.at_war(FactionId(1), FactionId(0)),
+        "the faction that kept the rule must hunt the idle faction"
+    );
+    assert!(
+        !world.at_war(FactionId(2), FactionId(0)),
+        "the faction that gave the rule up must leave the idle faction alone"
     );
 }
