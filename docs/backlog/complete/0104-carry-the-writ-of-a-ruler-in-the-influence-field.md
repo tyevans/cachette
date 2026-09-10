@@ -188,7 +188,7 @@ priority index holds it rather than this item.
 [^10]: Influence maps, section 7. `docs/research/reports/09-influence-maps.md`
 [^11]: ADR-0060, an influence map is stored as a shared basis, decision D4. `docs/adrs/draft/adr-0060-an-influence-map-is-stored-as-a-shared-basis.md`
 [^12]: The influence field, its constructor, its readers, its solve and its hash. `crates/cachette-core/src/influence.rs`
-[^13]: The public influence reader and source writer. `crates/cachette-core/src/world.rs`
+[^13]: The public influence reader and source writer. `crates/cachette-core/src/world/pyramid.rs`
 [^14]: The influence solve stage. `crates/cachette-core/src/stage.rs`
 [^15]: The fixed pass count of one solve. `crates/cachette-core/src/influence.rs`
 [^16]: The influence tests. `crates/cachette-core/tests/influence.rs`

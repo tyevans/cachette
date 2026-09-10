@@ -661,7 +661,7 @@ Not verdicts. For whoever maintains them.
 [^16]: Budgets and costs, the scale constants. `docs/reference/budgets.md`
 [^17]: ADR-0003, every random draw is keyed, never stateful. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 [^18]: ADR-0004, iteration order is explicit. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-[^19]: The world step and the movement intents. `crates/cachette-core/src/world.rs`
+[^19]: The world step and the movement intents. `crates/cachette-core/src/world/step.rs`, `crates/cachette-core/src/world/movement.rs`
 [^20]: Recurring defect shapes. `.claude/rules/recurring-defects.md`
 [^21]: Findings register, FND-037. `docs/FINDINGS.md`
 [^22]: Findings register, FND-042. `docs/FINDINGS.md`

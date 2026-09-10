@@ -52,7 +52,7 @@ lose a real value. An empty deposit is a real state.[^6]
 **Serves.** PRD-0007.
 
 **Conflict surface.** `crates/cachette-core/src/resource.rs` is new.
-`crates/cachette-core/src/world.rs` at the constructor, the step, the state
+`crates/cachette-core/src/world/` at the constructor, the step, the state
 hash and the invariant check. `crates/cachette-core/src/soldier.rs` gains a
 carried-amount column. It touches the same three functions of `world.rs` as
 item 0052, so it rebases on that item and does not merge beside it.

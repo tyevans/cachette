@@ -127,7 +127,6 @@ def _defines() -> str:
         "CLOUD_RELIEF": ink.CLOUD_RELIEF,
         "CLOUD_FACE_LIT": ink.CLOUD_FACE_LIT,
         "CLOUD_FACE_DARK": ink.CLOUD_FACE_DARK,
-        "SKY_DEEP_MARK": ink.SKY_DEEP_MARK,
         "SKY_GLOOM": ink.SKY_GLOOM,
         "HOLDER_WASH": ink.HOLDER_WASH,
         "WASH_GAIN": ink.WASH_GAIN,
@@ -516,21 +515,27 @@ class GlSketch(Sketch):
 
         if self._sky:
             # **The array renderer holds the one reader, and this calls it.**
-            # The cover, the heading of the wind and the lattice the cloud
-            # noise reads all come from that module, so the two renderers
-            # cannot read the sky two ways.[^3]
+            # The cover, the storm, the heading of the wind and the lattice
+            # the cloud noise reads all come from that module, so the two
+            # renderers cannot read the sky two ways.[^3]
             #
             # [^3]: Recurring Defect Shapes, shape 1.
             # `.agents/rules/recurring-defects.md`
-            cover, along_x, along_y = self.sky_fields()
-            device.upload("tile_cloud", cover, "r32f")
+            cover, storm, along_x, along_y = self.sky_fields()
+            # **The cover and the storm ride in one texture, on two bands.**
+            # The device keeps the last of its texture units for its own work,
+            # and the composite pass already binds every other unit, so a
+            # channel of the sky that took a unit of its own would take the
+            # unit the device needs. The two bands are read at one point of
+            # one lattice, so nothing can index them apart.
+            device.upload("tile_sky", np.stack((cover, storm), axis=2), "rg32f")
             device.upload("tile_along_x", along_x, "r32f")
             device.upload("tile_along_y", along_y, "r32f")
             device.upload("cloud_table", self.cloud_lattice(), "r32f")
         else:
             # The shader binds these whether it reads them or not.
+            device.ensure("tile_sky", "rg32f", bands=2)
             for name in (
-                "tile_cloud",
                 "tile_along_x",
                 "tile_along_y",
                 "cloud_table",
@@ -639,7 +644,7 @@ class GlSketch(Sketch):
             ("page", 0),
             ("page_grain", 1),
             ("tile_holder", 2),
-            ("tile_cloud", 3),
+            ("tile_sky", 3),
             ("tile_along_x", 4),
             ("tile_along_y", 5),
             ("tile_hue", 6),

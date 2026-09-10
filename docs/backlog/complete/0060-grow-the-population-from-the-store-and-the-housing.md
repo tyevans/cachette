@@ -97,7 +97,7 @@ the per-site count.[^18] All three apply directly.
 
 **Conflict surface.**
 
-- `crates/cachette-core/src/world.rs`, at the step between the reap stage and
+- `crates/cachette-core/src/world/`, at the step between the reap stage and
   the barrier that follows it, and at the spawn and residence verbs.
 - `crates/cachette-core/src/site.rs`, read for the store and for the housing
   capacity that item 0059 adds.

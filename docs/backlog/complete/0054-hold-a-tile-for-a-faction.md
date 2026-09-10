@@ -64,7 +64,7 @@ must therefore cost the area that changed and not the area that exists.[^9]
 **Serves.** PRD-0006.
 
 **Conflict surface.** `crates/cachette-core/src/holding.rs` is new.
-`crates/cachette-core/src/world.rs` at the step, the state hash and the
+`crates/cachette-core/src/world/` at the step, the state hash and the
 invariant check; `crates/cachette-core/src/pyramid.rs` gains a summary field;
 `crates/cachette-view` gains a holder layer. It touches `pyramid.rs`, which no
 other item in this plan touches, and `world.rs`, which most of them do. **Run

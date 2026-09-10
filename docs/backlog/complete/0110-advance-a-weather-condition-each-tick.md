@@ -70,4 +70,4 @@ hash the same.[^5]
 [^4]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^5]: The weather field, its solve, its account check and its hash. `crates/cachette-core/src/weather.rs`
 [^6]: The weather solve stage. `crates/cachette-core/src/stage.rs`
-[^7]: The weather solve call and the invariant check. `crates/cachette-core/src/world.rs`
+[^7]: The weather solve call and the invariant check. `crates/cachette-core/src/world/weather.rs`, `crates/cachette-core/src/world/invariants.rs`

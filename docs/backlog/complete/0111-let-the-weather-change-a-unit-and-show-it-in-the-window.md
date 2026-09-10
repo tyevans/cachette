@@ -59,6 +59,6 @@ the field as text.[^7] [^8]
 [^3]: Backlog item 0109. `docs/backlog/complete/0109-decide-how-the-world-holds-a-condition-that-moves.md`
 [^4]: Backlog item 0110. `docs/backlog/complete/0110-advance-a-weather-condition-each-tick.md`
 [^5]: Product record PRD-0005. `docs/product/shipped/prd-0005-a-watcher-can-tell-what-is-happening-and-why.md`
-[^6]: The wet cell branch and the wet gather bonus. `crates/cachette-core/src/world.rs`
+[^6]: The wet cell branch and the wet gather bonus. `crates/cachette-core/src/world/weather.rs`, `crates/cachette-core/src/world/gather.rs`
 [^7]: The moisture and air overlay spans. `crates/cachette-view/src/overlay.rs`
 [^8]: The weather panel. `crates/cachette-view/src/panel/weather.rs`

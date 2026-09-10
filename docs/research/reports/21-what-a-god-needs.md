@@ -963,7 +963,7 @@ Each command ran in this worktree on 3 September 2026.
 | The write surface is eight callables | `grep -n "let mut world = self.lock()" crates/cachette-py/src/lib.rs` | Nine sites. One is `step` |
 | No binding calls the build verbs | `grep -c "order_build\|destroy_upgrade\|stop_build" crates/cachette-py/src/lib.rs` | 0 |
 | No Python calls them either | `grep -rn "order_build\|destroy_upgrade\|return_direction" python tests --include "*.py"` | 0 lines |
-| The core has them | `grep -n "    pub fn " crates/cachette-core/src/world.rs` | `order_build`, `stop_build`, `build_order`, `destroy_upgrade`, `return_direction`, `exit_direction`, `tiles_held_by` |
+| The core has them | `grep -rn "    pub fn " crates/cachette-core/src/world/` | `order_build`, `stop_build`, `build_order`, `destroy_upgrade`, `return_direction`, `exit_direction`, `tiles_held_by` |
 | Nothing models a fight or a belief | `grep -rin "attack\|combat\|damage\|belief\|allegiance\|diplomac" crates/cachette-core/src/*.rs` | One line, and it is about coordinate conversion |
 | The upgrade catalogue is two kinds | `grep -n "enum UpgradeKind" -A 10 crates/cachette-core/src/upgrade.rs` | `Road` and `Terrace` |
 | The faction ceiling is 63 | `grep -n "FACTION_CEILING" crates/cachette-core/src/types.rs` | `pub const FACTION_CEILING: u16 = 63` |

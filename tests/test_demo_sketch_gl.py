@@ -462,6 +462,62 @@ def test_the_device_draws_every_wash_of_a_flat_page_as_the_processor_does(
     assert_agree(*drawn_both_ways(overlay=overlay, sky=sky, relief=False))
 
 
+# The weather pitch that the storm fixture states, in tiles.
+#
+# **The engine default puts four cells across this world.** The lattice then
+# carries almost no margin, and a storm raised near the border walks off it on
+# the first step. A finer pitch gives the storm somewhere to stand.[^1]
+#
+# [^1]: Testing Rules, section 2a. ``.agents/rules/testing.md``
+STORM_PITCH = 8
+
+
+def a_stormed_world() -> tuple[World, Camera]:
+    """Give back a world that carries a raised storm, and a camera for it."""
+    world = World(
+        width=SIDE,
+        height=SIDE,
+        seed=SEED,
+        faction_count=4,
+        weather_cell_tiles=STORM_PITCH,
+    )
+    world.seed_world()
+    for _ in range(12):
+        world.step(1)
+    world.raise_cyclone(
+        (SIDE // 2, SIDE // 2), depth=world.storm_depth_whole, radius=8, life=320
+    )
+    world.step(1)
+    assert (world.storm_depths() > 0).any(), "the fixture carries no storm"
+    return world, Camera.fitting(world, WIDTH, HEIGHT)
+
+
+def test_the_device_draws_the_deep_of_the_sky_as_the_processor_does() -> None:
+    """A storm reaches both renderers through one channel.
+
+    **The deep of the sky is the pressure deficit of a storm.** The array
+    renderer reads it from the engine and hands it to the device on the second
+    band of the texture that carries the sky. A shader that read the wrong
+    band would draw a sky that looks nearly right, and only this comparison
+    would notice.
+
+    The fixture raises a storm, because where the world puts its own storms
+    follows the seed.[^1]
+
+    [^1]: Testing Rules, section 2a. ``.agents/rules/testing.md``
+    """
+    device_or_skip()
+    world, camera = a_stormed_world()
+    frames = []
+    for make in (Sketch, GlSketch):
+        drawing = make(world, view=View(), sky=True)
+        drawing._raised = np.zeros_like(drawing._raised)
+        surface = Surface(WIDTH, HEIGHT)
+        drawing(camera, WIDTH, HEIGHT, surface.pixels)
+        frames.append(surface.pixels.copy())
+    assert_agree(frames[0], frames[1])
+
+
 @pytest.mark.parametrize(("turn", "lean"), [*EDGE_ANGLES, (2.4, 0.85)])
 def test_the_relief_is_the_only_thing_the_two_renderers_draw_apart(
     turn: float, lean: float

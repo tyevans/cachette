@@ -70,7 +70,7 @@ invents.[^6] [^7]
 **Conflict surface.** `crates/cachette-core/src/founding.rs` is new. It reads
 `crates/cachette-core/src/terrain.rs` and
 `crates/cachette-core/src/resource.rs`, and it writes through the settlement
-and the soldier arenas. `crates/cachette-core/src/world.rs` gains the founding
+and the soldier arenas. `crates/cachette-core/src/world/` gains the founding
 calls. `crates/cachette-view/src/main.rs` founds a run instead of spreading
 soldiers over the world. **It is the only item in this plan that changes the
 world constructor**, so it merges alone with respect to that function.

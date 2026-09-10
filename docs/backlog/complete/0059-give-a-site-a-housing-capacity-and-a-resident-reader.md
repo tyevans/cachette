@@ -108,7 +108,7 @@ structure here.
 
 - `crates/cachette-core/src/site.rs`, at the settlement column set, for the
   housing capacity.
-- `crates/cachette-core/src/world.rs`, at the state hash and at the public
+- `crates/cachette-core/src/world/`, at the state hash and at the public
   readers.
 - `crates/cachette-core/src/cohort.rs`, read only. This item adds a reader that
   sums the rows of one site. It changes no write path and adds no store.

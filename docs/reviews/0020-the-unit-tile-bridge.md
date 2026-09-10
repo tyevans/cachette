@@ -7,7 +7,7 @@ Commit `7fe45d6`, on branch `feat/sprint-3-entities-move`.
 | Path | State |
 |---|---|
 | `crates/cachette-core/src/bridge.rs` | New |
-| `crates/cachette-core/src/world.rs` | Changed |
+| `crates/cachette-core/src/world/` | Changed |
 | `crates/cachette-core/src/soldier.rs` | Changed |
 | `crates/cachette-core/src/lib.rs` | Changed |
 | `crates/cachette-core/tests/unit_tile_bridge.rs` | New |

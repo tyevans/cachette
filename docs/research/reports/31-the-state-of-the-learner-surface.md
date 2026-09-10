@@ -75,8 +75,8 @@ address rather than a tile index.
 
 | Wrapper | Location |
 |---|---|
-| `faction_sees_now(faction, address)` | `crates/cachette-core/src/world.rs:6595` |
-| `faction_has_seen(faction, address)` | `crates/cachette-core/src/world.rs:6611` |
+| `faction_sees_now(faction, address)` | `crates/cachette-core/src/world/observation.rs` |
+| `faction_has_seen(faction, address)` | `crates/cachette-core/src/world/observation.rs` |
 
 **Correction two.** Neither layer is a tile bitmap. Each layer is an array over
 the block lattice that the summary level aggregates over. Each block holds one
@@ -90,10 +90,10 @@ claim 5 and for section 3 of this report.
 
 **CONFIRMED. The line number in the survey is right.**
 
-The step calls the rebuild at `crates/cachette-core/src/world.rs:5946`. The
+The step calls the rebuild in `crates/cachette-core/src/world/step.rs`. The
 enclosing function is `pub fn step`, which starts at
-`crates/cachette-core/src/world.rs:5383`. The next item starts at
-`crates/cachette-core/src/world.rs:5998`, so the call sits inside the step.
+`crates/cachette-core/src/world/step.rs`. The next item starts below it in that file,
+so the call sits inside the step.
 
 The call sits in a bare block with a stage span. It has no condition, no
 feature gate and no flag. It runs on every tick. The stage is an ordinary
@@ -112,7 +112,7 @@ grep -rn "sees_now\|has_seen\|visible_layer\|remembered_layer\|seen_now\|seen_ev
 ```
 
 Outside the fog module itself, every caller is either a thin wrapper in
-`crates/cachette-core/src/world.rs` or a line in
+`crates/cachette-core/src/world/` or a line in
 `crates/cachette-core/tests/observation.rs`.
 
 **No production code reads the fog.** No pass filters on it. No view uses it.
@@ -123,7 +123,7 @@ consumes. The project rule on inert code names this shape.[^10]
 
 **PARTLY TRUE.**
 
-The world hashes the observation at `crates/cachette-core/src/world.rs:4488`.
+The world hashes the observation in `crates/cachette-core/src/world/hash.rs`.
 That call is real.
 
 The call hashes half the fog. The hash function at
@@ -132,7 +132,7 @@ walks the remembered layers only. **The visible layer never enters the hash.**
 
 This is correct, not a defect. The visible layer is a pure function of the
 units and the rules, so its inputs enter instead. A comment at
-`crates/cachette-core/src/world.rs:4480` states the reasoning. ADR-0164
+`crates/cachette-core/src/world/hash.rs` states the reasoning. ADR-0164
 decisions D1 to D3 govern it.[^11]
 
 The accurate statement is this. The remembered layer and the sight rules are
@@ -399,7 +399,7 @@ The engine holds one hook for an external player.
 | `Controller::set_externally_controlled` | `crates/cachette-core/src/controller.rs:1065` |
 | The binding setter | `crates/cachette-py/src/lib.rs:3895` |
 | The binding reader | `crates/cachette-py/src/lib.rs:3910` |
-| `run_controller` | `crates/cachette-core/src/world.rs:14521` |
+| `run_controller` | `crates/cachette-core/src/world/controller.rs` |
 
 A faction whose flag is set receives no evaluation from the built-in
 controller. The controller runs as the last stage of the step, after every
@@ -460,8 +460,8 @@ expansion of the fog, and whether that expansion is the expensive part.
 **No expansion is needed. This is the good news in the audit.**
 
 The world builds the fog and the summary level from one lattice value. It
-constructs the observation at `crates/cachette-core/src/world.rs:1636` and the
-pyramid at `crates/cachette-core/src/world.rs:1643`, and both take the same
+constructs the observation and the
+pyramid in `crates/cachette-core/src/world/seeding.rs`, and both take the same
 layout. The lattice type is at `crates/cachette-core/src/bridge.rs:195`, and it
 gives the block count and the two block extents. ADR-0022 D2 is the reason the
 two share one lattice.[^20]
@@ -622,7 +622,7 @@ order, not a value order.
 **1. Fog-scope the readers.** Backlog item 0495 holds this work.[^6] It already
 sits first in the backlog priority index, which calls it the last gate before a
 learner can be trained.[^8] It is in `proposed/`, so refining it is part of the
-work. Files: `crates/cachette-core/src/world.rs` for the readers, and
+work. Files: `crates/cachette-core/src/world/observation.rs` for the readers, and
 `crates/cachette-core/src/observation.rs` for the per-unit mask. It touches the
 step, so one worker holds it at a time. The masked summary rule of ADR-0059 D4
 is the expensive clause inside it.[^21]

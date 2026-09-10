@@ -1,7 +1,7 @@
 # Review: ADR-0017, the world is a rhombus, so a tile index is raw axial
 
 **Reviewed:** `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md`,
-against `crates/cachette-core/src/hex.rs`, `crates/cachette-core/src/world.rs`
+against `crates/cachette-core/src/hex.rs`, `crates/cachette-core/src/world/`
 and `crates/cachette-core/tests/hex_geometry.rs`, at commit `6fa3a44`.
 
 **Reviewer:** an agent that wrote no part of the record and no part of the

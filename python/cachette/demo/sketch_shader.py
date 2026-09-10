@@ -371,7 +371,9 @@ float way_ink_at(ivec2 at) {
 """
 
 COMPOSITE = """
-uniform sampler2D tile_cloud;
+// The sky over each tile, on two bands. The first is the cloud cover and the
+// second is the pressure deficit the storms put on the tile.
+uniform sampler2D tile_sky;
 uniform sampler2D tile_along_x;
 uniform sampler2D tile_along_y;
 uniform sampler2D cloud_table;
@@ -394,7 +396,19 @@ uniform isampler2D fit_y;
 
 float share_at(ivec2 at) {
     int take = take_at(at);
-    return (take >= 0) ? texelFetch(tile_cloud, tile_of(take), 0).r : 0.0;
+    return (take >= 0) ? texelFetch(tile_sky, tile_of(take), 0).r : 0.0;
+}
+
+// The pressure deficit the storms put on the tile under one point, from
+// nothing to one.
+//
+// **This is a channel of its own and the cover does not give it.** A storm
+// rains its own sky out, so the cover under a storm measures lower than the
+// cover beside it. The array renderer scales the deficit by the ceiling the
+// engine declares, and this reads the field it made.
+float storm_at(ivec2 at) {
+    int take = take_at(at);
+    return (take >= 0) ? texelFetch(tile_sky, tile_of(take), 0).g : 0.0;
 }
 
 vec2 along_at(ivec2 at) {
@@ -551,11 +565,11 @@ vec3 sky_over(vec3 page, ivec2 at) {
         : 0.0;
     page = page * (1.0 - under * lands_on * CLOUD_SHADOW_DEPTH);
 
-    // **The deep of the sky is the top of the cover range.** A sky that
-    // stands there darkens the whole of itself and closes its cloud over.
+    // **The deep of the sky is the storm.** The engine holds a storm as a
+    // pressure deficit over each cell, and a sky under one darkens the whole
+    // of itself.
     ivec2 above_at = at + ivec2(0, cloud_lift);
-    float share = on_page(above_at) ? share_at(above_at) : 0.0;
-    float deep = clamp((share - SKY_DEEP_MARK) / (1.0 - SKY_DEEP_MARK), 0.0, 1.0);
+    float deep = on_page(above_at) ? storm_at(above_at) : 0.0;
     vec3 sky = SKY_INK + (STORM_INK - SKY_INK) * deep;
     float gloom = deep * SKY_GLOOM;
     page = page * (1.0 - gloom) + sky * gloom;

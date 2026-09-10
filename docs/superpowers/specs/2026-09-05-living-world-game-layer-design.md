@@ -576,7 +576,7 @@ the code.
 [^2]: Balance table, to be created. `docs/reference/balance.md`
 [^3]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^4]: Blockers register, BLK-036. `docs/BLOCKERS.md`
-[^5]: The step, stage order. `crates/cachette-core/src/world.rs`
+[^5]: The step, stage order. `crates/cachette-core/src/world/step.rs`
 [^6]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
 [^7]: ADR-0003, every random draw is keyed, never stateful. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
 [^8]: ADR-0004, iteration order is explicit. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`

@@ -86,7 +86,7 @@ PRD-0016 as the tier they both need.
 **Conflict surface.** `crates/cachette-core/src/character.rs` is new.
 `crates/cachette-core/src/lib.rs`, `crates/cachette-core/src/soldier.rs` at an
 achievement column and a character back-reference, and
-`crates/cachette-core/src/world.rs` at the state hash and the invariant check.
+`crates/cachette-core/src/world/` at the state hash and the invariant check.
 **It is independent of every item from 0053 to 0065** except for the shared
 edit to `world.rs` and `soldier.rs`, so **it is the one item in this plan that
 a second worker can start on day one, beside item 0052.**

@@ -655,7 +655,7 @@ reader.[^19] A wonder reader now exists and fires.[^14] The comment is false.
 [^11]: Report 31, the state of the learner surface. `docs/research/reports/31-the-state-of-the-learner-surface.md`
 [^12]: The controller module. `crates/cachette-core/src/controller.rs`
 [^13]: The learner environment. `python/cachette/learn/env.py`
-[^14]: The world module. `crates/cachette-core/src/world.rs`
+[^14]: The world module. `crates/cachette-core/src/world/`
 [^15]: The balance table, the renown target. `crates/cachette-core/src/balance.rs`
 [^16]: Findings register, FND-582. `docs/FINDINGS.md`
 [^17]: The reward module. `python/cachette/learn/reward.py`

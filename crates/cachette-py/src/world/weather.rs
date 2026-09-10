@@ -107,6 +107,68 @@ impl PyWorld {
         CLOUD_SHARE_WHOLE
     }
 
+    /// Copies the storm depth over every tile into a new NumPy array.
+    ///
+    /// Returns a one-dimensional array of `numpy.int32`, one entry for each
+    /// tile, in row-major order. Entry `r * width + q` is the tile at the
+    /// address `(q, r)`. The order is the order that `cloud_shares` uses.
+    ///
+    /// **Each entry is the pressure deficit that the storms put on that
+    /// tile**, from none to `storm_depth_whole`. The unit is the depth of a
+    /// storm, which is the number that `raise_cyclone` takes and that
+    /// `cyclones` reports. A tile that no storm reaches reads zero, and every
+    /// tile reads zero while no storm stands.
+    ///
+    /// **The deficit is a cone.** It stands at the depth of the storm over the
+    /// eye and falls in a straight line to nothing one cell beyond the radius.
+    /// Two storms that overlap add, and the sum is held at the ceiling.
+    ///
+    /// **This is not the cloud.** A storm rains the sky it stands in out, so
+    /// the cover under a storm may be lower than the cover beside it. A caller
+    /// that painted a storm from the top of the cover range would paint the
+    /// wrong cells.[^2]
+    ///
+    /// **The array stands at tile resolution and the weather stands on the
+    /// weather cell**, so every tile of one cell reports the same depth. **The
+    /// engine owns the map from a tile to its weather cell.** The weather
+    /// lattice carries a margin around the world, and `cyclones` reports an
+    /// eye in the cell coordinates of that whole lattice, so a caller that
+    /// mapped an eye to tiles would hold a second copy of the map. This reader
+    /// therefore answers per tile and publishes no map.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-569. `docs/FINDINGS.md`
+    /// [^2]: Findings register, FND-723. `docs/FINDINGS.md`
+    fn storm_depths<'py>(&self, python: Python<'py>) -> Bound<'py, PyArray1<i32>> {
+        let raw: Vec<i32> = python.detach(|| {
+            let world = self.lock();
+            let grid = world.grid();
+            (0..grid.tile_count())
+                .map(|index| {
+                    grid.address_of(TileIdx(index))
+                        .and_then(|address| world.storm_depth_at(address))
+                        .unwrap_or(0)
+                })
+                .collect()
+        });
+        raw.to_pyarray(python)
+    }
+
+    /// The largest storm depth, as an integer.
+    ///
+    /// A `storm_depths` entry runs from zero to this number, and so does the
+    /// `depth` that `raise_cyclone` takes. The engine declares it, so a caller
+    /// that scales the depth holds no second copy of the ceiling.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    #[getter]
+    fn storm_depth_whole(&self) -> i32 {
+        cachette_core::CYCLONE_DEPTH_CEILING
+    }
+
     /// Copies the wind over every tile into two NumPy arrays.
     ///
     /// Returns a `dict` with the keys `q` and `r`. Each holds a

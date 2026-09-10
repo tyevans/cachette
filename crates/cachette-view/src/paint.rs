@@ -51,7 +51,7 @@ use cachette_core::hex::NEIGHBOURS;
 use cachette_core::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use cachette_core::terrain::{TileKind, KIND_COUNT};
 use cachette_core::upgrade::{UpgradeCategory, UpgradeSite, UPGRADE_CATEGORY_COUNT};
-use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World};
+use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World, CYCLONE_DEPTH_CEILING};
 
 use crate::overlay::{self, Layer};
 use crate::text;
@@ -267,10 +267,12 @@ const CLOUD_FINE: i64 = 256;
 /// mark from a cyclone, because both filled the sky.
 const STORM_COLOUR: u32 = 0x0048_5460;
 
-/// The least mass the viewer gives a tile under a storm.
+/// The least mass the viewer gives a tile at the deepest pressure deficit.
 ///
 /// A storm that broke into separate masses read as fair weather. The deficit
-/// cone is a real object of the engine, so the picture of it is whole.
+/// cone is a real object of the engine, so the picture of it is whole. The
+/// floor is the floor at the eye of the deepest storm, and a tile at a
+/// shallower deficit takes its share of it.
 const STORM_LEAST_MASS: i64 = 200;
 
 /// The stride the luxury hue turns by, for each step of the kind ordinal.
@@ -2400,8 +2402,8 @@ pub fn draw_paced(
                 let weight = air_weight(cloud_mass_at(world, address, drift));
                 if weight > 0 {
                     let share = world.cloud_share_at(address).unwrap_or(0);
-                    let storming = world.tile_under_a_storm(address) == Some(true);
-                    ground_colour = mix(ground_colour, sky_colour(share, storming), weight);
+                    let deficit = world.storm_depth_at(address).unwrap_or(0);
+                    ground_colour = mix(ground_colour, sky_colour(share, deficit), weight);
                 }
             }
             let (left, top, wide, tall) = tile_rect(camera, address);
@@ -2935,34 +2937,56 @@ pub fn cloud_mass_at(world: &World, address: Axial, drift: (i64, i64)) -> i64 {
         i64::from(address.r) + drift.1,
     );
     let mass = cloud_mass(share, shape);
-    if world.tile_under_a_storm(address) == Some(true) {
-        mass.max(STORM_LEAST_MASS)
-    } else {
-        mass
-    }
+    mass.max(storm_floor(world.storm_depth_at(address).unwrap_or(0)))
+}
+
+/// Returns the mass a pressure deficit alone puts over a tile.
+///
+/// **The deficit is graded and the picture follows it.** A storm stands at its
+/// depth over the eye and falls in a straight line to nothing one cell beyond
+/// its radius, so a floor that switched on any deficit above zero drew a flat
+/// disc with a hard edge. The floor rises with the deficit instead, and the
+/// edge of the storm meets the sky beside it.
+///
+/// The answer is zero for a tile that no storm reaches.
+///
+/// **This is public so that a test can move one input and watch the answer
+/// move.**
+#[must_use]
+pub fn storm_floor(deficit: i32) -> i64 {
+    let held = i64::from(deficit.clamp(0, CYCLONE_DEPTH_CEILING));
+    held * STORM_LEAST_MASS / i64::from(CYCLONE_DEPTH_CEILING)
 }
 
 /// Returns the colour of the cloud over one tile.
 ///
 /// **A sky darkens as it fills.** The air colour alone said only that water
 /// stands overhead, so a fair sky at its own mark and a cyclone drew the same
-/// pale wash. The colour now runs from the air colour to the storm colour as
-/// the share passes [`CLOUD_DARK_FROM`].
+/// pale wash. The colour runs from the air colour to the storm colour as the
+/// share passes [`CLOUD_DARK_FROM`].
 ///
-/// A tile under a storm takes the storm colour whatever its share is. The
-/// deficit cone is a real object of the engine, and a watcher must be able to
-/// find it.
+/// **A storm darkens the sky by its own depth, and the cover cannot stand in
+/// for it.** A storm rains its own sky out, so the cover under a storm reads
+/// lower than the cover beside it. The deficit is the second input for that
+/// reason, and it takes the colour further than the share alone can.[^1]
+///
+/// The deficit runs from zero to the ceiling of a storm depth. A tile at the
+/// ceiling takes the storm colour whatever its share is.
 ///
 /// **This is public so that a test can move one input and watch the answer
 /// move.**
+///
+/// # References
+///
+/// [^1]: Findings register, FND-723. `docs/FINDINGS.md`
 #[must_use]
-pub fn sky_colour(share: i64, storming: bool) -> u32 {
-    if storming {
-        return STORM_COLOUR;
-    }
+pub fn sky_colour(share: i64, deficit: i32) -> u32 {
     let above = (share.clamp(0, AIR_AT_FULL_SHADE) - CLOUD_DARK_FROM).max(0);
     let span = (AIR_AT_FULL_SHADE - CLOUD_DARK_FROM).max(1);
-    let depth = u8::try_from(above * 255 / span).unwrap_or(u8::MAX);
+    let filled = above * 255 / span;
+    let held = i64::from(deficit.clamp(0, CYCLONE_DEPTH_CEILING));
+    let stormed = held * 255 / i64::from(CYCLONE_DEPTH_CEILING);
+    let depth = u8::try_from(filled.max(stormed)).unwrap_or(u8::MAX);
     mix(AIR_COLOUR, STORM_COLOUR, depth)
 }
 

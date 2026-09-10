@@ -97,7 +97,7 @@ the top of a need.[^11] [^12]
 **Conflict surface.** `crates/cachette-core/src/cohort.rs` is new.
 `crates/cachette-core/src/site.rs` gains the cohort columns.
 `crates/cachette-core/src/soldier.rs` gains a need column and a deficit
-column. `crates/cachette-core/src/world.rs` at the step and the state hash.
+column. `crates/cachette-core/src/world/` at the step and the state hash.
 **It cannot run beside item 0055**, which edits the same site reduction, and
 **it cannot run beside item 0057**, which extends its own output.
 

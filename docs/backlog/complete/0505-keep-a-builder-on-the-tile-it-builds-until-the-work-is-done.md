@@ -107,7 +107,7 @@ the reading, and FND-550 holds the correction to FND-545.
 
 ## References
 
-[^1]: The build pass and the build intents. `crates/cachette-core/src/world.rs`
+[^1]: The build pass and the build intents. `crates/cachette-core/src/world/upgrades.rs`
 [^2]: Balance register, the road work by level and the build rate. `docs/reference/balance.md`
 [^4]: Findings register, FND-545. `docs/FINDINGS.md`
 [^5]: Backlog item 0502. `docs/backlog/proposed/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`

@@ -154,6 +154,108 @@ def test_the_cloud_column_is_flat_over_one_weather_cell() -> None:
     assert len(set(clouds.ravel().tolist())) > 1, "the fixture must vary between cells"
 
 
+def _a_stormed_world() -> cachette.World:
+    """Build a world that carries one raised storm over several cells.
+
+    **The pitch puts one weather cell on each tile.** The engine default puts
+    a few cells across a world this size, and a storm then reaches every one
+    of them at one depth. A fixture like that measures nothing about the
+    cone.[^1]
+
+    The verb puts a storm in the list and the solve writes the deficit plane,
+    so the world steps once after the storm is raised.
+
+    [^1]: Testing rules, section 2a. ``.agents/rules/testing.md``
+    """
+    world = cachette.World(
+        width=EXTENT,
+        height=EXTENT,
+        seed=COASTAL_SEED,
+        faction_count=2,
+        weather_cell_tiles=1,
+    )
+    for _ in range(20):
+        world.step(2)
+    world.raise_cyclone((EXTENT // 2, EXTENT // 2), kind="tropical")
+    world.step(2)
+    return world
+
+
+def test_the_storm_column_agrees_with_the_storms_the_world_carries() -> None:
+    """The bulk deficit answers where a storm stands, and how deep it is.
+
+    The column has no single-tile reader at the boundary to agree with, so it
+    agrees with the storms the world reports. A world that carries a storm
+    must read a deficit somewhere, and a world that carries none must read
+    zero everywhere.
+
+    The deficit is a cone, so it must grade. A column that answered one value
+    over the whole footprint would draw a flat disc.
+    """
+    quiet = cachette.World(
+        width=EXTENT, height=EXTENT, seed=SEED, faction_count=2, weather_cell_tiles=2
+    )
+    assert not quiet.cyclones(), "the fixture must start with no storm"
+    assert (quiet.storm_depths() == 0).all(), (
+        "a world with no storm reads a deficit somewhere"
+    )
+
+    world = _a_stormed_world()
+    assert world.cyclones(), "the fixture must carry a storm"
+    depths = world.storm_depths()
+    assert depths.shape == (EXTENT * EXTENT,)
+    assert depths.min() >= 0
+    assert depths.max() <= world.storm_depth_whole
+    under = depths > 0
+    assert under.any(), "the storm reaches no tile of the world"
+    assert (~under).any(), "the storm covers the whole world, so nothing is beside it"
+    assert len(set(depths[under].tolist())) > 1, (
+        "the cone answers one value over its whole footprint, so nothing grades it"
+    )
+
+
+def test_the_storm_column_is_not_the_cloud_column() -> None:
+    """A storm rains its own sky out, so the cover cannot stand in for it.
+
+    A renderer once read the top of the cover range as a storm. This states
+    why that reading is wrong: the tiles under the storm do not carry the
+    highest cover of the world, so the guess picks the wrong tiles.[^2]
+
+    [^2]: Findings register, FND-723. ``docs/FINDINGS.md``
+    """
+    world = _a_stormed_world()
+    depths = world.storm_depths()
+    cover = world.cloud_shares()
+    under = depths > 0
+    assert under.any() and (~under).any(), "the fixture must reach both cases"
+    highest = cover >= np.quantile(cover, 0.9)
+    caught = int((highest & under).sum())
+    assert caught < int(under.sum()) // 2, (
+        f"the top of the cover range names {caught} of {int(under.sum())} "
+        f"stormed tiles, so it could stand in for the deficit"
+    )
+
+
+def test_the_storm_column_is_flat_over_one_weather_cell() -> None:
+    """Weather stands on the cell, so every tile of one cell reads alike."""
+    world = cachette.World(
+        width=EXTENT,
+        height=EXTENT,
+        seed=COASTAL_SEED,
+        faction_count=2,
+        weather_cell_tiles=2,
+    )
+    for _ in range(20):
+        world.step(2)
+    world.raise_cyclone((EXTENT // 2, EXTENT // 2), kind="tropical")
+    world.step(2)
+    edge = world.weather_cell_tiles
+    depths = world.storm_depths().reshape(EXTENT, EXTENT)
+    assert (depths > 0).any(), "the fixture must reach a stormed tile"
+    blocks = depths.reshape(EXTENT // edge, edge, EXTENT // edge, edge)
+    assert (blocks.min(axis=(1, 3)) == blocks.max(axis=(1, 3))).all()
+
+
 def _a_struck_world() -> tuple[cachette.World, tuple[int, int]]:
     """Build a dry world in which one faction holds ground, and strike it."""
     world = cachette.World(

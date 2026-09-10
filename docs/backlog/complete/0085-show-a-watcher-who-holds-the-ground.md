@@ -137,7 +137,7 @@ too. This item confirms that. It does not restate it.
 visible tiles, and at the colour readers.
 `crates/cachette-view/tests/draws_the_ground.rs` and
 `crates/cachette-view/tests/paints_the_world.rs` gain the cases.
-`crates/cachette-core/src/holding.rs` and `crates/cachette-core/src/world.rs`
+`crates/cachette-core/src/holding.rs` and `crates/cachette-core/src/world/`
 are read and not changed.
 
 **It cannot run beside item 0069**, which paints the same tiles to show a tile

@@ -6,7 +6,7 @@ Four draft decision records.
 
 | Record | Path | Implementation state |
 |---|---|---|
-| ADR-0017 | `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md` | Implemented by `crates/cachette-core/src/hex.rs` and `crates/cachette-core/src/world.rs` |
+| ADR-0017 | `docs/adrs/accepted/adr-0017-the-world-is-a-rhombus-so-a-tile-index-is-raw-axial.md` | Implemented by `crates/cachette-core/src/hex.rs` and `crates/cachette-core/src/world/` |
 | ADR-0012 | `docs/adrs/accepted/adr-0012-tiles-are-dense-columns-and-units-are-a-generational-arena.md` | Not implemented |
 | ADR-0014 | `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md` | Partly implemented: `Entity` in `crates/cachette-core/src/types.rs` |
 | ADR-0018 | `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md` | Not implemented |

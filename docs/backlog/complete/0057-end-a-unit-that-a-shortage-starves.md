@@ -73,7 +73,7 @@ keys the death must be tested field by field.[^8]
 
 **Conflict surface.** `crates/cachette-core/src/cohort.rs`,
 `crates/cachette-core/src/soldier.rs` at the despawn path, and
-`crates/cachette-core/src/world.rs` at the step and the event log. **It cannot
+`crates/cachette-core/src/world/` at the step and the event log. **It cannot
 run beside item 0056** or **item 0060**; all three write the death path.
 
 ## Done when

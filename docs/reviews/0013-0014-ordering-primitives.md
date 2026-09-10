@@ -9,7 +9,7 @@ branch `feat/sprint-2-entity-storage`.
 |------|------|
 | `crates/cachette-core/src/slots.rs` | New. The slot reduction. |
 | `crates/cachette-core/src/sort.rs` | New. The key vector sort. |
-| `crates/cachette-core/src/world.rs` | Changed. The step now calls the slot reduction. |
+| `crates/cachette-core/src/world/` | Changed. The step now calls the slot reduction. |
 | `crates/cachette-core/src/lib.rs` | Changed. Two modules and four re-exports. |
 | `crates/cachette-core/tests/slot_reduction.rs` | New. Eight tests. |
 | `crates/cachette-core/tests/key_vector_sort.rs` | New. Twelve tests. |

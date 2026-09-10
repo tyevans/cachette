@@ -461,8 +461,27 @@ records-probe:
 check:
     ./scripts/gate-budget.sh just gates
 
+# **Every recipe runs, and the report names each one that failed.** A gate that
+# stopped at its first failure hid a changed simulation behind eight lint
+# errors that no behaviour depended on. The cosmetic checks run before the
+# load-bearing ones, so stopping early is what lets a formatting slip cost a
+# determinism result. The findings register holds the case as FND-722.
+#
+# The list below is the one declaration of what a gate is. Add a recipe there
+# and nowhere else.
+#
 # The gates themselves. Run `just check` instead, to get the cost report.
-gates: fmt-check lint test records records-probe merge-defects
+gates:
+    @failed=""; \
+    for recipe in fmt-check lint test records records-probe merge-defects; do \
+        echo "=== $recipe ==="; \
+        just "$recipe" || failed="$failed $recipe"; \
+    done; \
+    if [ -n "$failed" ]; then \
+        echo "gates failed:$failed"; \
+        exit 1; \
+    fi; \
+    echo "every gate passed"
 
 # What continuous integration runs.
 ci: check test-slow
