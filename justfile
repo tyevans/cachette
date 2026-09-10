@@ -42,8 +42,15 @@ invariants:
 test: test-rust census probe test-python smoke
 
 # Run the Rust tests. They go through the public crate API.
+#
+# The run does not stop at the first failing binary. Cargo stops there by
+# default, so one cheap red hides every red that sorts after it. A repair to
+# one fixture once revealed three failures in a second file that had been red
+# for as long, and nothing reported them while the first one stood.[^1]
+#
+# [^1]: Findings register, FND-754. `docs/FINDINGS.md`
 test-rust:
-    cargo test --workspace
+    cargo test --workspace --no-fail-fast
 
 # Prove that building a world visits no tile of the value field.
 #

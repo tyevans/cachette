@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-753**
+**Next number: FND-755**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -20813,6 +20813,31 @@ term deleted from the engine. Nothing in the text of the test showed that.
 
 **A region world may leave foraged food unable to grow back at all.** A blocker
 holds that question.[^F752C]
+
+### FND-754 — The Rust gate stopped at the first failing binary, so one red hid three others
+
+**What the project believed.** The gate reported the failing tests. A red gate
+named the work, and a green gate meant the suite was green.
+
+**What is true.** The gate ran the Rust tests without asking cargo to continue
+past a failure. Cargo stops at the first test binary that fails. The gate
+therefore named the first failure in sort order and hid every failure after it.
+
+**The evidence.** One fixture file failed for a whole session. A repair landed
+and the gate ran again. Three tests in a second file then failed on the same
+run. That second file had changed in no commit of the session, and the repair
+touched one test file and two registers and no engine file. The three failures
+were as old as the first one, and nothing reported them while the first one
+stood.
+
+**What follows.** The gate now asks cargo to run every test binary. A gate that
+stops early states a lower bound on the failures and reads like a complete
+list. The two are not the same statement, and only one of them is safe to plan
+from.
+
+**This shape reaches further than one flag.** Any check that stops at its first
+failure reports a lower bound. A cheap check that runs before an expensive one
+hides the expensive one for as long as the cheap one is red.
 
 ## References
 
