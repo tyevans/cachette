@@ -15,8 +15,9 @@ blocked-by: []
 **A reclaimed training run now keeps its weights and cannot use them.** The
 launcher rents a spot instance, trains the learner on it, and follows the run
 from this machine. A spot instance can be taken back at any time. The follower
-copies the resume point and the best centre of every strategy to this machine
-at every poll, so a reclaim costs the work of one poll.[^1]
+copies the resume point, the best centre and the copy of every generation of
+every strategy to this machine at every poll, so a reclaim costs the work of
+one poll.[^1]
 
 That closes the loss of the weights. It does not close the loss of the run. A
 person who wants the search to continue must rent a new instance, and the new
@@ -74,6 +75,9 @@ The work must send four things to the new instance: the resume point of every
 strategy, the best centre of every strategy, the controller baseline cache,
 and the arguments the reclaimed run used. The launcher already sends a wheel
 cache and a baseline cache, so the mechanism exists.
+
+The run directory also holds the copy of every generation. The trainer resumes
+from the resume point alone, so a restart need not send those copies.[^2]
 
 The work must prove itself without renting a machine. A probe drives the fetch
 of the launcher against a stand-in for the copy tool, and a restart probe can
