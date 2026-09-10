@@ -43,8 +43,9 @@ use crate::hash::StateHash;
 use crate::rates::RateSchedule;
 use crate::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use crate::rng;
+use crate::sim_math;
 use crate::trade::{Advert, ADVERT_OFFERS, ADVERT_WANTS};
-use crate::types::{Entity, FactionId, Tick, TileIdx};
+use crate::types::{Entity, FactionId, Fix32, Tick, TileIdx};
 use crate::unit_type::UnitTypeId;
 use crate::upgrade::{UpgradeCategory, UPGRADE_CATEGORY_COUNT};
 
@@ -128,6 +129,24 @@ pub const CONTRACT_CARRIERS_DEFAULT: u32 = 2;
 ///
 /// [^1]: Balance register, the contract term. `docs/reference/balance.md`
 pub const CONTRACT_TERM_DEFAULT: u32 = 200;
+
+/// The held ground a faction must have over another before it hunts it, as a
+/// raw Q16.16 factor.
+///
+/// A faction overmatches another when its own held ground reaches this
+/// multiple of the held ground of the other. An overmatched faction is prey:
+/// the stronger faction moves its relation toward war against it on every
+/// tick, and it marches on the nearest settlement of the prey as soon as the
+/// pair reaches the war band.
+///
+/// **This is a provisional value and not a measured one.** The balance
+/// register holds the row, marks it unset, and records how this value was
+/// chosen.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
+pub const OVERMATCH_RATIO_DEFAULT: i32 = 2 << 16;
 
 /// The weights that bias the choices of one faction.
 ///
@@ -669,6 +688,61 @@ pub fn rival_of(
     territory_winner(held.filter(|(other, _)| *other != faction))
 }
 
+/// Picks the prey of a faction: the weakest other faction it overmatches.
+///
+/// A faction overmatches another when its own held ground reaches the stated
+/// multiple of the held ground of the other. The answer is the faction with
+/// the least held ground among those it overmatches, so a strong faction goes
+/// after the one it can finish rather than after the leader. **A tie resolves
+/// by the lowest faction identifier**, because the scan visits the factions in
+/// ascending order and replaces the choice only on a strictly smaller count.
+///
+/// A faction that holds no ground itself hunts nobody. Without that guard two
+/// factions with nothing would each overmatch the other, and both would
+/// declare a war neither can fight. A ratio at or below zero takes the rule
+/// out of the game and names no prey at all.
+///
+/// The comparison is exact integer arithmetic through the arithmetic
+/// module.[^1] A prey that holds no ground at all is overmatched by any
+/// faction that holds some, which is the case this rule exists for.
+///
+/// **The holding of the hunter comes from the list the prey comes from.** A
+/// caller that passed its own count would hold a second copy of one number,
+/// and nothing would fail when the two disagreed.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+/// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+#[must_use]
+pub fn prey_of(
+    faction: FactionId,
+    ratio: Fix32,
+    held: impl Iterator<Item = (FactionId, i64)> + Clone,
+) -> Option<FactionId> {
+    if ratio.0 <= 0 {
+        return None;
+    }
+    let mine = held
+        .clone()
+        .find(|(other, _)| *other == faction)
+        .map_or(0, |(_, count)| count);
+    if mine <= 0 {
+        return None;
+    }
+    let mut weakest: Option<(FactionId, i64)> = None;
+    for (other, theirs) in held {
+        if other == faction || sim_math::scale_work(theirs, ratio) > mine {
+            continue;
+        }
+        match weakest {
+            Some((_, least)) if theirs >= least => {}
+            _ => weakest = Some((other, theirs)),
+        }
+    }
+    weakest.map(|(other, _)| other)
+}
+
 /// Makes one evaluation for one faction.
 ///
 /// **This draws exactly once.** The key is the controller system, the tick,
@@ -1003,6 +1077,18 @@ pub struct FactionState {
     /// The faction it would move a relation against, or `None` when it holds
     /// no leader unit and when no other faction exists.
     pub rival: Option<FactionId>,
+    /// The weakest faction it overmatches, or `None` when it overmatches
+    /// none and when it holds no leader unit.
+    ///
+    /// **A prey outranks a rival.** A faction with a prey moves its relation
+    /// toward the prey and not toward the leader, and it moves on every tick
+    /// rather than on a draw. Without the prey the controller declared on the
+    /// leader alone, so a weak faction was never a target.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
+    pub prey: Option<FactionId>,
     /// The objective kind and the tile it would march on, or `None` when no
     /// pair it belongs to is at war, when no enemy site exists, when it holds
     /// a live campaign, and when it holds a carrier.
@@ -1064,6 +1150,7 @@ pub struct Controller {
     surplus_mark: u32,
     contract_carriers: u32,
     contract_term: u32,
+    overmatch_ratio: Fix32,
     carriers: Vec<CarrierAssignment>,
     boards_written: u32,
     offers_made: u32,
@@ -1097,6 +1184,7 @@ impl Controller {
             surplus_mark: SURPLUS_MARK_DEFAULT,
             contract_carriers: CONTRACT_CARRIERS_DEFAULT,
             contract_term: CONTRACT_TERM_DEFAULT,
+            overmatch_ratio: Fix32(OVERMATCH_RATIO_DEFAULT),
             carriers: Vec::new(),
             boards_written: 0,
             offers_made: 0,
@@ -1297,6 +1385,28 @@ impl Controller {
         self.contract_term = term;
     }
 
+    /// Returns the held ground a faction must have over another before it
+    /// hunts it, as a raw Q16.16 factor.
+    #[must_use]
+    pub const fn overmatch_ratio(&self) -> Fix32 {
+        self.overmatch_ratio
+    }
+
+    /// Sets the held ground a faction must have over another before it hunts
+    /// it, as a raw Q16.16 factor.
+    ///
+    /// A ratio at or below zero takes the rule out of the game: no faction
+    /// then overmatches any other, and every relation move goes back to the
+    /// war weight draw. The value is a balance value, and the register holds
+    /// the row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
+    pub const fn set_overmatch_ratio(&mut self, ratio: Fix32) {
+        self.overmatch_ratio = ratio;
+    }
+
     /// Returns every carrier the controller has assigned, in faction order
     /// and then in contract order and then in identity order.
     #[must_use]
@@ -1398,8 +1508,10 @@ impl Controller {
     /// row says what the world offers that faction this tick: the rival it
     /// would move a relation against, the objective it would march on, and
     /// whether a board write, a negotiation step or a carrier move is due.
-    /// A faction with a rival draws once more, at the index past the
-    /// evaluations, and the draw decides whether it moves.[^3] A faction with
+    /// A faction with a prey moves its relation against the prey at the index
+    /// past the evaluations, and it draws nothing for that move. A faction
+    /// with no prey and a rival draws once at that index instead, and the
+    /// draw decides whether it moves.[^3] A faction with
     /// an objective draws once more, at the index past that, and the draw
     /// decides whether it raises.[^4] A faction with a negotiation step due
     /// draws once more, at the index past the board write, and the draw
@@ -1432,7 +1544,13 @@ impl Controller {
                 commands.push((faction, draw, choice));
             }
             let state = states.get(usize::from(index)).copied().unwrap_or_default();
-            if let Some(rival) = state.rival {
+            // **A prey outranks a rival, and the move against a prey draws
+            // nothing.** A faction that overmatches a neighbour hunts it on
+            // every tick, whatever its war weight says. The draw index is the
+            // relation index either way, so the two paths never collide.
+            if let Some(prey) = state.prey {
+                commands.push((faction, self.relation_draw_index(), Choice::Relation(prey)));
+            } else if let Some(rival) = state.rival {
                 let draw = self.relation_draw_index();
                 if wants_relation_move(seed, tick, faction, draw, row.weights) {
                     commands.push((faction, draw, Choice::Relation(rival)));
@@ -1633,6 +1751,7 @@ impl Controller {
             .write_u64(u64::from(self.surplus_mark))
             .write_u64(u64::from(self.contract_carriers))
             .write_u64(u64::from(self.contract_term))
+            .write_u64(i64::from(self.overmatch_ratio.0) as u64)
             .write_u64(self.carriers.len() as u64)
             .write(bytemuck::cast_slice(&self.carriers))
     }

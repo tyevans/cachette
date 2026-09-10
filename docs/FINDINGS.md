@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-724**
+**Next number: FND-725**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -19688,3 +19688,38 @@ change had an innocent reading available, and the innocent reading is also
 wrong. The storm does change the cover, and it changes it downward.
 
 [^F723A]: The storm cover probe. `crates/cachette-core/examples/storm_cover_probe.rs`
+### FND-724 — A seat that takes no action wins no game, and never did
+
+**Believed.** Passivity beats the built-in controller. A policy reached a win
+share of about 0.74 on 256 held-out seeds while 97 percent of its decisions
+went to one action row, and the project read that as a win for doing nothing.
+The reading named two causes: a controller that fails to punish an idle
+neighbour, and win paths that accrue without contest.
+
+**True.** A seat that never acts wins nothing at all. It loses every game,
+and it loses more of them to conquest than a seat the controller drives.
+
+**Evidence.** Three seats played the training world of the run: 128 columns,
+three factions, seat zero, a tick limit of 6000 and a decision every 10 ticks.
+The seed set was the first 64 seeds that seat every faction on ground that
+feeds it. A seat that sent no action won 0 of 64. The built-in controller in
+the same seat won 26 of 64. Every game of both arms ended before the tick
+limit. Ten of the 64 idle games ended by domination against six of the 64
+controller games, so the idle seat was conquered more often, not less.
+
+**Follows.** Three things.
+
+**A repetitive policy is not a passive one.** A policy that sends one action
+row on 97 decisions in 100 still sends about 18 actions in an episode of 600
+decisions, and those actions carry the whole result. The share of one row
+measures how varied a policy is. It does not measure how much the policy does.
+
+**Ask what the strong baseline is before you name a weak one.** The number
+that separates a policy from the built-in controller is the controller's own
+win share. The number that says whether the policy plays at all is the win
+share of a seat that sends nothing, and nobody had measured it.
+
+**The controller still had one target only.** It moved its relation toward the
+other faction with the most held ground, so the weakest seat of a game was the
+one seat nobody marched on. That is a real gap in the opponent, and it is
+worth closing on its own terms. It is not the reason a policy won.

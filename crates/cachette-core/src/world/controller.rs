@@ -18,7 +18,7 @@ use crate::rates::{RateError, RateSchedule};
 use crate::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use crate::stage::{self, Stage};
 use crate::trade::{Consideration, TradeRow, TRADE_OFFERED};
-use crate::types::{Entity, FactionId, TileIdx};
+use crate::types::{Entity, FactionId, Fix32, TileIdx};
 use crate::unit_type::{UnitTypeId, UnitTypeRow, LEADER, UNIT_TYPE_COUNT};
 use crate::upgrade::UpgradeCategory;
 
@@ -136,6 +136,31 @@ impl World {
     /// [^1]: Balance register, the surplus mark. `docs/reference/balance.md`
     pub const fn set_surplus_mark(&mut self, mark: u32) {
         self.controller.set_surplus_mark(mark);
+    }
+
+    /// Returns the held ground a faction must have over another before it
+    /// hunts it, as a raw Q16.16 factor.
+    #[must_use]
+    pub const fn overmatch_ratio(&self) -> i32 {
+        self.controller.overmatch_ratio().0
+    }
+
+    /// Sets the held ground a faction must have over another before it hunts
+    /// it, as a raw Q16.16 factor.
+    ///
+    /// A faction that reaches this multiple of the held ground of another
+    /// moves its relation toward war against that faction on every tick, and
+    /// it marches on the nearest settlement of that faction once the pair
+    /// reaches the war band. A ratio at or below zero takes the rule out of
+    /// the game.
+    ///
+    /// The ratio is a balance value, and the register holds the row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
+    pub const fn set_overmatch_ratio(&mut self, raw: i32) {
+        self.controller.set_overmatch_ratio(Fix32(raw));
     }
 
     /// Returns how many carriers one faction assigns to one contract.
@@ -817,6 +842,18 @@ impl World {
                 controller::rival_of(FactionId(index as u16), held.iter().copied())
             })
             .collect();
+        // The prey of a faction is the weakest other faction it overmatches.
+        // A faction with no speaker has no prey, because the relation verb
+        // would refuse it. **The prey is chosen from the same held ground
+        // list the rival is chosen from**, so the two never read different
+        // counts of one tick.
+        let ratio = self.controller.overmatch_ratio();
+        let prey: Vec<Option<FactionId>> = (0..factions)
+            .map(|index| {
+                speakers[index]?;
+                controller::prey_of(FactionId(index as u16), ratio, held.iter().copied())
+            })
+            .collect();
         // A faction that holds a carrier raises no campaign, because the
         // campaign takes the destination plane the carriers climb.
         let objectives: Vec<Option<(u8, TileIdx)>> = objectives
@@ -879,6 +916,7 @@ impl World {
                 let faction = FactionId(index as u16);
                 FactionState {
                     rival: rivals.get(index).copied().flatten(),
+                    prey: prey.get(index).copied().flatten(),
                     objective: objectives.get(index).copied().flatten(),
                     board_due: due && self.trading_site_of(faction).is_some(),
                     trade_due: self.controller_answer_due(faction).is_some()

@@ -269,6 +269,14 @@ fn a_trading_world(seed: u64) -> World {
     let mut world = World::new(config(2, seed)).expect("the extent describes a world");
     seat_close(&mut world);
     world.set_surplus_mark(MARK);
+    // **This world measures trade, so the hunt is off in it.** A faction that
+    // overmatches another by the balance ratio moves its relation toward war
+    // on every tick, and a pair at war refuses every offer and every counter.
+    // A long run of this fixture therefore ends in a war rather than in a
+    // delivery, and the test would then measure the hunt.[^1]
+    //
+    // [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
+    world.set_overmatch_ratio(0);
     world
         .set_advertisement_schedule(1, 0)
         .expect("the period is inside the range");
