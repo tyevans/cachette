@@ -25,26 +25,6 @@ impl World {
         &self.storm_lost_log
     }
 
-    /// Returns the pressure deficit that the storms put over one tile.
-    ///
-    /// The answer is the sum over every storm that reaches the cell covering
-    /// the tile, and it is zero where no storm reaches. Every harm of this
-    /// module is a rate against this number, so a caller that wants to know
-    /// how hard a storm presses on a place reads it here.
-    ///
-    /// The answer is the coarseness of the weather lattice, so two tiles of
-    /// one weather cell answer alike.[^1]
-    ///
-    /// Returns `None` when the address lies outside the world.
-    ///
-    /// # References
-    ///
-    /// [^1]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
-    #[must_use]
-    pub fn storm_depth_at(&self, address: crate::hex::Axial) -> Option<i32> {
-        let tile = self.grid.index_of(address)?;
-        Some(self.weather.depression_at(self.weather_cell_of(tile)?))
-    }
 
     /// Takes the food and the people that the storms of this tick reach.
     ///

@@ -211,11 +211,17 @@ impl World {
     /// **No decision record holds the storm.** The deficit cone is stated in
     /// the weather module and nowhere else.
     ///
+    /// **Every harm a storm does is a rate against this number.** The damage
+    /// pass reads it here rather than holding a reader of its own, because two
+    /// readers of one fact are the defect shape this project meets most
+    /// often.[^2]
+    ///
     /// Returns `None` when the address lies outside the world.
     ///
     /// # References
     ///
     /// [^1]: ADR-0140, weather is a field over the level 1 cell lattice, decision D1. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
+    /// [^2]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
     #[must_use]
     pub fn storm_depth_at(&self, address: Axial) -> Option<i32> {
         let tile = self.grid.index_of(address)?;
