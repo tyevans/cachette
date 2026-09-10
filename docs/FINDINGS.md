@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-762**
+**Next number: FND-763**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -21204,6 +21204,52 @@ Its flag for a due trade reads the two due readers. That costs the controller
 one wasted choice, and it gives no wrong answer to a learner. A change there
 moves every golden state hash, so it is a separate piece of work.
 
+### FND-762 — A storm death could not be seen at the Python boundary, and a calm latitude belongs to one world
+
+**Believed.** Two things. A Python test counted every unit that left a short
+world as a unit that a shortage ended. It held that a shortage is the only
+thing that ends a unit there. A viewer repair then chose 25 degrees north for
+its fixture, because no storm reached its run at that latitude.[^F762A]
+
+**True.** A storm ended three units of the short world before the first
+starvation, at ticks 12, 18 and 77. The starved log named ten units at tick
+90, and thirteen units had left. At 25 degrees north under the span of a
+region, a storm still ended two units. Under the span of the planet, no storm
+ended a unit before the scan, and the scan ended one unit.
+
+The Python boundary published no reader for the storm log. The core held it,
+and a Rust fixture could subtract it. A Python fixture could not tell a storm
+death from a starvation. The cyclone reader does not stand in for the log: two
+of the three storm deaths fell on a step after which no cyclone stood.
+
+**Evidence.** A bisect over the one test gives 31eb8769 green and 6120e0db
+red. That commit made a map one region of a planet. A temporary Rust probe
+copied the Python fixture and read every log after each step. Its counts match
+the Python run exactly.
+
+| Tick | Units that left | Storm log | Starved log | Other |
+|---|---|---|---|---|
+| 12 | 1 | 1 | 0 | none |
+| 18 | 1 | 1 | 0 | none |
+| 77 | 1 | 1 | 0 | none |
+| 80 | 1 | 0 | 0 | a queue swapped one resident for one new unit |
+| 90 | 11 | 0 | 10 | a queue swapped one resident for one new unit |
+
+**Follows.** The boundary now publishes the storm log, through a named reader
+and through the general reader. Both read the layout that the engine
+declares.[^F762B] [^F762C] The starved test subtracts the units that the storm
+log names, and it keeps the world that starves ten at once.[^F762D] A test of
+the new reader drives the same world.
+
+**A calm latitude belongs to one world.** A fixture that avoids the weather by
+its latitude must assert on every step that the sky ended nobody. A Python
+fixture can now make that assertion through the storm log.
+
+**The count also rests on the production queue.** In this world a queue swaps
+one resident for one new unit, so the count of units holds. A queue row that
+took more people than it made would break the count, and the failure would
+name neither log.
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -21263,3 +21309,7 @@ moves every golden state hash, so it is a separate piece of work.
 [^F761C]: The controller, the trade step and its refusal reader. `crates/cachette-core/src/world/controller.rs`
 [^F761D]: The legality answer, the trade arm. `crates/cachette-core/src/world/actions.rs`
 [^F761E]: The learner action tests, the two trade row tests. `crates/cachette-core/tests/learner_acts.rs`
+[^F762A]: The viewer fixture that stands at a calm latitude. `crates/cachette-view/tests/draws_what_a_unit_suffers.rs`
+[^F762B]: The event layouts, the storm event. `crates/cachette-core/src/event_layout.rs`
+[^F762C]: The storm log reader and the register of logs. `crates/cachette-py/src/world/event_log.rs`
+[^F762D]: The unit type and log tests. `tests/test_unit_types_and_logs.py`

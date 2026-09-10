@@ -368,6 +368,7 @@ mod declarations {
     use crate::promotion::UnitPromoted;
     use crate::rates::SiteShortfall;
     use crate::relation::RelationCrossed;
+    use crate::storm::UnitLostToAStorm;
     use crate::trade::TradeSpoken;
     use crate::types::{Accum, FactionId, Fix32, Tick, TileIdx};
     use crate::unit_type::UnitTypeId;
@@ -405,6 +406,15 @@ mod declarations {
             unit: u64 => "unit",
             deficit: Fix32 => "deficit",
             padding: [u8; 4] => pad,
+        };
+
+        UnitLostToAStorm, "unit_lost_to_a_storm", {
+            tick: Tick => "tick",
+            unit: u64 => "unit",
+            tile: TileIdx => "tile",
+            faction: FactionId => "faction",
+            unit_type: UnitTypeId => "unit_type",
+            padding: [u8; 1] => pad,
         };
 
         SiteShortfall, "site_shortfall", {
