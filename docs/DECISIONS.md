@@ -1998,6 +1998,36 @@ concluded, and it called that argument its weakest.
 
 ## Closed
 
+### DEC-283 — Which city does a wonder belong to when more than one city could claim it?
+
+**Closed. The nearest live city of the faction that holds the tile, and a tie
+goes to the lower slot.**
+
+One lookup names the city whose ground holds each wonder, so a controller can
+march on that city and a policy can find it.[^DEC283A] The holder column names
+a faction and not a city, so a rule must pick one city of that faction.
+
+**Option A. The nearest live city of the holder, and a tie goes to the lower
+slot.** The rule reads no reach. The reach count already uses it to give a
+finished upgrade to one city, so the engine states it once.[^DEC283B] It names
+a city whenever the holder has one, and that includes ground a lease holds. It
+costs one walk of the settlement slots for each wonder.
+
+**Option B. The nearest city of the holder whose reach covers the tile, and a
+tie goes to the lower slot.** This is the holder decision, restricted to one
+faction.[^DEC283C] It needs the reach of every city, and a reach counts the
+finished upgrades against every city, on every read. It names no city for
+ground that a lease holds. Between two steps it reads a reach that the last
+rewrite did not read.
+
+**Outcome: A.** Two cities whose reaches both cover the tile resolve the same
+way under both options: by distance, and then by the lower slot. The options
+differ in two cases. A lease can hold the tile, and then only A names a city.
+A nearer city of the holder can fail to reach the tile while a farther one
+reaches it. Then B names the city whose fall frees the tile, and A names the
+nearer city. A is cheaper and has one statement. **Revisit this if a campaign
+aimed by the lookup takes a city and the wonder stays with its holder.**
+
 ### DEC-279 — What does it cost a faction to take a city, and what does it cost to burn one?
 
 **Closed. Option C. A site falls to a siege, and a raze costs a multiple of a
@@ -4969,6 +4999,9 @@ blocker governs every cost in work.[^BLK7]
 [^DEC282A]: ADR-0195, the observation of a faction is a fixed-width scale-free table in an egocentric frame, decision D1. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
 [^DEC282B]: Reinforcement learning parameters register, the observation layout. `docs/reference/rl-costs.md`
 [^DEC282C]: Research report 42, what a policy should be able to see, sections 9 and 12. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
+[^DEC283A]: The wonder lookup. `crates/cachette-core/src/world/victory.rs`
+[^DEC283B]: The holding, the nearest settlement of a faction. `crates/cachette-core/src/holding.rs`
+[^DEC283C]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^DEC276G]: Backlog item 0516, give a faction one flat observation array, and declare its layout in a schema. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
 [^DEC277B]: Research report 30, the published atmospheric math, section 9. `docs/research/reports/30-the-published-atmospheric-math.md`
 [^DEC277C]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`

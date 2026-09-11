@@ -79,8 +79,8 @@ pub mod weather;
 pub mod world;
 
 pub use action::{
-    place_cell, ActionSchema, ActionShape, CandidateKind, PositionRow, Verb, VerbRow,
-    ACTION_VERSION, PLACE_ANYWHERE, PLACE_COUNT,
+    place_cell, place_of_cell, ActionSchema, ActionShape, CandidateKind, PositionRow, Verb,
+    VerbRow, ACTION_VERSION, PLACE_ANYWHERE, PLACE_COUNT,
 };
 pub use balance::{Balance, RENOWN_TARGET};
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};
@@ -189,7 +189,7 @@ pub use weather::{
 };
 pub use world::{
     CampaignError, CensusBasis, CensusRow, ConvertError, IdentityError, MoveRelationError,
-    RazeError, SeedError, Standing, StepError, World, WorldConfig, WorldError,
+    RazeError, SeedError, Standing, StepError, WonderSite, World, WorldConfig, WorldError,
     FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, STOCK_CEILING_OF_ONE_SETTLEMENT,
     SUBSYSTEM_CENSUS,
 };

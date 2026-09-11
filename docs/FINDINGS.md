@@ -21311,6 +21311,37 @@ holder.[^F765C] The balance register holds the rate.[^F765D]
 **A way to win is a plan only when a rival can answer it.** A path whose
 progress no act of a rival can undo gives every other player no plan against
 it.
+### FND-764 — A wonder channel read zero for a reason that was false, and a survey read the wrong token set
+
+**Believed.** The settlement token declared a `wonder_progress` channel. Its
+writer listed the channel with the others that read zero, and gave one reason
+for the whole list: the engine holds no quantity for each settlement.[^F764A]
+A survey for the work that filled it also said that a rival settlement gets a
+settlement token while the reader sees it.
+
+**True.** The engine held the source. A wonder is work on one tile. The holder
+column names the faction that holds the tile. The reach rule already gives a
+finished upgrade on held ground to one city of that faction. Nothing joined
+the three, so the channel read zero for a reason that did not hold for it.
+
+The settlement set holds the reader's own settlements only. The selection
+skips every settlement of another faction. The set that admits a seen rival is
+the rival set, and it holds one token for each rival faction and no place.
+
+**Evidence.** The audit of the observation named the channel as declared and
+never written, and ranked it fourth for its cost.[^F764B] The selection of the
+settlement set compares the faction of each settlement with the reader and
+skips the rest. A test now builds a wonder at one of two cities of the reader,
+and the channel carries its work in that token alone.[^F764C]
+
+**Follows.** One lookup now states each wonder, its work and the city it
+belongs to.[^F764D] The settlement token reads it. The place of a rival wonder
+went to the rival token, because the settlement set cannot hold a rival.
+
+**A reason that covers a list of channels must hold for each channel on the
+list.** Check each one against the sources the engine holds before calling it
+unfillable. **Read the selection of a token set, and not its channel list,
+before you say which subjects it holds.**
 
 ## References
 
@@ -21382,3 +21413,7 @@ it.
 [^F765B]: The build pass and the wear pass, and the capture and the raze. `crates/cachette-core/src/world/upgrades.rs` and `crates/cachette-core/src/world/sites.rs`
 [^F765C]: ADR-0206, a part-built wonder decays when nobody works it. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
 [^F765D]: Balance register, the wonder decay. `docs/reference/balance.md`
+[^F764A]: The settlement token writer. `crates/cachette-core/src/obs_token.rs`
+[^F764B]: The audit of the observation, section 3.4. `docs/research/what-a-policy-cannot-see.md`
+[^F764C]: The token tests, the wonder on the ground of one settlement. `crates/cachette-core/tests/a_faction_reads_its_frontier_and_its_tokens.rs`
+[^F764D]: The wonder lookup. `crates/cachette-core/src/world/victory.rs`

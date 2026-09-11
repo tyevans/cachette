@@ -1152,21 +1152,8 @@ impl Holding {
             let Some(address) = grid.address_of(site.tile) else {
                 continue;
             };
-            let mut best: Option<(u32, usize)> = None;
-            for (slot, standing) in live.iter().enumerate() {
-                if *standing != 1 || factions[slot] != holder {
-                    continue;
-                }
-                let Some(seat) = grid.address_of(tiles[slot]) else {
-                    continue;
-                };
-                let distance = address.distance(seat);
-                if best.is_none_or(|(nearest, _)| distance < nearest) {
-                    best = Some((distance, slot));
-                }
-            }
-            if let Some((_, slot)) = best {
-                finished[slot] += 1;
+            if let Some(slot) = nearest_settlement_of(grid, settlements, holder, address) {
+                finished[slot as usize] += 1;
             }
         }
 
@@ -1572,6 +1559,55 @@ pub struct City {
     ///
     /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
     pub finished: u32,
+}
+
+/// Returns the slot of the live settlement of one faction that stands nearest
+/// to one address, or `None` when the faction holds no live settlement.
+///
+/// **This is the one statement of which city of a faction a place on its
+/// ground belongs to.** The holder column names a faction and not a city. The
+/// reach count gives a finished upgrade to the city this returns, and the
+/// wonder lookup names the city this returns as the one that holds a
+/// wonder.[^1]
+///
+/// Distance is the hex distance from the address to the tile of the city. Two
+/// cities at one distance resolve by the lower settlement slot. The walk is in
+/// ascending slot order, and a later city must be strictly nearer to win. That
+/// is the tie rule of the holder decision.[^2]
+///
+/// The rule reads no reach. Two cities of one faction whose reaches both
+/// cover the address therefore resolve by distance and then by slot, which is
+/// the answer the holder decision gives for them.
+///
+/// The cost is the slot count of the arena.
+///
+/// # References
+///
+/// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+/// [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D1. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+#[must_use]
+pub fn nearest_settlement_of(
+    grid: Grid,
+    settlements: &SettlementArena,
+    faction: FactionId,
+    address: Axial,
+) -> Option<u32> {
+    let tiles = settlements.tile_column();
+    let factions = settlements.faction_column();
+    let mut best: Option<(u32, u32)> = None;
+    for (slot, standing) in settlements.live_column().iter().enumerate() {
+        if *standing != 1 || factions[slot] != faction {
+            continue;
+        }
+        let Some(seat) = grid.address_of(tiles[slot]) else {
+            continue;
+        };
+        let distance = address.distance(seat);
+        if best.is_none_or(|(nearest, _)| distance < nearest) {
+            best = Some((distance, slot as u32));
+        }
+    }
+    best.map(|(_, slot)| slot)
 }
 
 /// What the holder decision reads of the lease.

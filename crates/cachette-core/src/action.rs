@@ -119,6 +119,12 @@ pub const PLACE_ANYWHERE: u32 = 0;
 /// [^1]: ADR-0199, a verb names a place by a cell of the egocentric frame the observation publishes, decision D4. `docs/adrs/draft/adr-0199-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
 pub const PLACE_COUNT: u32 = RING_STACK_CELLS + 1;
 
+/// The place value that names the first cell of the egocentric frame.
+///
+/// **This is the one statement of the offset between a place value and a
+/// cell.** The mapping and its inverse both read it.
+const FIRST_CELL_PLACE: u32 = PLACE_ANYWHERE + 1;
+
 /// Returns the cell of the egocentric frame that one place value names, and
 /// nothing when the value names the whole frame.
 ///
@@ -130,10 +136,25 @@ pub const PLACE_COUNT: u32 = RING_STACK_CELLS + 1;
 /// [^1]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
 #[must_use]
 pub const fn place_cell(place: u32) -> Option<u32> {
-    if place == PLACE_ANYWHERE || place >= PLACE_COUNT {
+    if place < FIRST_CELL_PLACE || place >= PLACE_COUNT {
         None
     } else {
-        Some(place - 1)
+        Some(place - FIRST_CELL_PLACE)
+    }
+}
+
+/// Returns the place value that names one cell of the egocentric frame, and
+/// nothing when the frame holds no such cell.
+///
+/// This is the inverse of [`place_cell`]. The observation calls it to publish
+/// where a subject stands, so the value a policy reads is the value it emits
+/// to name that cell.
+#[must_use]
+pub const fn place_of_cell(cell: u32) -> Option<u32> {
+    if cell >= RING_STACK_CELLS {
+        None
+    } else {
+        Some(cell + FIRST_CELL_PLACE)
     }
 }
 

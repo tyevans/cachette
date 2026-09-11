@@ -611,7 +611,7 @@ nothing asked whether the number the feed renders means the policy plays.
 [^STYLES]: The play style table. `python/cachette/learn/play_styles.toml`
 [^PROG]: The progress reader and the dashboard. `scripts/train_progress.py`
 [^LAUNCH]: The training launcher. `scripts/graviton-train.sh`
-[^MANIFEST]: The manifests of the four published policies. `checkpoints/styles/`
+[^MANIFEST]: The manifests of the four published policies, archived at observation version 8. `archive/obs7-act2-policies/`
 [^INDEX]: The stored policy index. `checkpoints/README.md`
 [^VICTORY]: The game end readers of the engine. `crates/cachette-core/src/world/victory.rs`
 [^PUBLISH]: The commit `Publish the four play style policies, and read each file's own world`. Read its message for the four scores and the shared log hazard.

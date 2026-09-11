@@ -7,10 +7,10 @@
 use super::World;
 use crate::balance::Balance;
 use crate::controller::{self, FactionRow, GameEnd, WinPath};
-use crate::holding::Holder;
+use crate::holding::{nearest_settlement_of, Holder};
 use crate::sim_math;
 use crate::site::{CommodityId, COMMODITY_COUNT};
-use crate::types::{Accum, FactionId};
+use crate::types::{Accum, Entity, FactionId, Fix32, TileIdx};
 use crate::upgrade::{self, UpgradeCategory, UpgradeRow};
 
 /// One game end reader: a pure function of the world that names the faction
@@ -60,6 +60,60 @@ pub struct Standing {
     ///
     /// [^1]: ADR-0174, a wonder is a win path and a stock total is not, decision D1. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
     pub wonder_progress: i64,
+}
+
+/// One tile on which a wonder stands, or on which work builds toward one.
+///
+/// A wonder is an upgrade row that carries a victory claim above zero.[^1]
+/// The wonder lookup returns one of these for each tile whose standing row
+/// carries a claim, and for each tile whose next row carries one.
+///
+/// **The holder and the settlement say whose wonder it is.** The faction that
+/// holds the tile gets the credit on the wonder path. The settlement is the
+/// city of that faction that the ground belongs to, so a caller that wants to
+/// stop a wonder knows which city to march on.
+///
+/// # References
+///
+/// [^1]: ADR-0174, a wonder is a win path and a stock total is not, decision D1. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WonderSite {
+    /// The tile that carries the work.
+    pub tile: TileIdx,
+    /// The victory claim of the row that stands on the tile.
+    ///
+    /// Zero means that the wonder is still under construction.
+    pub claim: i64,
+    /// The work done toward the wonder.
+    ///
+    /// A finished wonder reports the whole requirement, because the work of a
+    /// site returns to zero when its level rises.
+    pub work: i64,
+    /// The work that the wonder row asks for.
+    pub requirement: i64,
+    /// The faction that holds the tile, or `None` when nobody holds it.
+    pub holder: Option<FactionId>,
+    /// The settlement of the holder that the tile belongs to, or `None` when
+    /// nobody holds the tile or the holder has no live settlement.
+    pub settlement: Option<Entity>,
+}
+
+impl WonderSite {
+    /// Reports whether the wonder stands, and is not only under
+    /// construction.
+    #[must_use]
+    pub const fn is_finished(self) -> bool {
+        self.claim > 0
+    }
+
+    /// Returns the work done as a share of the requirement.
+    ///
+    /// A finished wonder reads one. A requirement of zero reads as one, so
+    /// the share never divides by zero.
+    #[must_use]
+    pub const fn progress_share(self) -> Fix32 {
+        sim_math::bounded_share(self.work, self.requirement)
+    }
 }
 
 impl World {
@@ -318,43 +372,123 @@ impl World {
             .collect()
     }
 
-    /// Returns the largest victory claim, and the work toward it, on the
-    /// ground of every faction, by faction number.
+    /// Returns every wonder of the world: each tile on which a wonder stands,
+    /// and each tile on which work builds toward one.
     ///
-    /// The reader walks the sparse upgrade map and reads the victory claim
-    /// column of two rows for each entry: the row that stands there, and the
-    /// row above it. An entry that stands at a row with a claim reports the
-    /// work of that row, and an entry that builds toward one reports the work
-    /// done. It names no category.[^2]
+    /// **This is the one declaration of where a wonder stands, how far it has
+    /// come, and whose it is.** The wonder reader, the standing, the
+    /// observation and the controller read it, so none of them states the
+    /// rule a second time.
+    ///
+    /// The contract of each entry:
+    ///
+    /// - A tile whose standing row carries a victory claim is a finished
+    ///   wonder. Its claim is that claim, and its work and its requirement
+    ///   are both the work of that row.
+    /// - A tile whose next row carries a claim builds toward a wonder. Its
+    ///   claim is zero, its work is the work done, and its requirement is the
+    ///   work of the next row.
+    /// - The holder is the faction that holds the tile now. A tile nobody
+    ///   holds has no holder and no settlement.
+    /// - The settlement is the live settlement of the holder nearest to the
+    ///   tile. Two settlements at one distance resolve by the lower slot. The
+    ///   rule reads no reach, so two settlements whose reaches both cover the
+    ///   tile resolve by distance and then by slot. It is the rule that gives
+    ///   a finished upgrade to one city of its faction, and it has one
+    ///   statement.[^1]
+    ///
+    /// The entries are in ascending tile order, which is the order of the
+    /// sparse upgrade map. No hash order and no thread order enters.[^2]
     ///
     /// The walk is over one entry for each improved tile, so it is not a walk
-    /// over the tiles.[^1] A claim on ground nobody holds counts for nobody.
+    /// over the tiles.[^3] Each held entry also walks the settlement slots
+    /// once, and the entries are the wonder sites alone.
     ///
     /// # References
     ///
-    /// [^1]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
-    /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
-    pub(crate) fn victory_claims(&self) -> Vec<(i64, i64)> {
-        let mut best = vec![(0i64, 0i64); usize::from(self.config.faction_count.max(1))];
-        for site in self.upgrades.sites() {
+    /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
+    /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^3]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    #[must_use]
+    pub fn wonder_sites(&self) -> Vec<WonderSite> {
+        self.wonder_sites_unplaced()
+            .map(|site| WonderSite {
+                settlement: site
+                    .holder
+                    .and_then(|faction| {
+                        let address = self.grid.address_of(site.tile)?;
+                        nearest_settlement_of(self.grid, &self.settlements, faction, address)
+                    })
+                    .and_then(|slot| self.settlements.entity_at(slot)),
+                ..site
+            })
+            .collect()
+    }
+
+    /// Returns every wonder of the world with its holder, and with no
+    /// settlement named.
+    ///
+    /// The reader walks the sparse upgrade map and reads the victory claim
+    /// column of the row that stands at each entry. It names no category.[^1]
+    ///
+    /// **Whether the work of an entry builds toward a claim has one
+    /// statement, and this walk calls it.** The wonder work pass reads the
+    /// same test to decide which work decays and which resets, so the work
+    /// this walk counts is the work that pass touches.[^2]
+    ///
+    /// **The game end reader runs every step and needs no settlement**, so it
+    /// reads this walk and pays nothing for the settlement rule. The public
+    /// lookup adds the settlement to the same entries.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    fn wonder_sites_unplaced(&self) -> impl Iterator<Item = WonderSite> + '_ {
+        self.upgrades.sites().iter().filter_map(move |site| {
             let standing = self.upgrade_table.row(site.category, site.level);
-            let next = self.upgrade_table.row(site.category, site.level + 1);
             let claimed = standing.map_or(0, |row| i64::from(row.victory_claim));
-            let (claim, work) = if claimed > 0 {
-                (claimed, standing.map_or(0, |row| i64::from(row.work)))
-            } else if next.is_some_and(|row| row.victory_claim > 0) {
-                (0, site.progress.0)
+            let (claim, work, requirement) = if claimed > 0 {
+                let whole = standing.map_or(0, |row| i64::from(row.work));
+                (claimed, whole, whole)
+            } else if site.builds_toward_a_claim(&self.upgrade_table) {
+                let whole = self.upgrade_table.work_above(site.category, site.level);
+                (0, site.progress.0, whole)
             } else {
-                continue;
+                return None;
             };
             let holder = self
                 .grid
                 .address_of(site.tile)
                 .and_then(|address| self.holding.holder(address))
                 .and_then(Holder::faction);
-            if let Some(slot) = holder.and_then(|faction| best.get_mut(usize::from(faction.0))) {
-                slot.0 = slot.0.max(claim);
-                slot.1 = slot.1.max(work);
+            Some(WonderSite {
+                tile: site.tile,
+                claim,
+                work,
+                requirement,
+                holder,
+                settlement: None,
+            })
+        })
+    }
+
+    /// Returns the largest victory claim, and the work toward it, on the
+    /// ground of every faction, by faction number.
+    ///
+    /// This folds the wonder lookup by holder. An entry that stands at a row
+    /// with a claim reports the work of that row, and an entry that builds
+    /// toward one reports the work done. A claim on ground nobody holds
+    /// counts for nobody.
+    pub(crate) fn victory_claims(&self) -> Vec<(i64, i64)> {
+        let mut best = vec![(0i64, 0i64); usize::from(self.config.faction_count.max(1))];
+        for site in self.wonder_sites_unplaced() {
+            if let Some(slot) = site
+                .holder
+                .and_then(|faction| best.get_mut(usize::from(faction.0)))
+            {
+                slot.0 = slot.0.max(site.claim);
+                slot.1 = slot.1.max(site.work);
             }
         }
         best
@@ -564,5 +698,145 @@ impl World {
                 },
             )
             .is_ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::hex::Axial;
+    use crate::world::WorldConfig;
+
+    /// Returns the claims by the walk that the wonder lookup replaced.
+    ///
+    /// **This is that walk, kept as the oracle.** The fold over the lookup
+    /// must give the same pair for every faction, because the game end
+    /// reader and the observation read the pair, and the state hash follows
+    /// the game end.
+    fn claims_by_the_replaced_walk(world: &World) -> Vec<(i64, i64)> {
+        let mut best = vec![(0i64, 0i64); usize::from(world.config.faction_count.max(1))];
+        for site in world.upgrades.sites() {
+            let standing = world.upgrade_table.row(site.category, site.level);
+            let next = world.upgrade_table.row(site.category, site.level + 1);
+            let claimed = standing.map_or(0, |row| i64::from(row.victory_claim));
+            let (claim, work) = if claimed > 0 {
+                (claimed, standing.map_or(0, |row| i64::from(row.work)))
+            } else if next.is_some_and(|row| row.victory_claim > 0) {
+                (0, site.progress.0)
+            } else {
+                continue;
+            };
+            let holder = world
+                .grid
+                .address_of(site.tile)
+                .and_then(|address| world.holding.holder(address))
+                .and_then(Holder::faction);
+            if let Some(slot) = holder.and_then(|faction| best.get_mut(usize::from(faction.0))) {
+                slot.0 = slot.0.max(claim);
+                slot.1 = slot.1.max(work);
+            }
+        }
+        best
+    }
+
+    /// Returns an address that admits a unit, near the one asked for.
+    fn ground_near(world: &World, wanted: Axial) -> Axial {
+        (0..=14)
+            .flat_map(|ring: i32| {
+                (-ring..=ring).flat_map(move |column| {
+                    (-ring..=ring)
+                        .filter(move |row| column.abs().max(row.abs()) == ring)
+                        .map(move |row| Axial::new(wanted.q + column, wanted.r + row))
+                })
+            })
+            .find(|candidate| world.admits_a_unit(*candidate))
+            .expect("the fixture finds ground that admits a unit")
+    }
+
+    /// Founds a city of one faction near one address, puts builders on its
+    /// tile, and orders each to build a wonder. Returns the tile.
+    fn a_wonder_underway(
+        world: &mut World,
+        faction: FactionId,
+        wanted: Axial,
+        builders: u32,
+    ) -> Axial {
+        let place = ground_near(world, wanted);
+        world
+            .spawn_soldier(place, faction)
+            .expect("the ground admits a unit");
+        world
+            .found_settlement(place, faction)
+            .expect("the ground admits a city");
+        world.step(1).expect("the step runs");
+        for _ in 0..builders {
+            let unit = world
+                .spawn_soldier(place, faction)
+                .expect("the ground admits a unit");
+            world
+                .order_build(unit, UpgradeCategory::WONDER)
+                .expect("the builder stands on ground its faction holds");
+        }
+        place
+    }
+
+    /// The fold over the wonder lookup gives the claims the replaced walk
+    /// gave.
+    ///
+    /// **The fixture holds every case the fold reads.** One faction holds a
+    /// finished wonder, whose work is the work of its row and not the work of
+    /// the site. Another holds a wonder under construction. The third holds
+    /// none. A fold that read the work of the site for a finished wonder, or
+    /// that read the claim of the next row, would disagree with the oracle.
+    #[test]
+    fn the_fold_over_the_lookup_gives_the_claims_the_replaced_walk_gave() {
+        let mut world = World::new(WorldConfig {
+            width: 96,
+            height: 96,
+            seed: 0x0a1d_5eed_0003_0003,
+            faction_count: 3,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
+        })
+        .expect("the configuration describes a world");
+        world
+            .set_choice_schedule(12)
+            .expect("the exponent is inside the range");
+        world.set_win_readers_enabled(false);
+        assert!(world.set_wonder_work(240));
+        let finished_at = ground_near(&world, Axial::new(20, 20));
+        let room = world
+            .tile_capacity(finished_at)
+            .expect("the tile lies inside the world")
+            .saturating_sub(1)
+            .max(1);
+        a_wonder_underway(&mut world, FactionId(0), finished_at, room);
+        a_wonder_underway(&mut world, FactionId(1), Axial::new(70, 70), 1);
+        for _ in 0..400 {
+            if world.finished_upgrade(finished_at) == Some(UpgradeCategory::WONDER) {
+                break;
+            }
+            world.step(1).expect("the step runs");
+        }
+        world.step(1).expect("the step runs");
+
+        let sites = world.wonder_sites();
+        assert!(
+            sites
+                .iter()
+                .any(|site| site.is_finished() && site.holder == Some(FactionId(0))),
+            "the fixture must finish a wonder on the ground of faction 0"
+        );
+        assert!(
+            sites.iter().any(|site| !site.is_finished()
+                && site.work > 0
+                && site.holder == Some(FactionId(1))),
+            "the fixture must leave a wonder under construction on the ground of faction 1"
+        );
+        assert_eq!(
+            world.victory_claims(),
+            claims_by_the_replaced_walk(&world),
+            "the fold over the lookup gives the claims of the replaced walk"
+        );
     }
 }

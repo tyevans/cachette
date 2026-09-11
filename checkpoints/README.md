@@ -8,9 +8,10 @@ layout, one action layout, one world extent and one faction count. The loader
 reads the fit a file states, compares it against the world the caller names,
 and refuses a file that disagrees.[^C3]
 
-**This index holds four policies, all at observation version 7.** Every
-earlier policy read version 6 and the loader refuses it; the section on what is
-gone holds what each of those measured.
+**This index holds no policy that loads today.** The observation reached
+version 8 on 10 September 2026, so the loader refuses the four policies at
+version 7 and every earlier policy. The section on what is gone holds what each
+of those measured.
 
 **A file the loader refuses is removed rather than retired in place.** An index
 that lists a file nobody can load costs a reader the time it takes to find that
@@ -23,26 +24,34 @@ measurement stays here when its file cannot.
 ## Watch one play
 
 The demonstration refuses a policy that does not fit the world it plays, so
-name the world the policy was trained on. A policy trained on a 48 by 48 world
-of three factions plays like this:
+name the world the policy was trained on. The manifest beside a file states
+the extent and the faction count. A policy trained on a 128 by 128 world of
+three factions plays like this:
 
     uv run python -m cachette.demo --extent 128 --factions 3 \
-      --policy 0=checkpoints/styles/obs7-act2-aggressive-gen7.npz
+      --policy 0=checkpoints/<group>/<file>.npz
 
 `--policy` repeats, and `N=path` names the faction that holds it, so three
-policies play each other by naming three paths:
+policies play each other by naming three paths.
 
-    uv run python -m cachette.demo --extent 128 --factions 3 \
-      --policy 0=checkpoints/styles/obs7-act2-aggressive-gen7.npz \
-      --policy 1=checkpoints/styles/obs7-act2-wonder-rush-gen9.npz \
-      --policy 2=checkpoints/styles/obs7-act2-defensive-expansionist-gen3.npz
-
-**Name the world these policies were trained on.** Every file here was fitted
-on 128 by 128 with three factions, and the loader refuses a file trained
-against another world. The earlier index said 48 by 48, which is the world the
-retired policies played.
+**A command that names a live weight file goes stale the next time the
+observation moves.** The example therefore names a path shape and no file.
 
 ## What is here
+
+No policy loads at observation version 8. The next run that trains against it
+writes the first.
+
+## What is gone
+
+### The play style table at observation version 7
+
+**The observation reached version 8 on 10 September 2026, and the loader
+refuses all four policies below.** The raise was mandated. The settlement
+token and the rival token gained published values, and the rival token took
+two channels from the reserve. The files are kept under
+`archive/obs7-act2-policies/` rather than deleted, for the reason the version 6
+group below gives.
 
 Four policies from one run of the play style table, on a 128 by 128 world of
 three factions at a tick limit of 6000, at observation version 7 and action
@@ -114,9 +123,6 @@ by minus three.
 
 **The run these came from was still training when they were taken.** A later
 generation may hold a better centre.
-
-
-## What is gone
 
 ### The place action table at observation version 6
 

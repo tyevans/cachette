@@ -139,7 +139,7 @@ pub use self::errors::{
 pub use self::founding::FOUNDING_GROUP_DEFAULT;
 pub use self::luxuries::LUXURY_DEPOSITS_DEFAULT;
 pub use self::sites::STOCK_CEILING_OF_ONE_SETTLEMENT;
-pub use self::victory::Standing;
+pub use self::victory::{Standing, WonderSite};
 
 /// A simulated world.
 ///

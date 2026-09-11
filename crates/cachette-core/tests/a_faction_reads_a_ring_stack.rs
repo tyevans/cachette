@@ -131,7 +131,7 @@ fn the_three_blocks_hold_the_positions_the_layout_states() {
     assert_eq!(RING_STACK_SLOTS, 3775);
     assert_eq!(RING_STACK_SLOTS, RING_STACK_CELLS * RING_STACK_CHANNELS);
     assert_eq!(FRONTIER_SLOTS, 32);
-    assert_eq!(TOKEN_SLOTS, 624);
+    assert_eq!(TOKEN_SLOTS, 636);
 }
 
 #[test]

@@ -61,17 +61,18 @@
 //! [^2]: Findings register, FND-647. `docs/FINDINGS.md`
 //! [^3]: The audit of the observation, section 2. `docs/research/what-a-policy-cannot-see.md`
 
+use crate::action::{place_of_cell, PLACE_ANYWHERE, PLACE_COUNT};
 use crate::faction_view::FactionViewError;
 use crate::hex::{Axial, Grid};
 use crate::obs_frontier::Frontier;
 use crate::obs_ring::{
-    hex_distance_from_origin, ring_of_distance, ring_position, shared_sector_of, FAR_SECTORS,
-    RING_CAP,
+    cell_of_delta, hex_distance_from_origin, ring_of_distance, ring_position, shared_sector_of,
+    FAR_SECTORS, RING_CAP,
 };
 use crate::obs_ring_stack::{same_name, RingStack};
 use crate::sim_math;
 use crate::types::{Accum, Entity, FactionId, Fix32};
-use crate::world::World;
+use crate::world::{WonderSite, World};
 
 /// The name a schema gives to the space a token set lays its tokens out in.
 ///
@@ -130,6 +131,17 @@ pub const SETTLEMENT_CHANNEL_NAMES: &[&str] = &[
 /// strength, the finished upgrades, the best renown and the wonder work. The
 /// writer of the token states what each of the other five needs and does not
 /// have.
+///
+/// **The last two channels say where the wonder of the rival stands, when the
+/// reader sees it.** The progress channel holds the work of that wonder as a
+/// share of its requirement. The place channel holds the place value of the
+/// action table that names the cell of the settlement that holds it, so a
+/// policy can aim a campaign at that settlement.[^1] Both read zero when the
+/// reader sees no wonder of the rival, and a place of zero names no cell.
+///
+/// # References
+///
+/// [^1]: ADR-0199, a verb names a place by a cell of the egocentric frame the observation publishes, decisions D1 and D2. `docs/adrs/draft/adr-0199-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
 pub const RIVAL_CHANNEL_NAMES: &[&str] = &[
     "validity",
     "settlement_ratio",
@@ -155,6 +167,8 @@ pub const RIVAL_CHANNEL_NAMES: &[&str] = &[
     "observation_confidence",
     "unit_mix_distance",
     "relation_to_leader",
+    "wonder_site_progress",
+    "wonder_site_place",
 ];
 
 /// The channels of one threat cluster token, in the order the token stores
@@ -217,6 +231,42 @@ const fn channel_index(names: &[&str], wanted: &str) -> usize {
         index += 1;
     }
     panic!("the channel list of the token set holds no channel of that name");
+}
+
+/// Returns one place value of the action table as one position of a token.
+///
+/// A place value of zero names the whole frame, and every other value names
+/// one cell of the egocentric frame. The position holds the value over the
+/// largest place value, so it lies inside the bounds of a share and it
+/// follows nothing about the world.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0199, a verb names a place by a cell of the egocentric frame the observation publishes, decision D4. `docs/adrs/draft/adr-0199-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+#[must_use]
+pub const fn place_position(place: u32) -> Fix32 {
+    sim_math::bounded_share(place as i64, (PLACE_COUNT - 1) as i64)
+}
+
+/// Returns the place value that one token position holds.
+///
+/// **This is the inverse of [`place_position`], and a reader that turns a
+/// position back into a place calls it.** The share rounds down, so this
+/// rounds up. The place count is far below the fixed-point unit, so the round
+/// trip gives back every place value exactly.
+#[must_use]
+pub const fn place_of_position(position: i64) -> u32 {
+    let one = Fix32::ONE.0 as i64;
+    let widest = (PLACE_COUNT - 1) as i64;
+    if position <= 0 {
+        return PLACE_ANYWHERE;
+    }
+    let place = (position * widest + one - 1) / one;
+    if place > widest {
+        widest as u32
+    } else {
+        place as u32
+    }
 }
 
 /// The settlement tokens the block holds.
@@ -526,18 +576,23 @@ impl World {
         let settlements = self.select_settlements(faction, &mut tokens);
         let rivals = self.select_rivals(faction, &mut tokens);
         let threats = self.select_threats(faction, &mut tokens)?;
+        let wonders = self.wonder_sites();
 
         let mut written = vec![0i64; TOKEN_SLOTS as usize];
         for slot in 0..SETTLEMENT_TOKENS as usize {
             let channels = match settlements.get(slot) {
-                Some(entry) => self.settlement_token(faction, centre, *entry, &mut tokens),
+                Some(entry) => {
+                    self.settlement_token(faction, centre, *entry, &wonders, &mut tokens)
+                }
                 None => [Fix32::ZERO; SETTLEMENT_CHANNELS as usize],
             };
             write_token(&mut written, TokenSet::Settlements, slot, &channels);
         }
         for slot in 0..RIVAL_TOKENS as usize {
             let channels = match rivals.get(slot) {
-                Some(entry) => self.rival_token(faction, *entry, &settlements, powers),
+                Some(entry) => {
+                    self.rival_token(faction, centre, *entry, &settlements, powers, &wonders)
+                }
                 None => [Fix32::ZERO; RIVAL_CHANNELS as usize],
             };
             write_token(&mut written, TokenSet::Rivals, slot, &channels);
@@ -898,15 +953,25 @@ impl World {
     /// garrison share, the garrison strength, the food coverage in ticks, the
     /// distance to the reach boundary, the rival strength within the disc,
     /// the own strength within the disc, the tiles lost over the window, the
-    /// population change over the window, the wonder progress at the
-    /// settlement and the settlement age. The engine holds no per-settlement
-    /// population, no per-settlement upgrade count, no per-settlement age, no
-    /// window history and no military strength.
+    /// population change over the window and the settlement age. The engine
+    /// holds no per-settlement population, no per-settlement upgrade count,
+    /// no per-settlement age, no window history and no military strength.
+    ///
+    /// **The wonder progress channel reads the wonder lookup.** It holds the
+    /// largest progress share of any wonder whose ground belongs to this
+    /// settlement, and zero where that ground holds none. A policy then reads
+    /// which of its settlements holds the work, and not only how far the work
+    /// has come. The settlement is the reader's own, so no fog applies.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-671. `docs/FINDINGS.md`
     fn settlement_token(
         &self,
         faction: FactionId,
         centre: Axial,
         entry: SettlementEntry,
+        wonders: &[WonderSite],
         tokens: &mut EntityTokens,
     ) -> [Fix32; SETTLEMENT_CHANNELS as usize] {
         let grid = self.grid();
@@ -931,6 +996,8 @@ impl World {
             sim_math::compressed_magnitude(entry.store);
         channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "own_upgrades_near") }] =
             sim_math::compressed_magnitude(disc.own_upgrades);
+        channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "wonder_progress") }] =
+            wonder_share_of(wonders, entry.settlement);
         channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "hazard_share") }] =
             sim_math::bounded_share(disc.hazard_tiles, disc.observed);
         channels[const { channel_index(SETTLEMENT_CHANNEL_NAMES, "rival_settlement_distance") }] =
@@ -983,15 +1050,27 @@ impl World {
     /// distance needs the type histogram of a rival, and the fogged unit
     /// walk keeps a histogram for the reader alone.
     ///
+    /// **The two wonder site channels read the wonder the reader sees, and
+    /// nothing else.** They hold the wonder of the rival that the reader sees
+    /// now, and the place of the settlement that holds it. The place is the
+    /// value the campaign verb takes, so a policy that reads it can name the
+    /// cell of that settlement.[^2] A wonder the reader does not see reads
+    /// zero in both. The wonder ratio above keeps its own rule, and a blocker
+    /// holds the question of that rule.[^3]
+    ///
     /// # References
     ///
     /// [^1]: ADR-0195, the observation of a faction is a fixed-width scale-free table, decision D8. `docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md`
+    /// [^2]: ADR-0199, a verb names a place by a cell of the egocentric frame the observation publishes, decisions D1 and D2. `docs/adrs/draft/adr-0199-a-verb-names-a-place-by-a-cell-of-the-egocentric-frame.md`
+    /// [^3]: Blockers register, BLK-160. `docs/BLOCKERS.md`
     fn rival_token(
         &self,
         faction: FactionId,
+        centre: Axial,
         entry: RivalEntry,
         own: &[SettlementEntry],
         powers: &RivalPowers,
+        wonders: &[WonderSite],
     ) -> [Fix32; RIVAL_CHANNELS as usize] {
         let grid = self.grid();
         let seat = usize::from(faction.0);
@@ -1026,8 +1105,62 @@ impl World {
             self.relation(entry.faction, FactionId(powers.leader as u16))
                 .unwrap_or(0),
         );
+        if let Some((share, home)) = self.seen_rival_wonder(faction, entry.faction, wonders) {
+            let cell = cell_of_delta(Axial::new(home.q - centre.q, home.r - centre.r));
+            channels[const { channel_index(RIVAL_CHANNEL_NAMES, "wonder_site_progress") }] = share;
+            channels[const { channel_index(RIVAL_CHANNEL_NAMES, "wonder_site_place") }] =
+                place_position(place_of_cell(cell).unwrap_or(PLACE_ANYWHERE));
+        }
         channels
     }
+
+    /// Returns the wonder of one rival that the reader sees now, as its
+    /// progress share and the address of the settlement that holds it.
+    ///
+    /// **A wonder counts only when the reader sees both its tile and the
+    /// settlement that holds it this frame.** The work is a fact of the tile,
+    /// and the place is a fact of the settlement, so each needs its own
+    /// sight. A wonder on ground the reader does not see stays hidden, and
+    /// that is the rule the rival selection keeps for a settlement.[^1]
+    ///
+    /// The largest share wins. A tie goes to the first wonder of the lookup,
+    /// which is the lowest tile, because a later wonder must be strictly
+    /// larger to win.
+    ///
+    /// # References
+    ///
+    /// [^1]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
+    fn seen_rival_wonder(
+        &self,
+        faction: FactionId,
+        rival: FactionId,
+        wonders: &[WonderSite],
+    ) -> Option<(Fix32, Axial)> {
+        let arena = self.settlements();
+        let grid = self.grid();
+        let mut best: Option<(Fix32, Axial)> = None;
+        for site in wonders {
+            if site.holder != Some(rival) {
+                continue;
+            }
+            let (Some(home), Some(ground)) = (
+                site.settlement
+                    .and_then(|settlement| arena.address(settlement)),
+                grid.address_of(site.tile),
+            ) else {
+                continue;
+            };
+            if !self.faction_sees_now(faction, home) || !self.faction_sees_now(faction, ground) {
+                continue;
+            }
+            let share = site.progress_share();
+            if best.is_none_or(|(kept, _)| share.0 > kept.0) {
+                best = Some((share, home));
+            }
+        }
+        best
+    }
+
     /// Writes the channels of one threat cluster token.
     ///
     /// **The three strength channels and the balance read the strength of
@@ -1209,6 +1342,17 @@ fn power_ratio(values: &[i64], subject: usize, seat: usize) -> Fix32 {
         values.get(subject).copied().unwrap_or(0),
         values.get(seat).copied().unwrap_or(0),
     )
+}
+
+/// Returns the largest progress share of the wonders whose ground belongs to
+/// one settlement, or zero when that ground holds no wonder.
+fn wonder_share_of(wonders: &[WonderSite], settlement: Entity) -> Fix32 {
+    wonders
+        .iter()
+        .filter(|site| site.settlement == Some(settlement))
+        .map(|site| site.progress_share().0)
+        .max()
+        .map_or(Fix32::ZERO, Fix32)
 }
 
 /// Returns a flag as one position of a token.
