@@ -39,12 +39,13 @@ References
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
-from cachette.learn.env import Env, EnvConfig
+from cachette.learn.env import Env, EnvConfig, Opponent, viable_seeds
 from cachette.learn.layout import ObservationLayout, RingBlock, token_blocks
 from cachette.learn.normalize import (
     derive_normalizer,
@@ -526,3 +527,89 @@ def test_a_normalizer_refuses_a_sample_of_another_length() -> None:
         normalizer.apply(np.zeros((2, 7)))
 
     assert "6 positions" in str(raised.value)
+
+
+def an_opponent_file(path: Path) -> Opponent:
+    """Write a stored policy that fits the world of these tests, and seat it.
+
+    The file holds the fit of the world and nothing a run trained, because
+    the seat only has to be readable. The seat is the one after the learner,
+    which leaves the built-in controller the third seat.
+    """
+    env = Env(CONFIG, WEIGHTING)
+    LinearPolicy.zeros(env.action_length, env.observation_length).save(
+        path, PolicyFit.of_env(env).as_meta()
+    )
+    return Opponent.of_file(path, seat=1)
+
+
+def with_an_opponent(path: Path) -> EnvConfig:
+    """Give the world of these tests with one stored opponent seated."""
+    return replace(CONFIG, opponents=(an_opponent_file(path),))
+
+
+def test_an_opponent_seat_does_not_change_the_normalizer(tmp_path: Path) -> None:
+    """Two configurations that differ only in the opponents derive one normalizer.
+
+    A normalizer is a function of the world and not of who plays it. A seated
+    opponent changes what the reference sample plays, so a run that seated
+    one derived its own arrays and then refused every stored file that
+    another run wrote for the same world.
+    """
+    seated = with_an_opponent(tmp_path / "opponent.npz")
+
+    alone = derive_normalizer(CONFIG, WEIGHTING, episodes=EPISODES, decisions=DECISIONS)
+    against = derive_normalizer(
+        seated, WEIGHTING, episodes=EPISODES, decisions=DECISIONS
+    )
+
+    assert seated.opponents != CONFIG.opponents
+    assert alone.digest() == against.digest()
+
+
+def test_the_cache_gives_one_normalizer_whoever_holds_the_seats(
+    tmp_path: Path,
+) -> None:
+    """The cached door answers both configurations with one derivation.
+
+    The key is the world, so the order of the two calls cannot decide the
+    answer. A cache that held two entries would give a run that seats an
+    opponent a normalizer of its own, whichever caller reached it first.
+    """
+    seated = with_an_opponent(tmp_path / "opponent.npz")
+
+    forget_normalizers()
+    alone_first = reference_normalizer(
+        CONFIG, WEIGHTING, episodes=EPISODES, decisions=DECISIONS
+    )
+    seated_second = reference_normalizer(
+        seated, WEIGHTING, episodes=EPISODES, decisions=DECISIONS
+    )
+
+    forget_normalizers()
+    seated_first = reference_normalizer(
+        seated, WEIGHTING, episodes=EPISODES, decisions=DECISIONS
+    )
+    alone_second = reference_normalizer(
+        CONFIG, WEIGHTING, episodes=EPISODES, decisions=DECISIONS
+    )
+
+    assert alone_first is seated_second
+    assert seated_first is alone_second
+    assert alone_first.digest() == seated_first.digest()
+
+
+def test_a_stored_opponent_still_takes_its_seat(tmp_path: Path) -> None:
+    """The engine seats the file the run named, against the fit of the world.
+
+    This drives the environment and not the reader, because the environment
+    is what must reach the file. A normalizer derived without the opponents
+    is now what the world derives, so the file the run named still loads.
+    """
+    seated = with_an_opponent(tmp_path / "opponent.npz")
+
+    env = Env(seated, WEIGHTING)
+    env.reset(viable_seeds(seated, 1, HELD_OUT_START)[0])
+
+    assert env.config.opponents[0].seat == 1
+    assert not env.done
