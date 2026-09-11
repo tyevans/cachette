@@ -143,6 +143,12 @@ the entry, and the entry stays.[^10] Whether that entry then belongs to the new
 holder is the question one blocker holds, and this record does not answer
 it.[^15]
 
+**This paragraph does not hold for work toward a victory claim.** Part-built
+wonder work resets to nothing when its ground changes holder, and it decays
+when nobody works it. Another record states that rule and changes this
+paragraph for those rows only.[^27] Every row that carries no victory claim
+keeps its progress as stated above.
+
 A reviewer finds a violation when a unit finishes a build of any kind other
 than a road on ground its faction does not hold, or when the build verb and the
 build pass apply two different tests.
@@ -287,3 +293,4 @@ governs every cost figure in this project.[^25]
 [^24]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
 [^25]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^26]: ADR-0153, a tile's lease follows the units that stand on it, decisions D5 and D6. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+[^27]: ADR-0206, a part-built wonder decays when nobody works it, and resets when its ground changes holder. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`

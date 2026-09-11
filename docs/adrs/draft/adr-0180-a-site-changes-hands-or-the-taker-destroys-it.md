@@ -81,6 +81,16 @@ A captured city keeps its roads, its terraces, its lodging and its walls. A
 developed city is therefore a prize. A raze is therefore a real sacrifice,
 because the razing faction destroys work that it could have used.
 
+**Part-built wonder work is the one exception, added on 10 September 2026.**
+The project owner chose it. Work toward a victory claim that is not finished
+resets to nothing when its ground changes holder, and it decays when nobody
+works it. Another record states that rule.[^19] A finished wonder and every
+other upgrade change hands as this decision states.
+
+**The exception gives no upgrade a faction of its own.** The rule reads a
+change of holder at the tile during the step. It stores no owner beside an
+upgrade, so the reviewer test below applies to the exception too.
+
 A reviewer finds a violation when an upgrade carries a faction of its own, when
 a capture destroys an upgrade, or when a change of holder pays anything back to
 the previous holder.
@@ -409,3 +419,4 @@ records.[^15]
 [^16]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^17]: Decisions register, DEC-279. `docs/DECISIONS.md`
 [^18]: Recurring defect shapes, shape 3. `.agents/rules/recurring-defects.md`
+[^19]: ADR-0206, a part-built wonder decays when nobody works it, and resets when its ground changes holder. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`

@@ -944,6 +944,12 @@ sacrifice.
 hold the constraints: one for the capture and the raze, and one for the
 elimination that a raze made reachable.[^BLK36A] [^BLK36B]
 
+**Part-built wonder work is the one exception, added on 10 September 2026.**
+The project owner chose it. Work toward a victory claim resets to nothing when
+its ground changes holder, and it decays when nobody works it. A finished
+wonder and every other upgrade still change hands with the ground. A third
+record states the exception.[^BLK36C]
+
 ### BLK-052 — Nobody has measured whether a fight at this granularity looks like a fight
 
 **Resolved on 3 September 2026. The measurement is taken, and a fight resolves
@@ -1199,6 +1205,7 @@ normally.
 [^BLK50B]: Research report 21, what a god needs from this engine, section 8. `docs/research/reports/21-what-a-god-needs.md`
 [^BLK36A]: ADR-0180, a site changes hands or the taker destroys it. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
 [^BLK36B]: ADR-0181, a faction that holds no site and no unit leaves the game. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
+[^BLK36C]: ADR-0206, a part-built wonder decays when nobody works it, and resets when its ground changes holder. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
 [^BLK52A]: Research report 21, what a god needs from this engine, section 4. `docs/research/reports/21-what-a-god-needs.md`
 [^BLK52B]: Research report 21, what a god needs from this engine, section 4.2. `docs/research/reports/21-what-a-god-needs.md`
 [^BLK52C]: Findings register, FND-390. `docs/FINDINGS.md`

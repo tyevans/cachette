@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-283**
+**Next number: DEC-285**
 
 ## Open
 
@@ -4641,10 +4641,10 @@ A standing level is not wonder work, so a reset never lowers one.
 **The wonder only.** The rule reads the victory claim column, and in the default
 table only the wonder row carries a claim. A wider rule would remove a road or a
 terrace that is half built, and no need asks for that. The resolved blocker
-keeps every other upgrade with the ground.[^DEC284B]
+keeps every other upgrade with the ground.[^DEC160C]
 
 **The rate is a balance row, and the record states no value.**[^DEC284C] One
-blocker governs every cost in work.[^DEC284D]
+blocker governs every cost in work.[^BLK7]
 
 
 ## References
@@ -4656,9 +4656,7 @@ blocker governs every cost in work.[^DEC284D]
 [^DEC278C]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^DEC281A]: Findings register, FND-630. `docs/FINDINGS.md`
 [^DEC284A]: ADR-0206, a part-built wonder decays when nobody works it. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
-[^DEC284B]: Blockers register, BLK-036. `docs/BLOCKERS.md`
 [^DEC284C]: Balance register, the wonder decay. `docs/reference/balance.md`
-[^DEC284D]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 
 [^DEC224A]: Review of backlog item 0345, section 10. `docs/reviews/0345-resolve-a-meeting.md`
 [^DEC224B]: Backlog item 0432, decide the lifetime of every log the bindings expose. `docs/backlog/proposed/0432-decide-the-lifetime-of-every-log-the-bindings-expose.md`
