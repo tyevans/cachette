@@ -382,6 +382,41 @@ def strategy_notes(arguments: argparse.Namespace, names: list[str]) -> list[str]
     return notes
 
 
+def refuse_readout_only_run(
+    parser: argparse.ArgumentParser,
+    arguments: argparse.Namespace,
+    names: list[str],
+) -> None:
+    """End a run that trains the readout alone of a strategy that holds none.
+
+    **Only a path that trains, or that answers for a training run, calls
+    this.** The training run, the baseline pass, the plan and the strategy
+    names all answer for the strategies a run trains. The launcher asks for
+    the plan before it rents a machine. A run that names a linear strategy
+    beside the flag therefore fails there and costs nothing.
+
+    **A path that trains nothing does not call this.** The world lines and the
+    report of the stored policies read no trainable span, so the flag cannot
+    apply to them. The launcher on the instance removes `--only` before it
+    asks for the world. The names of that call are every row of the table. A
+    refusal on that call failed a structured run on its first linear row,
+    after the instance was paid for.
+
+    The rule and its message stay in ``refuse_readout_only``.
+    """
+    if not arguments.train_readout_only:
+        return
+    for name in names:
+        if name not in STRATEGIES:
+            continue
+        try:
+            refuse_readout_only(STRATEGIES[name][2])
+        except ValueError as refusal:
+            parser.error(
+                f"the strategy {name} cannot train its readout alone: {refusal}"
+            )
+
+
 def use_decision_interval(interval: int) -> None:
     """Set how many ticks one decision covers, and hold the rest of the world.
 
@@ -1250,27 +1285,15 @@ def main() -> int:
 
     names = [name for name in arguments.only.split(",") if name] or list(STRATEGIES)
 
-    # **A flag that cannot apply ends the run before anything reads it.** The
-    # launcher asks for the plan before it rents a machine, so a run that
-    # names a linear strategy beside this flag fails there and costs nothing.
-    if arguments.train_readout_only:
-        for name in names:
-            if name not in STRATEGIES:
-                continue
-            try:
-                refuse_readout_only(STRATEGIES[name][2])
-            except ValueError as refusal:
-                parser.error(
-                    f"the strategy {name} cannot train its readout alone: {refusal}"
-                )
-
     if arguments.print_strategies:
+        refuse_readout_only_run(parser, arguments, names)
         print(" ".join(names))
         return 0
     if arguments.print_world:
         print(world_lines(WORLD))
         return 0
     if arguments.print_plan:
+        refuse_readout_only_run(parser, arguments, names)
         # **The rows are the interface a launcher reads, and a note is for a
         # person.** A note carries no tab, so a reader that takes a field by
         # name never meets one.
@@ -1282,6 +1305,8 @@ def main() -> int:
         if WORLD.limit_is_loss:
             print(f"# note {LIMIT_RULE_NOTE}")
         return 0
+    if not arguments.behaviour:
+        refuse_readout_only_run(parser, arguments, names)
     # **One number sizes the whole run.** The queue holds one worker process
     # for each core, and the passes that no queue splits step one batch of
     # worlds with one engine thread for each core. A run that names nothing
