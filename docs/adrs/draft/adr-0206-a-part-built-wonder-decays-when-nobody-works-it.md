@@ -52,17 +52,34 @@ work on the tick it was attended, or when wonder work falls below nothing.
 
 ### D2. Wonder work returns to nothing when the ground under it changes holder
 
-Each entry records the holder that its work belongs to. When the holder of the
-tile is not that holder, the work returns to nothing. An entry at no level is
-removed. An entry at a standing level keeps its level, and it takes the new
-holder.
+When the holder of the tile under wonder work changes during a step, the work
+returns to nothing on that step. An entry at no level is then removed. An entry
+at a standing level keeps its level.
+
+**The rule stores no owner.** An upgrade is stored against a tile, and no owner
+is stored on it or beside it.[^4] The holder of the tile is the only answer to
+whose the work is. The rule therefore has no stored holder to compare with the
+holder column.
+
+**The step watches the ground instead.** At a fixed point in each step, the
+step lists the tiles under wonder work. Each write that changes the holder of a
+listed tile marks that tile. The pass resets the work on a marked tile, and the
+list then ends. The list is working memory for one step. It is not world state,
+and the state hash does not cover it, because no later step reads it.[^8]
+
+**A change and a change back both mark the tile.** The spread can give the
+ground to nobody, and a land transfer later in the same step can give it back
+to the same faction. The two ends of that step name one holder, and the work
+still resets.
 
 The rule reads the holder column and never the act. A capture, a raze, the
 release of a faction that leaves the game, a land transfer and a lease all
-change the holder, and one rule covers all of them.
+change the holder through one write, and one rule covers all of them.
 
 A reviewer finds a violation when the new holder of a tile can add to, or
-finish, work that an earlier holder put in.
+finish, work that an earlier holder put in. A reviewer also finds a violation
+when an upgrade stores a faction on it or beside it, or when the watch enters
+the state hash.
 
 ### D3. The rule reads the victory claim column, and it touches no standing level
 
@@ -87,18 +104,26 @@ and the game end reader. A change of holder therefore resets the work on the
 tick it happens, and the next build never adds to the work of an earlier
 holder.
 
+**The watch of D2 starts after the build and the wear, and before the first
+stage that writes the holder column.** Work that the build starts on a tick is
+therefore watched on that tick. A capture on the first tick of a build resets
+that work. No stage writes the holder column between this pass and the start of
+the next watch, and no verb writes it between two steps. A write there would be
+seen by no rule.
+
 A wonder that finishes on a tick does not decay on that tick. The build runs
 first. A finished entry at the top of its category is not wonder work, and the
 build attended every entry it advanced.
 
 The walk is serial and in ascending tile order. It makes no random draw. Every
 term is a whole number, and the arithmetic goes through the arithmetic
-module.[^10] [^11] The holder of each entry is stored state that the next tick
-reads, so the state hash covers it.[^8]
+module.[^10] [^11] The watch is ordered by tile, and the one write of the holder
+column runs on one thread, so the marks do not depend on the thread count.
 
 A reviewer finds a violation when a stage that writes the holder column runs
-after this pass and before the next build, when the observation or the game end
-reader runs before it, or when its result depends on the thread count.
+before the watch starts or after this pass, when the observation or the game
+end reader runs before the pass, or when its result depends on the thread
+count.
 
 ## The alternatives this rejects
 
@@ -135,6 +160,19 @@ the ground.[^3]
 the paths that change the holder. A rule that one writer of the column states is
 a rule that the other writers miss.[^12]
 
+**Store on each entry the holder that its work belongs to, and compare it with
+the column.** Rejected. This was the first form of this rule. It put an owner on
+every upgrade, and the record that makes an upgrade change hands with the ground
+forbids that.[^4] A stored copy of the holder is also a second declaration of
+the holder column.[^12] It compared two ends too, so it missed a change and a
+change back inside one step.
+
+**List each tile and its holder at the start of the step, and compare the list
+at the pass.** Rejected. It compares two ends, so it misses a change and a
+change back inside one step. A list taken before the build also does not know
+the work that the build starts on that step. A capture on the first tick of a
+build would then give that work to the taker.
+
 ## Consequences
 
 **A rival can now undo a wonder.** It kills or drives off every builder and
@@ -148,9 +186,13 @@ keeps building.
 the progress of a build whose ground changed hands. It still holds for every row
 that carries no victory claim.[^7]
 
-**A new stage that writes the holder column must run before this pass.** No
-path writes the column between this pass and the next build. A path that did
-would let the next build add to the work of an earlier holder.
+**A new stage that writes the holder column must run after the watch starts and
+before this pass.** A new verb must not write the column between two steps. A
+write outside that window is seen by nothing, and it would let the next build
+add to the work of an earlier holder.
+
+**No upgrade carries a faction.** The rule costs a watch over the tiles under
+wonder work, and those tiles are sparse. It costs no field on any upgrade.
 
 **This record does not change what a finished wonder does.** A wonder that
 finishes on the tick its ground changes hands stands for the new holder when
