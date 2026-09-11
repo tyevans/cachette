@@ -100,7 +100,25 @@ TRAINED = EnvConfig(
 # renown weight, and that game then ran to the limit. The test of the early
 # ending asserts it, so a seed that stops ending early fails there first.
 EARLY_SEED = 116
-SEEDS = [0, EARLY_SEED, 3, 7]
+
+# One seed whose game runs to the tick limit while a rival still builds a
+# wonder. The wonder test needs a leader that holds wonder work at the end, and
+# the instrument reads the observation of the last decision.
+#
+# **This seed is a fixture and it decays too.** Part-built wonder work that no
+# builder attends now loses work on every tick, and it stops at nothing.[^1]
+# Seed 7 built toward a wonder for thirty decisions and then left it, so its
+# work was gone before the limit. The seeds 0 and 3 held no work at the end
+# either. The rival of this seed attends its work up to the last decision. The
+# wonder test asserts the raw reading of this seed first, so a seed that stops
+# holding work fails there with a message about the fixture.
+#
+# References
+# ----------
+# [^1]: ADR-0206, a part-built wonder decays when nobody works it, decision D1.
+# ``docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md``
+WONDER_SEED = 98
+SEEDS = [0, EARLY_SEED, WONDER_SEED, 7]
 
 WEIGHTING = Weighting(terms={"held_tiles": 1.0}, won=100.0, lost=-100.0, drawn=0.0)
 
@@ -258,7 +276,18 @@ def test_a_wonder_that_nobody_started_reaches_nothing(
     same zero for a policy at the edge of a wonder would say nothing**, and the
     leader entry of the same path is above zero here, which proves the reading
     is not a constant zero.
+
+    The first assertion reads the raw signal of one episode, and it checks the
+    fixture. The last assertion reads the summary, and it checks the
+    instrument. An instrument that read a constant zero passes the first and
+    fails the last.
     """
+    wonder_game = by_seed(whole_games, WONDER_SEED)
+    assert wonder_game.signals[PATH_LEADER["wonder"]] > 0.0, (
+        f"seed {WONDER_SEED} ends with no wonder work for any faction, so the "
+        "fixture no longer supplies a leader that started a wonder. Choose "
+        "another seed whose rival still builds at the tick limit."
+    )
     summary = summarise_endings(whole_games.episodes, catalogue.signals)
     assert summary.shares["wonder"] == 0.0
     assert summary.own["wonder"].highest == 0.0
