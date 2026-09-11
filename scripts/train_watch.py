@@ -117,6 +117,8 @@ WORKING = re.compile(
     r"live\s+(?P<live>\d+)/(?P<worlds>\d+)\s+"
     r"ticks\s+(?P<ticks>\d+)\s+rate\s+(?P<rate>[\d.]+) t/s\s+"
     r"\[(?P<seconds>[\d.]+)s\]"
+    r"(?:\s+wins\s+(?P<wins>\d+)/(?P<games>\d+)\s+won\s+[\d.]+"
+    r"\s+mean\s+-?[\d.]+\s+game\s+(?P<game>[\d.]+))?"
 )
 
 # The key the shared controller baseline takes in the set of reporters. Its
@@ -289,6 +291,9 @@ class Beat:
     worlds: int
     rate: float
     seconds: float
+    wins: int = 0
+    games: int = 0
+    game: float | None = None
 
 
 @dataclass
@@ -348,6 +353,39 @@ class Work:
     def seconds(self) -> float:
         """Return how long the slowest shard of this pass has run."""
         return max((beat.seconds for beat in self.shards.values()), default=0.0)
+
+    @property
+    def wins(self) -> int:
+        """Return the games every shard of this pass has won."""
+        return sum(beat.wins for beat in self.shards.values())
+
+    @property
+    def games(self) -> int:
+        """Return the games every shard of this pass has finished."""
+        return sum(beat.games for beat in self.shards.values())
+
+    @property
+    def won(self) -> float | None:
+        """Return the share of the finished games this pass has won.
+
+        **This reads a little high early.** The games still in flight are the
+        longest ones, and a game that reaches the tick limit is a loss under
+        the limit rule, so the share falls as a pass ends.
+        """
+        return None if self.games <= 0 else self.wins / self.games
+
+    @property
+    def game(self) -> float | None:
+        """Return the mean length of a finished game, over every shard."""
+        lengths = [
+            (beat.game, beat.games)
+            for beat in self.shards.values()
+            if beat.game is not None and beat.games > 0
+        ]
+        played = sum(games for _length, games in lengths)
+        if not played:
+            return None
+        return sum(length * games for length, games in lengths) / played
 
     @property
     def share(self) -> float | None:
@@ -494,6 +532,9 @@ def read(text: str) -> Reading:
                 worlds=int(work.group("worlds")),
                 rate=float(work.group("rate")),
                 seconds=float(work.group("seconds")),
+                wins=int(work.group("wins") or 0),
+                games=int(work.group("games") or 0),
+                game=float(work.group("game")) if work.group("game") else None,
             )
             what = " ".join(work.group("what").split())
             name = work.group("name")
@@ -831,9 +872,18 @@ def work_words(work: Work, sharding: int = 0) -> str:
         shards = f" {work.heard}/{expected or work.heard} shards"
         if expected and work.heard < expected:
             shards += " SHORT"
+    # The trainer states the running result only for a pass that plays whole
+    # episodes. A pass that counts decisions states none, and this line then
+    # says nothing about it rather than showing a zero nobody measured.
+    result = ""
+    won = work.won
+    if won is not None:
+        result = f" won {won:.3f} of {work.games}"
+        if work.game is not None:
+            result += f" game {work.game:.0f}"
     return (
         f"{work.what} {reached} of {work.worlds} worlds{shards} "
-        f"{work.rate:.0f}t/s d{work.decisions} [{work.seconds:.0f}s]"
+        f"{work.rate:.0f}t/s d{work.decisions} [{work.seconds:.0f}s]{result}"
     )
 
 

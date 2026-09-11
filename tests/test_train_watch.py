@@ -446,6 +446,30 @@ def test_a_heartbeat_of_an_unnamed_pass_is_reported_and_not_parsed() -> None:
     assert "1 lines say a pass is working and this screen cannot read them" in rendered
 
 
+def test_the_running_result_of_a_pass_in_flight_reaches_the_screen() -> None:
+    """A heartbeat that states a running result must show it.
+
+    The trainer states the wins, the win share and the mean game length of
+    the episodes a pass has finished. A reader watching a run judges it by
+    that share long before the generation ends, and this screen showed the
+    ticks and the progress alone.
+    """
+    beat = (
+        "  land-structured generation  0 working  episodes  3790 "
+        "live 8498/12288 ticks  12546390 rate  17212.1 t/s [757s] "
+        "wins 229/3790 won 0.060 mean 432.9 game 3310\n"
+    )
+    rendered = screen(beat, log_quiet=4.0)
+    assert "won 0.060 of 3790 game 3310" in rendered
+
+
+def test_a_pass_that_states_no_running_result_shows_none() -> None:
+    """A pass that counts decisions states no result, and none is invented."""
+    rendered = screen(MID_GENERATION, log_quiet=4.0)
+    assert "d463 [401s]" in rendered
+    assert "d463 [401s] won" not in rendered
+
+
 def test_the_shared_controller_baseline_is_shown_and_then_dropped() -> None:
     """One process measures the baseline for every strategy and names none.
 
