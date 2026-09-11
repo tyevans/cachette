@@ -265,9 +265,18 @@ class ObjectiveScoring:
             )
             raise StyleError(message)
 
-    def scorer(self, world: World, faction: int) -> ObjectiveReward:
-        """Build the scorer of one faction of one world under this style."""
-        return ObjectiveReward(world, faction, self.objectives, self.style)
+    def scorer(
+        self, world: World, faction: int, limit_is_loss: bool = False
+    ) -> ObjectiveReward:
+        """Build the scorer of one faction of one world under this style.
+
+        The limit entry says whether a game that reaches the tick limit is a
+        loss for the faction. The outcome reader holds that rule, so this
+        style pays its own loss weight for such a game.
+        """
+        return ObjectiveReward(
+            world, faction, self.objectives, self.style, limit_is_loss
+        )
 
 
 class ObjectiveReward:
@@ -289,12 +298,17 @@ class ObjectiveReward:
         faction: int,
         objectives: ObjectiveSet,
         style: PlayStyle,
+        limit_is_loss: bool = False,
     ) -> None:
-        """Build the scorer of one faction, and take the first reading."""
+        """Build the scorer of one faction, and take the first reading.
+
+        The limit entry says whether a game that reaches the tick limit is a
+        loss for the faction, and the outcome reader holds it.
+        """
         self._faction = faction
         self._objectives = objectives
         self._style = style
-        self._outcomes = OutcomeReader(world, faction)
+        self._outcomes = OutcomeReader(world, faction, limit_is_loss)
         self._previous: np.ndarray | None = None
         self._total = objectives.zero()
         self.reset(world)

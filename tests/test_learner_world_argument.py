@@ -228,6 +228,7 @@ def test_the_printed_world_names_every_field() -> None:
         "tick_limit",
         "decision_interval",
         "horizon",
+        "limit_is_loss",
     }
 
 

@@ -202,6 +202,9 @@ class TrainResult(TypedDict):
 READOUT_ONLY_KEY = "readout_only"
 """The key of a weight file that says whether its run trained the readout alone."""
 
+LIMIT_RULE_KEY = "limit_is_loss"
+"""The key of a weight file that says whether its run counted the limit as a loss."""
+
 
 def describe_readout_setting(readout_only: bool) -> str:
     """Say which part of the policy a run trains, as a clause of a sentence."""
@@ -415,6 +418,7 @@ class Checkpoint:
                 "horizon": self.env_config.horizon,
                 "decision_interval": self.env_config.decision_interval,
                 READOUT_ONLY_KEY: self.readout_only,
+                LIMIT_RULE_KEY: self.env_config.limit_is_loss,
             },
         )
 
@@ -474,6 +478,7 @@ class Checkpoint:
         )
         self._refuse_without_normalizer(stored)
         self._refuse_other_readout_setting(meta)
+        self._refuse_another_limit_rule(meta)
         policy = shell.rebuild(np.asarray(stored.flat()))
         first_generation = 0
         written = meta.get("generation")
@@ -540,6 +545,33 @@ class Checkpoint:
             f"{describe_readout_setting(self.readout_only)}. A resume across "
             "the two settings continues neither run. Resume with the setting "
             "the checkpoint states, or start a fresh run."
+        )
+        raise PolicyFitError(message)
+
+    def _refuse_another_limit_rule(self, meta: Mapping[str, object]) -> None:
+        """Refuse a checkpoint trained under the other rule of what a win is.
+
+        One rule pays a win for a game that a reader decides at the tick
+        limit, and the other pays a loss for it. A centre trained under one
+        rule climbed toward what that rule pays, so a resume under the other
+        rule would continue a different search under the old name.
+
+        **A file that states no rule was written before the rule existed.**
+        Every run of that time paid a win at the limit, so such a file reads
+        as the default rule. That is a statement of what the run did and not
+        a guess.
+        """
+        stored = bool(meta.get(LIMIT_RULE_KEY, False))
+        if stored == self.env_config.limit_is_loss:
+            return
+        wanted = "counts" if self.env_config.limit_is_loss else "does not count"
+        written = "counted" if stored else "did not count"
+        message = (
+            f"the checkpoint at {self.latest_path} was trained under a rule "
+            f"that {written} the tick limit as a loss, and this run {wanted} "
+            "it as one. The two rules pay opposite amounts for a game that "
+            "reaches the limit, so a resume would continue another search. "
+            "Start a fresh run rather than resuming across that boundary."
         )
         raise PolicyFitError(message)
 
@@ -1494,6 +1526,7 @@ def write_report(path: Path, payload: Mapping[str, object]) -> None:
 # buys nothing that a re-export does not.
 __all__ = [
     "HEARTBEAT_SECONDS",
+    "LIMIT_RULE_KEY",
     "READOUT_ONLY_KEY",
     "Checkpoint",
     "EnvConfig",
