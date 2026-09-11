@@ -654,7 +654,7 @@ connect() {
 # fetch yet, so this stays quiet until there is something to take.
 fetch_wheel() {
     [ -n "${wheel_key:-}" ] || return 0
-    local target="$WHEEL_CACHE/$wheel_key"
+    local target="$WHEEL_CACHE/$wheel_key-$INSTANCE_TYPE"
     compgen -G "$target/*.whl" >/dev/null && return 0
     mkdir -p "$target.part"
     if scp "${ssh_options[@]}" "$remote:wheelhouse/*.whl" "$target.part/" >/dev/null 2>&1; then
@@ -1056,7 +1056,7 @@ rm -f "$out_dir/tree.tgz"
 # does. The follower fetches the wheel a build produces, so the next run with
 # the same inputs pays nothing for it.
 wheel_key="$(build_key)"
-cached_wheel="$WHEEL_CACHE/$wheel_key"
+cached_wheel="$WHEEL_CACHE/$wheel_key-$INSTANCE_TYPE"
 if compgen -G "$cached_wheel/*.whl" >/dev/null; then
     say "Sending the cached wheel for build $wheel_key. The instance skips the compiler"
     ssh "${ssh_options[@]}" "$remote" "mkdir -p wheelhouse" >/dev/null
@@ -1143,7 +1143,13 @@ if ! ls "$HOME"/wheelhouse/*.whl >/dev/null 2>&1; then
     # **Build a wheel rather than install in place.** The two produce the same
     # module, and only the wheel is a file the follower can fetch and keep for
     # the next run.
-    uv run --no-project --with maturin maturin build --release \
+    # Build for the CPU of this instance, so a Graviton3 gets Neoverse V1
+    # scheduling and SVE. The launcher keys the wheel cache on the instance
+    # type, so this wheel never reaches a CPU that lacks the features.
+    printf 'target features: %s\n' \
+        "$(rustc --print cfg -C target-cpu=native | grep -oE 'sve[0-9a-z-]*' | sort -u | tr '\n' ' ')"
+    RUSTFLAGS="-C target-cpu=native" \
+        uv run --no-project --with maturin maturin build --release \
         --out "$HOME/wheelhouse" 2>&1 | tail -5
 fi
 uv pip install --reinstall "$HOME"/wheelhouse/*.whl 2>&1 | tail -3
