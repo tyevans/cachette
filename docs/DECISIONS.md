@@ -4593,6 +4593,59 @@ reads the same as one that got better together. The trainer therefore measures
 the centre against the built-in controller on the validation seeds, on every
 generation, and reports that number beside the relative one.
 
+### DEC-284 — How fast does unattended wonder work decay, and what does a change of holder do to it?
+
+**Closed. A linear decay of the work one full tile of builders adds, with no
+grace period. A change of holder sets the work to nothing, and it removes an
+entry that stands at no level.**
+
+The project owner ruled on 10 September 2026 that part-built wonder work
+becomes fragile. A record states the rule.[^DEC284A] This entry holds the
+choices that the record leaves open, and the reasoning for each one.
+
+**What counts as attended.** The build pass added work to the entry on that
+tick. One builder is enough. The build pass admits a builder only where its own
+faction holds the ground, so that builder is a builder of the holder.
+
+**Option A. A fixed amount on each tick that nobody attends.** One value, and
+the work reaches nothing in a known count of ticks.
+
+**Option B. A share of the work on each tick.** Rejected. A share of a whole
+number never reaches nothing without a floor rule. It also takes the most from a
+wonder near its end.
+
+**Option C. A fixed amount after a grace period.** Rejected. It needs a stored
+tick for each entry. Option A already makes a short gap cheap, because one tick
+that nobody attends takes one tick of decay.
+
+**Why A, and why the default is 8.** The default is derived and not chosen.
+
+- A wonder stands on one tile, and an ordinary tile admits 8 units.
+- A unit of a type that builds at the full rate adds 1 work in one tick.
+- The fastest crew on one wonder therefore adds 8 × 1 = 8 work in one tick,
+  and the decay takes the same 8.
+- A wonder that no unit works for N ticks loses what 8 builders add in N ticks.
+- The default wonder asks for 14400 work. Left alone one short of the end, it
+  goes in 14400 / 8 = 1800 ticks. That is under two fifths of the default tick
+  limit of 5000, so a rival that holds the tile can undo a whole wonder inside
+  one game.
+
+The module derives the value from the capacity and the rate. A change to either
+moves the default with it.
+
+**What a reset does.** The work returns to nothing. An entry at no level is
+removed, because an entry that holds nothing stands for nothing and refuses
+every other category on its tile. An entry at a standing level keeps its level.
+A standing level is not wonder work, so a reset never lowers one.
+
+**The wonder only.** The rule reads the victory claim column, and in the default
+table only the wonder row carries a claim. A wider rule would remove a road or a
+terrace that is half built, and no need asks for that. The resolved blocker
+keeps every other upgrade with the ground.[^DEC284B]
+
+**The rate is a balance row, and the record states no value.**[^DEC284C] One
+blocker governs every cost in work.[^DEC284D]
+
 
 ## References
 
@@ -4602,6 +4655,10 @@ generation, and reports that number beside the relative one.
 [^DEC278B]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^DEC278C]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^DEC281A]: Findings register, FND-630. `docs/FINDINGS.md`
+[^DEC284A]: ADR-0206, a part-built wonder decays when nobody works it. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+[^DEC284B]: Blockers register, BLK-036. `docs/BLOCKERS.md`
+[^DEC284C]: Balance register, the wonder decay. `docs/reference/balance.md`
+[^DEC284D]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 
 [^DEC224A]: Review of backlog item 0345, section 10. `docs/reviews/0345-resolve-a-meeting.md`
 [^DEC224B]: Backlog item 0432, decide the lifetime of every log the bindings expose. `docs/backlog/proposed/0432-decide-the-lifetime-of-every-log-the-bindings-expose.md`

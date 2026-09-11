@@ -383,6 +383,110 @@ fn run_with_wonder(threads: usize) -> (Vec<u8>, u64) {
     )
 }
 
+/// The work the decaying wonder of this file asks for.
+///
+/// A full tile of builders adds far less than this in the frames the scenario
+/// builds for, so the work stays part built and the decay has work to take.
+const DECAYING_WONDER_WORK: u32 = 2400;
+
+/// The frames the decaying wonder scenario builds for, and then leaves alone.
+const DECAYING_BUILD_FRAMES: u64 = 12;
+const DECAYING_IDLE_FRAMES: u64 = 6;
+
+/// Runs a world in which a tile of builders builds part of a wonder and then
+/// stops, so the work decays, and returns its log and its hash.
+///
+/// The builders stand on an island, so they never move and every one of them
+/// adds work on every frame of the build. The scenario asserts that the work
+/// fell and still stands, so the run reaches the decay and not the removal.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0206, a part-built wonder decays when nobody works it, decision D1. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+fn run_with_a_decaying_wonder(threads: usize) -> (Vec<u8>, u64) {
+    let config = WorldConfig {
+        width: 192,
+        height: 192,
+        seed: 102,
+        faction_count: 2,
+        unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        ..WorldConfig::DEFAULT
+    };
+    let mut world = World::new(config).expect("the extent must describe a world");
+    world
+        .set_choice_schedule(cachette_core::choose::PERIOD_LOG2_CEILING)
+        .expect("the exponent is inside the range");
+    assert!(world.set_wonder_work(DECAYING_WONDER_WORK));
+    let grid = world.grid();
+    let site = (0..grid.tile_count())
+        .map(|index| Axial::new((index % grid.width()) as i32, (index / grid.width()) as i32))
+        .find(|address| {
+            world.admits_a_unit(*address)
+                && world
+                    .grid()
+                    .neighbours(*address)
+                    .iter()
+                    .all(|side| side.is_none_or(|next| !world.admits_a_unit(next)))
+        })
+        .expect("the scenario must find an island");
+    world
+        .found_settlement(site, FactionId(0))
+        .expect("the island admits a city");
+    world.step(1).expect("the step must run");
+    let room = world
+        .tile_capacity(site)
+        .expect("the island is inside the world");
+    let builders: Vec<Entity> = (0..room)
+        .map(|_| {
+            let unit = world
+                .spawn_soldier(site, FactionId(0))
+                .expect("the island admits a unit");
+            assert!(world.order_build(unit, UpgradeCategory::WONDER).is_ok());
+            unit
+        })
+        .collect();
+    for _ in 0..DECAYING_BUILD_FRAMES {
+        world.step(threads).expect("the step must run");
+    }
+    let built = world
+        .upgrade_at(site)
+        .expect("the builders made an entry")
+        .progress
+        .0;
+    for unit in &builders {
+        assert!(world.stop_build(*unit));
+    }
+    for _ in 0..DECAYING_IDLE_FRAMES {
+        world.step(threads).expect("the step must run");
+    }
+    let left = world
+        .upgrade_at(site)
+        .expect("the scenario removed the work, so it tests the removal and not the decay")
+        .progress
+        .0;
+    assert!(left < built, "the work did not decay");
+    (
+        world.event_log_bytes().to_vec(),
+        world.state_hash().finish(),
+    )
+}
+
+#[test]
+fn a_world_in_which_a_wonder_decays_gives_one_answer_at_every_thread_count() {
+    let (expected_log, expected_hash) = run_with_a_decaying_wonder(THREAD_COUNTS[0]);
+    for threads in &THREAD_COUNTS[1..] {
+        let (log, hash) = run_with_a_decaying_wonder(*threads);
+        assert_eq!(
+            log, expected_log,
+            "the decaying wonder event log differs at {threads} threads"
+        );
+        assert_eq!(
+            hash, expected_hash,
+            "the decaying wonder state hash differs at {threads} threads"
+        );
+    }
+}
+
 #[test]
 fn a_world_that_finishes_a_wonder_gives_one_answer_at_every_thread_count() {
     let (expected_log, expected_hash) = run_with_wonder(THREAD_COUNTS[0]);

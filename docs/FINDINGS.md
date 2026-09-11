@@ -21284,6 +21284,34 @@ launcher.** A test at the command line proves that the refusal works. It does
 not prove that the launcher reaches the refusal with the arguments the test
 assumed.[^F763C]
 
+### FND-765 — A part-built wonder could not be stopped, so no rival could contest the wonder path
+
+**Believed.** A wonder costs work, stands on ground the faction holds, and a
+watcher sees it appear. The record that made the wonder a win path read it that
+way, and it treated the wonder as a path that rivals contest as they contest
+the other three.[^F765A]
+
+**True.** Nothing a rival did undid part-built wonder work. A rival that killed
+the builders stopped the work, and the work stayed. A capture gave the
+part-built wonder to the taker. A raze removed only the upgrade on the tile of
+the site. The wear pass read only a standing level, so work that was not
+finished never wore.
+
+**Evidence.** The project owner reported on 10 September 2026 that a trained
+policy won about a third of its games in a game of three factions by one
+tactic. It put every unit on one wonder from the first tick, and it did nothing
+else. The built-in controllers grew large and let it finish. A read of the build
+pass, the capture, the raze and the wear pass confirmed each of the four rules
+above.[^F765B]
+
+**Follows.** Wonder work is now fragile. It loses a stated amount on each tick
+that no builder adds to it, and it returns to nothing when its ground changes
+holder.[^F765C] The balance register holds the rate.[^F765D]
+
+**A way to win is a plan only when a rival can answer it.** A path whose
+progress no act of a rival can undo gives every other player no plan against
+it.
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -21350,3 +21378,7 @@ assumed.[^F763C]
 [^F763A]: The trainer command line, the readout-only refusal of a run. `python/cachette/learn/__main__.py`
 [^F763B]: The test of the trainer calls that the launcher makes. `tests/test_launcher_trainer_calls.py`
 [^F763C]: Testing Rules, drive the real caller, section 5. `.agents/rules/testing.md`
+[^F765A]: ADR-0174, a wonder is a win path and a stock total is not, the context. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
+[^F765B]: The build pass and the wear pass, and the capture and the raze. `crates/cachette-core/src/world/upgrades.rs` and `crates/cachette-core/src/world/sites.rs`
+[^F765C]: ADR-0206, a part-built wonder decays when nobody works it. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+[^F765D]: Balance register, the wonder decay. `docs/reference/balance.md`
