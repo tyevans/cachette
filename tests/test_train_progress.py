@@ -12,11 +12,15 @@ trainer.
 
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import sys
+from concurrent.futures import Future
 from pathlib import Path
 from types import ModuleType
 
+import numpy as np
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -490,3 +494,113 @@ def test_the_line_the_trainer_prints_is_the_line_the_feed_reads() -> None:
     )
 
     assert progress_module.parse(log).controller_weighting == "wonder_rush"
+
+
+# A heartbeat of a queued generation in the shape every trainer printed before
+# the heartbeat carried a running result. The running box and every older log
+# hold this shape, and a measured pass still prints it.
+OLD_BEAT = (
+    "  conquer generation  2 working  episodes    12 live    4/16   "
+    "ticks      5200 rate    866.7 t/s [6s]\n"
+)
+
+
+def heartbeat(label: str, results: list[object]) -> str:
+    """Return the last heartbeat the trainer prints for these finished results.
+
+    The trainer prints the line, so the reader is tested against the producer
+    and not against a copy of its format.
+    """
+    from cachette.learn.shard import Pending
+
+    futures: list[Future[object]] = []
+    for result in results:
+        future: Future[object] = Future()
+        future.set_result(result)
+        futures.append(future)
+    printed = io.StringIO()
+    with contextlib.redirect_stdout(printed):
+        Pending(futures).results(label)
+    return printed.getvalue().splitlines()[-1] + "\n"
+
+
+def episode(wins: int, rewards: list[float], ticks: int) -> object:
+    """Build one finished task of a generation, with one game for each reward."""
+    from cachette.learn.shard import EpisodeScore
+
+    array = np.asarray(rewards, dtype=float)
+    return EpisodeScore(
+        first_candidate=0,
+        seed_position=0,
+        ranked=array,
+        absolute=array,
+        wins=wins,
+        games=len(rewards),
+        ticks=ticks,
+    )
+
+
+def in_flight_line(rendered: str) -> str:
+    """Return the one in-flight line of a rendered dashboard."""
+    (line,) = [line for line in rendered.splitlines() if "in flight  " in line]
+    return line
+
+
+def test_an_old_heartbeat_parses_and_shows_no_running_result() -> None:
+    """A line without the running result is still a pass in flight.
+
+    The feed must not invent a share for it, and it must not drop the line.
+    """
+    flight = progress_module.parse(OLD_BEAT).strategies[0].flight
+    assert flight is not None
+    assert flight.decisions == 12
+    assert flight.won is None
+    assert flight.mean_reward is None
+    assert flight.ticks_per_game is None
+    rendered = progress_module.render(progress_module.parse(OLD_BEAT), 0.7723, 100)
+    assert in_flight_line(rendered).endswith("12 decisions [6s]")
+
+
+def test_a_new_heartbeat_shows_the_running_share_over_the_games() -> None:
+    """The share divides the wins by the games and never by the episodes.
+
+    Each task here holds two games, as a task of a seated generation does, so
+    a division by the finished episodes gives a different number.
+    """
+    line = heartbeat(
+        "conquer generation  2",
+        [
+            episode(2, [10.0, 20.0], 600),
+            episode(0, [0.0, 30.0], 1000),
+            episode(1, [40.0, 0.0], 400),
+        ],
+    )
+    assert line.rstrip().endswith("wins 3/6 won 0.500 mean 16.7 game 333")
+    flight = progress_module.parse(line).strategies[0].flight
+    assert flight is not None
+    assert flight.decisions == 3
+    assert flight.wins == 3
+    assert flight.games == 6
+    rendered = progress_module.render(progress_module.parse(line), 0.7723, 100)
+    assert in_flight_line(rendered).endswith(
+        ", won 0.500 of 6 games, mean 16.7, 333 ticks a game"
+    )
+
+
+def test_the_shards_of_a_pass_combine_as_counts_and_not_as_shares() -> None:
+    """Two shards that finished different numbers of games weigh differently.
+
+    The first shard won one of two games and the second won none of six. The
+    pass won one of eight, which is 0.125. A mean of the two shares is 0.25.
+    """
+    first = heartbeat("conquer generation  2 shard 1/2", [episode(1, [4.0, 0.0], 100)])
+    second = heartbeat(
+        "conquer generation  2 shard 2/2",
+        [episode(0, [1.0, 1.0], 100) for _ in range(3)],
+    )
+    flight = progress_module.parse(first + second).strategies[0].flight
+    assert flight is not None
+    assert flight.shards == 2
+    assert flight.won == pytest.approx(0.125)
+    assert flight.mean_reward == pytest.approx(1.25)
+    assert flight.ticks_per_game == pytest.approx(50.0)

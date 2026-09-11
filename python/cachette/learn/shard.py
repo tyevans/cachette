@@ -713,6 +713,53 @@ class Pending(Generic[Held]):
         return [future.result() for future in self._futures]
 
 
+@dataclass
+class _Tally:
+    """The running wins, games, reward and ticks of the finished episodes.
+
+    Only a training episode carries a win count, a game count and a reward
+    for each candidate. A measured episode carries none of them, so it adds
+    nothing here, and its heartbeat keeps the older shape.
+
+    The wins and the games are counts and not a share, for the reason the
+    episode result states. The reward is the sum over every finished game,
+    so the mean divides by the games and never by the episodes. **One task
+    of a seated generation holds several games**, so the two counts differ.
+    """
+
+    wins: int = 0
+    games: int = 0
+    reward: float = 0.0
+    ticks: int = 0
+
+    def add(self, result: object) -> None:
+        """Count one finished result, if it is a training episode."""
+        if not isinstance(result, EpisodeScore):
+            return
+        self.wins += result.wins
+        self.games += result.games
+        self.reward += float(np.sum(result.absolute))
+        self.ticks += result.ticks
+
+    def fields(self) -> str:
+        """Return the fields this tally adds to a heartbeat, or nothing.
+
+        The wins field holds the two counts, so that a reader can add the
+        shards of one pass as counts. The share, the mean reward and the
+        ticks for each game follow for a person who reads the log. **The
+        ticks are world ticks**, and one seated world holds several games,
+        so in a seated generation the ticks for each game read short by the
+        seat count.
+        """
+        if self.games <= 0:
+            return ""
+        return (
+            f" wins {self.wins}/{self.games} won {self.wins / self.games:.3f} "
+            f"mean {self.reward / self.games:.1f} "
+            f"game {self.ticks / self.games:.0f}"
+        )
+
+
 def _report_progress(futures: Sequence[Future[Held]], label: str) -> None:
     """Print what a generation has finished, while it runs.
 
@@ -726,10 +773,21 @@ def _report_progress(futures: Sequence[Future[Held]], label: str) -> None:
     over the whole elapsed time falls as the queue empties**, and that reads
     as a machine slowing down when it is only running fewer episodes.
 
+    A training generation adds the running wins over the games, the win
+    share, the mean reward for each game and the ticks for each game. These
+    fields follow the elapsed time, so a reader of the older line still
+    reads every field it knew, in the same order.
+
     **This reads the completion order, and only the printing reads it.** The
-    count of finished episodes reaches a line of the log and reaches no
-    score, and the clock decides when to print. A failed episode is counted
-    here and raised by the caller that reads the results.
+    count of finished episodes and the running share reach a line of the log
+    and reach no score, and the clock decides when to print. A failed
+    episode is counted here and raised by the caller that reads the results.
+
+    **The running share reads a little high until the queue drains.** The
+    episodes still in flight are the longest ones. A game that reaches the
+    tick limit counts as a loss, and the longest games are the ones that
+    reach it. The share of the finished games therefore leaves out most of
+    the losses at the limit until the last episodes finish.
     """
     total = len(futures)
     started = time.perf_counter()
@@ -737,10 +795,13 @@ def _report_progress(futures: Sequence[Future[Held]], label: str) -> None:
     finished = 0
     ticks = 0
     told = 0
+    tally = _Tally()
     for future in as_completed(futures):
         finished += 1
         if future.exception() is None:
-            ticks += future.result().ticks
+            result = future.result()
+            ticks += result.ticks
+            tally.add(result)
         now = time.perf_counter()
         if now - spoke < HEARTBEAT_SECONDS and finished < total:
             continue
@@ -752,7 +813,7 @@ def _report_progress(futures: Sequence[Future[Held]], label: str) -> None:
             f"  {label} working  episodes {finished:5d} "
             f"live {total - finished:4d}/{total:<4d} "
             f"ticks {ticks:9d} rate {rate:8.1f} t/s "
-            f"[{now - started:.0f}s]",
+            f"[{now - started:.0f}s]{tally.fields()}",
             flush=True,
         )
 

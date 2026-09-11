@@ -123,6 +123,16 @@ IN_FLIGHT = re.compile(r"(?:^|\s)working(?:\s|$)")
 # counts decisions. A generation of a training run holds one episode in each
 # task of a queue, so it counts the episodes that finished. Both are a count
 # of work done since the pass started, and the reader treats them alike.
+#
+# **The running result is optional, and it follows the elapsed time.** A
+# queued training generation adds the wins over the games, the win share, the
+# mean reward for each game and the ticks for each game, for example:
+#   conquer generation  2 working  episodes  12 live   4/16   ticks 5200
+#   rate 866.7 t/s [6s] wins 5/24 won 0.208 mean 16.7 game 217
+# A pass in one process, a measured pass and a log of an older trainer print
+# none of it, and the line must still parse. The reader takes the two counts
+# and the mean, and it derives the ticks for each game from the ticks and the
+# games, so the shards of one pass add as counts.
 WORKING = re.compile(
     r"^\s+(?:(?P<name>\S+) )?(?P<what>generation\s+\d+|yardstick|baseline"
     r"|validation\s+\d+|holdout\s+\d+)"
@@ -131,6 +141,8 @@ WORKING = re.compile(
     r"live\s+(?P<live>\d+)/(?P<worlds>\d+)\s+"
     r"ticks\s+(?P<ticks>\d+)\s+rate\s+(?P<rate>[\d.]+) t/s\s+"
     r"\[(?P<seconds>[\d.]+)s\]"
+    r"(?:\s+wins\s+(?P<wins>\d+)/(?P<games>\d+)\s+won\s+[\d.]+\s+"
+    r"mean\s+(?P<reward>-?[\d.]+)\s+game\s+[\d.]+)?"
 )
 
 
@@ -255,13 +267,21 @@ class Generation:
 
 @dataclass
 class Beat:
-    """The newest heartbeat of one shard, as numbers."""
+    """The newest heartbeat of one shard, as numbers.
+
+    The wins, the games and the mean reward are absent from a heartbeat that
+    carries no running result, and the shard then adds nothing to them.
+    """
 
     decisions: int
     live: int
     worlds: int
     rate: float
     seconds: float
+    ticks: int = 0
+    wins: int | None = None
+    games: int | None = None
+    reward: float | None = None
 
 
 @dataclass
@@ -277,6 +297,14 @@ class Flight:
     - The decisions add. Each shard counts only the decisions it took.
     - The rates add. The shards run at the same time on different cores.
     - The elapsed time is the longest. The pass ends with its slowest shard.
+    - The wins, the games, the reward and the ticks of the finished games
+      add. **The shards combine as counts and never as shares.** Two shards
+      that finished different numbers of games do not weigh the same, so a
+      mean of their two shares is a different number from the share of the
+      pass.
+
+    The running share, the mean reward and the ticks for each game read the
+    finished games alone, and each is absent when no shard reported a game.
 
     **A pass in flight contributes nothing to a derived figure.** The spend
     for each generation, the generations remaining and the estimate of the
@@ -293,11 +321,30 @@ class Flight:
     rate: float = 0.0
     seconds: float = 0.0
     shards: int = 0
+    wins: int = 0
+    games: int = 0
+    reward: float = 0.0
+    game_ticks: int = 0
 
     @property
     def share(self) -> float | None:
         """Return the part of the pass that has finished, from 0 to 1."""
         return None if self.worlds <= 0 else (self.worlds - self.live) / self.worlds
+
+    @property
+    def won(self) -> float | None:
+        """Return the win share of the finished games, or nothing."""
+        return None if self.games <= 0 else self.wins / self.games
+
+    @property
+    def mean_reward(self) -> float | None:
+        """Return the mean reward of the finished games, or nothing."""
+        return None if self.games <= 0 else self.reward / self.games
+
+    @property
+    def ticks_per_game(self) -> float | None:
+        """Return the world ticks for each finished game, or nothing."""
+        return None if self.games <= 0 else self.game_ticks / self.games
 
 
 @dataclass(frozen=True)
@@ -344,6 +391,7 @@ class Strategy:
         beats = self.working
         if not beats:
             return None
+        scored = [beat for beat in beats.values() if beat.games is not None]
         return Flight(
             what=self.pass_name,
             live=sum(beat.live for beat in beats.values()),
@@ -352,6 +400,10 @@ class Strategy:
             rate=sum(beat.rate for beat in beats.values()),
             seconds=max(beat.seconds for beat in beats.values()),
             shards=len(beats),
+            wins=sum(beat.wins or 0 for beat in scored),
+            games=sum(beat.games or 0 for beat in scored),
+            reward=sum((beat.reward or 0.0) * (beat.games or 0) for beat in scored),
+            game_ticks=sum(beat.ticks for beat in scored),
         )
 
     @property
@@ -582,12 +634,17 @@ def parse(text: str) -> Progress:
             if owner.pass_name != what:
                 owner.working = {}
                 owner.pass_name = what
+            games = beat.group("games")
             owner.working[int(beat.group("shard") or 0)] = Beat(
                 decisions=int(beat.group("decisions")),
                 live=int(beat.group("live")),
                 worlds=int(beat.group("worlds")),
                 rate=float(beat.group("rate")),
                 seconds=float(beat.group("seconds")),
+                ticks=int(beat.group("ticks")),
+                wins=None if games is None else int(beat.group("wins")),
+                games=None if games is None else int(games),
+                reward=None if games is None else float(beat.group("reward")),
             )
             continue
 
@@ -800,6 +857,24 @@ def collapse_lines(strategy: Strategy) -> list[str]:
     ]
 
 
+def flight_result(flight: Flight) -> str:
+    """Return the running result of a pass in flight, or nothing.
+
+    **This is a print of the finished games and not a measurement.** The
+    games still in flight are the longest, and a game at the tick limit
+    counts as a loss, so the share reads a little high until the pass ends.
+    """
+    won = flight.won
+    mean = flight.mean_reward
+    length = flight.ticks_per_game
+    if won is None or mean is None or length is None:
+        return ""
+    return (
+        f", won {won:.3f} of {flight.games} games, mean {mean:.1f}, "
+        f"{length:.0f} ticks a game"
+    )
+
+
 def render(
     progress: Progress,
     price_per_hour: float,
@@ -840,11 +915,12 @@ def render(
         if flight is not None:
             reached = "-" if flight.share is None else f"{flight.share:.0%}"
             shards = f", {flight.shards} shards" if flight.shards > 1 else ""
+            running = flight_result(flight)
             lines.append(
                 f"      in flight  {flight.what}, {reached} of "
                 f"{flight.worlds} worlds{shards}, "
                 f"{flight.rate:.0f} ticks/s, {flight.decisions} decisions "
-                f"[{flight.seconds:.0f}s]"
+                f"[{flight.seconds:.0f}s]{running}"
             )
         elif trained:
             lines.append("      in flight  nothing, this strategy ended")

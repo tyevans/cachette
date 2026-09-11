@@ -1,7 +1,7 @@
 ---
 id: 0544
 title: Show the running win share of a generation while it plays
-status: refined
+status: complete
 created: 2026-09-11
 implements: [ADR-0001 D1, ADR-0194 D3]
 changes: []
@@ -67,7 +67,27 @@ the generation path.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The heartbeat of a queued training generation now ends with four fields: the
+wins over the games, the win share, the mean reward for each game and the world
+ticks for each game. A measured episode carries no win count, so a measured
+pass prints the older line. The fields follow the elapsed time, so the reader
+on a running machine still reads every field it knew.
+
+The plan changed in one place. The heartbeat prints the wins as a count over
+the games, and not only as a share. A reader that has only a share cannot add
+two shards as counts. The reader takes the two counts and the mean. It derives
+the ticks for each game from the ticks and the games, and it does not read the
+printed value.
+
+The ticks are world ticks. One seated world holds several games, so in a
+seated generation the ticks for each game read short by the seat count. The
+docstring states this, and the dashboard label says ticks a game.
+
+Three tests went red with the defect put back: a tally that counted one game
+for each finished episode instead of the games of that episode.
+
+No register entry moved. No finding was corrected, no blocker opened or
+closed, and no record changed.
 
 ## References
 
