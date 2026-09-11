@@ -330,6 +330,13 @@ It must be more than the growth of one generation needs to reach the bound, or
 the test would assert a bound the run never touched.
 """
 
+CLIPPED_CENTRES = 40
+"""How many centres above the ceiling the clip test scales back.
+
+The plain factor overshoots the ceiling for about one centre in three, so a
+set of this size holds several centres that reach the case.
+"""
+
 
 def a_structured_shell() -> StructuredPolicy:
     """Build the untrained structured policy over the published layout."""
@@ -727,8 +734,41 @@ def test_the_norm_of_a_structured_centre_stays_inside_its_bound() -> None:
     assert not search.holds_unit_centre
     for generation in range(BOUND_GENERATIONS):
         centre = search.update(centre, generation, AGREED_SCORES).centre
-        assert float(np.linalg.norm(centre)) <= search.norm_ceiling * (1.0 + 1e-12)
+        assert float(np.linalg.norm(centre)) <= search.norm_ceiling
     assert float(np.linalg.norm(centre)) == pytest.approx(search.norm_ceiling)
+
+
+def test_a_clipped_centre_never_lands_above_the_ceiling() -> None:
+    """The ceiling is the largest length a centre reaches, with no rounding slack.
+
+    The plain factor ``ceiling / length`` rounds, and the norm of the scaled
+    centre rounds again. For many centres that norm lands one unit in the last
+    place above the ceiling. A test that allowed a relative slack hid this.
+
+    **The first assertion proves that the fixture reaches the case.** If no
+    centre here made the plain factor overshoot, the test would measure
+    nothing, and a return of that factor would stay green.
+    """
+    shell = a_structured_shell()
+    search = EvolutionStrategy(
+        shell=shell, pairs=3, sigma=0.5, learning_rate=0.3, seed=7
+    )
+    ceiling = search.norm_ceiling
+    centres = [
+        a_trained_centre(shell, seed=seed) * (2.0 + 0.25 * seed)
+        for seed in range(1, CLIPPED_CENTRES + 1)
+    ]
+    lengths = [float(np.linalg.norm(centre)) for centre in centres]
+    assert min(lengths) > ceiling, "a centre sits under the ceiling, so no clip"
+    plain = [
+        float(np.linalg.norm(centre * (ceiling / length)))
+        for centre, length in zip(centres, lengths, strict=True)
+    ]
+    assert max(plain) > ceiling, "no plain factor overshot, so the test is inert"
+    for centre in centres:
+        clipped = search.bounded(centre)
+        assert float(np.linalg.norm(clipped)) <= ceiling
+        assert float(np.linalg.norm(clipped)) == pytest.approx(ceiling)
 
 
 def test_the_bound_holds_a_resumed_centre_that_starts_above_it() -> None:
@@ -891,13 +931,19 @@ def test_the_report_states_the_alignment_and_the_wander() -> None:
 # reader that cuts a flat vector back into arrays reads the same order.
 POLICY_BLOCKS = ("scalars", "ring", "tokens", "trunk", "readout")
 
-TRAVEL_GENERATIONS = 14
+TRAVEL_GENERATIONS = 12
 """How many generations the travel test runs.
 
 The run must stay under the norm bound, because a clipped step is a step the
 bound chose and not one the layers chose. Every generation of the fixture
 agrees perfectly, which is the fastest the length can rise, and the test
 asserts that the length stayed inside the bound at the end.
+
+**The count leaves one full generation of margin under the bound.** The
+length of the shell comes from the observation layout of the engine, so a
+change to the layout moves the fixture. A run of 14 generations ended 0.2
+percent under the bound at one layout. The next layout took it past the
+bound, and the test then measured the clip.
 """
 
 TRAVEL_DEVIATIONS = 3.0
