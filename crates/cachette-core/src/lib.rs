@@ -79,8 +79,8 @@ pub mod weather;
 pub mod world;
 
 pub use action::{
-    place_cell, ActionSchema, ActionShape, CandidateKind, PositionRow, Verb, VerbRow,
-    ACTION_VERSION, PLACE_ANYWHERE, PLACE_COUNT,
+    place_cell, place_of_cell, ActionSchema, ActionShape, CandidateKind, PositionRow, Verb,
+    VerbRow, ACTION_VERSION, PLACE_ANYWHERE, PLACE_COUNT,
 };
 pub use balance::{Balance, RENOWN_TARGET};
 pub use bridge::{BlockLayout, BlockRange, BridgeError, UnitTileBridge};

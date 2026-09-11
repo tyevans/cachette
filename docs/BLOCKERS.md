@@ -205,9 +205,28 @@ fog, because it ends its own game on it, and cover a rival's standing with the
 fog. That answers the domination path, which needs the reader to know how far
 it has come, without telling anyone what it has not seen.
 
+**What a rival wonder publishes under the fog, from 10 September 2026.** The
+rival token now holds two channels for the wonder of a rival. One holds the
+work of that wonder as a share of its requirement. The other holds the place
+of the city that holds it, as a cell of the frame of the reader. Both read zero
+unless the reader sees the wonder tile and that city in the current frame.
+This is the third option above, for one path and one quantity.[^B160B]
+
+**It leaves this row open.** It does not answer the question, because the
+older fields still publish a rival's standing with no fog. The wonder power
+field, the wonder ratio of the rival token and the leader share of the wonder
+track all read the wonder work of every rival. The seats and the renown fields
+do the same. A policy therefore reads a rival wonder it has never observed
+through those fields, and the question is still whether it may.
+
+**The new channels do not widen that leak.** A test moves a rival wonder on
+ground the reader does not see, and both channels stay at zero.[^B160C]
+
 ## References
 
 [^B160A]: Findings register, FND-703. `docs/FINDINGS.md`
+[^B160B]: The rival token writer, the wonder the reader sees. `crates/cachette-core/src/obs_token.rs`
+[^B160C]: The token tests, a rival wonder the reader does not see. `crates/cachette-core/tests/a_faction_reads_its_frontier_and_its_tokens.rs`
 
 ### BLK-158 — How does the attack column and the armour column of a unit type combine into a military strength?
 

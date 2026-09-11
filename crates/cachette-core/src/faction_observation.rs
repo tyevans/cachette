@@ -192,7 +192,7 @@ use crate::world::World;
 ///
 /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, the consequences. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 /// [^2]: Findings register, FND-689. `docs/FINDINGS.md`
-pub const OBSERVATION_VERSION: u32 = 7;
+pub const OBSERVATION_VERSION: u32 = 8;
 
 /// The good classes that the layout carries.
 ///
@@ -268,12 +268,13 @@ pub const OBJECTIVE_WEIGHT_COUNT: u32 = 12;
 /// length.** A field added anywhere else moves the start of every field after
 /// it, and that refuses every stored weight file.
 ///
-/// Four revisions claimed positions from it. The event history gained two
+/// Five revisions claimed positions from it. The event history gained two
 /// kinds, which widened five fields of the memory block. The domination path
 /// gained two counts at the end of the layout. The founding chain gained the
 /// settler count. The campaign path gained the objective it would march on.
-/// The commit message of each states what it took.
-pub const LAYOUT_RESERVE: u32 = 13;
+/// The rival token gained two channels for the wonder the reader sees. The
+/// commit message of each states what it took.
+pub const LAYOUT_RESERVE: u32 = 1;
 
 /// How a reader reads every position of one field.
 ///

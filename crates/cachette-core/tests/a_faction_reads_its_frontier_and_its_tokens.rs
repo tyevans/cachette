@@ -19,16 +19,21 @@
 //! [^1]: Findings register, FND-647. `docs/FINDINGS.md`
 //! [^2]: Testing Rules, section 5. `.agents/rules/testing.md`
 
+use cachette_core::action::{place_cell, place_of_cell, Verb, PLACE_ANYWHERE, PLACE_COUNT};
 use cachette_core::faction_observation::observation_schema;
 use cachette_core::obs_frontier::FRONTIER_SLOTS;
+use cachette_core::obs_ring::RING_STACK_CELLS;
 use cachette_core::obs_token::{
-    RivalPowers, RIVAL_CHANNELS, RIVAL_CHANNEL_NAMES, RIVAL_TOKENS, SETTLEMENT_CHANNELS,
-    SETTLEMENT_TOKENS, SITE_CHANNELS, SITE_TOKENS, THREAT_CHANNELS, THREAT_CHANNEL_NAMES,
-    THREAT_TOKENS, TOKEN_SLOTS,
+    place_of_position, place_position, RivalPowers, RIVAL_CHANNELS, RIVAL_CHANNEL_NAMES,
+    RIVAL_TOKENS, SETTLEMENT_CHANNELS, SETTLEMENT_CHANNEL_NAMES, SETTLEMENT_TOKENS, SITE_CHANNELS,
+    SITE_TOKENS, THREAT_CHANNELS, THREAT_CHANNEL_NAMES, THREAT_TOKENS, TOKEN_SLOTS,
 };
 use cachette_core::site::CommodityId;
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
-use cachette_core::{Axial, Entity, FactionId, Fix32, SightRules, World, WorldConfig};
+use cachette_core::upgrade::UpgradeCategory;
+use cachette_core::{
+    Axial, Entity, FactionId, Fix32, SightRules, TileIdx, WonderSite, World, WorldConfig,
+};
 
 /// The faction that reads in every fixture below.
 const READER: FactionId = FactionId(0);
@@ -192,7 +197,7 @@ fn the_two_blocks_hold_the_positions_the_layout_states() {
             + THREAT_TOKENS * THREAT_CHANNELS
             + SITE_TOKENS * SITE_CHANNELS
     );
-    assert_eq!(TOKEN_SLOTS, 624);
+    assert_eq!(TOKEN_SLOTS, 636);
 }
 
 #[test]
@@ -569,4 +574,373 @@ fn the_balance_of_a_threat_token_reads_strength_and_not_the_headcount() {
         "one unit of nine outweighs four units of one, so the balance leans \
          to the rival"
     );
+}
+
+/// The work the wonder fixtures below ask a wonder for.
+///
+/// **The fixture states its own requirement and does not read the balance
+/// value.** A small requirement lets a few builders move the share in a few
+/// steps, and the share stays below one, so no wonder finishes and no game
+/// end stops the run.
+const FIXTURE_WONDER_WORK: u32 = 240;
+
+/// The builders a wonder fixture puts on the wonder tile.
+const WONDER_BUILDERS: u32 = 3;
+
+/// The steps a wonder fixture lets its builders work.
+const WONDER_STEPS: u32 = 4;
+
+/// Puts builders of one faction on one tile and orders each to build a
+/// wonder.
+fn order_a_wonder(world: &mut World, faction: FactionId, tile: Axial) {
+    for _ in 0..WONDER_BUILDERS {
+        let unit = world
+            .spawn_soldier(tile, faction)
+            .expect("the ground admits a unit");
+        world
+            .order_build(unit, UpgradeCategory::WONDER)
+            .expect("the builder stands on ground its faction holds");
+    }
+}
+
+/// Returns the entry of the wonder lookup for one tile.
+fn the_wonder_on(world: &World, tile: Axial) -> WonderSite {
+    let index = world
+        .grid()
+        .index_of(tile)
+        .expect("the tile lies inside the world");
+    world
+        .wonder_sites()
+        .into_iter()
+        .find(|site| site.tile == index)
+        .expect("the lookup names the tile the builders work on")
+}
+
+/// Returns the tile index of one address.
+fn tile_of(world: &World, address: Axial) -> TileIdx {
+    world
+        .grid()
+        .index_of(address)
+        .expect("the address lies inside the world")
+}
+
+/// A settlement token carries the wonder that stands on its ground.
+///
+/// **The channel read zero in every token, and the observation declared
+/// it.** A policy that read the wonder work of its faction could not tell
+/// which settlement held it. The fixture builds the wonder at one of two
+/// cities, so a writer that put the work on every token, or on none, fails.
+#[test]
+fn an_own_settlement_token_carries_the_wonder_on_its_ground() {
+    let (mut world, first, second) = a_world_with_two_cities(0x0bad_c0de_3333_4444);
+    assert!(world.set_wonder_work(FIXTURE_WONDER_WORK));
+    let place = world
+        .settlements()
+        .address(second)
+        .expect("the second city is alive");
+    order_a_wonder(&mut world, READER, place);
+    for _ in 0..WONDER_STEPS {
+        world.step(1).expect("the step runs");
+    }
+    world
+        .set_settlement_store(first, FIRST_COMMODITY, Fix32::from_int(10))
+        .expect("the commodity lies inside the commodity set");
+    world
+        .set_settlement_store(second, FIRST_COMMODITY, Fix32::from_int(400))
+        .expect("the commodity lies inside the commodity set");
+
+    let site = the_wonder_on(&world, place);
+    assert!(
+        site.work > 0 && !site.is_finished(),
+        "the fixture must leave work on an unfinished wonder"
+    );
+    assert_eq!(
+        site.settlement,
+        Some(second),
+        "the wonder stands on the ground of the second city"
+    );
+    let tokens = published_set(&world, "token_own_settlements");
+    assert_eq!(
+        channel_of(&tokens, SETTLEMENT_CHANNEL_NAMES, 0, "wonder_progress"),
+        i64::from(site.progress_share().0),
+        "the first slot holds the larger store, which is the city of the wonder"
+    );
+    assert_eq!(
+        channel_of(&tokens, SETTLEMENT_CHANNEL_NAMES, 1, "wonder_progress"),
+        0,
+        "the other city holds no wonder on its ground"
+    );
+}
+
+/// The people the reader's seat founds with.
+const SEAT_GROUP: u32 = 8;
+
+/// A world in which the reader sees a wonder of the rival.
+struct RivalWonder {
+    world: World,
+    seat: Axial,
+    wonder_city: Axial,
+    decoy_city: Axial,
+}
+
+/// Builds a world in which the reader sees a wonder of the rival, and runs
+/// every step at one thread count.
+///
+/// **The rival holds two cities in view, and the wonder stands on the far
+/// one.** The near one stands nearer to the seat of the reader, so a
+/// campaign over the whole frame marches on it. Only a place that names the
+/// cell of the far city aims the campaign at the wonder. The tests assert
+/// that the fixture reached this case.
+///
+/// **The reader founds a group, and not a lone city.** A group founding
+/// records the seat of the faction, and the campaign verb measures from the
+/// seat. A faction with no seat marches on nothing. A unit of the reader then
+/// stands on the seat, so the reader sees the cities of the rival.
+fn a_rival_wonder_in_view(threads: usize) -> RivalWonder {
+    let mut world = a_still_world(96, 96, 0x00d0_0d1e_8888_9999);
+    assert!(world.set_wonder_work(FIXTURE_WONDER_WORK));
+    let seat = ground_near(&world, Axial::new(48, 48), 14);
+    world
+        .found_group_at(seat, SEAT_GROUP, READER)
+        .expect("the fixture founds the seat of the reader on open ground");
+    world
+        .spawn_soldier(seat, READER)
+        .expect("the seat admits a unit");
+    let wonder_city = a_city_of_near(&mut world, RIVAL, Axial::new(seat.q + 4, seat.r));
+    let decoy_city = a_city_of_near(&mut world, RIVAL, Axial::new(seat.q - 3, seat.r));
+    world.step(threads).expect("the step runs");
+    order_a_wonder(&mut world, RIVAL, wonder_city);
+    for _ in 0..WONDER_STEPS {
+        world.step(threads).expect("the step runs");
+    }
+    RivalWonder {
+        world,
+        seat,
+        wonder_city,
+        decoy_city,
+    }
+}
+
+/// A rival token publishes the wonder the reader sees, and a place.
+#[test]
+fn a_rival_token_publishes_the_wonder_the_reader_sees() {
+    let fixture = a_rival_wonder_in_view(1);
+    let world = &fixture.world;
+    let site = the_wonder_on(world, fixture.wonder_city);
+    assert!(
+        site.work > 0 && !site.is_finished(),
+        "the fixture must leave work on an unfinished wonder"
+    );
+    assert_eq!(
+        site.settlement,
+        world.settlement_on(fixture.wonder_city),
+        "the wonder stands on the ground of the far city"
+    );
+    assert!(
+        world.faction_sees_now(READER, fixture.wonder_city),
+        "the fixture must put the wonder in view of the reader"
+    );
+    let rivals = published_set(world, "token_rivals");
+    assert_eq!(
+        channel_of(&rivals, RIVAL_CHANNEL_NAMES, 0, "validity"),
+        65536,
+        "the reader sees the cities of the rival, so the rival holds a token"
+    );
+    assert_eq!(
+        channel_of(&rivals, RIVAL_CHANNEL_NAMES, 0, "wonder_site_progress"),
+        i64::from(site.progress_share().0),
+        "the token carries the progress of the wonder the reader sees"
+    );
+    assert_ne!(
+        place_of_position(channel_of(
+            &rivals,
+            RIVAL_CHANNEL_NAMES,
+            0,
+            "wonder_site_place"
+        )),
+        PLACE_ANYWHERE,
+        "a wonder the reader sees names a cell"
+    );
+}
+
+/// Sets the reader and the rival at war, in both directions.
+fn declare_war(world: &mut World) {
+    let war = world.relation_rules().war_edge - 1;
+    assert!(world.set_relation(READER, RIVAL, war));
+    assert!(world.set_relation(RIVAL, READER, war));
+    assert!(world.at_war(READER, RIVAL));
+}
+
+/// The idle units the reader gives a campaign to march.
+const COHORT: u32 = 4;
+
+/// Raises a campaign of the reader on one place, and returns the tile it
+/// marches on.
+///
+/// The reader gains idle units at its seat first, because the campaign verb
+/// refuses a faction that has no idle unit to march.
+fn campaign_objective(fixture: RivalWonder, place: u32) -> TileIdx {
+    let RivalWonder {
+        mut world, seat, ..
+    } = fixture;
+    for _ in 0..COHORT {
+        world
+            .spawn_soldier(seat, READER)
+            .expect("the seat admits a unit");
+    }
+    declare_war(&mut world);
+    let action = world
+        .action_schema()
+        .encode(Verb::Campaign, &[place])
+        .expect("the place is inside the bound");
+    let legal = world
+        .legal_actions(READER)
+        .expect("the reader is a faction of this world");
+    assert_eq!(
+        legal[action as usize], 1,
+        "the answer allows a campaign on place {place}"
+    );
+    let before = world.campaign_log().len();
+    assert!(
+        world.act(READER, action),
+        "the verb took the row the answer allowed"
+    );
+    let raised = &world.campaign_log()[before..];
+    assert_eq!(raised.len(), 1, "one action raises one campaign");
+    TileIdx(raised[0].objective_tile)
+}
+
+/// The place of a seen rival wonder aims a campaign at the city that holds
+/// it.
+///
+/// **This is the need the channel answers: a learner finds a rival wonder it
+/// sees and aims a campaign at it.** The fixture puts a second city of the
+/// rival nearer to the seat, so a campaign over the whole frame marches on
+/// that city. A place that named no cell, or the wrong one, would march on
+/// the near city or on nothing.
+#[test]
+fn the_place_of_a_seen_rival_wonder_aims_a_campaign_at_the_city_that_holds_it() {
+    let aimed = a_rival_wonder_in_view(1);
+    let seat = aimed.seat;
+    assert!(
+        seat.distance(aimed.decoy_city) < seat.distance(aimed.wonder_city),
+        "the fixture must put the city with no wonder nearer to the seat"
+    );
+    let wonder_tile = tile_of(&aimed.world, aimed.wonder_city);
+    let decoy_tile = tile_of(&aimed.world, aimed.decoy_city);
+    let rivals = published_set(&aimed.world, "token_rivals");
+    let place = place_of_position(channel_of(
+        &rivals,
+        RIVAL_CHANNEL_NAMES,
+        0,
+        "wonder_site_place",
+    ));
+
+    assert_eq!(
+        campaign_objective(a_rival_wonder_in_view(1), PLACE_ANYWHERE),
+        decoy_tile,
+        "a campaign over the whole frame marches on the nearer city, so only \
+         the place can aim at the wonder"
+    );
+    assert_eq!(
+        campaign_objective(aimed, place),
+        wonder_tile,
+        "the published place aims the campaign at the city that holds the wonder"
+    );
+}
+
+/// A rival wonder that the reader does not see publishes nothing.
+///
+/// **The rival holds a token, because the reader sees one of its cities.**
+/// The wonder stands on another city, out of sight. A writer that read the
+/// lookup and not the fog would publish that wonder, and the test fails it.
+#[test]
+fn a_rival_wonder_the_reader_does_not_see_publishes_nothing() {
+    let mut world = a_still_world(96, 96, 0x00d0_0d1e_aaaa_bbbb);
+    assert!(world.set_wonder_work(FIXTURE_WONDER_WORK));
+    let mine = a_city_of_near(&mut world, READER, Axial::new(24, 24));
+    a_city_of_near(&mut world, RIVAL, Axial::new(mine.q + 3, mine.r));
+    let far = a_city_of_near(&mut world, RIVAL, Axial::new(80, 80));
+    world.step(1).expect("the step runs");
+    order_a_wonder(&mut world, RIVAL, far);
+    for _ in 0..WONDER_STEPS {
+        world.step(1).expect("the step runs");
+    }
+
+    let site = the_wonder_on(&world, far);
+    assert!(site.work > 0, "the fixture must put work on the far wonder");
+    assert_eq!(site.holder, Some(RIVAL), "the rival holds the far wonder");
+    assert!(
+        !world.faction_sees_now(READER, far),
+        "the fixture must hide the far city from the reader"
+    );
+    let rivals = published_set(&world, "token_rivals");
+    assert_eq!(
+        channel_of(&rivals, RIVAL_CHANNEL_NAMES, 0, "validity"),
+        65536,
+        "the reader sees the near city, so the rival holds a token"
+    );
+    assert_eq!(
+        channel_of(&rivals, RIVAL_CHANNEL_NAMES, 0, "wonder_site_progress"),
+        0,
+        "a wonder the reader does not see publishes no progress"
+    );
+    assert_eq!(
+        channel_of(&rivals, RIVAL_CHANNEL_NAMES, 0, "wonder_site_place"),
+        0,
+        "a wonder the reader does not see names no place"
+    );
+}
+
+/// The observation of a seen rival wonder is one array at every thread
+/// count.
+///
+/// The fixture must publish the wonder, or the comparison would compare two
+/// arrays of zeros in the channels this change fills.
+#[test]
+fn a_seen_rival_wonder_reads_one_array_at_every_thread_count() {
+    let field = observation_schema()
+        .row("token_rivals")
+        .expect("the layout holds the rival tokens");
+    let progress_at = field.start as usize
+        + RIVAL_CHANNEL_NAMES
+            .iter()
+            .position(|name| *name == "wonder_site_progress")
+            .expect("the rival token holds the channel");
+    let arrays: Vec<Vec<i64>> = [1usize, 2, 12]
+        .iter()
+        .map(|threads| {
+            a_rival_wonder_in_view(*threads)
+                .world
+                .faction_observation(READER)
+                .expect("the reader is a faction of this world")
+        })
+        .collect();
+    assert!(
+        arrays[0][progress_at] > 0,
+        "the fixture must publish the wonder the reader sees"
+    );
+    assert_eq!(arrays[0], arrays[1], "one thread and two agree");
+    assert_eq!(arrays[0], arrays[2], "one thread and twelve agree");
+}
+
+/// A place position turns back into the place value it holds, for every
+/// place value, and a cell turns into a place and back.
+#[test]
+fn a_place_position_turns_back_into_the_place_it_holds() {
+    for place in 0..PLACE_COUNT {
+        assert_eq!(
+            place_of_position(i64::from(place_position(place).0)),
+            place,
+            "the place value {place} survives the position"
+        );
+    }
+    for cell in 0..RING_STACK_CELLS {
+        assert_eq!(
+            place_of_cell(cell).and_then(place_cell),
+            Some(cell),
+            "the cell {cell} survives the place value"
+        );
+    }
+    assert_eq!(place_of_cell(RING_STACK_CELLS), None);
 }
