@@ -1,7 +1,7 @@
 ---
 id: 0540
 title: Name the city that holds each wonder, and publish a rival wonder the reader sees
-status: refined
+status: complete
 created: 2026-09-10
 implements: [ADR-0174 D1, ADR-0150 D1, ADR-0150 D2, ADR-0004 D1, ADR-0154 D3, ADR-0195 D7, ADR-0195 D9, ADR-0199 D1, ADR-0199 D2]
 changes: []
@@ -84,20 +84,44 @@ follow a changed position or a changed value.[^13]
 
 ## Outcome
 
-The code, the tests and the registers are on the branch of this item. The
-gates have not run, because a worker does not run them. The dispatcher runs
-them and then moves this item to `complete/`.
+The wonder lookup and the wonder channels of the observation are on the main
+line. Two commits hold the work, and one merge joined them.[^14] [^15]
 
-The lookup is `World::wonder_sites`. The reader of the win path folds it. The
-settlement token and the rival token read it. The rival token gained two
-channels, and the positions came from the reserve, so the length holds. The
-version rose from 7 to 8, and the four stored policies at version 7 moved to
-the archive.
+**What was done.** `World::wonder_sites` is the one lookup. For each wonder it
+states the tile, the claim, the work, the requirement, the holder and a city.
+The city is the city of the holder that the tile belongs to. The lookup walks
+the sparse upgrade map in ascending tile order. The reader of the win path
+folds the lookup, and a unit test compares the fold with the walk it replaced.
+One function picks the nearest city of a faction, and a tie goes to the lower
+slot.
 
-A survey had said that a rival settlement gets a settlement token while the
-reader sees it. The settlement set holds the reader's own settlements only. The
-place of a rival wonder therefore went to the rival token. FND-764 records
-it.[^14] DEC-283 records the tie rule.[^8]
+The settlement token of the reader carries the largest progress of a wonder on
+its ground. The rival token gained two channels. One holds the progress of the
+rival wonder the reader sees. The other holds the place value of the city that
+holds that wonder. Both read zero unless the reader sees the wonder tile and
+that city on that frame. The new positions came from the layout reserve, so
+the length of the observation holds.
+
+The observation version rose from 7 to 8. The four stored policies at version
+7 moved to the archive.[^16] The index of the stored policies lists them under
+what is gone.[^17]
+
+**What changed from the plan.** The plan put the place of a rival wonder in a
+settlement token. A survey had said that a rival settlement gets a settlement
+token while the reader sees it. That was false, because the settlement set
+holds the reader's own settlements only. The place of a rival wonder therefore
+went to the rival token. The writer had also said that the engine holds no
+source for the wonder channel of the settlement token, and that was false too.
+FND-764 records both.[^18]
+
+**Registers.** FND-764 is recorded. DEC-283 is closed, and it holds the tie
+rule.[^8] A later commit made DEC-283 cite the held ground record under the
+label that the register already holds.[^19] BLK-160 now states what a rival
+wonder publishes under the fog, and the row stays open.[^9] No decision record
+changed.
+
+**Gates.** The dispatcher runs the whole check command on the settled tree.
+This item does not state the result.
 
 ## References
 
@@ -114,4 +138,9 @@ it.[^14] DEC-283 records the tie rule.[^8]
 [^11]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^12]: Findings register, FND-671. `docs/FINDINGS.md`
 [^13]: Findings register, FND-689. `docs/FINDINGS.md`
-[^14]: Findings register, FND-764. `docs/FINDINGS.md`
+[^14]: Commit 64f1288e, name the city that holds each wonder in one lookup. It merged in d7d5338d.
+[^15]: Commit 25171c03, publish the wonder of each settlement and a seen rival wonder. It merged in d7d5338d.
+[^16]: The archive of the stored policies at observation version 7. `archive/obs7-act2-policies/`
+[^17]: The index of the stored policies. `checkpoints/README.md`
+[^18]: Findings register, FND-764. `docs/FINDINGS.md`
+[^19]: Commit 8319ce1b, cite the held ground record under one label in DEC-283.

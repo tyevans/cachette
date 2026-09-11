@@ -1,7 +1,7 @@
 ---
 id: 0541
 title: Make part-built wonder work fragile
-status: refined
+status: complete
 created: 2026-09-10
 implements: [ADR-0001 D4, ADR-0004 D1, ADR-0023 D1, ADR-0151 D4, ADR-0164 D1, ADR-0174 D1]
 changes: [ADR-0150 D4]
@@ -76,27 +76,49 @@ upgrade and for work toward a row that carries no claim.
 
 ## Outcome
 
-Part-built wonder work is fragile. The item stays in `refined/` until the
-integrator runs the gate and regenerates the golden state hash. Then it moves to
-`complete/`.
+Part-built wonder work is fragile. The work merged in two steps. The second
+step removed an owner that the first step stored on each upgrade.
 
-**What was done.** The rule reads the victory claim column of the row above an
-entry, so in the default table it touches the wonder alone.[^3] Each entry
-stores the holder that its work belongs to. A new serial pass runs after the
-last stage that writes the holder column. It resets wonder work whose holder
-changed, and it takes the decay from wonder work that the build did not advance
-on that tick. An entry at no level that reaches nothing is removed.
+**What was done.** ADR-0206 states the rule, and a new serial pass applies
+it.[^18] The rule reads the victory claim column of the row above an entry. In
+the default table it therefore touches the wonder alone.[^3] The pass takes the
+decay from wonder work that the build did not advance on that tick. It resets
+wonder work whose ground changed holder, and it removes an entry at no level
+with no work. A finished wonder and every other upgrade keep the old rules.
+
+**The stored holder was removed.** The first merge put a holder field on each
+upgrade entry, and the state hash covered it.[^19] That contradicted ADR-0180
+D2, which stores no owner beside an upgrade.[^11] A later merge removed the
+field.[^20] Now the step watches each tile under wonder work for one step. The
+write of the holder column marks a watched tile when the holder there changes.
+The pass resets the work on a marked tile, and the watch enters no hash.
+
+The watch also sees two changes that the stored field did not see. One is
+ground that goes to nobody and back in one step. The other is a capture on the
+first tick of a build. ADR-0206 D2 and D4 now state the watch.[^18]
 
 **What changed from the plan.** The decay is a value of the upgrade table and
 not a column of a row, because only a row with a claim reads it. A world setter
-writes it, and the table hash covers it.
+writes it, and the table hash covers it. The plan did not edit ADR-0150. A
+follow-up commit added the exception for wonder work to ADR-0150 D4 and to
+ADR-0180 D2.[^21] [^4] BLK-036 stays resolved, and its row names the same
+exception.[^17]
+
+**The golden state hash.** A separate commit regenerated it after the first
+merge.[^22] Another commit regenerated it after the watch and after the
+controller change of item 0542.[^23]
 
 **What was left undone.** No binding exposes the decay setter to Python. No
-event marks a reset or a removal of wonder work. ADR-0150 is not edited, because
-another owner holds it. ADR-0206 states the clause it changes.
+event marks a reset or a removal of wonder work.
 
-**Registers.** DEC-284 is closed. FND-765 is recorded. The balance register holds
-the wonder decay row. No blocker opened or closed.
+**Registers.** DEC-284 is closed, and it holds the rate and the reset
+rule.[^24] FND-765 records the belief that a rival could contest a
+wonder.[^25] FND-767 records that a merged worker stored an owner on every
+upgrade against a record.[^26] The balance register holds the wonder decay
+row.[^15] No blocker opened or closed.
+
+**Gates.** The dispatcher runs the whole check command on the settled tree.
+This item does not state the result.
 
 ## References
 
@@ -117,3 +139,12 @@ the wonder decay row. No blocker opened or closed.
 [^15]: Balance register, the wonder decay. `docs/reference/balance.md`
 [^16]: Findings register, FND-011. `docs/FINDINGS.md`
 [^17]: Blockers register, BLK-036. `docs/BLOCKERS.md`
+[^18]: ADR-0206, a part-built wonder decays when nobody works it, decisions D2 and D4. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+[^19]: Commit dba095b6, make part-built wonder work decay and reset on a change of holder. It merged in b9e2a6e1.
+[^20]: Commit 3b7cea0f, watch wonder ground for a change of holder instead of storing an owner. It merged in bd42db12.
+[^21]: Commit 75541854, say where part-built wonder work is the exception to the ground rule.
+[^22]: Commit 098b980c, regenerate the golden state hashes for fragile wonder work.
+[^23]: Commit d80477a1, regenerate the golden state hashes for the win threat and the wonder watch.
+[^24]: Decisions register, DEC-284. `docs/DECISIONS.md`
+[^25]: Findings register, FND-765. `docs/FINDINGS.md`
+[^26]: Findings register, FND-767. `docs/FINDINGS.md`

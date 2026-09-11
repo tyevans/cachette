@@ -1,7 +1,7 @@
 ---
 id: 0542
 title: Aim the controller at a rival that nears a win
-status: refined
+status: complete
 created: 2026-09-10
 implements: [ADR-0144 D1, ADR-0144 D2, ADR-0144 D4, ADR-0144 D5, ADR-0146 D5, ADR-0174 D1, ADR-0181 D5, ADR-0204 D4, ADR-0206 D2]
 changes: []
@@ -77,18 +77,32 @@ weight and the renown weight each still decide one choice.
 
 ## Outcome
 
-The controller aims at a rival that nears a win. The item stays in `refined/`
-until the integrator runs the gate and regenerates the golden state hash. Then
-it moves to `complete/`.
+The built-in controller aims at a rival that nears a win. One commit holds the
+work.[^13]
 
 **What was done.** The world computes the reading of every faction on every win
-path from the readers that already state each numerator and each requirement.
-Each faction row holds a win threat share. The rival with the highest reading
-at or above that share is the win threat. The threat outranks the prey and the
-rival by held ground, and the move against it draws nothing. The campaign
-objective against a threat in the war band is the city that the wonder lookup
-names, when the threat nears the wonder path. Otherwise it is the nearest city
-of the threat.
+path. It uses the readers that already state each numerator and each
+requirement. Each faction row holds a win threat share. The rival with the
+highest reading at or above that share is the win threat. The threat outranks
+the prey and the rival by held ground, and the move against it draws nothing.
+The war weight and the renown weight therefore each still decide one
+choice.[^12]
+
+A campaign against a threat in the war band aims at one city. When the threat
+nears the wonder path, that city is the city that the wonder lookup of item
+0540 names. Otherwise it is the nearest city of the threat.
+
+**The share.** The default share is five eighths. The controller module states
+it once, as `WIN_THREAT_SHARE_DEFAULT`.[^14] The balance register holds the row
+and its derivation, and BLK-050 governs the value.[^15] [^10] A share of zero
+takes the rule out of the game.
+
+**The fog.** The controller reads the full world state for its rival, its prey
+and its win threat. BLK-160 still holds whether the standing of a rival toward
+a win is public. This item leaves that row open.[^11]
+
+**The golden state hash.** The controller row gained the share, so the golden
+state hash moved. A separate commit regenerated it after the merge.[^16]
 
 **What changed from the plan.** The controller reads two readers that were
 private to the observation and to the game end. Each became visible to the
@@ -100,8 +114,11 @@ not re-aim it at a new threat. The territory reader still ranks the factions at
 the tick limit, so the territory reading reaches one only when a faction holds
 all passable ground.[^5]
 
-**Registers.** The balance register holds the win threat share row. No finding,
-decision or blocker opened or closed.
+**Registers.** The balance register holds the win threat share row. The item
+used no register number. No finding, decision or blocker opened or closed.
+
+**Gates.** The dispatcher runs the whole check command on the settled tree.
+This item does not state the result.
 
 ## References
 
@@ -117,3 +134,7 @@ decision or blocker opened or closed.
 [^10]: Blockers register, BLK-050. `docs/BLOCKERS.md`
 [^11]: Blockers register, BLK-160. `docs/BLOCKERS.md`
 [^12]: Findings register, FND-739. `docs/FINDINGS.md`
+[^13]: Commit 21d7a834, aim the controller at a rival that nears a win. It merged in e25c343b.
+[^14]: The controller module. `crates/cachette-core/src/controller.rs`
+[^15]: Balance register, the win threat share. `docs/reference/balance.md`
+[^16]: Commit d80477a1, regenerate the golden state hashes for the win threat and the wonder watch.
