@@ -191,7 +191,8 @@ class ValidationScore:
     A win is always defined, so the win share is a real quantity over any
     pass. The engine's territory reader compares held ground at the tick
     limit and names a winner there, so an episode that runs out of ticks ends
-    won or lost rather than drawn.[^2]
+    won or lost rather than drawn.[^2] A run under the limit rule counts that
+    episode as lost, so its win share counts only the wins before the limit.
 
     **This type exists so that a caller cannot use one figure where it meant
     the other.** The pass used to give back a bare float, and the one caller

@@ -163,6 +163,23 @@ class EnvConfig:
     that reaches the limit still ends won or lost. A horizon shorter than
     the tick limit truncates instead, and a truncated episode can report no
     outcome at all.
+
+    The limit entry says whether a game that reaches the tick limit is a loss
+    for the seat. It is false by default, and the seat then takes the result
+    the engine records. **When it is true, only a win before the limit is a
+    win.** A game that a reader decides at the limit is a loss, whoever the
+    reader names, and a draw is a loss as well.
+
+    **The rule is here and not in the scoring.** Every scorer of one episode
+    reads the same rule, so the reward, the win share and the controller bar
+    cannot disagree about how the episode ended. The baseline cache keys on
+    this whole configuration, so a bar measured under one rule never answers
+    for the other.[^1]
+
+    References
+    ----------
+    [^1]: Recurring defect shapes, shape 1.
+    ``.agents/rules/recurring-defects.md``
     """
 
     width: int = 48
@@ -174,6 +191,7 @@ class EnvConfig:
     decision_interval: int = 5
     threads: int = 1
     controlled: bool = True
+    limit_is_loss: bool = False
 
 
 @dataclass(frozen=True)
@@ -331,7 +349,9 @@ class Env:
         episode.** A reused world would carry the state of the run before it.
         """
         self._world = self._build(seed)
-        self._reward = self._scoring.scorer(self._world, self._config.seat)
+        self._reward = self._scoring.scorer(
+            self._world, self._config.seat, limit_is_loss=self._config.limit_is_loss
+        )
         self._also = self._companions()
         self._decisions = 0
         self._terminated = False
@@ -343,7 +363,9 @@ class Env:
         """Build one companion scorer for each further scoring, in name order."""
         world = self._require_world()
         return {
-            name: scoring.scorer(world, self._config.seat)
+            name: scoring.scorer(
+                world, self._config.seat, limit_is_loss=self._config.limit_is_loss
+            )
             for name, scoring in self._also_scorings.items()
         }
 
@@ -402,7 +424,9 @@ class Env:
         this is the only place that widens it.
         """
         self._world = cast(World, world)
-        self._reward = self._scoring.scorer(self._world, self._config.seat)
+        self._reward = self._scoring.scorer(
+            self._world, self._config.seat, limit_is_loss=self._config.limit_is_loss
+        )
         self._also = self._companions()
         self._decisions = 0
         self._terminated = False

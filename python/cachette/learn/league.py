@@ -268,7 +268,8 @@ class SeatedGame:
             world.set_externally_controlled(seat, True)
         self._world = world
         self._rewards = {
-            seat: self._scoring.scorer(world, seat) for seat in self._seats
+            seat: self._scoring.scorer(world, seat, limit_is_loss=config.limit_is_loss)
+            for seat in self._seats
         }
         self._decisions = 0
         self._done = False

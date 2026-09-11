@@ -123,6 +123,13 @@ nothing, so a run under a weighting that states no early weight scores what
 it scored before this term existed. A register holds the row, and one finding
 holds the reasoning.[^12]
 
+**A run may count the tick limit as a loss.** A territory win is the
+truncation of another path, so a win at the limit pays a policy for letting
+the clock run out.[^14] Under the limit rule only a win before the limit is a
+win. A game that a reader decides at the limit is a loss, whoever it names,
+and a draw is a loss as well. The rule lives in the world configuration of
+the run, so every scorer of one episode reads the same outcome.
+
 Two shaped forms
 ----------------
 
@@ -183,6 +190,8 @@ decisions D1 and D2.
 [^12]: Findings register, FND-692. ``docs/FINDINGS.md``
 
 [^13]: Findings register, FND-700. ``docs/FINDINGS.md``
+
+[^14]: Findings register, FND-753. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -199,6 +208,7 @@ if TYPE_CHECKING:
     import numpy as np
 
     from cachette import World
+    from cachette._core import GameEnd
 
     from .signals import Signal
 
@@ -418,15 +428,18 @@ class Weighting:
         unset.extend(name for name in TERMINAL_ROWS if getattr(self, name) is None)
         return tuple(unset)
 
-    def scorer(self, world: World, faction: int) -> Reward:
+    def scorer(self, world: World, faction: int, limit_is_loss: bool = False) -> Reward:
         """Build the scorer of one faction of one world under this weighting.
 
         This makes a weighting one of the two things a run may be scored by.
         The other is an objective vector under a play style, and an
         environment tells them apart by nothing: it asks either one for a
         scorer.
+
+        The limit entry says whether a game that reaches the tick limit is a
+        loss for the faction. Such a game then pays the loss weight.
         """
-        return Reward(world, faction, self)
+        return Reward(world, faction, self, limit_is_loss)
 
 
 # The weighting the register states. Every row is present and every row is
@@ -480,9 +493,14 @@ class Scoring(Protocol):
     An environment builds a new world for each episode, so it needs a way to
     build a new scorer for it. This is that way, and it is the one seam
     between a run and what the run rewards.
+
+    The limit entry says whether a game that reaches the tick limit is a loss
+    for the faction. **The world configuration holds that rule, and the
+    scoring does not.** Every scorer of one episode then reads one answer for
+    how the episode ended, whatever it weighs.
     """
 
-    def scorer(self, world: World, faction: int) -> Scorer:
+    def scorer(self, world: World, faction: int, limit_is_loss: bool = False) -> Scorer:
         """Build the scorer of one faction of one world."""
 
 
@@ -575,7 +593,7 @@ class OutcomeReader:
     ``docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md``
     """
 
-    def __init__(self, world: World, faction: int) -> None:
+    def __init__(self, world: World, faction: int, limit_is_loss: bool = False) -> None:
         """Find the positions this reader needs in the layout of one world.
 
         The elapsed share comes through the signal catalogue of the world
@@ -583,8 +601,12 @@ class OutcomeReader:
         form the engine published for the field, and that form states the
         bound the share was written against. A divisor written here would be
         a second declaration of an engine rule.
+
+        The limit entry says whether a game that reaches the tick limit is a
+        loss for the faction. The outcome function below states that rule.
         """
         self._faction = faction
+        self._limit_is_loss = limit_is_loss
         self._starts = _field_starts(world, (_REMAINING_TICKS, *_ACTING_FIELDS))
         self._elapsed = _ElapsedShare.of_world(world)
         self._outcome = RUNNING
@@ -642,12 +664,68 @@ class OutcomeReader:
 
     def _name_of(self, world: World, reading: Mapping[str, int]) -> str:
         """Name the state of the run after one reading."""
-        end = world.game_end()
-        if end is not None:
-            return WON if end["winner"] == self._faction else "lost"
-        if world.tick_limit > 0 and reading[_REMAINING_TICKS] == 0:
-            return "drawn"
-        return RUNNING
+        return outcome_of(
+            world.game_end(),
+            self._faction,
+            world.tick_limit,
+            reading[_REMAINING_TICKS],
+            self._limit_is_loss,
+        )
+
+
+def outcome_of(
+    end: GameEnd | None,
+    faction: int,
+    tick_limit: int,
+    remaining_ticks: int,
+    limit_is_loss: bool = False,
+) -> str:
+    """Name how one run ended for one faction, from the facts it ended on.
+
+    **This is the one declaration of what counts as a win.** The reward, the
+    objective scorer, the win share and the controller bar all read the name
+    this returns, so no two of them can disagree about one episode.
+
+    The end entry is the game end record of the world, or nothing while no
+    reader has fired. The remaining ticks entry is the published count of
+    ticks before the limit, and it reads zero once the clock has run out.
+
+    Under the default rule a reader that names the faction is a win, and a
+    reader that names another faction is a loss. A clock that ran out with no
+    end record is a draw.
+
+    **Under the limit rule, only a win before the tick limit is a win.** A
+    game reached the limit when its end record stands at the limit tick or
+    later, or when the clock ran out with no end record. Such a game is a
+    loss for every faction, whoever a reader named. A reader that fires
+    before the limit decides the game as it did before.
+
+    **The rule reads the tick of the end and not the path.** The engine
+    advances the clock before the readers run, and the territory reader
+    answers nothing below the limit, so a territory ending always records the
+    limit tick. A domination ending on the limit tick reached the limit as
+    well. A draft record ends a game at the limit with no winner, and this
+    rule reads that ending the same way.[^1]
+
+    The answer is a pure function of these facts. It reads no order and no
+    thread, so it gives one answer at any thread count.[^2]
+
+    References
+    ----------
+    [^1]: ADR-0204, every win path holds a bar of its own, decision D3.
+    ``docs/adrs/draft/adr-0204-every-win-path-holds-a-bar-of-its-own.md``
+
+    [^2]: ADR-0001, one binary gives one answer at any thread count.
+    ``docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md``
+    """
+    limited = tick_limit > 0
+    if end is not None:
+        if limit_is_loss and limited and int(end["tick"]) >= tick_limit:
+            return "lost"
+        return WON if end["winner"] == faction else "lost"
+    if limited and remaining_ticks == 0:
+        return "lost" if limit_is_loss else "drawn"
+    return RUNNING
 
 
 @dataclass(frozen=True)
@@ -714,8 +792,18 @@ class Reward:
     ``docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md``
     """
 
-    def __init__(self, world: World, faction: int, weighting: Weighting) -> None:
+    def __init__(
+        self,
+        world: World,
+        faction: int,
+        weighting: Weighting,
+        limit_is_loss: bool = False,
+    ) -> None:
         """Build the reward of one faction, and take the first reading.
+
+        The limit entry says whether a game that reaches the tick limit is a
+        loss for the faction. The outcome reader holds it, so the terminal
+        weight this reward pays follows the outcome it names.
 
         Raises ``TermError`` when a term names no single-position field of
         the schema of this world, or when a level term names a field whose
@@ -727,7 +815,7 @@ class Reward:
         self._starts = _field_starts(world, tuple(weighting.terms))
         self._level_starts = _field_starts(world, tuple(weighting.levels))
         self._units = _field_units(world, tuple(weighting.levels))
-        self._outcomes = OutcomeReader(world, faction)
+        self._outcomes = OutcomeReader(world, faction, limit_is_loss)
         unset = weighting.unset_names()
         if unset:
             message = (

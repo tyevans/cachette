@@ -91,6 +91,12 @@ limit. A finding holds the measurement.[^6]
 | `lost`, what the faction gets when a reader names another winner | The reward of a faction | unset, the project owner | BLK-050 | |
 | `drawn`, what the faction gets when the run reaches the tick limit with no winner | The reward of a faction | unset, the project owner | BLK-050 | |
 
+**A run may count the tick limit as a loss.** Under that option only a win
+before the limit is a win. A game that a reader decides at the limit pays the
+`lost` row, whoever the reader names, and a draw pays the `lost` row as well.
+The `drawn` row then pays on no episode. The option is off by default, and the
+world configuration of the run holds it.[^28]
+
 ## The terminal timing terms
 
 A terminal timing term is paid once, when the run ends. It weighs a level and
@@ -413,3 +419,4 @@ target platform measures it.
 [^25]: The test of the terminal scale. `tests/test_learner_terminal_scale.py`
 [^26]: Target platform costs. `docs/reference/graviton-costs.md`
 [^27]: Research, what the win conditions are and what can reach them. `docs/research/what-the-win-conditions-are-and-what-can-reach-them.md`
+[^28]: The reward module, the function that names how a run ended. `python/cachette/learn/reward.py`
