@@ -353,8 +353,9 @@ else
     report "the launcher refuses a start or a resume beside a start file" 1
 fi
 
-# `--styles` shares its first four characters with `--start-from`, so a rule
-# that refused every short prefix would refuse a style run.
+# `--styles` begins with the same four characters as `--start-from`, and it is
+# not a prefix of it. A rule that matched on those four characters would
+# refuse a style run.
 if refuse_start_from "--generations 3 --only alpha --styles bold" "$start_file" \
     2>/dev/null; then
     report "the launcher accepts run arguments beside a start file" 0

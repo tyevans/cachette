@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-768**
+**Next number: FND-769**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -21371,6 +21371,33 @@ hash.[^F767D]
 old value is a second declaration of the value, and a second declaration is
 the shape that the defect register names first.[^F590A]
 
+### FND-768 — A failed plan call ended the training launcher without a word
+
+**Believed.** The launcher asks the trainer for the plan before it rents a
+machine. When the trainer could not state the plan, the launcher printed a
+reason and stopped. The line after the call said so.[^F768A]
+
+**True.** The launcher shell stops at the first command that fails. An
+assignment from a command substitution that fails is such a command. The
+script therefore stopped on the assignment, and the line with the message
+never ran. The call also discarded the error stream of the trainer. A refusal
+by the trainer ended the launcher with status 2 and no text.
+
+**Evidence.** In a shell that stops on a failure, an assignment from `false`
+exits with status 1 before the next line runs. The work that lets a run start
+from the weights of another run needs a refusal of the trainer before the
+rental. A test of the dry path gives a start file to a run of every strategy,
+and it asserts that the reason of the trainer reaches the person. With the
+error stream discarded again, that test fails.[^F768B]
+
+**Follows.** The plan call keeps the error stream in a file. A failed call
+assigns an empty plan, so the message runs, and it repeats the last lines of
+the reason.
+
+**A refusal must say why.** A launcher that stops with no text leaves the
+person to guess the cause, and the cause is often a rule that the trainer
+already stated.
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -21449,3 +21476,5 @@ the shape that the defect register names first.[^F590A]
 [^F767B]: ADR-0180, a site changes hands or the taker destroys it, decision D2. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
 [^F767C]: The fragile wonder tests, the faction test and the round trip test. `crates/cachette-core/tests/a_part_built_wonder_is_fragile.rs`
 [^F767D]: ADR-0206, a part-built wonder decays when nobody works it, decision D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+[^F768A]: The training launcher, the plan call before the rental. `scripts/graviton-train.sh`
+[^F768B]: The launcher trainer call tests, the refusal of a start for every strategy. `tests/test_launcher_trainer_calls.py`
