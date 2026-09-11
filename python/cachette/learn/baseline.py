@@ -208,7 +208,7 @@ class BaselineCache:
         return {
             "engine": self._engine_key,
             "observation_version": int(schema_version),
-            "world": asdict(config),
+            "world": world_inputs(config),
             "seeds": [int(seed) for seed in seeds],
             "scoring": described,
         }
@@ -324,6 +324,27 @@ class BaselineCache:
         except OSError:
             return True
         return held > self._wait_seconds
+
+
+def world_inputs(config: EnvConfig) -> dict[str, Any]:
+    """Return the world a baseline depends on, as plain data.
+
+    **An opponent enters as its seat and its sha256, and never as its
+    path.** The opponent plays in the controller world, so a bar measured
+    against one opponent never answers for another. The path is where the
+    file lies on one machine and says nothing about what it plays.
+
+    A world without an opponent states no opponent entry at all, so a bar
+    stored before opponents existed still answers for such a world.
+    """
+    world = asdict(config)
+    del world["opponents"]
+    if config.opponents:
+        world["opponents"] = [
+            {"seat": opponent.seat, "sha256": opponent.sha256}
+            for opponent in config.opponents
+        ]
+    return world
 
 
 def key_of(inputs: dict[str, Any]) -> str:

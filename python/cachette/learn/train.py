@@ -217,6 +217,15 @@ START_STRATEGY_KEY = "started_from_strategy"
 START_GENERATION_KEY = "started_from_generation"
 """The key of a weight file that names the generation its start file states."""
 
+OPPONENT_SEATS_KEY = "opponent_seats"
+"""The key of a weight file that names the seat of each stored opponent."""
+
+OPPONENT_FILES_KEY = "opponent_files"
+"""The key of a weight file that names the file of each stored opponent."""
+
+OPPONENT_SHA256_KEY = "opponent_sha256"
+"""The key of a weight file that names the sha256 of each stored opponent."""
+
 
 @dataclass(frozen=True)
 class StartPoint:
@@ -293,6 +302,22 @@ def describe_readout_setting(readout_only: bool) -> str:
     if readout_only:
         return "trained the readout alone and held the towers at their seeded draw"
     return "trained every weight of the policy"
+
+
+def opponent_meta(config: EnvConfig) -> dict[str, object]:
+    """Return the entries a weight file states for the opponents of its run.
+
+    Each list holds one entry for each opponent, in seat order: the seat,
+    the file name and the sha256 of the file. **A run with no opponent
+    states no entry**, so its files read as the files of every earlier run.
+    """
+    if not config.opponents:
+        return {}
+    return {
+        OPPONENT_SEATS_KEY: [opponent.seat for opponent in config.opponents],
+        OPPONENT_FILES_KEY: [opponent.name for opponent in config.opponents],
+        OPPONENT_SHA256_KEY: [opponent.sha256 for opponent in config.opponents],
+    }
 
 
 def _figure_meta(prefix: str, score: ValidationScore | None) -> dict[str, object]:
@@ -514,6 +539,7 @@ class Checkpoint:
                 LIMIT_RULE_KEY: self.env_config.limit_is_loss,
                 STRATEGY_KEY: self.name,
                 **(self.start.as_meta() if self.start is not None else {}),
+                **opponent_meta(self.env_config),
             },
         )
 

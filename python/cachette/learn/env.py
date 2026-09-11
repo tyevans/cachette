@@ -41,15 +41,18 @@ positions each verb declares, decision D1.
 
 from __future__ import annotations
 
+import hashlib
+import threading
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 import numpy as np
 
 from cachette._core import Batch, World
 
-from .policy import ActionTable
+from .policy import ActionTable, PolicyFit, load_policy
 from .reward import RewardStep, Scorer, Scoring
 from .signals import SignalCatalogue
 
@@ -59,6 +62,8 @@ if TYPE_CHECKING:  # pragma: no cover - the import is for the type checker
     import numpy.typing as npt
 
     from cachette._core import FoundingReport, GameEnd, ObservationSchema
+
+    from .policy import Policy
 
 # The reader names the environment is allowed to call on a world.
 #
@@ -192,6 +197,140 @@ class EnvConfig:
     threads: int = 1
     controlled: bool = True
     limit_is_loss: bool = False
+    opponents: tuple[Opponent, ...] = ()
+
+
+@dataclass(frozen=True)
+class Opponent:
+    """A stored policy that holds one seat of every world a run plays.
+
+    The seat entry names the faction. The path entry names the weight file,
+    and the digest entry is the sha256 of that file.
+
+    **The digest is the identity of the opponent, and the path is not.** A
+    file copied to another machine keeps its digest and changes its path, so
+    a cache that keys on the opponent keys on the digest.
+
+    The opponent holds its seat in the controller world as well. **Only the
+    learner seat goes back to the built-in controller there**, so the bar
+    measures the controller against the same opponent the learner met.
+    """
+
+    seat: int
+    path: str
+    sha256: str
+
+    @classmethod
+    def of_file(cls, path: Path, seat: int) -> Opponent:
+        """Return the opponent that the file at this path gives one seat."""
+        return cls(seat=seat, path=str(path.resolve()), sha256=file_sha256(path))
+
+    @property
+    def name(self) -> str:
+        """The file name of the weight file, without its directory."""
+        return Path(self.path).name
+
+
+def file_sha256(path: Path) -> str:
+    """Return the sha256 of the file at this path, as hexadecimal text."""
+    held = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1 << 20), b""):
+            held.update(block)
+    return held.hexdigest()
+
+
+def seat_opponents(config: EnvConfig, paths: Sequence[Path]) -> EnvConfig:
+    """Give each weight file the next seat after the learner, in order.
+
+    The first file takes the first seat that is not the learner seat, the
+    second file the next one, and so on.
+
+    Raises ``ValueError`` when the files would fill every seat but the
+    learner seat. **The built-in controller keeps at least one seat**, because
+    it is the yardstick the run is measured against.
+    """
+    free = [seat for seat in range(config.faction_count) if seat != config.seat]
+    if len(paths) >= len(free):
+        message = (
+            f"{len(paths)} opponent files would fill every seat of a world of "
+            f"{config.faction_count} factions but the learner seat, and the "
+            "built-in controller must keep one seat. Name at most "
+            f"{len(free) - 1}"
+        )
+        raise ValueError(message)
+    return replace(
+        config,
+        opponents=tuple(
+            Opponent.of_file(Path(path), seat)
+            for path, seat in zip(paths, free, strict=False)
+        ),
+    )
+
+
+def check_opponents(config: EnvConfig) -> None:
+    """Refuse a configuration whose opponents cannot all hold their seats.
+
+    An opponent seat must be a faction of the world, must not be the learner
+    seat, and must not be the seat of another opponent. At least one seat
+    stays with the built-in controller.
+    """
+    seats = [opponent.seat for opponent in config.opponents]
+    if not seats:
+        return
+    if any(seat < 0 or seat >= config.faction_count for seat in seats):
+        message = (
+            f"an opponent seat of {seats} is not a faction of a world of "
+            f"{config.faction_count} factions"
+        )
+        raise ValueError(message)
+    if config.seat in seats:
+        message = f"an opponent cannot hold the learner seat {config.seat}"
+        raise ValueError(message)
+    if len(set(seats)) != len(seats):
+        message = f"two opponents name one seat: {seats}"
+        raise ValueError(message)
+    if len(seats) + 1 >= config.faction_count:
+        message = (
+            f"the opponents hold seats {seats} and the learner holds seat "
+            f"{config.seat}, so the built-in controller holds no seat of a "
+            f"world of {config.faction_count} factions"
+        )
+        raise ValueError(message)
+
+
+_OPPONENT_POLICIES: dict[tuple[str, str, PolicyFit], Policy] = {}
+_OPPONENT_LOCK = threading.Lock()
+
+
+def opponent_policy(opponent: Opponent, fit: PolicyFit) -> Policy:
+    """Return the policy one opponent file holds, read once for each fit.
+
+    A vector builds one environment for each world, and each of them plays
+    the same opponent. **The file is read once and the policy is shared**,
+    because a greedy choice reads the weights and writes nothing.
+
+    Raises ``PolicyFitError`` when the file was trained against another
+    world, and ``ValueError`` when the file no longer holds the digest the
+    run recorded for it.
+    """
+    key = (opponent.path, opponent.sha256, fit)
+    with _OPPONENT_LOCK:
+        found = _OPPONENT_POLICIES.get(key)
+        if found is not None:
+            return found
+        path = Path(opponent.path)
+        held = file_sha256(path)
+        if held != opponent.sha256:
+            message = (
+                f"the opponent file {path} holds the sha256 {held}, and the run "
+                f"recorded {opponent.sha256}. The file changed after the run "
+                "started"
+            )
+            raise ValueError(message)
+        policy, _ = load_policy(path, fit)
+        _OPPONENT_POLICIES[key] = policy
+        return policy
 
 
 @dataclass(frozen=True)
@@ -296,6 +435,23 @@ class Env:
         self.action_version: int = int(action["version"])
         self.action_table: ActionTable = ActionTable.of_schema(action)
         self.signals: SignalCatalogue = SignalCatalogue.of_world(probe)
+        self._opponents = self._seat_opponents()
+
+    def _seat_opponents(self) -> tuple[tuple[int, Policy], ...]:
+        """Read the policy of each opponent seat, against the fit of this world.
+
+        **A file of another world is refused here, before any episode
+        plays.** The reader compares the fit the file states with the fit of
+        this world, which is the check a stored policy meets everywhere else.
+        """
+        check_opponents(self._config)
+        if not self._config.opponents:
+            return ()
+        fit = PolicyFit.of_env(self)
+        return tuple(
+            (opponent.seat, opponent_policy(opponent, fit))
+            for opponent in self._config.opponents
+        )
 
     @property
     def config(self) -> EnvConfig:
@@ -340,6 +496,8 @@ class Env:
         # baseline that measures the controller against itself.
         if config.controlled:
             world.set_externally_controlled(config.seat, True)
+        for opponent in config.opponents:
+            world.set_externally_controlled(opponent.seat, True)
         return world
 
     def reset(self, seed: int) -> np.ndarray:
@@ -494,8 +652,20 @@ class Env:
         anyway. A caller that measures a policy counts the refusals, because a
         policy whose actions the engine mostly refuses is close to a no-op
         whatever it chooses.
+
+        **Each opponent seat acts here as well, whoever holds the learner
+        seat.** The opponent chooses greedily from the observation and the
+        legality answer of its own seat, so it reads only what a player of
+        that seat could see. The controller world still drives the
+        opponents, so the bar and the learner meet the same opponent.
         """
         world = self._require_world()
+        for seat, policy in self._opponents:
+            chosen = policy.choose_many(
+                world.faction_observation(seat)[None, :],
+                world.legal_actions(seat)[None, :],
+            )
+            world.act(seat, int(chosen[0]))
         if not self._config.controlled:
             return None
         return world.act(self._config.seat, int(action))
