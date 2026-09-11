@@ -23,6 +23,11 @@
 //! accumulator lets a builder bank surplus it can never spend, and that
 //! overflow reaches the state hash.[^6]
 //!
+//! **Wonder work is fragile.** Work toward a row that carries a victory claim
+//! loses a stated amount on each tick that no builder adds to it, and it
+//! returns to nothing when its ground changes holder. Work toward every other
+//! row keeps what it holds.[^9]
+//!
 //! **A finished upgrade holds a condition, and the condition is the life of
 //! it.** A level that has just been finished stands at the full condition.
 //! The weather over its tile and a hostile unit on its tile take from it, a
@@ -42,10 +47,12 @@
 //! [^6]: Findings register, FND-011. `docs/FINDINGS.md`
 //! [^7]: ADR-0151, an upgrade is a category with a ground fit and a level, decisions D1 and D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 //! [^8]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+//! [^9]: ADR-0206, a part-built wonder decays when nobody works it, decisions D1 to D3. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
 
 use bytemuck::{Pod, Zeroable};
 
 use crate::hash::StateHash;
+use crate::holding::Holder;
 use crate::sim_math;
 use crate::terrain::{TileKind, KIND_COUNT};
 use crate::types::{Accum, TileIdx};
@@ -766,6 +773,30 @@ pub const WONDER_VICTORY_CLAIM: u32 = 1;
 /// the victory claim of the wonder changes the row at this level.
 pub const WONDER_LEVEL: u8 = 1;
 
+/// The work that wonder work loses on a tick when no builder adds to it.
+///
+/// **Wonder work is fragile.** A wonder is a row that carries a victory claim
+/// above zero, and wonder work is the progress of an entry toward such a row.
+/// A tick on which the build pass adds nothing to that work takes this much
+/// from it. A change of the holder of its ground takes all of it.[^1]
+///
+/// **The value is derived and not measured.** It is the work that the largest
+/// crew one tile admits adds in one tick: the ordinary capacity of a tile, at
+/// the builder rate of a type that builds at the full rate. A rival that keeps
+/// every builder off a wonder therefore undoes, tick for tick, what the
+/// fastest crew adds. The balance register states how many ticks the whole
+/// default wonder then lasts.[^2]
+///
+/// A caller sets the value at run time. The upgrade table holds it, so the
+/// state hash covers it.[^3]
+///
+/// # References
+///
+/// [^1]: ADR-0206, a part-built wonder decays when nobody works it, decisions D1 and D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+/// [^2]: Balance register, the wonder decay. `docs/reference/balance.md`
+/// [^3]: ADR-0164, every stored value the step reads enters the state hash, decision D1. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+pub const WONDER_DECAY: u32 = crate::terrain::ORDINARY_CAPACITY * (BUILD_RATE as u32);
+
 /// The value that says a row asks for the builder's own ground.
 ///
 /// The column is a whole number and the rule it holds is a yes or a no. The
@@ -966,7 +997,10 @@ pub const DEFAULT_UPGRADE_TABLE: UpgradeTable = {
         own_ground_required: OWN_GROUND_REQUIRED,
         ..UpgradeRow::NONE
     };
-    UpgradeTable { rows }
+    UpgradeTable {
+        rows,
+        wonder_decay: WONDER_DECAY,
+    }
 };
 
 /// Returns the position of one category at one level in the row array.
@@ -989,6 +1023,16 @@ const fn row_at(category: UpgradeCategory, level: u8) -> usize {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct UpgradeTable {
     rows: [UpgradeRow; UPGRADE_ROW_COUNT],
+    /// The work that wonder work loses on a tick when no builder adds to it.
+    ///
+    /// The value is not a row, so a table that holds no row still holds it.
+    /// It decides what a later frame does to the work, so the table hash
+    /// covers it beside the rows.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0164, every stored value the step reads enters the state hash, decision D1. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    wonder_decay: u32,
 }
 
 impl Default for UpgradeTable {
@@ -1002,10 +1046,15 @@ impl UpgradeTable {
     ///
     /// A world built with this table refuses every build order, because no
     /// row fits any ground.
+    ///
+    /// The wonder decay is not a row, so this table holds the default decay.
+    /// A caller that then writes a row with a victory claim gets the rule
+    /// that the default table gives.
     #[must_use]
     pub const fn empty() -> Self {
         Self {
             rows: [UpgradeRow::NONE; UPGRADE_ROW_COUNT],
+            wonder_decay: WONDER_DECAY,
         }
     }
 
@@ -1013,6 +1062,27 @@ impl UpgradeTable {
     #[must_use]
     pub const fn rows(&self) -> &[UpgradeRow; UPGRADE_ROW_COUNT] {
         &self.rows
+    }
+
+    /// Returns the work that wonder work loses on a tick when no builder
+    /// adds to it.
+    #[must_use]
+    pub const fn wonder_decay(&self) -> u32 {
+        self.wonder_decay
+    }
+
+    /// Sets the work that wonder work loses on a tick when no builder adds
+    /// to it.
+    ///
+    /// A value of zero keeps wonder work while nobody works it. A change of
+    /// the holder of its ground still resets it, because that rule reads no
+    /// rate.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0206, a part-built wonder decays when nobody works it, decisions D1 and D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+    pub const fn set_wonder_decay(&mut self, work: u32) {
+        self.wonder_decay = work;
     }
 
     /// Returns the row of one category at one level.
@@ -1148,6 +1218,7 @@ impl UpgradeTable {
     #[must_use]
     pub fn hash_into(&self, hash: StateHash) -> StateHash {
         hash.write(bytemuck::cast_slice(&self.rows))
+            .write_u64(u64::from(self.wonder_decay))
     }
 
     /// Reports whether the table holds its invariants.
@@ -1296,9 +1367,56 @@ pub struct UpgradeSite {
     /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     /// [^2]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     pub condition: Accum,
+    /// The holder of the ground that the work in the progress belongs to.
+    ///
+    /// The merge writes the holder of the tile when it makes the entry. The
+    /// wonder work pass writes it again when it resets the work of a standing
+    /// level, and nothing else writes it.
+    ///
+    /// **Only the wonder rule reads it.** Wonder work returns to nothing when
+    /// the tile changes holder, and this field is how the pass knows that the
+    /// holder changed.[^1] The rule for every other row reads no holder, so on
+    /// such an entry the field names the holder at the time the entry was
+    /// made.
+    ///
+    /// It is stored state that the next tick reads, so it enters the state
+    /// hash.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0206, a part-built wonder decays when nobody works it, decision D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+    /// [^2]: ADR-0164, every stored value the step reads enters the state hash, decision D1. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    pub holder: Holder,
 }
 
 impl UpgradeSite {
+    /// Reports whether the work of this entry is wonder work.
+    ///
+    /// Wonder work is progress toward a row that carries a victory claim
+    /// above zero. The rule reads the claim column of the row above the
+    /// entry, and it names no category.[^1]
+    ///
+    /// **This is the one statement of what wonder work is.** The wonder work
+    /// pass reads it to decide what decays and what resets. A second
+    /// statement would let a reader count as wonder work an entry that the
+    /// pass never touches.[^2]
+    ///
+    /// A finished wonder at the top of its category is not wonder work,
+    /// because no row stands above it.[^3]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D4. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^2]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^3]: ADR-0206, a part-built wonder decays when nobody works it, decision D3. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+    #[must_use]
+    pub const fn builds_toward_a_claim(self, table: &UpgradeTable) -> bool {
+        match table.row(self.category, self.level.saturating_add(1)) {
+            Some(row) => row.victory_claim > 0,
+            None => false,
+        }
+    }
+
     /// Reports whether a level of the upgrade stands on the tile.
     ///
     /// A site at level zero is a first build under construction, and it
@@ -1389,6 +1507,22 @@ pub struct UpgradeMap {
     /// The sites the last merge raised a level on, in ascending tile order,
     /// as the merge left them. A diagnostic of the last call, as above.
     raised: Vec<UpgradeSite>,
+    /// The tiles whose entry the last merge added work to, in ascending tile
+    /// order.
+    ///
+    /// **This is the one statement of which work a builder attended on this
+    /// tick.** The wonder work pass reads it, and an entry it does not name
+    /// loses the decay.[^1] A contribution that the merge dropped, because
+    /// the tile carries another category, names nothing here.
+    ///
+    /// The list describes one call. It is rebuilt by every merge, including
+    /// a merge of no work, so it never outlives the tick. It enters no state
+    /// hash.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0206, a part-built wonder decays when nobody works it, decision D1. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+    worked: Vec<TileIdx>,
 }
 
 impl UpgradeMap {
@@ -1402,6 +1536,7 @@ impl UpgradeMap {
             collapses: 0,
             collapsed: Vec::new(),
             raised: Vec::new(),
+            worked: Vec::new(),
         }
     }
 
@@ -1477,8 +1612,10 @@ impl UpgradeMap {
 
     /// Adds a run of work, given in ascending tile order.
     ///
-    /// Each element names a tile, the category being built there, and the
-    /// work that this tick added. The caller states the order and the merge
+    /// Each element names a tile, the category being built there, the work
+    /// that this tick added, and the holder of the tile. The merge writes the
+    /// holder into an entry it makes, and it never writes it into an entry
+    /// that already stands.[^3] The caller states the order and the merge
     /// relies on it: a run out of order would silently produce an unsorted
     /// map, and every later lookup would then read the wrong tile.
     ///
@@ -1499,9 +1636,10 @@ impl UpgradeMap {
     ///
     /// [^1]: Findings register, FND-011. `docs/FINDINGS.md`
     /// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+    /// [^3]: ADR-0206, a part-built wonder decays when nobody works it, decision D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
     pub fn merge_ascending(
         &mut self,
-        run: &[(TileIdx, UpgradeCategory, i64)],
+        run: &[(TileIdx, UpgradeCategory, i64, Holder)],
         table: &UpgradeTable,
     ) {
         debug_assert!(
@@ -1514,6 +1652,7 @@ impl UpgradeMap {
         );
         let mut visits = 0u64;
         self.raised.clear();
+        self.worked.clear();
         if run.is_empty() {
             // Nothing was built, so the merge read nothing. It did not walk
             // the sites, and it did not walk the world.
@@ -1531,9 +1670,13 @@ impl UpgradeMap {
                 self.scratch.push(mine);
                 here += 1;
             } else if theirs.0 .0 < mine.tile.0 {
+                self.worked.push(theirs.0);
                 self.scratch.push(fresh_site(theirs, table));
                 there += 1;
             } else {
+                if mine.category == theirs.1 {
+                    self.worked.push(mine.tile);
+                }
                 let after = advanced(mine, theirs.1, theirs.2, table);
                 // A level that rose is a moment, and the world publishes it.
                 // The walk is ascending, so the raises are gathered in
@@ -1550,6 +1693,7 @@ impl UpgradeMap {
         self.scratch.extend_from_slice(&self.sites[here..]);
         for added in &run[there..] {
             visits += 1;
+            self.worked.push(added.0);
             self.scratch.push(fresh_site(*added, table));
         }
         core::mem::swap(&mut self.sites, &mut self.scratch);
@@ -1667,7 +1811,9 @@ impl UpgradeMap {
     /// The entries enter in tile order, which the map holds them in.[^1] An
     /// unfinished build is state that the next frame reads, so the level and
     /// the progress enter as well.[^2] The condition of a standing level is
-    /// state that the next frame reads too, so it enters beside them.[^2]
+    /// state that the next frame reads too, so it enters beside them.[^2] The
+    /// holder that the work belongs to is read by the wonder rule on the next
+    /// frame, so it enters last.[^2]
     ///
     /// # References
     ///
@@ -1681,9 +1827,77 @@ impl UpgradeMap {
                 .write(&site.tile.0.to_le_bytes())
                 .write(&[site.category.to_u8(), site.level])
                 .write(&site.progress.0.to_le_bytes())
-                .write(&site.condition.0.to_le_bytes());
+                .write(&site.condition.0.to_le_bytes())
+                .write(&site.holder.to_bits().to_le_bytes());
         }
         running
+    }
+
+    /// Takes wonder work back from every entry that no builder worked on this
+    /// tick, and resets the wonder work whose ground changed holder.
+    ///
+    /// Wonder work is progress toward a row that carries a victory claim, and
+    /// one predicate on the entry states it. The pass leaves every other entry
+    /// where it is.[^1]
+    ///
+    /// **A holder that changed resets the work.** When the holder of the tile
+    /// is not the holder the work belongs to, the work returns to nothing and
+    /// the entry takes the new holder. A capture, a raze, a release and a land
+    /// transfer all change the holder, so the rule reads the column that they
+    /// all write and never the act.[^2]
+    ///
+    /// **Work that no builder added to on this tick loses the decay.** The
+    /// last merge names the entries it advanced, and an entry it did not name
+    /// loses the decay the table holds. The work never falls below
+    /// nothing.[^3]
+    ///
+    /// **An entry at no level that holds no work is removed.** It stands for
+    /// nothing, and the tile returns to the world the generator made.[^4] A
+    /// standing level is never removed here.
+    ///
+    /// The walk is serial and ascending, over the entries and over the
+    /// advanced tiles together, so neither side searches. It makes no random
+    /// draw, and every term is a whole number.[^5] [^6]
+    ///
+    /// # References
+    ///
+    /// [^1]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^2]: ADR-0206, a part-built wonder decays when nobody works it, decision D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+    /// [^3]: ADR-0206, a part-built wonder decays when nobody works it, decision D1. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+    /// [^4]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D4. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    /// [^5]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
+    /// [^6]: ADR-0023, an aggregate combines exactly, in any order, decision D1. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
+    pub fn undo_wonder_work(&mut self, holders: &[Holder], table: &UpgradeTable) {
+        debug_assert!(
+            self.worked.windows(2).all(|pair| pair[0].0 < pair[1].0),
+            "the advanced tiles must rise and name each tile once"
+        );
+        let decay = Accum(-i64::from(table.wonder_decay()));
+        let worked = &self.worked;
+        let mut there = 0usize;
+        self.sites.retain_mut(|site| {
+            while there < worked.len() && worked[there].0 < site.tile.0 {
+                there += 1;
+            }
+            if !site.builds_toward_a_claim(table) {
+                return true;
+            }
+            let attended = worked.get(there).is_some_and(|tile| *tile == site.tile);
+            let holder = holders
+                .get(site.tile.0 as usize)
+                .copied()
+                .unwrap_or(Holder::NOBODY);
+            let left = if holder != site.holder {
+                site.holder = holder;
+                0
+            } else if attended {
+                site.progress.0
+            } else {
+                sim_math::combine(site.progress, decay).0.max(0)
+            };
+            site.progress = Accum(left);
+            left > 0 || site.is_complete()
+        });
     }
 
     /// Reports whether the map holds its invariants.
@@ -1729,16 +1943,18 @@ impl UpgradeMap {
 /// Builds the site that a first contribution creates.
 ///
 /// The site starts at no level, and the contribution may raise it to the
-/// first one at once.
+/// first one at once. It takes the holder of the tile at the moment the work
+/// went in, and the work belongs to that holder.
 #[must_use]
-fn fresh_site(added: (TileIdx, UpgradeCategory, i64), table: &UpgradeTable) -> UpgradeSite {
-    let (tile, category, work) = added;
+fn fresh_site(added: (TileIdx, UpgradeCategory, i64, Holder), table: &UpgradeTable) -> UpgradeSite {
+    let (tile, category, work, holder) = added;
     let start = UpgradeSite {
         tile,
         category,
         level: NO_LEVEL,
         progress: Accum(0),
         condition: Accum(CONDITION_FULL),
+        holder,
     };
     advanced(start, category, work, table)
 }

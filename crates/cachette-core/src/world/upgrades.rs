@@ -646,6 +646,35 @@ impl World {
         self.upgrades.last_advance_visits()
     }
 
+    /// Returns the work that wonder work loses on a tick when no builder adds
+    /// to it.
+    ///
+    /// The upgrade table holds the value, and this reads it there.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the wonder decay. `docs/reference/balance.md`
+    #[must_use]
+    pub const fn wonder_decay(&self) -> u32 {
+        self.upgrade_table.wonder_decay()
+    }
+
+    /// Sets the work that wonder work loses on a tick when no builder adds to
+    /// it.
+    ///
+    /// **This is a rate, and a balance row.** The table holds the value, so
+    /// this writes the one declaration and the state hash covers it.[^1] A
+    /// value of zero keeps wonder work while nobody works it. A change of the
+    /// holder of its ground still resets it.[^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the wonder decay. `docs/reference/balance.md`
+    /// [^2]: ADR-0206, a part-built wonder decays when nobody works it, decisions D1 and D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+    pub const fn set_wonder_decay(&mut self, work: u32) {
+        self.upgrade_table.set_wonder_decay(work);
+    }
+
     /// Tells one soldier to build, or to stop building.
     ///
     /// The soldier adds to the upgrade on the tile it stands on, on every
@@ -884,7 +913,7 @@ impl World {
 
         // The key packs the tile above the kind, so the sorted order is tile
         // major and every builder of one tile sits in one run.
-        let mut run: Vec<(TileIdx, UpgradeCategory, i64)> = Vec::new();
+        let mut run: Vec<(TileIdx, UpgradeCategory, i64, Holder)> = Vec::new();
         let mut at = 0usize;
         while at < order.len() {
             let tile = intents[order[at] as usize].tile;
@@ -908,7 +937,13 @@ impl World {
                     total.saturating_add(build_contribution(self.unit_types.row(intent.unit_type)))
                 });
             if work > 0 {
-                run.push((tile, winner, work));
+                let holder = self
+                    .holding
+                    .holders()
+                    .get(tile.0 as usize)
+                    .copied()
+                    .unwrap_or(Holder::NOBODY);
+                run.push((tile, winner, work, holder));
             }
             at = end;
         }
@@ -917,7 +952,7 @@ impl World {
         // produced, so nothing else states which build finished.
         let before: Vec<u8> = run
             .iter()
-            .map(|(tile, _, _)| {
+            .map(|(tile, _, _, _)| {
                 self.upgrades
                     .at(*tile)
                     .map_or(upgrade::NO_LEVEL, |site| site.level)
@@ -1140,6 +1175,47 @@ impl World {
         }
     }
 
+    /// Takes back wonder work that no builder worked on this tick, and resets
+    /// wonder work whose ground changed holder.
+    ///
+    /// Wonder work is progress toward a row that carries a victory claim. Work
+    /// toward every other row keeps what it holds, and a standing level is
+    /// never touched here, so a finished wonder keeps the rule of its own
+    /// record.[^1] [^2]
+    ///
+    /// **The pass runs after the last stage of the step that writes the
+    /// holder column.** The capture, the spread, the elimination and the land
+    /// transfer all run before it, so a change of holder on this tick resets
+    /// the work on this tick. The observation and the game end reader run
+    /// after it, so neither reads work that the ground no longer
+    /// supports.[^3]
+    ///
+    /// **The next build runs after it.** A builder of the new holder therefore
+    /// never adds to work that belonged to the old one, and never finishes a
+    /// wonder on it. A path that wrote the holder column after this pass and
+    /// before the next build would break that, and no such path exists.[^3]
+    ///
+    /// **A wonder that finishes on a tick does not decay on that tick.** The
+    /// build runs first. A finished entry at the top of its category is not
+    /// wonder work, and an entry that the build advanced was attended.[^3]
+    ///
+    /// The pass walks the sparse map and reads one holder for each entry of
+    /// wonder work. It takes no grid and no tile count.[^4]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0206, a part-built wonder decays when nobody works it, decision D3. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+    /// [^2]: ADR-0174, a wonder is a win path and a stock total is not, decision D1. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
+    /// [^3]: ADR-0206, a part-built wonder decays when nobody works it, decision D4. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+    /// [^4]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    pub(super) fn undo_wonder_work(&mut self) {
+        if self.upgrades.is_empty() {
+            return;
+        }
+        self.upgrades
+            .undo_wonder_work(self.holding.holders(), &self.upgrade_table);
+    }
+
     /// Raises the housing of a settlement for each level that the merge
     /// finished.
     ///
@@ -1168,10 +1244,10 @@ impl World {
     /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     fn lodge_the_finished_levels(
         &mut self,
-        run: &[(TileIdx, UpgradeCategory, i64)],
+        run: &[(TileIdx, UpgradeCategory, i64, Holder)],
         before: &[u8],
     ) {
-        for ((tile, _, _), stood) in run.iter().zip(before.iter()) {
+        for ((tile, _, _, _), stood) in run.iter().zip(before.iter()) {
             let Some(site) = self.upgrades.at(*tile) else {
                 continue;
             };

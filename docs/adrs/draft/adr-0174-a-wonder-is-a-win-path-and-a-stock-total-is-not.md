@@ -110,6 +110,12 @@ is a column of the upgrade table, so a caller shapes the path without a rebuild.
 A caller that sets the victory claim to zero takes the path out of the game
 without touching the reader table.
 
+**The work toward a wonder is fragile, and a later record states how.** This
+record reads a finished wonder and states no rule for the work toward one. That
+work loses a stated amount on each tick that no builder adds to it, and it
+returns to nothing when its ground changes holder. A finished wonder keeps every
+rule of this record.[^6]
+
 **The order of the readers puts the wonder ahead of renown and behind
 territory.** Two paths that become true on one tick record the earlier of the
 fixed order. A run that reaches the tick limit with a finished wonder standing
@@ -136,3 +142,4 @@ keeps the stock total reported while the wonder progress now feeds a path.[^3]
 [^3]: ADR-0173, the wealth or wonder path has no reader. `docs/adrs/draft/adr-0173-the-wealth-or-wonder-path-has-no-reader.md`
 [^4]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
 [^5]: ADR-0165, the wealth bar stands above what one settlement can hold. `docs/adrs/draft/adr-0165-the-wealth-bar-stands-above-what-one-settlement-can-hold.md`
+[^6]: ADR-0206, a part-built wonder decays when nobody works it, decisions D1 to D3. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`

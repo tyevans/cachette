@@ -393,9 +393,17 @@ impl World {
     /// **This is the one place a capture happens.** The site keeps its
     /// identity, so a stored handle to a captured site still resolves.[^1]
     ///
+    /// **This function leaves the upgrades on the ground alone.** A standing
+    /// upgrade and work toward a row with no victory claim change hands with
+    /// the ground. Wonder work does not: the spread gives the ground to the
+    /// taker later in this step, and the wonder work pass then resets that
+    /// work because its holder changed.[^2] A part-built order in the queue
+    /// does not change hands, because the taker gave none of the orders.
+    ///
     /// # References
     ///
     /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
+    /// [^2]: ADR-0206, a part-built wonder decays when nobody works it, decision D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
     fn take_site(&mut self, site: Entity, taker: FactionId) -> bool {
         let Some(slot) = self.settlements.slot_of(site) else {
             return false;
@@ -438,10 +446,7 @@ impl World {
             }
         }
         // A queue holds orders the previous faction gave. The taker gave none
-        // of them, so the block is cleared by the same call a loss uses. Work
-        // that stands on the ground is an upgrade on a tile and it is
-        // untouched, so a part-built upgrade changes hands with the ground
-        // and a part-built order does not.
+        // of them, so the block is cleared by the same call a loss uses.
         self.queues.clear_slot(slot);
         // The cohort table indexes the residents by site and by faction, and
         // the faction of every resident has just changed.
@@ -520,7 +525,17 @@ impl World {
     /// afterwards, because the two callers reach this from different points
     /// of a step.
     ///
+    /// **This removes the upgrade on the tile of the site and no other.** The
+    /// rest of the ground the site held goes to another holder or to nobody at
+    /// the next spread. Wonder work on that ground then returns to nothing in
+    /// the wonder work pass, because its holder changed. Every other upgrade
+    /// there changes hands with the ground.[^1]
+    ///
     /// Returns `false` when the identity names no live site.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0206, a part-built wonder decays when nobody works it, decision D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
     fn burn_site(&mut self, site: Entity, razer: FactionId) -> bool {
         let Some(slot) = self.settlements.slot_of(site) else {
             return false;

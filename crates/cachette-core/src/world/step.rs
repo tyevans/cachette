@@ -429,6 +429,11 @@ impl World {
         // [^19]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D3. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
         self.settle_trades(threads)?;
 
+        {
+            let _span = stage::open(Stage::WonderFragility);
+            self.undo_wonder_work();
+        }
+
         // The site rates apply after the barrier of this frame and after the
         // gather resolve, and before level 1 rebuilds.
         //
