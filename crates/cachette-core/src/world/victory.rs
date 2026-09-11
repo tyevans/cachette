@@ -523,7 +523,7 @@ impl World {
     ///
     /// The walk is over the character arena in slot order. It is not a walk
     /// over the units or the tiles.
-    fn best_renown(&self) -> Vec<i64> {
+    pub(super) fn best_renown(&self) -> Vec<i64> {
         let mut best = vec![0i64; usize::from(self.config.faction_count.max(1))];
         for entity in self.characters.iter() {
             let (Some(faction), Some(renown)) = (
