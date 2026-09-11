@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-763**
+**Next number: FND-764**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -21250,6 +21250,40 @@ one resident for one new unit, so the count of units holds. A queue row that
 took more people than it made would break the count. The failure would then
 name neither log.
 
+### FND-763 — A flag passed its own tests and stopped a paid launch, because no test ran the launcher's calls
+
+**Believed.** The readout-only flag was tested at the trainer's command line.
+Its refusal of a linear strategy passed every test. The whole gate passed on
+the merge. The trainer printed a correct plan for a one-box run, so the flag
+looked ready to launch.
+
+**True.** The launcher calls the trainer several times, and one of its steps
+removes `--only`. The instance script asks for the world after that step. A
+call with no `--only` names every row of the strategy table. The refusal then
+checked the whole table and stopped the run on `conquer`. That row is the
+first row of the table, and it trains the linear policy. The instance compiled
+the engine, printed a correct plan, and failed 2.5 minutes after the launch.
+Its launcher then terminated it.
+
+**Evidence.** The launch of 11 September 2026 at 03:46 UTC carried
+`--only wealth-structured --train-readout-only`. The instance console ends
+with `error: the strategy conquer cannot train its readout alone`. On the old
+code, `--print-world` with the same arguments and no `--only` exits with code
+2. The same call with `--only` exits with code 0. The launcher makes seven
+trainer calls, and only this one failed.
+
+**Follows.** The refusal now runs only on the paths that train, or that answer
+for a training run.[^F763A] Those paths are the training run, the baseline
+pass, the plan and the strategy names. A new test drives the launcher's real
+sequence of calls.[^F763B] It runs the dry path of the launcher, with
+stand-ins for the machine. It also runs the instance script, which it takes
+from the launcher itself, so the test follows the launcher when it changes.
+
+**A flag that the launcher passes through must be tested through the
+launcher.** A test at the command line proves that the refusal works. It does
+not prove that the launcher reaches the refusal with the arguments the test
+assumed.[^F763C]
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -21313,3 +21347,6 @@ name neither log.
 [^F762B]: The event layouts, the storm event. `crates/cachette-core/src/event_layout.rs`
 [^F762C]: The storm log reader and the register of logs. `crates/cachette-py/src/world/event_log.rs`
 [^F762D]: The unit type and log tests. `tests/test_unit_types_and_logs.py`
+[^F763A]: The trainer command line, the readout-only refusal of a run. `python/cachette/learn/__main__.py`
+[^F763B]: The test of the trainer calls that the launcher makes. `tests/test_launcher_trainer_calls.py`
+[^F763C]: Testing Rules, drive the real caller, section 5. `.agents/rules/testing.md`
