@@ -2015,7 +2015,7 @@ costs one walk of the settlement slots for each wonder.
 
 **Option B. The nearest city of the holder whose reach covers the tile, and a
 tie goes to the lower slot.** This is the holder decision, restricted to one
-faction.[^DEC283C] It needs the reach of every city, and a reach counts the
+faction.[^DEC278B] It needs the reach of every city, and a reach counts the
 finished upgrades against every city, on every read. It names no city for
 ground that a lease holds. Between two steps it reads a reach that the last
 rewrite did not read.
@@ -5001,7 +5001,6 @@ blocker governs every cost in work.[^BLK7]
 [^DEC282C]: Research report 42, what a policy should be able to see, sections 9 and 12. `docs/research/reports/42-what-a-policy-should-be-able-to-see.md`
 [^DEC283A]: The wonder lookup. `crates/cachette-core/src/world/victory.rs`
 [^DEC283B]: The holding, the nearest settlement of a faction. `crates/cachette-core/src/holding.rs`
-[^DEC283C]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^DEC276G]: Backlog item 0516, give a faction one flat observation array, and declare its layout in a schema. `docs/backlog/complete/0516-give-a-faction-one-flat-observation-array-and-declare-its-layout-in-a-schema.md`
 [^DEC277B]: Research report 30, the published atmospheric math, section 9. `docs/research/reports/30-the-published-atmospheric-math.md`
 [^DEC277C]: ADR-0177, the row axis of a world is a latitude that the world states, decision D1. `docs/adrs/draft/adr-0177-the-row-axis-of-a-world-is-a-latitude-that-the-world-states.md`
