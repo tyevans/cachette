@@ -709,6 +709,17 @@ pub struct Holding {
     ///
     /// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D7. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
     lease_rules: LeaseRules,
+    /// The tiles that a step watches for a change of holder, in ascending
+    /// tile order, each with a mark that says whether its holder changed.
+    ///
+    /// **This is working memory for one step, and not state.** The step
+    /// starts the watch and ends it, so no later step reads it, and it enters
+    /// no state hash.[^1] The list reuses one buffer.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0164, every stored value the step reads enters the state hash, decision D1. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    watch: Vec<(TileIdx, bool)>,
 }
 
 impl Holding {
@@ -728,6 +739,7 @@ impl Holding {
             lease_count: vec![0; tiles],
             leased: Vec::new(),
             lease_rules: LeaseRules::DEFAULT,
+            watch: Vec::new(),
         }
     }
 
@@ -1288,6 +1300,72 @@ impl Holding {
         released
     }
 
+    /// Starts a watch on a list of tiles, given in ascending tile order.
+    ///
+    /// The watch replaces any watch that stands, and every mark starts clear.
+    /// From this call on, each write that changes the holder of a watched
+    /// tile marks that tile. A write that changes the holder, and a later
+    /// write that changes it back, both mark it. The mark therefore says that
+    /// the holder changed at least once, and not only that the two ends
+    /// differ.
+    ///
+    /// **This is how a reader sees a change of holder without an owner.** The
+    /// wonder work pass reads the marks. An upgrade stores no owner, and
+    /// nothing stores one beside it.[^1] [^2]
+    ///
+    /// **Every write of the holder column marks.** The spread, a release and
+    /// a land transfer all reach the column through one write, and that
+    /// write marks. No path writes the column and misses the mark.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D2. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^2]: ADR-0206, a part-built wonder decays when nobody works it, decision D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+    pub fn watch(&mut self, tiles: impl IntoIterator<Item = TileIdx>) {
+        self.watch.clear();
+        self.watch
+            .extend(tiles.into_iter().map(|tile| (tile, false)));
+        debug_assert!(
+            self.watch
+                .windows(2)
+                .all(|pair| pair[0].0 .0 < pair[1].0 .0),
+            "a watch must rise and name each tile once"
+        );
+    }
+
+    /// Returns each watched tile in ascending tile order, with a mark that
+    /// says whether its holder changed since the watch started.
+    #[must_use]
+    pub fn watched(&self) -> &[(TileIdx, bool)] {
+        &self.watch
+    }
+
+    /// Ends the watch. No write marks anything until the next watch starts.
+    ///
+    /// The buffer keeps its capacity, so the next watch allocates nothing
+    /// when it is no larger.
+    pub fn end_watch(&mut self) {
+        self.watch.clear();
+    }
+
+    /// Marks each watched tile that one write moved.
+    ///
+    /// The watch is small, so each moved tile costs one search of it. A
+    /// holding that watches nothing pays one length check for each write.
+    fn mark_watched(&mut self, moved: &[TileIdx]) {
+        if self.watch.is_empty() {
+            return;
+        }
+        for tile in moved {
+            if let Ok(at) = self
+                .watch
+                .binary_search_by_key(&tile.0, |(watched, _)| watched.0)
+            {
+                self.watch[at].1 = true;
+            }
+        }
+    }
+
     /// Writes the decided changes and repairs the three derived parts.
     ///
     /// The write is one scattered store for each change, and it runs on the
@@ -1332,6 +1410,7 @@ impl Holding {
             self.holders[tile.0 as usize] = *holder;
             moved.push(*tile);
         }
+        self.mark_watched(&moved);
         if moved.is_empty() {
             return;
         }

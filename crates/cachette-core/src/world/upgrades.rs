@@ -913,7 +913,7 @@ impl World {
 
         // The key packs the tile above the kind, so the sorted order is tile
         // major and every builder of one tile sits in one run.
-        let mut run: Vec<(TileIdx, UpgradeCategory, i64, Holder)> = Vec::new();
+        let mut run: Vec<(TileIdx, UpgradeCategory, i64)> = Vec::new();
         let mut at = 0usize;
         while at < order.len() {
             let tile = intents[order[at] as usize].tile;
@@ -937,13 +937,7 @@ impl World {
                     total.saturating_add(build_contribution(self.unit_types.row(intent.unit_type)))
                 });
             if work > 0 {
-                let holder = self
-                    .holding
-                    .holders()
-                    .get(tile.0 as usize)
-                    .copied()
-                    .unwrap_or(Holder::NOBODY);
-                run.push((tile, winner, work, holder));
+                run.push((tile, winner, work));
             }
             at = end;
         }
@@ -952,7 +946,7 @@ impl World {
         // produced, so nothing else states which build finished.
         let before: Vec<u8> = run
             .iter()
-            .map(|(tile, _, _, _)| {
+            .map(|(tile, _, _)| {
                 self.upgrades
                     .at(*tile)
                     .map_or(upgrade::NO_LEVEL, |site| site.level)
@@ -1199,8 +1193,13 @@ impl World {
     /// build runs first. A finished entry at the top of its category is not
     /// wonder work, and an entry that the build advanced was attended.[^3]
     ///
-    /// The pass walks the sparse map and reads one holder for each entry of
-    /// wonder work. It takes no grid and no tile count.[^4]
+    /// **The pass reads the watch, and it ends it.** The holding marked each
+    /// watched tile whose holder changed after the watch started. The pass
+    /// resets the wonder work on a marked tile, and the watch then stops, so
+    /// no mark outlives the step.[^5]
+    ///
+    /// The pass walks the sparse map and the watch together. It takes no grid
+    /// and no tile count.[^4]
     ///
     /// # References
     ///
@@ -1208,12 +1207,50 @@ impl World {
     /// [^2]: ADR-0174, a wonder is a win path and a stock total is not, decision D1. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
     /// [^3]: ADR-0206, a part-built wonder decays when nobody works it, decision D4. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
     /// [^4]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    /// [^5]: ADR-0206, a part-built wonder decays when nobody works it, decision D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
     pub(super) fn undo_wonder_work(&mut self) {
-        if self.upgrades.is_empty() {
-            return;
+        if !self.upgrades.is_empty() {
+            self.upgrades
+                .undo_wonder_work(self.holding.watched(), &self.upgrade_table);
         }
-        self.upgrades
-            .undo_wonder_work(self.holding.holders(), &self.upgrade_table);
+        self.holding.end_watch();
+    }
+
+    /// Starts the watch on the ground under every entry of wonder work.
+    ///
+    /// Wonder work returns to nothing when its ground changes holder.[^1] An
+    /// upgrade stores no owner, and nothing stores one beside it, so the step
+    /// cannot compare a stored holder with the column.[^2] The holding
+    /// watches these tiles instead. It marks each one whose holder changes
+    /// before the wonder work pass reads the marks.
+    ///
+    /// **The watch starts after the build and before the first stage that
+    /// writes the holder column.** Work that the build starts on this tick is
+    /// therefore watched too. A capture, a raze, a release and a land
+    /// transfer all write the column after this point, and each of them marks
+    /// the tile. A change that returns to the first holder inside the step
+    /// marks it as well.[^1]
+    ///
+    /// **No stage writes the holder column between the wonder work pass and
+    /// this call on the next step, and no verb writes it between two steps.**
+    /// A write there would be seen by nothing. A new writer of the column
+    /// must run after this call and before the pass.[^3]
+    ///
+    /// **The watch is working memory for one step.** The wonder work pass
+    /// ends it. It is not world state, and it enters no state hash, because
+    /// no later step reads it.[^4] It follows the entries of wonder work,
+    /// which are sparse, and it reuses one buffer.[^5]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0206, a part-built wonder decays when nobody works it, decision D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+    /// [^2]: ADR-0180, a site changes hands or the taker destroys it, decision D2. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+    /// [^3]: ADR-0206, a part-built wonder decays when nobody works it, decision D4. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+    /// [^4]: ADR-0164, every stored value the step reads enters the state hash, decision D1. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
+    /// [^5]: ADR-0090, a tile upgrade is stored sparsely, as the difference from the generated world, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+    pub(super) fn watch_wonder_ground(&mut self) {
+        self.holding
+            .watch(self.upgrades.wonder_work_tiles(&self.upgrade_table));
     }
 
     /// Raises the housing of a settlement for each level that the merge
@@ -1244,10 +1281,10 @@ impl World {
     /// [^4]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     fn lodge_the_finished_levels(
         &mut self,
-        run: &[(TileIdx, UpgradeCategory, i64, Holder)],
+        run: &[(TileIdx, UpgradeCategory, i64)],
         before: &[u8],
     ) {
-        for ((tile, _, _, _), stood) in run.iter().zip(before.iter()) {
+        for ((tile, _, _), stood) in run.iter().zip(before.iter()) {
             let Some(site) = self.upgrades.at(*tile) else {
                 continue;
             };

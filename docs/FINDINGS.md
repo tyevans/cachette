@@ -22,7 +22,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^1]
 
-**Next number: FND-766**
+**Next number: FND-768**
 
 **This line answers from merged history, so it cannot see a number that a
 branch has taken and not merged.** A dispatcher issues ranges above it for that
@@ -21343,6 +21343,34 @@ list.** Check each one against the sources the engine holds before calling it
 unfillable. **Read the selection of a token set, and not its channel list,
 before you say which subjects it holds.**
 
+### FND-767 — A merged worker added an owner to every upgrade, and a record forbids it
+
+**Believed.** The fragile wonder rule had to know when the ground under wonder
+work changed holder. The change that made wonder work fragile stored a holder
+on every upgrade entry for that purpose. The merge wrote it, the state hash
+covered it, and the wonder pass compared it with the holder column.[^F767A]
+
+**True.** A record forbids an owner on an upgrade or beside it. Its reviewer
+test calls an upgrade that carries a faction of its own a violation.[^F767B]
+The field broke that test on every entry, and not only on wonder work. It also
+compared only two ends, so it missed ground that changed holder and changed
+back inside one step.
+
+**Evidence.** One test builds a finished wonder in two worlds with the island
+faction swapped, and a gift ends the ground with one faction in both. With
+the field put back, the two entries differ only in the stored holder. A second
+test gives the ground to nobody and back in one step. With the field put back,
+the work stays.[^F767C]
+
+**Follows.** The step now watches the tiles under wonder work for one step.
+The one write of the holder column marks a watched tile when it changes the
+holder there. No upgrade stores a faction, and the watch enters no state
+hash.[^F767D]
+
+**A rule that must see a change can watch the change.** A stored copy of the
+old value is a second declaration of the value, and a second declaration is
+the shape that the defect register names first.[^F590A]
+
 ## References
 
 [^F735A]: Report 44, a family of tunable controllers, and how to rank them. `docs/research/reports/44-a-family-of-tunable-controllers.md`
@@ -21417,3 +21445,7 @@ before you say which subjects it holds.**
 [^F764B]: The audit of the observation, section 3.4. `docs/research/what-a-policy-cannot-see.md`
 [^F764C]: The token tests, the wonder on the ground of one settlement. `crates/cachette-core/tests/a_faction_reads_its_frontier_and_its_tokens.rs`
 [^F764D]: The wonder lookup. `crates/cachette-core/src/world/victory.rs`
+[^F767A]: The commit that made part-built wonder work fragile. `git show dba095b6`
+[^F767B]: ADR-0180, a site changes hands or the taker destroys it, decision D2. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+[^F767C]: The fragile wonder tests, the faction test and the round trip test. `crates/cachette-core/tests/a_part_built_wonder_is_fragile.rs`
+[^F767D]: ADR-0206, a part-built wonder decays when nobody works it, decision D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
