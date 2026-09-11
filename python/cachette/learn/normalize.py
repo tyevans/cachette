@@ -45,6 +45,7 @@ References
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -79,6 +80,21 @@ REFERENCE_SEED_START = 0
 _HELD: dict[tuple[object, ...], FeatureNormalizer] = {}
 
 
+def world_only(config: EnvConfig) -> EnvConfig:
+    """Give the configuration of the world alone, with no opponent seated.
+
+    **A normalizer is a function of the world and not of who plays it.** An
+    opponent seat changes what the reference sample plays, so a sample that
+    seated one would give a run its own normalizer and refuse every stored
+    file that another run wrote for the same world.
+
+    This is the one place that strips the seats. Every caller of this module
+    therefore reads one normalizer for one world, whether it seats an
+    opponent or not.
+    """
+    return replace(config, opponents=())
+
+
 def reference_observations(
     config: EnvConfig,
     scoring: Scoring,
@@ -98,9 +114,14 @@ def reference_observations(
     it reached. A seed the engine refuses to generate a world for contributes
     nothing and moves nothing else.
 
+    The sample plays the world alone. **An opponent seat of the caller is
+    stripped here**, because a normalizer is a function of the world and not
+    of who plays it.
+
     Raises ``ValueError`` when the whole sample reached no decision. A
     normalizer over no rows states nothing.
     """
+    config = world_only(config)
     seeds = viable_seeds(config, episodes, seed_start)
     env = Env(config, scoring)
     rows: list[np.ndarray] = []
@@ -160,7 +181,12 @@ def reference_normalizer(
     The cache is keyed on the configuration and on every constant of the
     derivation. **The scoring is not in the key**, because a scoring reaches
     no choice of the world and therefore no observation the sample holds.
+
+    **The opponent seats are not in the key either.** The sample strips them,
+    so a run that seats an opponent and a run that seats none derive one
+    normalizer and read each other's stored files.
     """
+    config = world_only(config)
     key: tuple[object, ...] = (config, episodes, decisions, draw_seed, seed_start)
     held = _HELD.get(key)
     if held is None:
@@ -189,4 +215,5 @@ __all__ = [
     "forget_normalizers",
     "reference_normalizer",
     "reference_observations",
+    "world_only",
 ]
