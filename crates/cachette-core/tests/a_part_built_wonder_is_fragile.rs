@@ -23,7 +23,8 @@
 
 use cachette_core::holding::{Holder, ReachRules};
 use cachette_core::site::SiegeRules;
-use cachette_core::upgrade::{UpgradeCategory, BUILD_RATE, WONDER_DECAY};
+use cachette_core::trade::Consideration;
+use cachette_core::upgrade::{UpgradeCategory, UpgradeSite, BUILD_RATE, WONDER_DECAY};
 use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
 
 /// The extent of the worlds below.
@@ -113,9 +114,9 @@ fn step_until(field: &mut World, bound: u32, mut done: impl FnMut(&World) -> boo
     ran
 }
 
-/// What a fixture holds: an island city of faction zero, a rival city far
-/// away, and a full tile of builders that has built on the ground beside the
-/// island for a few ticks.
+/// What a fixture holds: an island city, a rival city far away, and a full
+/// tile of builders that has built on the ground beside the island for a few
+/// ticks.
 struct Fixture {
     field: World,
     seat: Axial,
@@ -124,17 +125,30 @@ struct Fixture {
     builders: Vec<Entity>,
 }
 
-/// Builds the fixture, or returns `None` when the seed cannot hold it.
+/// The places of a fixture world.
 ///
-/// The fixture holds the builders on their tile by the build order, and it
-/// keeps the choice pass away from the run, so every builder adds work on
-/// every tick of the build.
+/// The seat is an island. The ground is the nearest open tile to it. The
+/// rival city and the resident of the seat stand far from both, and far from
+/// each other.
+struct Places {
+    seat: Axial,
+    ground: Axial,
+    rival: Axial,
+    away: Axial,
+}
+
+/// Builds a world of these fixtures with nothing founded in it, or returns
+/// `None` when the seed cannot hold one.
+///
+/// The fixture keeps the choice pass away from the run, so a unit stays
+/// where the fixture puts it. Every city reaches every tile, so the nearest
+/// city decides the holder of a tile.
 ///
 /// **The caller drives both factions.** The built-in controller orders every
 /// idle unit of its faction onto work on a schedule of its own. A builder a
 /// test stopped would then build again, and the test would read the
 /// controller and not the rule.
-fn fixture(seed: u64, category: UpgradeCategory, wonder_work: u32) -> Option<Fixture> {
+fn open_world(seed: u64, wonder_work: u32) -> Option<World> {
     let mut field = World::new(WorldConfig {
         width: EXTENT,
         height: EXTENT,
@@ -154,47 +168,108 @@ fn fixture(seed: u64, category: UpgradeCategory, wonder_work: u32) -> Option<Fix
     field.set_reach_rules(ReachRules::new(REACH_TOGETHER, 1, REACH_TOGETHER));
     field.set_siege_rules(SiegeRules::new(SIEGE_WORK, SIEGE_MULTIPLE));
     assert!(field.set_wonder_work(wonder_work));
-    let seat = island(&field)?;
-    let ground = addresses(&field)
+    Some(field)
+}
+
+/// Returns the places of a fixture world, or `None` when the world has no
+/// island with open ground beside it.
+fn places(field: &World) -> Option<Places> {
+    let seat = island(field)?;
+    let ground = addresses(field)
         .into_iter()
         .filter(|address| *address != seat && field.admits_a_unit(*address))
         .min_by_key(|address| address.distance(seat))?;
     let far = |address: &Axial, from: &[Axial]| {
         field.admits_a_unit(*address) && from.iter().all(|place| address.distance(*place) > 8)
     };
-    let rival = addresses(&field)
+    let rival = addresses(field)
         .into_iter()
         .find(|address| far(address, &[seat, ground]))?;
-    let away = addresses(&field)
+    let away = addresses(field)
         .into_iter()
         .find(|address| far(address, &[seat, ground, rival]))?;
-    field.found_group_at(rival, 1, FactionId(1)).ok()?;
-    let founding = field.found_group_at(seat, 1, FactionId(0)).ok()?;
+    Some(Places {
+        seat,
+        ground,
+        rival,
+        away,
+    })
+}
+
+/// Founds the rival city and then the island city, steps once, and returns
+/// the world, its places and the island city.
+///
+/// Returns `None` when the ground beside the island does not go to the owner
+/// of the island.
+fn seated(
+    seed: u64,
+    wonder_work: u32,
+    owner: FactionId,
+    rival: FactionId,
+) -> Option<(World, Places, Entity)> {
+    let mut field = open_world(seed, wonder_work)?;
+    let at = places(&field)?;
+    field.found_group_at(at.rival, 1, rival).ok()?;
+    let founding = field.found_group_at(at.seat, 1, owner).ok()?;
     let site = founding.settlement();
     let resident = *founding.people().first()?;
-    field.place_soldier(resident, away).ok()?;
+    field.place_soldier(resident, at.away).ok()?;
     field.step(1).ok()?;
-    if holder_of(&field, ground).faction() != Some(FactionId(0)) {
+    if holder_of(&field, at.ground).faction() != Some(owner) {
         return None;
     }
+    Some((field, at, site))
+}
+
+/// Fills one tile with builders of one faction, each with an order to build
+/// one category there.
+///
+/// The build order holds each builder on its tile, so every builder adds
+/// work on every tick of the build.
+fn crew(
+    field: &mut World,
+    ground: Axial,
+    owner: FactionId,
+    category: UpgradeCategory,
+) -> Option<Vec<Entity>> {
     let room = field.tile_capacity(ground)?;
     let mut builders = Vec::new();
     for _ in 0..room {
-        let unit = field.spawn_soldier(ground, FactionId(0)).ok()?;
+        let unit = field.spawn_soldier(ground, owner).ok()?;
         field.order_build(unit, category).ok()?;
         builders.push(unit);
     }
+    Some(builders)
+}
+
+/// Builds the fixture with one faction on the island and the other far away,
+/// or returns `None` when the seed cannot hold it.
+fn fixture_of(
+    seed: u64,
+    category: UpgradeCategory,
+    wonder_work: u32,
+    owner: FactionId,
+    rival: FactionId,
+) -> Option<Fixture> {
+    let (mut field, at, site) = seated(seed, wonder_work, owner, rival)?;
+    let builders = crew(&mut field, at.ground, owner, category)?;
     for _ in 0..BUILD_TICKS {
         field.step(1).ok()?;
     }
-    field.upgrade_at(ground)?;
+    field.upgrade_at(at.ground)?;
     Some(Fixture {
         field,
-        seat,
+        seat: at.seat,
         site,
-        ground,
+        ground: at.ground,
         builders,
     })
+}
+
+/// Builds the fixture with faction zero on the island, or returns `None`
+/// when the seed cannot hold it.
+fn fixture(seed: u64, category: UpgradeCategory, wonder_work: u32) -> Option<Fixture> {
+    fixture_of(seed, category, wonder_work, FactionId(0), FactionId(1))
 }
 
 /// Returns the first seed that builds the fixture, or fails the test.
@@ -513,4 +588,326 @@ fn the_decay_enters_the_state_hash() {
     );
     first.set_wonder_decay(WONDER_DECAY + 1);
     assert_eq!(first.state_hash().finish(), second.state_hash().finish());
+}
+
+/// The ticks a land contract in these fixtures has before its deadline.
+///
+/// Every contract here settles on the first step after it binds, so this only
+/// has to outlast the fixture.
+const GIFT_TERM: u32 = 1000;
+
+/// Returns an open tile that one faction holds, that carries no city, and
+/// that is none of the tiles named.
+fn held_tile(field: &World, faction: FactionId, except: &[Axial]) -> Option<Axial> {
+    addresses(field).into_iter().find(|address| {
+        field.admits_a_unit(*address)
+            && !except.contains(address)
+            && field.settlement_on(*address).is_none()
+            && holder_of(field, *address).faction() == Some(faction)
+    })
+}
+
+/// Binds a contract by which one faction owes another one tile of ground,
+/// for one relation step.
+///
+/// No unit carries either side, so the tile changes hands at the settlement
+/// of contracts on the next step, and that settlement runs after the spread.
+/// Each party speaks only while one of its units stands on the ground of the
+/// other, so this spawns one unit for each party, away from the named tiles.
+fn bind_a_gift(
+    field: &mut World,
+    giver: FactionId,
+    taker: FactionId,
+    gift: Axial,
+    except: &[Axial],
+) {
+    let tile = field
+        .grid()
+        .index_of(gift)
+        .expect("the gift is inside the world");
+    let there = held_tile(field, taker, except).expect("the taker holds open ground");
+    field
+        .spawn_soldier(there, giver)
+        .expect("the ground of the taker admits a unit");
+    field
+        .offer_consideration(
+            giver,
+            taker,
+            Consideration::land(vec![tile]),
+            Consideration::relation(0, 1),
+            GIFT_TERM,
+        )
+        .expect("the giver holds the gift and stands on the ground of the taker");
+    let here = held_tile(field, giver, except).expect("the giver holds open ground");
+    field
+        .spawn_soldier(here, taker)
+        .expect("the ground of the giver admits a unit");
+    field
+        .accept_trade(taker, giver)
+        .expect("the taker stands on the ground of the giver");
+}
+
+/// Builds the fixture of a finished wonder with one faction on the island,
+/// and takes its builders away.
+fn finished_and_left(seed: u64, owner: FactionId, rival: FactionId) -> Fixture {
+    let mut built = fixture_of(seed, UpgradeCategory::WONDER, FINISHED_WORK, owner, rival)
+        .expect("the seed builds the fixture with either faction on the island");
+    assert_eq!(
+        built.field.finished_upgrade(built.ground),
+        Some(UpgradeCategory::WONDER),
+        "the fixture never finished the wonder"
+    );
+    for unit in &built.builders {
+        assert!(built.field.despawn_soldier(*unit));
+    }
+    built
+}
+
+/// Two worlds differ only in which faction built a standing upgrade, and the
+/// ground under it ends with one faction. The two upgrades must be one value.
+///
+/// **This is the reviewer test of the record that an upgrade changes hands
+/// with the ground.** It fails when an upgrade carries a faction of its
+/// own.[^1] A holder stored on the entry at the build differs between the two
+/// worlds, and nothing rewrites it on a standing level, so the two entries
+/// differ.
+///
+/// The ground changes hands by a gift, and the gift runs after the spread, so
+/// the island city does not take it back on the tick it is read.
+///
+/// **The pattern below names every field of the entry and holds no rest
+/// pattern.** A field added to the entry therefore stops this file from
+/// compiling. The author of that field must then answer the record here, in
+/// the pattern, before anything else runs.
+///
+/// # References
+///
+/// [^1]: ADR-0180, a site changes hands or the taker destroys it, decision D2. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
+#[test]
+fn an_upgrade_carries_no_faction_of_its_own() {
+    let seed = any_seed(UpgradeCategory::WONDER, FINISHED_WORK);
+    let (zero, one) = (FactionId(0), FactionId(1));
+    let mut kept = finished_and_left(seed, zero, one);
+    let mut given = finished_and_left(seed, one, zero);
+    assert_eq!(
+        kept.ground, given.ground,
+        "the two worlds put the ground in two places"
+    );
+    let ground = given.ground;
+    bind_a_gift(&mut given.field, one, zero, ground, &[given.seat, ground]);
+    kept.field.step(1).expect("the step must run");
+    given.field.step(1).expect("the step must run");
+    for field in [&kept.field, &given.field] {
+        assert_eq!(
+            holder_of(field, ground).faction(),
+            Some(zero),
+            "the ground does not end with one faction in both worlds"
+        );
+    }
+    let site = given
+        .field
+        .upgrade_at(ground)
+        .expect("the gift took the upgrade off the ground");
+    assert_eq!(
+        kept.field.upgrade_at(ground),
+        Some(site),
+        "two worlds that differ only in which faction built a standing upgrade hold two different upgrades"
+    );
+    let UpgradeSite {
+        tile,
+        category,
+        level,
+        progress,
+        condition,
+    } = site;
+    assert_eq!(given.field.grid().index_of(ground), Some(tile));
+    assert_eq!(category, UpgradeCategory::WONDER);
+    assert!(level > 0, "the wonder does not stand");
+    assert_eq!(
+        progress.0, 0,
+        "a wonder at the top of its category holds work"
+    );
+    assert!(condition.0 > 0, "a standing wonder holds no condition");
+    assert!(kept.field.check_invariants());
+    assert!(given.field.check_invariants());
+}
+
+/// Runs a world in which a rival owes the island faction the ground under its
+/// wonder work, and returns the holder of that ground, the work on it after
+/// the gift settles, and the work before.
+///
+/// The rival holds the ground first, because the island city does not stand
+/// yet, and it binds itself to give the ground away. The island city then
+/// takes the ground by the spread, and its builders put work on it.
+///
+/// When the ground is lost, the spread of the last step gives it to nobody,
+/// and the gift gives it back to the island faction later in the same step.
+/// The two ends of that step then name one holder.
+fn gift_back(seed: u64, lose_the_ground: bool) -> (Holder, Option<i64>, i64) {
+    let (island, rival) = (FactionId(0), FactionId(1));
+    let mut field = open_world(seed, PART_BUILT_WORK).expect("the seed opens a world");
+    let at = places(&field).expect("the seed has an island");
+    field
+        .found_group_at(at.rival, 1, rival)
+        .expect("the rival city founds");
+    field.step(1).expect("the step must run");
+    assert_eq!(
+        holder_of(&field, at.ground).faction(),
+        Some(rival),
+        "the rival does not hold the ground before the island city stands"
+    );
+    let tile = field
+        .grid()
+        .index_of(at.ground)
+        .expect("the ground is inside the world");
+    let visitor = field
+        .spawn_soldier(at.ground, island)
+        .expect("the ground admits a unit");
+    field
+        .offer_consideration(
+            island,
+            rival,
+            Consideration::relation(0, 1),
+            Consideration::land(vec![tile]),
+            GIFT_TERM,
+        )
+        .expect("the rival holds the ground, and a unit of the island faction stands on it");
+    assert!(field.despawn_soldier(visitor));
+    let founding = field
+        .found_group_at(at.seat, 1, island)
+        .expect("the island admits a city");
+    let resident = *founding.people().first().expect("the city has a resident");
+    field
+        .place_soldier(resident, at.away)
+        .expect("the far tile admits a unit");
+    field.step(1).expect("the step must run");
+    assert_eq!(
+        holder_of(&field, at.ground).faction(),
+        Some(island),
+        "the island city did not take the ground beside it"
+    );
+    let builders = crew(&mut field, at.ground, island, UpgradeCategory::WONDER)
+        .expect("the ground admits builders");
+    for _ in 0..BUILD_TICKS {
+        field.step(1).expect("the step must run");
+    }
+    field.set_wonder_decay(0);
+    for unit in &builders {
+        assert!(field.despawn_soldier(*unit));
+    }
+    let built = work_at(&field, at.ground).expect("the builders made an entry");
+    assert!(built > 0);
+    let there = held_tile(&field, island, &[at.seat, at.ground])
+        .expect("the island faction holds open ground");
+    field
+        .spawn_soldier(there, rival)
+        .expect("the ground of the island faction admits a unit");
+    field
+        .accept_trade(rival, island)
+        .expect("the rival stands on the ground of the island faction");
+    if lose_the_ground {
+        field.set_reach_rules(ReachRules::new(0, 1, 0));
+    }
+    field.step(1).expect("the step must run");
+    assert!(field.check_invariants());
+    (
+        holder_of(&field, at.ground),
+        work_at(&field, at.ground),
+        built,
+    )
+}
+
+/// Ground that changes holder and changes back inside one step resets its
+/// wonder work.
+///
+/// **The rule reads each change of the holder column, and not only the two
+/// ends of the step.**[^1] The spread gives the ground to nobody, and a gift
+/// of land gives it back to the same faction before the wonder work pass
+/// runs. A rule that compared the holder at the start of the step with the
+/// holder at the pass would see one holder and keep the work.
+///
+/// The control binds the same gift and keeps the ground. The gift then names
+/// the holder the ground already has, so the ground never moves, and the work
+/// stays. That shows that the gift alone does not reset the work.
+///
+/// # References
+///
+/// [^1]: ADR-0206, a part-built wonder decays when nobody works it, decision D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+#[test]
+fn ground_that_changes_holder_and_back_in_one_step_resets_wonder_work() {
+    let seed = any_seed(UpgradeCategory::WONDER, PART_BUILT_WORK);
+    let (holder, work, built) = gift_back(seed, false);
+    assert_eq!(
+        holder.faction(),
+        Some(FactionId(0)),
+        "the gift moved the ground away from the island faction"
+    );
+    assert_eq!(
+        work,
+        Some(built),
+        "a gift of ground that the faction already holds changed its wonder work"
+    );
+    let (holder, work, _) = gift_back(seed, true);
+    assert_eq!(
+        holder.faction(),
+        Some(FactionId(0)),
+        "the gift did not give the ground back after the spread took it"
+    );
+    assert_eq!(
+        work, None,
+        "ground that changed holder and changed back in one step kept its wonder work"
+    );
+}
+
+/// Runs the first tick of a wonder build, and returns the holder of the
+/// ground and the work on it after that tick.
+///
+/// When the ground is lost, the spread of that tick gives it to nobody after
+/// the build has made the first work.
+fn first_tick_of_a_build(seed: u64, lose_the_ground: bool) -> (Holder, Option<i64>) {
+    let (mut field, at, _) = seated(seed, PART_BUILT_WORK, FactionId(0), FactionId(1))
+        .expect("the seed builds the fixture");
+    field.set_wonder_decay(0);
+    assert_eq!(field.upgrade_at(at.ground), None);
+    crew(&mut field, at.ground, FactionId(0), UpgradeCategory::WONDER)
+        .expect("the ground admits builders");
+    if lose_the_ground {
+        field.set_reach_rules(ReachRules::new(0, 1, 0));
+    }
+    field.step(1).expect("the step must run");
+    assert!(field.check_invariants());
+    (holder_of(&field, at.ground), work_at(&field, at.ground))
+}
+
+/// Work that the build starts on the tick its ground changes holder returns to
+/// nothing on that tick.
+///
+/// **The watch on the ground starts after the build.** The build makes the
+/// entry, and the spread then moves the ground in the same step. A watch that
+/// started before the build would not know the entry, and the new holder
+/// would inherit the work.[^1]
+///
+/// The control runs the same tick with the ground kept, and the work stands.
+///
+/// # References
+///
+/// [^1]: ADR-0206, a part-built wonder decays when nobody works it, decision D4. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+#[test]
+fn work_the_build_starts_on_the_tick_its_ground_changes_holder_resets() {
+    let seed = any_seed(UpgradeCategory::WONDER, PART_BUILT_WORK);
+    let (holder, work) = first_tick_of_a_build(seed, false);
+    assert_eq!(holder.faction(), Some(FactionId(0)));
+    assert!(
+        work.is_some_and(|work| work > 0),
+        "the first tick of the build made no work, so the test reads nothing"
+    );
+    let (holder, work) = first_tick_of_a_build(seed, true);
+    assert!(
+        holder.is_nobody(),
+        "the ground is still held with no city in reach"
+    );
+    assert_eq!(
+        work, None,
+        "work the build started on the tick its ground fell to nobody outlived that tick"
+    );
 }

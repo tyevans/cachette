@@ -297,6 +297,7 @@ impl World {
             let _span = stage::open(Stage::UpgradeWear);
             self.wear_upgrades();
         }
+        self.watch_wonder_ground();
 
         // The cities rewrite the holder column here, after the barrier of
         // this frame and after the build above. The reach of a city counts
