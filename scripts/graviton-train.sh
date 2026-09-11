@@ -65,6 +65,13 @@
 #                             receives it on the first attempt only. A restart
 #                             after a fault resumes from the resume point,
 #                             which then holds a newer centre
+#   CACHETTE_TRAIN_OPPONENT   one or more weight files on this machine,
+#                             separated by spaces or colons. Each file holds
+#                             the next seat after the learner in every world
+#                             the run plays. The launcher copies each file to
+#                             the instance, and the trainer receives it as
+#                             --opponent on every attempt. CACHETTE_TRAIN_ARGS
+#                             must not name --opponent
 #
 # What it needs: the AWS command line tool, authenticated, with permission
 # to run an instance, and `ssh`, `scp`, `tar`, `git` and `python3` here.
@@ -156,6 +163,55 @@ refuse_out_argument() {
                 return 1
                 ;;
         esac
+    done
+    return 0
+}
+
+# Refuses an opponent file that cannot reach the instance, before anything is
+# spent.
+#
+# **An opponent file is a path on this machine, and the instance holds no copy
+# of it unless the launcher sends one.** An `--opponent` in the run arguments
+# names a path the instance does not have, so the launcher refuses it, and a
+# prefix of it as well. A prefix of `--opponent` needs four characters, because
+# `--o` also begins `--only` and `--out`.
+#
+# Each file goes to the instance under its own name, so the name must be a
+# plain name, and two different files must not share one.
+refuse_opponent() {
+    local arguments="$1"
+    shift
+    local opponent="--opponent"
+    local word option file other
+    local -a words
+    read -r -a words <<<"$arguments"
+    for word in ${words[@]+"${words[@]}"}; do
+        option="${word%%=*}"
+        if [ "${#option}" -ge 4 ] && [ "${opponent:0:${#option}}" = "$option" ]; then
+            printf 'The run arguments name %s. Set CACHETTE_TRAIN_OPPONENT instead, so the launcher sends the file.\n' \
+                "$word" >&2
+            return 1
+        fi
+    done
+    for file in "$@"; do
+        if [ ! -f "$file" ]; then
+            printf 'CACHETTE_TRAIN_OPPONENT names %s, and no file is there.\n' "$file" >&2
+            return 1
+        fi
+        case "${file##*/}" in
+            *[!A-Za-z0-9._-]*)
+                printf 'The opponent file name %s holds a character other than a letter, a digit, a point, a dash or an underscore.\n' \
+                    "${file##*/}" >&2
+                return 1
+                ;;
+        esac
+        for other in "$@"; do
+            if [ "${other##*/}" = "${file##*/}" ] && ! [ "$other" -ef "$file" ]; then
+                printf 'Two opponent files share the name %s, and the instance holds one file for each name.\n' \
+                    "${file##*/}" >&2
+                return 1
+            fi
+        done
     done
     return 0
 }
@@ -311,12 +367,23 @@ train_args="${CACHETTE_TRAIN_ARGS:-$default_args}"
 # the root of the repository.** A relative path would then name another file,
 # so the path becomes absolute once it is known to exist.
 START_FROM="${CACHETTE_TRAIN_START_FROM:-}"
+opponent_list="${CACHETTE_TRAIN_OPPONENT:-}"
+read -r -a OPPONENTS <<<"${opponent_list//:/ }"
+opponent_args=()
 if [ "$mode" = "run" ] || [ "$mode" = "dry" ]; then
     refuse_out_argument "$train_args" || exit 1
     refuse_start_from "$train_args" "$START_FROM" || exit 1
+    refuse_opponent "$train_args" ${OPPONENTS[@]+"${OPPONENTS[@]}"} || exit 1
     if [ -n "$START_FROM" ]; then
         START_FROM="$(cd "$(dirname "$START_FROM")" && pwd)/${START_FROM##*/}"
     fi
+    resolved=()
+    for file in ${OPPONENTS[@]+"${OPPONENTS[@]}"}; do
+        file="$(cd "$(dirname "$file")" && pwd)/${file##*/}"
+        resolved+=("$file")
+        opponent_args+=(--opponent "$file")
+    done
+    OPPONENTS=(${resolved[@]+"${resolved[@]}"})
 fi
 
 # **The trainer answers the world.** The extent, the faction count and
@@ -801,7 +868,8 @@ cores="$(aws ec2 describe-instance-types --region "$REGION" \
 plan_errors="$out_dir/plan.err"
 plan="$(cd "$root" && uv run python -m cachette.learn \
     --print-plan --cores "$cores" --wall-minutes "$MAX_MINUTES" \
-    $train_args ${START_FROM:+--start-from "$START_FROM"} 2>"$plan_errors")" \
+    $train_args ${START_FROM:+--start-from "$START_FROM"} \
+    ${opponent_args[@]+"${opponent_args[@]}"} 2>"$plan_errors")" \
     || plan=""
 [ -n "$plan" ] || die "The trainer could not state the plan of this run.
 $(tail -3 "$plan_errors" 2>/dev/null)
@@ -847,6 +915,10 @@ start_line=""
 if [ -n "$START_FROM" ]; then
     start_line="  start from    $START_FROM, on the first attempt only. A restart
                 resumes from the resume point, which then holds a newer centre"
+fi
+if [ "${#OPPONENTS[@]}" -gt 0 ]; then
+    start_line="${start_line:+$start_line
+}  opponent      ${OPPONENTS[*]}, in the seats after the learner, on every attempt"
 fi
 
 size_warning=""
@@ -1091,6 +1163,18 @@ if [ -n "$START_FROM" ]; then
     scp "${ssh_options[@]}" "$START_FROM" "$remote:start-from/$start_name" >/dev/null
 fi
 
+# **An opponent file travels for the same reason, to a directory of its own.**
+# It is part of every attempt, and not of the first attempt only.
+opponent_names=""
+if [ "${#OPPONENTS[@]}" -gt 0 ]; then
+    say "Sending the opponent files. They hold the seats after the learner"
+    ssh "${ssh_options[@]}" "$remote" "mkdir -p opponent" >/dev/null
+    for file in "${OPPONENTS[@]}"; do
+        opponent_names="${opponent_names:+$opponent_names }${file##*/}"
+        scp "${ssh_options[@]}" "$file" "$remote:opponent/${file##*/}" >/dev/null
+    done
+fi
+
 # --------------------------------------------------------------------- remote
 
 cat > "$out_dir/remote.sh" <<'REMOTE'
@@ -1295,11 +1379,17 @@ measured_rate="$(awk -F'\t' '
     /^#/ { next }
     column && NF >= column { rate = $column }
     END { if (rate) print rate }' /tmp/throughput.txt)"
+# **An opponent holds its seat on every attempt.** It is part of the run and
+# not of its first centre, so a restart that resumes still plays against it.
+opponent=""
+for name in ${OPPONENT_NAMES:-}; do
+    opponent="$opponent --opponent $HOME/opponent/$name"
+done
 if [ -n "$measured_rate" ]; then
     uv run --no-sync python -m cachette.learn --print-plan \
         --cores "$cores" --wall-minutes "${WALL_MINUTES:-0}" \
         --ticks-for-each-worker "$measured_rate" --only "$(printf '%s' "$names" | tr ' ' ',')" \
-        $TRAIN_ARGS 2>&1 \
+        $TRAIN_ARGS $opponent 2>&1 \
         | sed 's/^/# measured plan /' | tee -a runs/learn/train.log || true
 fi
 
@@ -1373,7 +1463,7 @@ all_names="$(printf '%s' "$names" | tr ' ' ',')"
     while :; do
         started="$(date +%s)"
         uv run python -u -m cachette.learn --only "$all_names" \
-            $TRAIN_ARGS $extra --pool "$cores" --out runs/learn 2>&1 \
+            $TRAIN_ARGS $extra $opponent --pool "$cores" --out runs/learn 2>&1 \
             | tee -a runs/learn/train.log
         code="${PIPESTATUS[0]}"
         ran=$(( $(date +%s) - started ))
@@ -1428,6 +1518,7 @@ ssh "${ssh_options[@]}" "$remote" \
      WALL_MINUTES='$MAX_MINUTES' \
      CACHETTE_ENGINE_KEY='$wheel_key' \
      START_FROM_NAME='$start_name' \
+     OPPONENT_NAMES='$opponent_names' \
      PROBE_ONLY='${CACHETTE_TRAIN_PROBE_ONLY:-0}' \
      nohup setsid bash remote.sh > run.log 2>&1 < /dev/null & echo started"
 

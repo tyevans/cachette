@@ -95,7 +95,7 @@ from .baseline import (
     controller_baselines,
     start_controller_baselines,
 )
-from .env import Env, EnvConfig, viable_seeds
+from .env import Env, EnvConfig, seat_opponents, viable_seeds
 from .journal import ThreadJournal, strategy_log, strategy_logs
 from .policy import (
     LinearPolicy,
@@ -487,6 +487,42 @@ def refuse_start_from(
             f"--start-from cannot start the strategy {name} from {path}: "
             f"{refusal}. The run does not fall back to a seeded draw"
         )
+
+
+def use_opponents(
+    parser: argparse.ArgumentParser, arguments: argparse.Namespace
+) -> None:
+    """Seat each opponent file in the world every strategy plays, or refuse.
+
+    Each file takes the next seat after the learner seat. The world, the
+    controller world and the strategy table all take the opponents, so the
+    training, the validation, the held-out passes and the controller bar
+    all meet them.
+
+    **A file that cannot hold its seat ends the run before anything plays.**
+    The environment below reads each file against the fit of the world, so a
+    file of another world fails here. A list that fills every seat but the
+    learner seat fails here, and so does a league run, because a seated game
+    drives no opponent.
+    """
+    global WORLD, CONTROLLER_WORLD, STRATEGIES
+    paths = list(arguments.opponent or [])
+    if not paths:
+        return
+    if arguments.league.strip():
+        parser.error(
+            "--opponent seats a stored policy beside one learner seat, and "
+            "--league seats several candidates in one world. Name one of them"
+        )
+    try:
+        world = seat_opponents(WORLD, paths)
+        Env(world, Weighting(terms={}, won=0.0, lost=0.0, drawn=0.0))
+    except UNREADABLE as refusal:
+        named = " ".join(str(path) for path in paths)
+        parser.error(f"--opponent cannot seat {named}: {refusal}")
+    WORLD = world
+    CONTROLLER_WORLD = replace(WORLD, controlled=False)
+    STRATEGIES = strategy_table(WORLD)
 
 
 def use_decision_interval(interval: int) -> None:
@@ -1330,6 +1366,19 @@ def main() -> int:
         ),
     )
     parser.add_argument(
+        "--opponent",
+        type=Path,
+        action="append",
+        default=None,
+        help=(
+            "seat the stored policy in this weight file in the next seat "
+            "after the learner, in every world the run plays. Name it again "
+            "for the seat after that. The built-in controller keeps at least "
+            "one seat, and the option refuses --league and a file of another "
+            "world"
+        ),
+    )
+    parser.add_argument(
         "--behaviour",
         action="store_true",
         help="read the stored policies and report what they do, and train nothing",
@@ -1355,6 +1404,7 @@ def main() -> int:
         arguments.decision_interval,
         arguments.limit_is_loss,
     )
+    use_opponents(parser, arguments)
 
     # The play styles replace the strategy table, so they are chosen before
     # anything reads the table. A run that names none keeps the built-in
@@ -1425,6 +1475,12 @@ def main() -> int:
         print(
             f"the run starts from {arguments.start_from}, at generation 0 "
             "with no best score",
+            flush=True,
+        )
+    for opponent in WORLD.opponents:
+        print(
+            f"seat {opponent.seat} holds the stored policy {opponent.name}, "
+            f"sha256 {opponent.sha256}",
             flush=True,
         )
 

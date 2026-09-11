@@ -231,7 +231,18 @@ class SeatedGame:
     def __init__(
         self, config: EnvConfig, scoring: Scoring, seats: Sequence[int]
     ) -> None:
-        """Build the game over one configuration and a list of learner seats."""
+        """Build the game over one configuration and a list of learner seats.
+
+        Raises ``ValueError`` when the configuration seats a stored opponent.
+        A seated game drives no opponent, so the seat would fall back to the
+        built-in controller without a word.
+        """
+        if config.opponents:
+            message = (
+                "a seated game drives no stored opponent. Seat the "
+                "candidates or the opponents, and not both"
+            )
+            raise ValueError(message)
         self._config = config
         self._scoring = scoring
         self._seats = list(seats)
