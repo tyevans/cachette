@@ -202,6 +202,9 @@ class TrainResult(TypedDict):
 READOUT_ONLY_KEY = "readout_only"
 """The key of a weight file that says whether its run trained the readout alone."""
 
+LIMIT_RULE_KEY = "limit_is_loss"
+"""The key of a weight file that says whether its run counted the limit as a loss."""
+
 
 def describe_readout_setting(readout_only: bool) -> str:
     """Say which part of the policy a run trains, as a clause of a sentence."""
@@ -415,7 +418,7 @@ class Checkpoint:
                 "horizon": self.env_config.horizon,
                 "decision_interval": self.env_config.decision_interval,
                 READOUT_ONLY_KEY: self.readout_only,
-                "limit_is_loss": self.env_config.limit_is_loss,
+                LIMIT_RULE_KEY: self.env_config.limit_is_loss,
             },
         )
 
@@ -558,7 +561,7 @@ class Checkpoint:
         as the default rule. That is a statement of what the run did and not
         a guess.
         """
-        stored = bool(meta.get("limit_is_loss", False))
+        stored = bool(meta.get(LIMIT_RULE_KEY, False))
         if stored == self.env_config.limit_is_loss:
             return
         wanted = "counts" if self.env_config.limit_is_loss else "does not count"
@@ -1523,6 +1526,7 @@ def write_report(path: Path, payload: Mapping[str, object]) -> None:
 # buys nothing that a re-export does not.
 __all__ = [
     "HEARTBEAT_SECONDS",
+    "LIMIT_RULE_KEY",
     "READOUT_ONLY_KEY",
     "Checkpoint",
     "EnvConfig",
