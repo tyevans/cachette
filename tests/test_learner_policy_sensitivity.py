@@ -129,9 +129,34 @@ reach the same answer and cost a fraction of the ticks.
 """
 
 
+READS_THE_WORLD = {"obs8-act2-land-structured-gen4"}
+"""The stored files whose choice moves with the world.
+
+The register measured a constant preference order over every stored file it
+held, and each of those files trained before the settlement token published
+its values.[^2] A file here answers a changing world with more than one row,
+so the constant expectation is false of it and the opposite claim is the one
+worth testing.
+
+References
+----------
+[^2]: Findings register, FND-707. ``docs/FINDINGS.md``
+"""
+
+
 def stored_files() -> list[Path]:
     """Return every stored weight file, in a fixed order."""
     return sorted(CHECKPOINTS.rglob("*.npz"))
+
+
+def constant_files() -> list[Path]:
+    """Return the stored files the constant expectation covers."""
+    return [path for path in stored_files() if path.stem not in READS_THE_WORLD]
+
+
+def reading_files() -> list[Path]:
+    """Return the stored files that answer the world with more than one row."""
+    return [path for path in stored_files() if path.stem in READS_THE_WORLD]
 
 
 def blind_encode(
@@ -527,17 +552,19 @@ def decisions_of_one_world(world: World, seat: int = 0) -> np.ndarray:
     return np.stack(rows)
 
 
-@pytest.mark.parametrize("path", stored_files(), ids=lambda path: path.stem)
-def test_every_stored_policy_holds_one_fixed_preference_order(path: Path) -> None:
+@pytest.mark.parametrize("path", constant_files(), ids=lambda path: path.stem)
+def test_every_constant_stored_policy_holds_one_fixed_preference_order(
+    path: Path,
+) -> None:
     """Read what a stored file does, and not only that it loads.
 
-    Every stored file answers one row at every decision of a changing world,
-    with the mask out of it. That is the recorded shape, and this test is the
-    statement of it.[^1]
+    Each file this covers answers one row at every decision of a changing
+    world, with the mask out of it. That is the recorded shape, and this test
+    is the statement of it.[^1]
 
-    **A file that fails this reads the world.** Move its name out of the
-    expectation and say so in the commit, because that is the repair this
-    register asked for and not a defect in this test.
+    **A file that fails this reads the world.** Move its name into the reading
+    set and say so in the commit, because that is the repair this register
+    asked for and not a defect in this test.
 
     References
     ----------
@@ -548,5 +575,31 @@ def test_every_stored_policy_holds_one_fixed_preference_order(path: Path) -> Non
     scores = policy.scores_many(decisions_of_one_world(world))
     assert preference_count(scores) == 1, (
         f"{path.name} preferred more than one row over the stack, so it reads "
-        "the world. Move it out of the expectation of this test"
+        "the world. Move it into the reading set of this module"
+    )
+
+
+@pytest.mark.parametrize("path", reading_files(), ids=lambda path: path.stem)
+def test_every_reading_stored_policy_answers_the_world(path: Path) -> None:
+    """Require the named files to move their choice as the world changes.
+
+    A name in the reading set states that the file reads the world. Nothing
+    would fail if such a file became a constant, so the claim is tested here
+    rather than left as an exemption from the constant test.
+    """
+    policy, meta = load_policy(path)
+    world = a_world_of(meta, seed=3)
+    scores = policy.scores_many(decisions_of_one_world(world))
+    assert preference_count(scores) > 1, (
+        f"{path.name} preferred one row over the whole stack, so it ignores "
+        "the world. Move it out of the reading set of this module"
+    )
+
+
+def test_every_name_of_the_reading_set_is_a_stored_file() -> None:
+    """A name that no file answers to would exempt nothing and say nothing."""
+    stems = {path.stem for path in stored_files()}
+    assert READS_THE_WORLD <= stems, (
+        f"the reading set names {sorted(READS_THE_WORLD - stems)}, and no "
+        "stored file carries that name"
     )
