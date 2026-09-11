@@ -8,9 +8,9 @@ layout, one action layout, one world extent and one faction count. The loader
 reads the fit a file states, compares it against the world the caller names,
 and refuses a file that disagrees.[^C3]
 
-**This index holds no policy that loads today.** The observation reached
-version 8 on 10 September 2026, so the loader refuses the four policies at
-version 7 and every earlier policy. The section on what is gone holds what each
+**This index holds one policy that loads today, and it is the training
+reference.** The observation reached version 8 on 10 September 2026, so the
+loader refuses the four policies at version 7 and every earlier policy. The section on what is gone holds what each
 of those measured.
 
 **A file the loader refuses is removed rather than retired in place.** An index
@@ -39,8 +39,46 @@ observation moves.** The example therefore names a path shape and no file.
 
 ## What is here
 
-No policy loads at observation version 8. The next run that trains against it
-writes the first.
+### The training reference at observation version 8
+
+`land/obs8-act2-land-structured-gen4` is the training reference. The next warm
+start begins from it. It is generation 4 of a land-structured run, and that run
+started from generation 14 of a conquer-structured run. Both runs trained on a
+48 by 48 world of three factions at a tick limit of 3500. Both counted a game
+that reached the limit as a loss. Both trained the readout only, which is 3780
+of the 10542 weights.
+
+A rating run chose it. The run seated six players, and it played every group
+of three over six worlds. Each world played three rotations, so every player
+held every seat an equal number of times. That is 360 games over 120 worlds,
+and every game recorded a winner.[^C11]
+
+| Player | Win share | Elo against the controller | Standard error |
+|---|---|---|---|
+| `land-structured` generation 4 | 0.411 | +130.7 | 35.0 |
+| `land-structured` generation 2 | 0.378 | +110.8 | 36.4 |
+| `land-structured` generation 3 | 0.378 | +110.8 | 38.1 |
+| `conquer-structured` generation 14 | 0.344 | +90.1 | 36.9 |
+| `conquer-structured` generation 9 | 0.267 | +36.2 | 36.4 |
+| the built-in controller | 0.222 | 0.0 | — |
+
+**Generation 4 rates first, but the rating does not separate it from the next
+three.** Its gap clears two standard errors over the controller and over
+conquer generation 9. It clears nothing else.
+
+**The rating counts a win at the tick limit, and training did not.** At the
+limit the engine names the faction that holds the most ground as the winner.
+Between 84 and 88 percent of the games of each policy reached the limit. No
+game of three policies ended before it: all 180 ran to the limit and ended on
+held ground. No policy won a game by domination or by the wonder. So this
+policy holds ground and does not end a game. The rating measures the first
+skill and not the second.
+
+**The held-out figure in the weight file is not its own.** The file states a
+held-out win share of 0.320. That pass played the centre of generation 2,
+which was the published centre of the run at that time. No held-out pass
+measured generation 4. It won 0.30 of 12288 training episodes, where it held
+one seat against two controllers.
 
 ## What is gone
 
@@ -285,3 +323,4 @@ policy asks for an observation after a game ends.[^C2]
 [^C8]: Findings register, FND-698. `docs/FINDINGS.md`
 [^C9]: Findings register, FND-704. `docs/FINDINGS.md`
 [^C10]: Findings register, FND-707. `docs/FINDINGS.md`
+[^C11]: The policy league, which seats stored policies against each other and fits one strength for each. `scripts/policy_league.py`
