@@ -415,6 +415,7 @@ class Checkpoint:
                 "horizon": self.env_config.horizon,
                 "decision_interval": self.env_config.decision_interval,
                 READOUT_ONLY_KEY: self.readout_only,
+                "limit_is_loss": self.env_config.limit_is_loss,
             },
         )
 
@@ -474,6 +475,7 @@ class Checkpoint:
         )
         self._refuse_without_normalizer(stored)
         self._refuse_other_readout_setting(meta)
+        self._refuse_another_limit_rule(meta)
         policy = shell.rebuild(np.asarray(stored.flat()))
         first_generation = 0
         written = meta.get("generation")
@@ -540,6 +542,33 @@ class Checkpoint:
             f"{describe_readout_setting(self.readout_only)}. A resume across "
             "the two settings continues neither run. Resume with the setting "
             "the checkpoint states, or start a fresh run."
+        )
+        raise PolicyFitError(message)
+
+    def _refuse_another_limit_rule(self, meta: Mapping[str, object]) -> None:
+        """Refuse a checkpoint trained under the other rule of what a win is.
+
+        One rule pays a win for a game that a reader decides at the tick
+        limit, and the other pays a loss for it. A centre trained under one
+        rule climbed toward what that rule pays, so a resume under the other
+        rule would continue a different search under the old name.
+
+        **A file that states no rule was written before the rule existed.**
+        Every run of that time paid a win at the limit, so such a file reads
+        as the default rule. That is a statement of what the run did and not
+        a guess.
+        """
+        stored = bool(meta.get("limit_is_loss", False))
+        if stored == self.env_config.limit_is_loss:
+            return
+        wanted = "counts" if self.env_config.limit_is_loss else "does not count"
+        written = "counted" if stored else "did not count"
+        message = (
+            f"the checkpoint at {self.latest_path} was trained under a rule "
+            f"that {written} the tick limit as a loss, and this run {wanted} "
+            "it as one. The two rules pay opposite amounts for a game that "
+            "reaches the limit, so a resume would continue another search. "
+            "Start a fresh run rather than resuming across that boundary."
         )
         raise PolicyFitError(message)
 
