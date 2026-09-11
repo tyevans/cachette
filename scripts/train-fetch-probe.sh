@@ -122,7 +122,8 @@ take() {
 # longer ends on a bare closing brace comes out truncated. Each name below must
 # yield a body that opens and closes, and the probe stops when one does not.
 definitions="$work/definitions.sh"
-for name in fetch_file fetch_checkpoints report_local collect refuse_out_argument; do
+for name in fetch_file fetch_checkpoints report_local collect refuse_out_argument \
+    refuse_start_from; do
     body="$work/$name.body"
     take "$name" > "$body"
     if [ "$(head -1 "$body")" != "$name() {" ] || [ "$(tail -1 "$body")" != "}" ]
@@ -328,6 +329,65 @@ else
     printf '  the refusal is on line %s and the rental on line %s\n' \
         "${refuse_line:-none}" "${rent_line:-none}"
     report "the launcher refuses an output directory before it rents" 1
+fi
+
+# ------------------------------------------ case: the start file of a run
+
+# **A run that starts from a file takes it on the first attempt only.** A
+# start or a resume in the run arguments would reach every attempt, so the
+# launcher refuses both before it rents. The trainer reads an abbreviation of
+# an option as the option, so the launcher refuses each prefix as well.
+start_file="$work/wonder-latest.npz"
+printf 'a centre\n' > "$start_file"
+accepted=""
+for arguments in "--resume" "--res" "--generations 3 --resume" \
+    "--start-from /x.npz" "--sta=/x.npz"; do
+    if refuse_start_from "$arguments" "$start_file" 2>/dev/null; then
+        accepted="$accepted [$arguments]"
+    fi
+done
+if [ -z "$accepted" ]; then
+    report "the launcher refuses a start or a resume beside a start file" 0
+else
+    printf '  it accepted:%s\n' "$accepted"
+    report "the launcher refuses a start or a resume beside a start file" 1
+fi
+
+# `--styles` shares its first four characters with `--start-from`, so a rule
+# that refused every short prefix would refuse a style run.
+if refuse_start_from "--generations 3 --only alpha --styles bold" "$start_file" \
+    2>/dev/null; then
+    report "the launcher accepts run arguments beside a start file" 0
+else
+    report "the launcher accepts run arguments beside a start file" 1
+fi
+
+if refuse_start_from "--resume" "" 2>/dev/null; then
+    report "the launcher refuses nothing when no start file is set" 0
+else
+    report "the launcher refuses nothing when no start file is set" 1
+fi
+
+if refuse_start_from "--generations 3" "$work/missing-latest.npz" 2>/dev/null; then
+    report "the launcher refuses a start file that is not there" 1
+else
+    report "the launcher refuses a start file that is not there" 0
+fi
+
+printf 'a centre\n' > "$work/a centre.npz"
+if refuse_start_from "--generations 3" "$work/a centre.npz" 2>/dev/null; then
+    report "the launcher refuses a start file name that a command line splits" 1
+else
+    report "the launcher refuses a start file name that a command line splits" 0
+fi
+
+start_line="$(grep -nF "refuse_start_from \"\$train_args\"" "$launcher" | head -1 | cut -d: -f1)"
+if [ -n "$start_line" ] && [ -n "$rent_line" ] && [ "$start_line" -lt "$rent_line" ]; then
+    report "the launcher refuses a start file before it rents" 0
+else
+    printf '  the refusal is on line %s and the rental on line %s\n' \
+        "${start_line:-none}" "${rent_line:-none}"
+    report "the launcher refuses a start file before it rents" 1
 fi
 
 # ------------------------------------ case: the instance never answers again

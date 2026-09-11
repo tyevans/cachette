@@ -205,6 +205,88 @@ READOUT_ONLY_KEY = "readout_only"
 LIMIT_RULE_KEY = "limit_is_loss"
 """The key of a weight file that says whether its run counted the limit as a loss."""
 
+STRATEGY_KEY = "strategy"
+"""The key of a weight file that names the strategy of the run that wrote it."""
+
+START_FILE_KEY = "started_from"
+"""The key of a weight file that names the file its run took its first centre from."""
+
+START_STRATEGY_KEY = "started_from_strategy"
+"""The key of a weight file that names the strategy its start file states."""
+
+START_GENERATION_KEY = "started_from_generation"
+"""The key of a weight file that names the generation its start file states."""
+
+
+@dataclass(frozen=True)
+class StartPoint:
+    """The weight file a run took its first centre from, and what that file states.
+
+    **A run that starts from the centre of another run is not a run that
+    started from a seeded draw**, and nothing in its weights says which it
+    was. Every file such a run writes therefore names the source file, and the
+    strategy and the generation that the source states. A source that states
+    neither leaves them out, and this states nothing in their place.
+
+    The file entry is the name of the source and never its path. A path names
+    a directory of one machine, and the launcher copies the source to another
+    machine before the run starts.
+    """
+
+    file: str
+    strategy: str | None = None
+    generation: int | None = None
+
+    @classmethod
+    def of_source(cls, path: Path, meta: Mapping[str, object]) -> StartPoint:
+        """Return the start point of a run that reads the file at this path."""
+        strategy = meta.get(STRATEGY_KEY)
+        generation = meta.get("generation")
+        return cls(
+            file=path.name,
+            strategy=strategy if isinstance(strategy, str) and strategy else None,
+            generation=int(generation) if isinstance(generation, int) else None,
+        )
+
+    @classmethod
+    def read(cls, meta: Mapping[str, object]) -> StartPoint | None:
+        """Read back the start point a weight file states, or nothing.
+
+        A resumed run calls this. **The resume point of a started run names
+        its source, and the resumed run must keep naming it**, because every
+        file it writes after the restart holds a centre that came from the
+        same source.
+        """
+        file = meta.get(START_FILE_KEY)
+        if not isinstance(file, str) or not file:
+            return None
+        strategy = meta.get(START_STRATEGY_KEY)
+        generation = meta.get(START_GENERATION_KEY)
+        return cls(
+            file=file,
+            strategy=strategy if isinstance(strategy, str) and strategy else None,
+            generation=int(generation) if isinstance(generation, int) else None,
+        )
+
+    def as_meta(self) -> dict[str, object]:
+        """Return the entries a weight file states for this start point."""
+        meta: dict[str, object] = {START_FILE_KEY: self.file}
+        if self.strategy is not None:
+            meta[START_STRATEGY_KEY] = self.strategy
+        if self.generation is not None:
+            meta[START_GENERATION_KEY] = self.generation
+        return meta
+
+    def describe(self) -> str:
+        """Say what the source file states, as one sentence."""
+        strategy = f"the strategy {self.strategy}" if self.strategy else "no strategy"
+        generation = (
+            f"generation {self.generation}"
+            if self.generation is not None
+            else "no generation"
+        )
+        return f"The file {self.file} states {strategy} and {generation}."
+
 
 def describe_readout_setting(readout_only: bool) -> str:
     """Say which part of the policy a run trains, as a clause of a sentence."""
@@ -293,6 +375,10 @@ class Checkpoint:
     file this writes states it, and a resumed run refuses a checkpoint that
     states the other setting.
 
+    The start entry names the file of another run that this run took its
+    first centre from. Every file this writes states it, and a run that
+    started from a seeded draw holds none.
+
     References
     ----------
     [^1]: Findings register, FND-760. ``docs/FINDINGS.md``
@@ -305,6 +391,7 @@ class Checkpoint:
     kind: str
     normalizer: FeatureNormalizer | None = None
     readout_only: bool = False
+    start: StartPoint | None = None
 
     @property
     def best_path(self) -> Path:
@@ -384,6 +471,12 @@ class Checkpoint:
         it neither needs this key nor refuses a file that carries it. A file
         written by an older run therefore still loads.
 
+        **The file names the strategy of its run, and the file its run
+        started from.** A later run that starts from this file reads the
+        strategy back and names it in every file of its own. A run that
+        started from a seeded draw states no start file, so a reader can
+        tell the two kinds of run apart.
+
         References
         ----------
         [^1]: Recurring defect shapes, shape 1 and shape 3.
@@ -419,48 +512,52 @@ class Checkpoint:
                 "decision_interval": self.env_config.decision_interval,
                 READOUT_ONLY_KEY: self.readout_only,
                 LIMIT_RULE_KEY: self.env_config.limit_is_loss,
+                STRATEGY_KEY: self.name,
+                **(self.start.as_meta() if self.start is not None else {}),
             },
         )
 
-    def resume(
-        self, shell: Trainable
-    ) -> tuple[Trainable, int, ValidationScore | None, str | None]:
-        """Read back the centre, the generation counter, the best score and a note.
+    def read_centre(
+        self, path: Path, shell: Trainable
+    ) -> tuple[Trainable, dict[str, object], str | None]:
+        """Read one stored centre into this run, or refuse it.
 
-        **A resumed run continues the run. It is not a fresh run wearing an
-        old centre.** It takes the first three, so it neither repeats the
-        generations already paid for nor overwrites a better checkpoint with
-        a worse one.
+        **This is the one declaration of what a run refuses to read.** A
+        resume reads the resume point of this run, and a start reads the
+        centre of another run. Both call this, so the two paths cannot hold
+        two lists of refusals that part company.[^2]
 
-        **A resumed run refuses a checkpoint from another world.** The centre
-        of a run is a function of one observation layout, and a world of
-        another extent can hold the same layout length while meaning
-        something else by every position of it.
+        **A run refuses a centre of another policy kind.** A linear centre
+        and a structured centre are vectors of different lengths and
+        different meanings, and a rebuild of one through the shell of the
+        other fails inside an array operation that names neither kind.
 
-        It refuses a checkpoint written under another feature normalizer for
-        the same reason. Every weight of the centre scores a standardized
+        **A run refuses a centre from another world.** The centre of a run is
+        a function of one observation layout, and a world of another extent
+        can hold the same layout length while meaning something else by every
+        position of it.
+
+        It refuses a centre written under another feature normalizer for the
+        same reason. Every weight of the centre scores a standardized
         feature, so a centre read under another standardization means
         something else at every position.
 
-        **A checkpoint that states no normalizer is refused here.** The reader
+        **A file that states no normalizer is refused here.** The reader
         takes such a file, so a policy published before the normalizer existed
-        still plays. A resume must not take the same door. The file states no
+        still plays. A run must not take the same door. The file states no
         transform and this run holds one, which is one fact stored in two
         places with nothing that fails when they disagree, and the centre
         would then be read under a transform it was never trained through.
-        Start a fresh run rather than resuming across that boundary.
 
-        **A resumed run reports when it rebuilt the readout rather than
-        loading it.** A change to one verb of the action table moves the rows
-        of every verb above it, and the reader carries each row onto the row
-        of the same identity.[^1] The note says what moved, and it is nothing
-        when nothing moved. A reader who cannot tell a rebuild from a load
-        cannot read the score of the first generation.
+        It also refuses a centre that trained another part of the policy, and
+        a centre trained under the other rule of what a win is.
 
-        A weight file states what it holds, and the reader gives back what
-        the file held. A file written by an older run can therefore be
-        missing a key, so each read names the type it needs and falls back
-        to the value a fresh run would start at.
+        **A run reports when it rebuilt the readout rather than loading it.**
+        A change to one verb of the action table moves the rows of every verb
+        above it, and the reader carries each row onto the row of the same
+        identity.[^1] The note says what moved, and it is nothing when nothing
+        moved. A reader who cannot tell a rebuild from a load cannot read the
+        score of the first generation.
 
         References
         ----------
@@ -471,15 +568,43 @@ class Checkpoint:
         [^2]: Recurring defect shapes, shape 1.
         ``.agents/rules/recurring-defects.md``
         """
+        self._refuse_another_kind(load_policy(path)[1], path)
         stored, meta = load_policy(
-            self.latest_path,
+            path,
             PolicyFit.of_env(self.probe, self.normalizer),
             layout_of(shell),
         )
-        self._refuse_without_normalizer(stored)
-        self._refuse_other_readout_setting(meta)
-        self._refuse_another_limit_rule(meta)
-        policy = shell.rebuild(np.asarray(stored.flat()))
+        self._refuse_without_normalizer(stored, path)
+        self._refuse_other_readout_setting(meta, path)
+        self._refuse_another_limit_rule(meta, path)
+        note = meta.get("action_rebuild")
+        return (
+            shell.rebuild(np.asarray(stored.flat())),
+            meta,
+            note if isinstance(note, str) else None,
+        )
+
+    def resume(
+        self, shell: Trainable
+    ) -> tuple[Trainable, int, ValidationScore | None, str | None, StartPoint | None]:
+        """Read back the centre, the generation counter, the best score and a note.
+
+        **A resumed run continues the run. It is not a fresh run wearing an
+        old centre.** It takes the first three, so it neither repeats the
+        generations already paid for nor overwrites a better checkpoint with
+        a worse one. The refusals are those of ``read_centre``.
+
+        **A resumed run keeps the start point of the run.** A run that
+        started from the file of another run names that file in its resume
+        point, and every centre it writes after a restart came from the same
+        source.
+
+        A weight file states what it holds, and the reader gives back what
+        the file held. A file written by an older run can therefore be
+        missing a key, so each read names the type it needs and falls back
+        to the value a fresh run would start at.
+        """
+        policy, meta, note = self.read_centre(self.latest_path, shell)
         first_generation = 0
         written = meta.get("generation")
         if isinstance(written, (int, float)):
@@ -487,10 +612,40 @@ class Checkpoint:
         best = None
         if self.best_path.exists():
             best = _stored_figure(load_policy(self.best_path)[1], "best_selection")
-        note = meta.get("action_rebuild")
-        return policy, first_generation, best, note if isinstance(note, str) else None
+        return policy, first_generation, best, note, StartPoint.read(meta)
 
-    def _refuse_without_normalizer(self, stored: Policy) -> None:
+    def start_from(
+        self, path: Path, shell: Trainable
+    ) -> tuple[Trainable, StartPoint, str | None]:
+        """Read the centre of another run, to start this run from it.
+
+        **A run that starts from a file is a new run.** It takes the centre
+        and nothing else. The generation counter starts at zero and the run
+        holds no best score, because the source was scored under the reward
+        of its own run, and a score under one reward says nothing under
+        another. The run writes its files under its own name.
+
+        The refusals are those of ``read_centre``, so a start refuses every
+        file a resume refuses. The start point names the source, and the
+        strategy and the generation that the source states.
+        """
+        policy, meta, note = self.read_centre(path, shell)
+        return policy, StartPoint.of_source(path, meta), note
+
+    def _refuse_another_kind(self, meta: Mapping[str, object], path: Path) -> None:
+        """Refuse a stored centre of another policy kind than this run trains."""
+        stored = str(meta.get("kind", "linear"))
+        if stored == self.kind:
+            return
+        message = (
+            f"the checkpoint at {path} holds a {stored} policy, and this run "
+            f"trains a {self.kind} policy. The two centres have different "
+            "lengths and different meanings, so this run cannot read that "
+            "centre. Name a strategy of the kind the checkpoint holds."
+        )
+        raise PolicyFitError(message)
+
+    def _refuse_without_normalizer(self, stored: Policy, path: Path) -> None:
         """Refuse a checkpoint that states no feature normalizer.
 
         This run holds one, and the file states none. Every weight of the
@@ -513,25 +668,26 @@ class Checkpoint:
         if getattr(stored, "normalizer", None) is not None:
             return
         message = (
-            f"the checkpoint at {self.latest_path} states no feature "
+            f"the checkpoint at {path} states no feature "
             f"normalizer, and this run holds one of "
             f"{self.normalizer.describe()}. A centre trained through no "
             "transform means something else at every position under this "
-            "one, so a resume would read the wrong quantity from every "
-            "weight. Start a fresh run rather than resuming across that "
-            "boundary."
+            "one, so this run would read the wrong quantity from every "
+            "weight. Start a fresh run rather than crossing that boundary."
         )
         raise PolicyFitError(message)
 
-    def _refuse_other_readout_setting(self, meta: Mapping[str, object]) -> None:
+    def _refuse_other_readout_setting(
+        self, meta: Mapping[str, object], path: Path
+    ) -> None:
         """Refuse a checkpoint that trained another part of the policy.
 
         **A run that trained the readout alone holds its towers at the seeded
-        draw, and a run of every weight moved them.** A resume across the two
-        settings would continue neither run. It would either freeze towers
-        that another run moved, or move towers the stored run promised to
-        hold, and the log of the resumed run would describe an experiment
-        that nobody ran.
+        draw, and a run of every weight moved them.** A run that read a
+        centre across the two settings would continue neither run. It would
+        either freeze towers that another run moved, or move towers the
+        stored run promised to hold, and the log of the run would describe an
+        experiment that nobody ran.
 
         A file that states no setting was written before the setting existed.
         Every such run trained every weight, so this reads it as that.
@@ -540,21 +696,23 @@ class Checkpoint:
         if stored == self.readout_only:
             return
         message = (
-            f"the checkpoint at {self.latest_path} "
+            f"the checkpoint at {path} "
             f"{describe_readout_setting(stored)}, and this run "
-            f"{describe_readout_setting(self.readout_only)}. A resume across "
-            "the two settings continues neither run. Resume with the setting "
-            "the checkpoint states, or start a fresh run."
+            f"{describe_readout_setting(self.readout_only)}. A run across "
+            "the two settings continues neither run. Use the setting the "
+            "checkpoint states, or start a fresh run."
         )
         raise PolicyFitError(message)
 
-    def _refuse_another_limit_rule(self, meta: Mapping[str, object]) -> None:
+    def _refuse_another_limit_rule(
+        self, meta: Mapping[str, object], path: Path
+    ) -> None:
         """Refuse a checkpoint trained under the other rule of what a win is.
 
         One rule pays a win for a game that a reader decides at the tick
         limit, and the other pays a loss for it. A centre trained under one
-        rule climbed toward what that rule pays, so a resume under the other
-        rule would continue a different search under the old name.
+        rule climbed toward what that rule pays, so a run under the other
+        rule would continue a different search.
 
         **A file that states no rule was written before the rule existed.**
         Every run of that time paid a win at the limit, so such a file reads
@@ -567,11 +725,11 @@ class Checkpoint:
         wanted = "counts" if self.env_config.limit_is_loss else "does not count"
         written = "counted" if stored else "did not count"
         message = (
-            f"the checkpoint at {self.latest_path} was trained under a rule "
+            f"the checkpoint at {path} was trained under a rule "
             f"that {written} the tick limit as a loss, and this run {wanted} "
             "it as one. The two rules pay opposite amounts for a game that "
-            "reaches the limit, so a resume would continue another search. "
-            "Start a fresh run rather than resuming across that boundary."
+            "reaches the limit, so this run would continue another search. "
+            "Start a fresh run rather than crossing that boundary."
         )
         raise PolicyFitError(message)
 
@@ -843,8 +1001,18 @@ def train(
     holdout: list[int] | None = None,
     holdout_every: int = 5,
     shard_pool: ShardPool | None = None,
+    start_from: Path | None = None,
 ) -> TrainResult:
     """Train one policy, and return what each generation scored.
+
+    The start entry names the weight file of another run. **The run starts
+    from the centre that file holds, and it is a new run.** It starts at
+    generation zero with no best score, it writes its files under its own
+    name, and every file it writes names the source. A run cannot both
+    resume and start from a file. The file is read once before anything
+    plays, so a missing or unreadable file fails before the first episode
+    and never falls back to a seeded draw. The refusals of the centre come
+    after the feature normalizer, because one of them compares it.
 
     The shard pool entry is an open pool of worker processes that this
     strategy queues its episodes into. **A caller that trains several
@@ -901,6 +1069,14 @@ def train(
     trained on, and the record of the episode read both when the episode
     ended.
     """
+    if resume and start_from is not None:
+        message = (
+            "a run either resumes its own resume point or starts from the file "
+            "of another run, and never both"
+        )
+        raise ValueError(message)
+    if start_from is not None:
+        load_policy(start_from)
     if train_config.readout_only:
         refuse_readout_only(kind)
     fixed = first_scoring(scoring)
@@ -929,19 +1105,31 @@ def train(
         readout_only=train_config.readout_only,
     )
     trainable = trainable_count(shell, train_config.readout_only)
-    report_configuration(name, train_config, shell)
     policy: Trainable = shell
     first_generation = 0
     resumed_best: ValidationScore | None = None
+    rebuilt: str | None = None
+    if start_from is not None:
+        policy, start, rebuilt = checkpoint.start_from(start_from, shell)
+        checkpoint = replace(checkpoint, start=start)
+        print(
+            f"  {name} starts from {start_from} at generation 0 with no best "
+            f"score. {start.describe()}",
+            flush=True,
+        )
+    report_configuration(name, train_config, shell)
     if resume and checkpoint.latest_path.exists():
-        policy, first_generation, resumed_best, rebuilt = checkpoint.resume(policy)
+        policy, first_generation, resumed_best, rebuilt, start_point = (
+            checkpoint.resume(policy)
+        )
+        checkpoint = replace(checkpoint, start=start_point)
         print(
             f"  {name} resumes from {checkpoint.latest_path} "
             f"at generation {first_generation}",
             flush=True,
         )
-        if rebuilt is not None:
-            print(f"  {name} {rebuilt}", flush=True)
+    if rebuilt is not None:
+        print(f"  {name} {rebuilt}", flush=True)
 
     history: list[dict[str, float | None]] = []
     records: list[GenerationRecord] = []

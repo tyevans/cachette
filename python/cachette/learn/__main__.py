@@ -84,6 +84,7 @@ from __future__ import annotations
 import argparse
 import threading
 import time
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
 from dataclasses import asdict, replace
@@ -118,6 +119,7 @@ from .sizing import (
 )
 from .structured import STRUCTURED_KIND, StructuredPolicy
 from .train import (
+    Checkpoint,
     TrainConfig,
     configuration_lines,
     evaluate,
@@ -415,6 +417,76 @@ def refuse_readout_only_run(
             parser.error(
                 f"the strategy {name} cannot train its readout alone: {refusal}"
             )
+
+
+# The ways a weight file can fail to read. A missing file raises the first, a
+# truncated archive the second, an empty file the third, and a file of another
+# format or of another run the fourth and the fifth.
+UNREADABLE = (OSError, zipfile.BadZipFile, EOFError, ValueError, KeyError)
+
+
+def refuse_start_from(
+    parser: argparse.ArgumentParser,
+    arguments: argparse.Namespace,
+    names: list[str],
+) -> None:
+    """End a run whose start file cannot start it, before anything plays.
+
+    **A run that starts from a file is a new run.** It starts at generation
+    zero with no best score, so it cannot also resume, and one centre starts
+    one strategy. A run that names more strategies than one is refused, and
+    so is a run that resumes as well.
+
+    **A file that cannot be read never becomes a seeded draw.** The read
+    below is the read the trainer makes, through the same checkpoint and the
+    same refusals, so a file from another world, another readout setting,
+    another limit rule or another policy kind fails here. The launcher asks
+    for the plan with the file before it rents a machine, so such a run fails
+    there and costs nothing.
+
+    **The check here holds no feature normalizer.** The trainer derives the
+    normalizer from a sample of played episodes, and no episode plays before
+    this check. The trainer reads the file again through the normalizer
+    before its first generation, and it refuses a file that states none or
+    another one there.
+
+    Only a path that trains, or that answers for a training run, calls this,
+    for the reason ``refuse_readout_only_run`` states.
+    """
+    path = arguments.start_from
+    if path is None:
+        return
+    if arguments.resume:
+        parser.error(
+            "--start-from starts a new run at generation 0 from the centre of "
+            "another run, and --resume continues the run under --out. Name one "
+            "of them"
+        )
+    if len(names) != 1:
+        parser.error(
+            f"--start-from gives one centre to one strategy, and this run names "
+            f"{len(names)}: {' '.join(names)}. Name one strategy with --only"
+        )
+    name = names[0]
+    if name not in STRATEGIES:
+        return
+    env_config, scoring, kind = STRATEGIES[name]
+    probe = Env(env_config, first_scoring(scoring))
+    checkpoint = Checkpoint(
+        name=name,
+        out_dir=arguments.out,
+        env_config=env_config,
+        probe=probe,
+        kind=kind,
+        readout_only=arguments.train_readout_only,
+    )
+    try:
+        checkpoint.start_from(path, shell_policy(kind, probe))
+    except UNREADABLE as refusal:
+        parser.error(
+            f"--start-from cannot start the strategy {name} from {path}: "
+            f"{refusal}. The run does not fall back to a seeded draw"
+        )
 
 
 def use_decision_interval(interval: int) -> None:
@@ -1245,6 +1317,19 @@ def main() -> int:
         help="start each strategy from the weights already stored under --out",
     )
     parser.add_argument(
+        "--start-from",
+        type=Path,
+        default=None,
+        help=(
+            "start a new run from the centre stored in this weight file, "
+            "which another run wrote, possibly under another strategy. The "
+            "run starts at generation 0 with no best score, and every file "
+            "it writes names this file. It needs exactly one strategy and it "
+            "refuses --resume. A file of another world, another readout "
+            "setting, another limit rule or another policy kind is refused"
+        ),
+    )
+    parser.add_argument(
         "--behaviour",
         action="store_true",
         help="read the stored policies and report what they do, and train nothing",
@@ -1294,6 +1379,7 @@ def main() -> int:
         return 0
     if arguments.print_plan:
         refuse_readout_only_run(parser, arguments, names)
+        refuse_start_from(parser, arguments, names)
         # **The rows are the interface a launcher reads, and a note is for a
         # person.** A note carries no tab, so a reader that takes a field by
         # name never meets one.
@@ -1307,6 +1393,7 @@ def main() -> int:
         return 0
     if not arguments.behaviour:
         refuse_readout_only_run(parser, arguments, names)
+        refuse_start_from(parser, arguments, names)
     # **One number sizes the whole run.** The queue holds one worker process
     # for each core, and the passes that no queue splits step one batch of
     # worlds with one engine thread for each core. A run that names nothing
@@ -1330,6 +1417,16 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     if arguments.behaviour:
         return report_behaviour(names, out, arguments.holdout, pool_size)
+
+    # **A run that starts from a file says so on its first line.** A reader of
+    # the log must not take its first generation for the first generation of
+    # a seeded draw.
+    if arguments.start_from is not None and not arguments.baseline_only:
+        print(
+            f"the run starts from {arguments.start_from}, at generation 0 "
+            "with no best score",
+            flush=True,
+        )
 
     # The training pool and the holdout share no seed, so a reported figure
     # comes from a world the policy never trained on.
@@ -1524,6 +1621,7 @@ def main() -> int:
                     pool,
                     kind=kind,
                     resume=arguments.resume,
+                    start_from=arguments.start_from,
                     validation=validation,
                     validate_every=validate_every,
                     holdout=holdout,

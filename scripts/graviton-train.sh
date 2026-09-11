@@ -56,6 +56,15 @@
 #   CACHETTE_TRAIN_PROBE_ONLY set to 1 to measure the throughput and train
 #                             nothing. This is the cheap way to get a
 #                             ticks-a-second figure for the costs register
+#   CACHETTE_TRAIN_START_FROM a weight file on this machine. The run starts
+#                             from the centre it holds, at generation 0 with
+#                             no best score. The run must name one strategy
+#                             with --only, and CACHETTE_TRAIN_ARGS must name
+#                             neither --start-from nor --resume. The launcher
+#                             copies the file to the instance, and the trainer
+#                             receives it on the first attempt only. A restart
+#                             after a fault resumes from the resume point,
+#                             which then holds a newer centre
 #
 # What it needs: the AWS command line tool, authenticated, with permission
 # to run an instance, and `ssh`, `scp`, `tar`, `git` and `python3` here.
@@ -148,6 +157,56 @@ refuse_out_argument() {
                 ;;
         esac
     done
+    return 0
+}
+
+# Refuses a start file that cannot start this run, before anything is spent.
+#
+# **A run that starts from a file is a new run, and the trainer receives the
+# file on the first attempt only.** A restart after a fault resumes from the
+# resume point, which then holds a newer centre than the file. The run
+# arguments therefore must name neither `--start-from` nor `--resume`, because
+# an option there reaches every attempt.
+#
+# The trainer reads an abbreviation of an option as the option, so a prefix is
+# refused as well. A prefix of `--start-from` needs five characters, because
+# `--st` also begins `--styles`.
+#
+# The file name travels to the instance inside a command line, so it must be a
+# plain name. The trainer refuses a file that does not fit the run, and the
+# launcher asks it through the plan before the rental.
+refuse_start_from() {
+    local arguments="$1"
+    local file="$2"
+    local start="--start-from"
+    local resume="--resume"
+    local word option
+    local -a words
+    [ -n "$file" ] || return 0
+    read -r -a words <<<"$arguments"
+    for word in "${words[@]}"; do
+        option="${word%%=*}"
+        if { [ "${#option}" -ge 5 ] && [ "${start:0:${#option}}" = "$option" ]; } \
+            || { [ "${#option}" -ge 3 ] && [ "${resume:0:${#option}}" = "$option" ]; }; then
+            printf 'The run arguments name %s, and CACHETTE_TRAIN_START_FROM is set.\n' \
+                "$word" >&2
+            printf 'The launcher gives the file on the first attempt and resumes on a restart. Remove it.\n' >&2
+            return 1
+        fi
+    done
+    if [ ! -f "$file" ]; then
+        printf 'CACHETTE_TRAIN_START_FROM names %s, and no file is there.\n' "$file" >&2
+        printf 'The run would start from a seeded draw, so it stops.\n' >&2
+        return 1
+    fi
+    case "${file##*/}" in
+        *[!A-Za-z0-9._-]*)
+            printf 'The start file name %s holds a character other than a letter, a digit, a point, a dash or an underscore.\n' \
+                "${file##*/}" >&2
+            printf 'The name travels inside a command line to the instance. Rename the file.\n' >&2
+            return 1
+            ;;
+    esac
     return 0
 }
 
@@ -247,8 +306,17 @@ train_args="${CACHETTE_TRAIN_ARGS:-$default_args}"
 
 # A run that is already on an instance must still stop and still attach, so
 # the refusal applies only to a run that has not started.
+#
+# **The start file is a path on this machine, and the plan call below runs in
+# the root of the repository.** A relative path would then name another file,
+# so the path becomes absolute once it is known to exist.
+START_FROM="${CACHETTE_TRAIN_START_FROM:-}"
 if [ "$mode" = "run" ] || [ "$mode" = "dry" ]; then
     refuse_out_argument "$train_args" || exit 1
+    refuse_start_from "$train_args" "$START_FROM" || exit 1
+    if [ -n "$START_FROM" ]; then
+        START_FROM="$(cd "$(dirname "$START_FROM")" && pwd)/${START_FROM##*/}"
+    fi
 fi
 
 # **The trainer answers the world.** The extent, the faction count and
@@ -719,11 +787,26 @@ cores="$(aws ec2 describe-instance-types --region "$REGION" \
 # source with a regular expression, and one read the table before the play
 # styles replaced it. Both were wrong for a style run, and the run failed
 # after it had paid for the instance.
+#
+# **The plan call carries the start file, so the trainer refuses a file that
+# cannot start this run here, before the rental.** The trainer holds the rule
+# that one centre starts one strategy, and the rules that refuse a file of
+# another world, another readout setting, another limit rule or another policy
+# kind. This script holds a copy of none of them.
+#
+# **A refusal must reach the person who reads the preview.** The error stream
+# of the call goes to a file, and the message below repeats the last lines of
+# it. A failed call assigned nothing and ended this script without a word,
+# because the shell stops on a failed assignment.
+plan_errors="$out_dir/plan.err"
 plan="$(cd "$root" && uv run python -m cachette.learn \
     --print-plan --cores "$cores" --wall-minutes "$MAX_MINUTES" \
-    $train_args 2>/dev/null)"
+    $train_args ${START_FROM:+--start-from "$START_FROM"} 2>"$plan_errors")" \
+    || plan=""
 [ -n "$plan" ] || die "The trainer could not state the plan of this run.
+$(tail -3 "$plan_errors" 2>/dev/null)
 Nothing was created. A run whose size nobody knows is worse than no run."
+rm -f "$plan_errors"
 plan_field() { printf '%s\n' "$plan" | awk -F'\t' -v k="$1" '$1==k{print $2}'; }
 strategies="$(plan_field strategies)"
 queued_episodes="$(plan_field queued_episodes)"
@@ -755,6 +838,15 @@ if [ "$holdout_every" = "0" ]; then
     holdout_words="It plays the held-out seeds only when a strategy ends, so a
   capped run leaves a figure that the validation seeds selected and nothing
   that measures."
+fi
+
+# **The person who approves the price sees where the run starts.** A run
+# that starts from a file plays a different search from a run that starts
+# from a seeded draw, and nothing else in the preview says which one it is.
+start_line=""
+if [ -n "$START_FROM" ]; then
+    start_line="  start from    $START_FROM, on the first attempt only. A restart
+                resumes from the resume point, which then holds a newer centre"
 fi
 
 size_warning=""
@@ -795,6 +887,7 @@ cat >&2 <<PLAN
   estimate      $estimated_minutes minutes against a cap of $MAX_MINUTES, and this is a
                 floor on the time rather than a measurement
   results       $out_dir
+$start_line
 $size_warning
 
   The cap is the bound and the estimate above is a floor. The run stops when
@@ -983,6 +1076,19 @@ if compgen -G "$BASELINE_CACHE/*.json" >/dev/null; then
         "$remote:.cache/cachette-baselines/" >/dev/null
 else
     say "No stored controller baseline. This run measures it once and keeps the result"
+fi
+
+# **The start file must travel, because the archive holds the tracked files
+# only.** A weight file of an earlier run is not tracked, so nothing else puts
+# it on the instance. It goes to a directory of its own under the home, apart
+# from the directory the follower fetches, so a fetch never brings it back as
+# a weight of this run.
+start_name=""
+if [ -n "$START_FROM" ]; then
+    start_name="${START_FROM##*/}"
+    say "Sending the start file $start_name. The first attempt of the trainer starts from it"
+    ssh "${ssh_options[@]}" "$remote" "mkdir -p start-from" >/dev/null
+    scp "${ssh_options[@]}" "$START_FROM" "$remote:start-from/$start_name" >/dev/null
 fi
 
 # --------------------------------------------------------------------- remote
@@ -1242,8 +1348,22 @@ all_names="$(printf '%s' "$names" | tr ' ' ',')"
     # last value of an option. The launcher refuses an `--out` in the run
     # arguments before it rents anything, and this order holds the same rule
     # for a run whose arguments reach the instance by another path.
+    #
+    # **A run that starts from a file takes the file on its first attempt
+    # only.** A restart resumes from the resume point, because the resume point
+    # then holds a newer centre than the file, and a restart from the file
+    # would throw that work away. The launcher refused a file name that a
+    # command line splits, so the words below split where they must.
+    #
+    # **A restart before the first resume point exists takes the file again.**
+    # A resume that finds no resume point starts from the seeded draw, and a
+    # started run must never fall back to that without a word.
+    start_from=""
+    if [ -n "${START_FROM_NAME:-}" ]; then
+        start_from="--start-from $HOME/start-from/$START_FROM_NAME"
+    fi
     attempt=1
-    extra=""
+    extra="$start_from"
     while :; do
         started="$(date +%s)"
         uv run python -u -m cachette.learn --only "$all_names" \
@@ -1268,8 +1388,15 @@ all_names="$(printf '%s' "$names" | tr ' ' ',')"
         # The resume point carries the centre of each strategy, so the restart
         # continues every search instead of starting it again.
         extra="--resume"
-        printf '  restarting from the resume points, attempt %s\n' \
-            "$attempt" | tee -a runs/learn/train.log
+        if [ -n "$start_from" ] \
+            && [ ! -f "runs/learn/${all_names}-latest.npz" ]; then
+            extra="$start_from"
+            printf '  restarting from the start file, because no resume point exists yet, attempt %s\n' \
+                "$attempt" | tee -a runs/learn/train.log
+        else
+            printf '  restarting from the resume points, attempt %s\n' \
+                "$attempt" | tee -a runs/learn/train.log
+        fi
         sleep 15
     done
 )
@@ -1294,6 +1421,7 @@ ssh "${ssh_options[@]}" "$remote" \
      PROBE_WORLDS='$probe_worlds' \
      WALL_MINUTES='$MAX_MINUTES' \
      CACHETTE_ENGINE_KEY='$wheel_key' \
+     START_FROM_NAME='$start_name' \
      PROBE_ONLY='${CACHETTE_TRAIN_PROBE_ONLY:-0}' \
      nohup setsid bash remote.sh > run.log 2>&1 < /dev/null & echo started"
 
