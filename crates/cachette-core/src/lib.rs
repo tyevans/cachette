@@ -189,7 +189,7 @@ pub use weather::{
 };
 pub use world::{
     CampaignError, CensusBasis, CensusRow, ConvertError, IdentityError, MoveRelationError,
-    RazeError, SeedError, Standing, StepError, World, WorldConfig, WorldError,
+    RazeError, SeedError, Standing, StepError, WonderSite, World, WorldConfig, WorldError,
     FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, STOCK_CEILING_OF_ONE_SETTLEMENT,
     SUBSYSTEM_CENSUS,
 };
