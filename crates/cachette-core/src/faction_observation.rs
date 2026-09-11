@@ -2035,7 +2035,7 @@ impl World {
     /// seat rule once.** The whole count feeds the rival seat counts, which
     /// hold a seat whose faction has left the game. The live count feeds the
     /// domination track, whose denominator is the ask of the reader.
-    fn seat_holding(&self, seats: usize) -> SeatHolding {
+    pub(crate) fn seat_holding(&self, seats: usize) -> SeatHolding {
         let mut holding = SeatHolding {
             held: vec![0i64; seats],
             live_held: vec![0i64; seats],
@@ -2110,15 +2110,15 @@ impl World {
 }
 
 /// Who holds the seats of the world, from one walk over them.
-struct SeatHolding {
+pub(crate) struct SeatHolding {
     /// The seats each faction holds, by faction number, whether the faction
     /// that started on a seat is still in the game or not.
     held: Vec<i64>,
     /// The seats of factions that are still in the game, by the faction
     /// number of the holder.
-    live_held: Vec<i64>,
+    pub(crate) live_held: Vec<i64>,
     /// The seats the domination reader asks a candidate to hold.
-    live_seats: i64,
+    pub(crate) live_seats: i64,
 }
 
 /// The campaign objective one faction has observed.

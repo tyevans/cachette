@@ -4,6 +4,7 @@
 //! objective falls or the deadline passes. The raise, the objective readers
 //! and the close sit together, because they are three points on one life.
 
+use super::controller_targets::WinThreat;
 use super::errors::CampaignError;
 use super::World;
 use crate::campaign::{self, CampaignEvent, CampaignRow};
@@ -290,16 +291,30 @@ impl World {
     /// Chooses, for each faction, the objective it would march on.
     ///
     /// A faction with no seat, with a live campaign, or with no pair in the
-    /// war band gets none.[^1] Otherwise an own settlement whose ground a
-    /// faction at war holds is a relief, and the nearest enemy settlement is
-    /// a take. The relief comes first. Nearest is the hex distance from the
-    /// seat, and a tie goes to the lowest settlement slot. The scan walks the
-    /// settlements and no unit, so it follows the site count.
+    /// war band gets none.[^1] Otherwise the objective is the first of these
+    /// that names a settlement:
+    ///
+    /// 1. **A win threat in the war band.** The objective is the city whose
+    ///    ground holds the wonder of the threat, when the threat nears the
+    ///    wonder path. Otherwise it is the nearest settlement of the threat.
+    ///    Taking the ground of a part-built wonder resets its work, so a march
+    ///    on that city is the one act that undoes the wonder.[^2]
+    /// 2. **A relief.** An own settlement whose ground a faction at war holds.
+    /// 3. **A take.** The nearest enemy settlement.
+    ///
+    /// The threats list holds one entry for each faction, by faction number.
+    /// Nearest is the hex distance from the seat, and a tie goes to the
+    /// lowest settlement slot. The scan walks the settlements and no unit, so
+    /// it follows the site count.
     ///
     /// # References
     ///
     /// [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D2. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
-    pub(super) fn campaign_objectives(&self) -> Vec<Option<(u8, TileIdx)>> {
+    /// [^2]: ADR-0206, a part-built wonder decays when nobody works it, and resets when its ground changes holder, decision D2. `docs/adrs/draft/adr-0206-a-part-built-wonder-decays-when-nobody-works-it.md`
+    pub(super) fn campaign_objectives(
+        &self,
+        threats: &[Option<WinThreat>],
+    ) -> Vec<Option<(u8, TileIdx)>> {
         let count = self.config.faction_count.max(1);
         let sites: Vec<(u32, FactionId, TileIdx)> = self
             .settlements
@@ -338,6 +353,23 @@ impl World {
                         .and_then(Holder::faction)
                         .is_some_and(at_war)
                 };
+                let nearest_of = |owner: FactionId| {
+                    campaign::nearest_site(
+                        sites
+                            .iter()
+                            .filter(|(_, held_by, _)| *held_by == owner)
+                            .map(|(slot, _, tile)| (distance(*tile), *slot, *tile)),
+                    )
+                };
+                if let Some(threat) = threats.get(usize::from(index)).copied().flatten() {
+                    if at_war(threat.faction) {
+                        if let Some(tile) =
+                            threat.wonder_city.or_else(|| nearest_of(threat.faction))
+                        {
+                            return Some((campaign::OBJECTIVE_TAKE_SITE, tile));
+                        }
+                    }
+                }
                 let relief = campaign::nearest_site(
                     sites
                         .iter()

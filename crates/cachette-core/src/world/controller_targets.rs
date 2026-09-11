@@ -1,15 +1,31 @@
-//! How the controller picks the tile a crossing or a settling aims at.
+//! How the controller picks its targets: the rival that nears a win, and the
+//! tile a crossing or a settling aims at.
 //!
 //! A crossing and a settling each survey a plane of candidate tiles and take
 //! one. The two surveys share the shape of the answer and the constants that
 //! bound it, so they sit together rather than inside the controller pass that
-//! calls them.
+//! calls them. The win threat reads the reading of every faction on every win
+//! path, and it names the city a march on a wonder aims at.
 
+use super::victory::WonderSite;
 use super::World;
 use crate::bridge::BLOCK_BITS_DEFAULT;
+use crate::controller::{self, WinPath, WIN_PATH_COUNT};
 use crate::founding::{self};
 use crate::hex::Axial;
-use crate::types::{Accum, Entity, FactionId, TileIdx};
+use crate::sim_math;
+use crate::types::{Accum, Entity, FactionId, Fix32, TileIdx};
+
+/// One rival that nears a win, as one faction sees it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct WinThreat {
+    /// The rival.
+    pub(super) faction: FactionId,
+    /// The tile of the city whose ground holds the wonder of the rival, or
+    /// `None` when the rival does not near the wonder path, or when the
+    /// wonder lookup names no live city for it.
+    pub(super) wonder_city: Option<TileIdx>,
+}
 
 /// The group that the crossing order surveys for.
 ///
@@ -85,6 +101,154 @@ const _: () = assert!(
 );
 
 impl World {
+    /// Returns the reading of every faction on every win path, by faction
+    /// number and then by the number of the path.
+    ///
+    /// A reading is a bounded share. Its numerator is what the faction has
+    /// done toward the requirement of the path, and its denominator is the
+    /// requirement.[^1] **Each numerator and each requirement comes from a
+    /// reader the engine already holds**, and this states no rule of its own
+    /// for how far a faction has come:
+    ///
+    /// - Domination reads the seats of the factions still in the game that
+    ///   the faction holds, over those seats.
+    /// - Territory reads the held ground of the faction, over the passable
+    ///   ground of the world.
+    /// - Wonder reads the wonder lookup. The reading is the highest progress
+    ///   share among the wonder sites whose holder is the faction.
+    /// - Renown reads the best renown of a live character of the faction,
+    ///   over the renown target.
+    ///
+    /// **The observation publishes the same progress to each faction about
+    /// itself.** For domination and territory it calls the same readers. For
+    /// renown and the wonder it folds the same columns in a pass of its own,
+    /// so a test compares the two and fails when they part.[^2]
+    ///
+    /// **This reads the whole world, and not what one faction observes.** The
+    /// controller reads the whole world for its rival and its prey as well.
+    /// Whether the standing of a rival toward a win is public is an open
+    /// question, and a blocker holds it.[^3]
+    ///
+    /// The walk is over the seats, the characters and the wonder sites, so
+    /// it is not a walk over the units or the tiles.[^4]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0204, every win path holds a bar of its own, decision D4. `docs/adrs/draft/adr-0204-every-win-path-holds-a-bar-of-its-own.md`
+    /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^3]: Blockers register, BLK-160. `docs/BLOCKERS.md`
+    /// [^4]: ADR-0144, a faction controller runs inside the step and acts only through the caller's verbs, decision D1. `docs/adrs/accepted/adr-0144-a-faction-controller-runs-inside-the-step-and-acts-only-through-the-callers-verbs.md`
+    #[must_use]
+    pub fn win_readings(&self) -> Vec<[Fix32; WIN_PATH_COUNT]> {
+        self.win_readings_over(&self.wonder_sites())
+    }
+
+    /// Returns the readings, over a wonder lookup the caller already holds.
+    ///
+    /// The controller stage reads the lookup once for the readings and once
+    /// for the city of a wonder, so it passes one copy to both.
+    pub(super) fn win_readings_over(&self, wonders: &[WonderSite]) -> Vec<[Fix32; WIN_PATH_COUNT]> {
+        let seats = usize::from(self.config.faction_count.max(1));
+        let seat_holding = self.seat_holding(seats);
+        let renown = self.best_renown();
+        let passable = self.pyramid().total().open_tiles();
+        let target = i64::from(self.balance.renown_target());
+        (0..seats)
+            .map(|at| {
+                let faction = FactionId(at as u16);
+                WinPath::ALL.map(|path| match path {
+                    WinPath::Domination => sim_math::bounded_share(
+                        seat_holding.live_held.get(at).copied().unwrap_or(0),
+                        seat_holding.live_seats,
+                    ),
+                    WinPath::Territory => {
+                        sim_math::bounded_share(self.holding.holding_of(faction), passable)
+                    }
+                    WinPath::Wonder => wonders
+                        .iter()
+                        .filter(|site| site.holder == Some(faction))
+                        .map(|site| site.progress_share())
+                        .max()
+                        .unwrap_or(Fix32::ZERO),
+                    WinPath::Renown => {
+                        sim_math::bounded_share(renown.get(at).copied().unwrap_or(0), target)
+                    }
+                })
+            })
+            .collect()
+    }
+
+    /// Returns the win threat of every faction, by faction number.
+    ///
+    /// The threat of a faction is the rival that nears a win, as the choice
+    /// in the controller module names it from the share of that faction.[^1]
+    /// Only a faction still in the game is a candidate, because a faction
+    /// that has left the game wins nothing.[^2]
+    ///
+    /// **A threat that nears the wonder path names the city whose ground
+    /// holds its wonder.** The city is the one the wonder lookup names, so
+    /// this states no rule of its own for which city holds a wonder.[^3] A
+    /// rival with more than one wonder site names the site with the highest
+    /// share, and a tie takes the lower tile, because the lookup is in tile
+    /// order and the scan keeps the first site at the highest share.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the win threat share. `docs/reference/balance.md`
+    /// [^2]: ADR-0181, a faction that holds no site and no unit leaves the game, decision D5. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
+    /// [^3]: ADR-0174, a wonder is a win path and a stock total is not, decision D1. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
+    pub(super) fn win_threats(
+        &self,
+        readings: &[[Fix32; WIN_PATH_COUNT]],
+        wonders: &[WonderSite],
+    ) -> Vec<Option<WinThreat>> {
+        let highest: Vec<(FactionId, Fix32)> = readings
+            .iter()
+            .enumerate()
+            .map(|(at, paths)| {
+                (
+                    FactionId(at as u16),
+                    paths.iter().copied().max().unwrap_or(Fix32::ZERO),
+                )
+            })
+            .filter(|(faction, _)| !self.is_eliminated(*faction))
+            .collect();
+        (0..readings.len())
+            .map(|at| {
+                let faction = FactionId(at as u16);
+                let share = self.controller.win_threat_share(faction)?;
+                let threat = controller::win_threat_of(faction, share, highest.iter().copied())?;
+                let nears_the_wonder = readings
+                    .get(usize::from(threat.0))
+                    .is_some_and(|paths| paths[WinPath::Wonder.index()].0 >= share.0);
+                let wonder_city = if nears_the_wonder {
+                    self.city_of_the_wonder_of(threat, wonders)
+                } else {
+                    None
+                };
+                Some(WinThreat {
+                    faction: threat,
+                    wonder_city,
+                })
+            })
+            .collect()
+    }
+
+    /// Returns the tile of the city whose ground holds the furthest wonder of
+    /// one faction, or `None` when the lookup names no live city for it.
+    fn city_of_the_wonder_of(&self, faction: FactionId, wonders: &[WonderSite]) -> Option<TileIdx> {
+        let mut furthest: Option<WonderSite> = None;
+        for site in wonders.iter().filter(|site| site.holder == Some(faction)) {
+            match furthest {
+                Some(best) if site.progress_share().0 <= best.progress_share().0 => {}
+                _ => furthest = Some(*site),
+            }
+        }
+        furthest
+            .and_then(|site| site.settlement)
+            .and_then(|city| self.settlements.tile(city))
+    }
+
     /// Sends the idle units of one faction to the projects its plan zones.
     ///
     /// **Each unit takes the project nearest to it by hex distance, and a tie

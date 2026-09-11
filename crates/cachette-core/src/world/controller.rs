@@ -218,6 +218,49 @@ impl World {
             .set_faction_overmatch_ratio(faction, Fix32(raw))
     }
 
+    /// Returns the win threat share of one faction as a raw Q16.16 share, or
+    /// `None` when the world has no such faction.
+    ///
+    /// The share is the reading on a win path at which a rival becomes a win
+    /// threat for that faction.
+    #[must_use]
+    pub fn faction_win_threat_share(&self, faction: FactionId) -> Option<i32> {
+        self.controller
+            .win_threat_share(faction)
+            .map(|share| share.0)
+    }
+
+    /// Sets the win threat share of every faction, as a raw Q16.16 share.
+    ///
+    /// A rival whose reading on any win path reaches the share becomes the
+    /// target of the faction. The faction moves its relation toward that
+    /// rival on every tick, and it marches on it once the pair reaches the
+    /// war band. A share at or below zero takes the rule out of the game.
+    ///
+    /// The share is a balance value, and the register holds the row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the win threat share. `docs/reference/balance.md`
+    pub fn set_win_threat_share(&mut self, raw: i32) {
+        self.controller.set_win_threat_share(Fix32(raw));
+    }
+
+    /// Sets the win threat share of one faction, and leaves every other
+    /// faction where it is.
+    ///
+    /// The value is simulated state and it enters the state hash, so a write
+    /// parts two worlds on the next tick.[^1] Returns `false` and changes
+    /// nothing when the world has no such faction.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
+    pub fn set_faction_win_threat_share(&mut self, faction: FactionId, raw: i32) -> bool {
+        self.controller
+            .set_faction_win_threat_share(faction, Fix32(raw))
+    }
+
     /// Returns how many carriers one faction assigns to one contract.
     #[must_use]
     pub const fn carriers_per_contract(&self) -> u32 {
@@ -956,7 +999,13 @@ impl World {
             }
         }
         self.close_campaigns(&cohorts);
-        let objectives = self.campaign_objectives();
+        // The wonder lookup is read once. The readings and the city of a
+        // wonder both come from this one copy, so the two never read two
+        // ticks of one wonder.
+        let wonders = self.wonder_sites();
+        let readings = self.win_readings_over(&wonders);
+        let threats = self.win_threats(&readings, &wonders);
+        let objectives = self.campaign_objectives(&threats);
         drop(prologue_span);
         // The rival of a faction is the other faction with the most held
         // tiles. A faction with no speaker has no rival, because the verb
@@ -1046,6 +1095,15 @@ impl World {
                 FactionState {
                     rival: rivals.get(index).copied().flatten(),
                     prey: prey.get(index).copied().flatten(),
+                    // A faction with no speaker has no win threat to move a
+                    // relation against, because the verb would refuse it.
+                    // Its objective still reads the threat.
+                    win_threat: speakers
+                        .get(index)
+                        .copied()
+                        .flatten()
+                        .and(threats.get(index).copied().flatten())
+                        .map(|threat| threat.faction),
                     objective: objectives.get(index).copied().flatten(),
                     board_due: due && self.trading_site_of(faction).is_some(),
                     trade_due: self.controller_answer_due(faction).is_some()

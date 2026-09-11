@@ -9,8 +9,9 @@
 //!
 //! # What it holds
 //!
-//! One row for each faction: the four weights that bias its choices, and the
-//! flag that says an external caller controls it. Two parameters that the
+//! One row for each faction: the weights that bias its choices, the two
+//! values that name its targets, and the flag that says an external caller
+//! controls it. Two parameters that the
 //! step reads on every tick: the evaluation count and the tick limit. The
 //! game end record, empty until a reader fires. Every one of those is state
 //! that a later frame reads, so every one enters the state hash.[^2]
@@ -149,6 +150,25 @@ pub const CONTRACT_TERM_DEFAULT: u32 = 200;
 /// [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
 pub const OVERMATCH_RATIO_DEFAULT: i32 = 2 << 16;
 
+/// The reading on a win path at which a rival becomes a win threat, as a raw
+/// Q16.16 share. Every faction of a new world starts on this value, and a
+/// caller may then give one faction a value of its own.
+///
+/// A rival nears a win when its reading on any win path reaches this share.
+/// The controller then takes that rival as its target, ahead of a prey and
+/// ahead of a rival by held ground.
+///
+/// **This is a provisional value and not a measured one.** The rules of the
+/// downstream game are not written down, so a blocker governs it.[^1] The
+/// balance register holds the row and records how this value was
+/// chosen.[^2]
+///
+/// # References
+///
+/// [^1]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+/// [^2]: Balance register, the win threat share. `docs/reference/balance.md`
+pub const WIN_THREAT_SHARE_DEFAULT: i32 = (5 << 16) / 8;
+
 /// The weights that bias the choices of one faction.
 ///
 /// The vector is drawn from the seed when the world is built, and it is
@@ -284,9 +304,9 @@ pub struct FactionRow {
     pub externally_controlled: u8,
     /// Declared padding, always zero.
     ///
-    /// The row is 4 bytes of seat, the weight vector, one flag, this array
-    /// and the ratio below, at an alignment of four. The assertion below
-    /// fails to compile when the array stops filling the row.
+    /// The row is 4 bytes of seat, the weight vector, one flag, this array,
+    /// the ratio and the share below, at an alignment of four. The assertion
+    /// below fails to compile when the array stops filling the row.
     pub padding: [u8; 2],
     /// The held ground this faction must have over another before it hunts
     /// it, as a raw Q16.16 factor.
@@ -305,10 +325,24 @@ pub struct FactionRow {
     ///
     /// [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
     pub overmatch_ratio: i32,
+    /// The reading on a win path at which a rival becomes a win threat for
+    /// this faction, as a raw Q16.16 share.
+    ///
+    /// **The share belongs to one faction and not to the world**, for the
+    /// reason the ratio above does. A share at or below zero takes the rule
+    /// out of the game for that faction alone.
+    ///
+    /// The value is a balance row, and the register holds it.[^1] It is
+    /// simulated state, and the row enters the state hash.
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the win threat share. `docs/reference/balance.md`
+    pub win_threat_share: i32,
 }
 
 /// The size of one controller row, in bytes.
-pub const FACTION_ROW_BYTES: usize = 16;
+pub const FACTION_ROW_BYTES: usize = 20;
 
 const _: () = assert!(core::mem::size_of::<FactionRow>() == FACTION_ROW_BYTES);
 
@@ -349,7 +383,27 @@ pub enum WinPath {
     Renown = 3,
 }
 
+/// How many win paths the game end readers know.
+pub const WIN_PATH_COUNT: usize = 4;
+
 impl WinPath {
+    /// Every win path, in the order of its number.
+    ///
+    /// The position of a path in this list is its number, and the assertion
+    /// below fails to compile when the two part.
+    pub const ALL: [Self; WIN_PATH_COUNT] = [
+        Self::Domination,
+        Self::Territory,
+        Self::Wonder,
+        Self::Renown,
+    ];
+
+    /// Returns the position of the path in a list ordered by number.
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self as usize
+    }
+
     /// Returns the path for its number, or `None` when the number names none.
     #[must_use]
     pub const fn from_u8(value: u8) -> Option<Self> {
@@ -379,6 +433,14 @@ impl WinPath {
         }
     }
 }
+
+const _: () = {
+    let mut at = 0;
+    while at < WIN_PATH_COUNT {
+        assert!(WinPath::ALL[at].index() == at);
+        at += 1;
+    }
+};
 
 /// The record of how a game ended.
 ///
@@ -772,6 +834,45 @@ pub fn prey_of(
     weakest.map(|(other, _)| other)
 }
 
+/// Picks the win threat of a faction: the rival whose reading toward a win
+/// is highest, among those whose reading reaches the stated share.
+///
+/// The reading of a rival is its highest reading over every win path. Each
+/// reading is a bounded share that reaches one on the tick its reader
+/// fires.[^1] The caller passes the factions that are still in the game,
+/// because a faction that has left the game wins nothing.[^2]
+///
+/// **A tie resolves by the lowest faction identifier**, because the scan
+/// visits the factions in ascending order and replaces the choice only on a
+/// strictly higher reading. A share at or below zero takes the rule out of
+/// the game and names no threat, because every reading reaches it.
+///
+/// # References
+///
+/// [^1]: ADR-0204, every win path holds a bar of its own, decision D4. `docs/adrs/draft/adr-0204-every-win-path-holds-a-bar-of-its-own.md`
+/// [^2]: ADR-0181, a faction that holds no site and no unit leaves the game, decision D5. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
+#[must_use]
+pub fn win_threat_of(
+    faction: FactionId,
+    share: Fix32,
+    readings: impl Iterator<Item = (FactionId, Fix32)>,
+) -> Option<FactionId> {
+    if share.0 <= 0 {
+        return None;
+    }
+    let mut nearest: Option<(FactionId, Fix32)> = None;
+    for (other, reading) in readings {
+        if other == faction || reading.0 < share.0 {
+            continue;
+        }
+        match nearest {
+            Some((_, best)) if reading.0 <= best.0 => {}
+            _ => nearest = Some((other, reading)),
+        }
+    }
+    nearest.map(|(other, _)| other)
+}
+
 /// Makes one evaluation for one faction.
 ///
 /// **This draws exactly once.** The key is the controller system, the tick,
@@ -1118,6 +1219,15 @@ pub struct FactionState {
     ///
     /// [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
     pub prey: Option<FactionId>,
+    /// The rival that nears a win, or `None` when no rival reaches the share
+    /// of this faction on any win path, or when it holds no leader unit.
+    ///
+    /// **A win threat outranks a prey and a rival.** A faction with a win
+    /// threat moves its relation toward it on every tick, and it draws
+    /// nothing for that move. A game that a rival is about to win ends with
+    /// that rival as the winner, so the threat is the one target a faction
+    /// cannot leave for later.
+    pub win_threat: Option<FactionId>,
     /// The objective kind and the tile it would march on, or `None` when no
     /// pair it belongs to is at war, when no enemy site exists, when it holds
     /// a live campaign, and when it holds a carrier.
@@ -1198,6 +1308,7 @@ impl Controller {
                 externally_controlled: 0,
                 padding: [0; 2],
                 overmatch_ratio: OVERMATCH_RATIO_DEFAULT,
+                win_threat_share: WIN_THREAT_SHARE_DEFAULT,
             })
             .collect();
         Self {
@@ -1455,6 +1566,46 @@ impl Controller {
         true
     }
 
+    /// Returns the win threat share of one faction, or `None` when the world
+    /// has no such faction.
+    ///
+    /// The share is the reading on a win path at which a rival becomes a win
+    /// threat for that faction, as a Q16.16 share.
+    #[must_use]
+    pub fn win_threat_share(&self, faction: FactionId) -> Option<Fix32> {
+        self.rows
+            .get(usize::from(faction.0))
+            .map(|row| Fix32(row.win_threat_share))
+    }
+
+    /// Writes the win threat share of every faction.
+    ///
+    /// The write walks the rows in ascending faction order. A share at or
+    /// below zero takes the rule out of the game. The value is a balance
+    /// value, and the register holds the row.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the win threat share. `docs/reference/balance.md`
+    pub fn set_win_threat_share(&mut self, share: Fix32) {
+        for row in &mut self.rows {
+            row.win_threat_share = share.0;
+        }
+    }
+
+    /// Writes the win threat share of one faction, and leaves every other
+    /// faction where it is.
+    ///
+    /// Returns `false` and changes nothing when the world has no such
+    /// faction.
+    pub fn set_faction_win_threat_share(&mut self, faction: FactionId, share: Fix32) -> bool {
+        let Some(row) = self.rows.get_mut(usize::from(faction.0)) else {
+            return false;
+        };
+        row.win_threat_share = share.0;
+        true
+    }
+
     /// Returns every carrier the controller has assigned, in faction order
     /// and then in contract order and then in identity order.
     #[must_use]
@@ -1556,9 +1707,11 @@ impl Controller {
     /// row says what the world offers that faction this tick: the rival it
     /// would move a relation against, the objective it would march on, and
     /// whether a board write, a negotiation step or a carrier move is due.
-    /// A faction with a prey moves its relation against the prey at the index
-    /// past the evaluations, and it draws nothing for that move. A faction
-    /// with no prey and a rival draws once at that index instead, and the
+    /// A faction with a win threat moves its relation against the threat at
+    /// the index past the evaluations, and it draws nothing for that move. A
+    /// faction with no win threat and a prey does the same against the prey.
+    /// A faction with no win threat, no prey and a rival draws once at that
+    /// index instead, and the
     /// draw decides whether it moves.[^3] A faction with
     /// an objective draws once more, at the index past that, and the draw
     /// decides whether it raises.[^4] A faction with a negotiation step due
@@ -1592,11 +1745,20 @@ impl Controller {
                 commands.push((faction, draw, choice));
             }
             let state = states.get(usize::from(index)).copied().unwrap_or_default();
-            // **A prey outranks a rival, and the move against a prey draws
-            // nothing.** A faction that overmatches a neighbour hunts it on
-            // every tick, whatever its war weight says. The draw index is the
-            // relation index either way, so the two paths never collide.
-            if let Some(prey) = state.prey {
+            // **A win threat outranks a prey, a prey outranks a rival, and
+            // neither the move against a threat nor the move against a prey
+            // draws.** A faction that sees a rival near a win moves against
+            // it on every tick, and a faction that overmatches a neighbour
+            // hunts it on every tick, whatever its war weight says. The draw
+            // index is the relation index on every path, so no two paths
+            // collide.
+            if let Some(threat) = state.win_threat {
+                commands.push((
+                    faction,
+                    self.relation_draw_index(),
+                    Choice::Relation(threat),
+                ));
+            } else if let Some(prey) = state.prey {
                 commands.push((faction, self.relation_draw_index(), Choice::Relation(prey)));
             } else if let Some(rival) = state.rival {
                 let draw = self.relation_draw_index();
