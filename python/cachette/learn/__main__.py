@@ -105,6 +105,7 @@ from .policy import (
 )
 from .presets import ObjectiveSchedule, load_library, schedule_of
 from .reward import Scoring, Weighting
+from .search import refuse_readout_only, shell_policy
 from .shard import ShardPool
 from .sizing import (
     TICKS_A_SECOND_FOR_EACH_WORKER,
@@ -116,7 +117,14 @@ from .sizing import (
     workers_for_each_strategy,
 )
 from .structured import STRUCTURED_KIND, StructuredPolicy
-from .train import TrainConfig, evaluate, first_scoring, train, write_report
+from .train import (
+    TrainConfig,
+    configuration_lines,
+    evaluate,
+    first_scoring,
+    train,
+    write_report,
+)
 
 # How many ticks one decision covers. The engine changes little in five
 # ticks, and a decision costs one boundary crossing for every world of the
@@ -303,6 +311,49 @@ def run_plan(arguments: argparse.Namespace, names: list[str]) -> Plan:
         arguments.wall_minutes * 60.0,
         arguments.ticks_for_each_worker or TICKS_A_SECOND_FOR_EACH_WORKER,
     )
+
+
+def search_config(arguments: argparse.Namespace) -> TrainConfig:
+    """Return the part of the trainer configuration that the arguments state.
+
+    **This is the one place the arguments become a configuration.** The plan
+    reads it to state the alignment of each strategy, and each strategy adds
+    the fields of its machine and its seat to it. Two readings of the same
+    arguments would state two runs, and nothing would fail when they parted.
+    """
+    return TrainConfig(
+        generations=arguments.generations,
+        population=arguments.population,
+        seeds_per_generation=arguments.seeds,
+        sigma=arguments.sigma,
+        learning_rate=arguments.learning_rate,
+        validate_candidate=arguments.validate_candidate,
+        readout_only=arguments.train_readout_only,
+    )
+
+
+def strategy_notes(arguments: argparse.Namespace, names: list[str]) -> list[str]:
+    """Return what each named strategy can reach, before a machine exists.
+
+    **The plan states the alignment of each strategy.** The alignment follows
+    from the pair count and the weights the search may move, so it is free,
+    and a run that states it only in the log of a paid machine states it too
+    late. The trainer prints the same lines on its first lines.
+
+    The shell of each strategy comes from a probe of the world that strategy
+    plays, so the counts come from the engine schemas. A name the table does
+    not hold states nothing here, and the run refuses it where it always
+    did.
+    """
+    config = search_config(arguments)
+    notes: list[str] = []
+    for name in names:
+        if name not in STRATEGIES:
+            continue
+        env_config, scoring, kind = STRATEGIES[name]
+        shell = shell_policy(kind, Env(env_config, first_scoring(scoring)))
+        notes.extend(f"{name} {line}" for line in configuration_lines(config, shell))
+    return notes
 
 
 def use_decision_interval(interval: int) -> None:
@@ -978,6 +1029,21 @@ def main() -> int:
             "worlds as well as the centre. Off by default"
         ),
     )
+    # **A run may train the readout alone.** One measurement could not
+    # separate such a run from a run of every weight on twelve held-out
+    # worlds, and a step over fewer weights aligns better at one population.
+    # The towers and the trunk keep the seeded draw of the shell, and every
+    # saved file still holds the whole policy.
+    parser.add_argument(
+        "--train-readout-only",
+        action="store_true",
+        help=(
+            "train the readout of the structured policy alone. The towers "
+            "and the trunk keep the seeded draw they start from, and the "
+            "alignment counts the readout weights alone. A run that names a "
+            "strategy of another policy refuses this. Off by default"
+        ),
+    )
     parser.add_argument("--only", type=str, default="")
     parser.add_argument(
         "--print-strategies",
@@ -1141,6 +1207,20 @@ def main() -> int:
 
     names = [name for name in arguments.only.split(",") if name] or list(STRATEGIES)
 
+    # **A flag that cannot apply ends the run before anything reads it.** The
+    # launcher asks for the plan before it rents a machine, so a run that
+    # names a linear strategy beside this flag fails there and costs nothing.
+    if arguments.train_readout_only:
+        for name in names:
+            if name not in STRATEGIES:
+                continue
+            try:
+                refuse_readout_only(STRATEGIES[name][2])
+            except ValueError as refusal:
+                parser.error(
+                    f"the strategy {name} cannot train its readout alone: {refusal}"
+                )
+
     if arguments.print_strategies:
         print(" ".join(names))
         return 0
@@ -1153,7 +1233,7 @@ def main() -> int:
         # name never meets one.
         plan = run_plan(arguments, names)
         print(plan_lines(plan))
-        for note in plan_notes(plan):
+        for note in [*plan_notes(plan), *strategy_notes(arguments, names)]:
             print(f"# note {note}")
         return 0
     # **One number sizes the whole run.** The queue holds one worker process
@@ -1226,6 +1306,7 @@ def main() -> int:
         "holdout_every": arguments.holdout_every,
         "sigma": arguments.sigma,
         "learning_rate": arguments.learning_rate,
+        "readout_only": arguments.train_readout_only,
         "learner_seats": list(learner_seats),
         "pool": pool_size,
         "relative_scoring": bool(learner_seats) and not arguments.absolute_scoring,
@@ -1353,18 +1434,13 @@ def main() -> int:
             with strategy_log(journal, out / f"{name}.log"):
                 env_config, scoring, kind = STRATEGIES[name]
                 print(f"\n=== {name} ({kind}) ===", flush=True)
-                train_config = TrainConfig(
-                    generations=arguments.generations,
-                    population=arguments.population,
-                    seeds_per_generation=arguments.seeds,
-                    sigma=arguments.sigma,
-                    learning_rate=arguments.learning_rate,
+                train_config = replace(
+                    search_config(arguments),
                     workers=batch_workers,
                     pool=pool_size,
                     seed=index,
                     learner_seats=learner_seats,
                     relative=not arguments.absolute_scoring,
-                    validate_candidate=arguments.validate_candidate,
                 )
                 result = train(
                     name,

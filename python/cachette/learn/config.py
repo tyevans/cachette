@@ -83,6 +83,11 @@ class TrainConfig:
     # of many draws on a few worlds is a real gain or the luckiest draw. That
     # question has been answered, so the pass is off unless a caller asks.
     validate_candidate: bool = False
+    # Whether the search moves the readout of the structured policy alone. The
+    # towers and the trunk then keep their seeded draw for the whole run. A
+    # worker process reads this field from the configuration it receives, so
+    # it draws the candidates the trainer draws.
+    readout_only: bool = False
 
     @property
     def pairs(self) -> int:

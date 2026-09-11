@@ -77,6 +77,24 @@ search should throw away the agreement between the candidates as well. The
 search reads that agreement out of the ranks, and it moves the centre by the
 learning rate times the agreement.
 
+# A run may train the readout alone
+
+A run may ask the search to move the readout of the structured policy and
+nothing else. The towers and the trunk then keep the seeded draw of the shell,
+bit for bit, at every generation. **The flat vector stays whole.** A saved
+file, a resume and every reader see the whole policy, and only the search
+reads the setting.
+
+The perturbations are zero outside the readout, and the step writes the
+readout alone. Every figure that counts trainable weights counts the readout,
+because the alignment of a step follows from the weights the step can move.[^4]
+
+**The generator draws what it draws for a run of every weight.** The draw
+reads the run seed and the generation alone, and the restriction multiplies it
+by zero outside the readout. A worker reads the setting from the run
+configuration and the span from the shell it builds. It therefore draws the
+candidates the trainer draws, whatever the worker count.
+
 # References
 
 [^1]: ADR-0194, a generation is scored one episode at a time, and
@@ -84,6 +102,7 @@ combined in candidate order, decision D2.
 ``docs/adrs/draft/adr-0194-a-generation-is-scored-in-shards.md``
 [^2]: Findings register, FND-713. ``docs/FINDINGS.md``
 [^3]: Findings register, FND-711. ``docs/FINDINGS.md``
+[^4]: Findings register, FND-668. ``docs/FINDINGS.md``
 """
 
 from __future__ import annotations
@@ -212,7 +231,68 @@ def centre_scale(vector: np.ndarray) -> float:
     return length if length > 0.0 else 1.0
 
 
-def perturbation_scale(policy: Trainable, centre: np.ndarray, sigma: float) -> float:
+def refuse_readout_only(kind: str) -> None:
+    """Refuse to train the readout alone for a kind that holds no readout block.
+
+    **Only the structured kind separates a readout from the layers under
+    it.** The linear kind holds one matrix from the features to the action
+    rows, so that matrix is the whole policy. A run that asked to train its
+    readout alone would train every weight, and a flag that is accepted and
+    changes nothing is worse than a refusal.
+
+    The trainer, the command line and the search all call this, so the rule
+    and its message sit in one place.
+
+    Raises ``ValueError`` for every kind but the structured one.
+    """
+    if kind == STRUCTURED_KIND:
+        return
+    message = (
+        f"only the {STRUCTURED_KIND} policy can train its readout alone, and "
+        f"this run trains the {kind} policy. The {kind} policy holds one "
+        "matrix from the features to the action rows, so it has no readout "
+        "block to separate from the rest. Remove --train-readout-only, or "
+        f"train a {STRUCTURED_KIND} strategy"
+    )
+    raise ValueError(message)
+
+
+def trainable_span(policy: Trainable, readout_only: bool = False) -> slice:
+    """Return the part of the flat vector the search may move, as one slice.
+
+    A run of every weight moves the whole vector. A run that trains the
+    readout alone moves the span the policy states for its readout, and every
+    weight outside it keeps the value it started at.
+
+    **The span comes from the policy and never from a count here.** The
+    policy states where its readout sits, from the same shapes it reads to
+    cut a flat vector back into arrays.
+
+    Raises ``ValueError`` when a run asks to train the readout alone of a
+    policy that holds no readout block.
+    """
+    if not readout_only:
+        return slice(0, int(sum(layer_sizes(policy))))
+    if not isinstance(policy, StructuredPolicy):
+        refuse_readout_only("linear")
+    assert isinstance(policy, StructuredPolicy)
+    return policy.readout_span
+
+
+def trainable_count(policy: Trainable, readout_only: bool = False) -> int:
+    """Return how many weights the search may move.
+
+    **Every figure that counts trainable weights reads this.** The alignment
+    of a step follows from the weights the step can move, and a weight the
+    search holds fixed costs no alignment.
+    """
+    span = trainable_span(policy, readout_only)
+    return int(span.stop - span.start)
+
+
+def perturbation_scale(
+    policy: Trainable, centre: np.ndarray, sigma: float, readout_only: bool = False
+) -> float:
     """Return the length of one perturbation of this centre.
 
     **Sigma is a fraction of the centre and never a length.** A perturbation
@@ -227,14 +307,24 @@ def perturbation_scale(policy: Trainable, centre: np.ndarray, sigma: float) -> f
     scaling keeps its centre where it is, so the fraction comes from the
     length of the centre.
 
-    **The trainer and every worker process call this with the same two
+    **The trainer and every worker process call this with the same
     arguments**, so a sharded generation builds the candidates a single
     process would build. The shell states the kind and the centre states the
     length, and neither reads a number this module holds.
+
+    **A search that trains the readout alone takes the fraction from the
+    length of the readout.** The perturbation moves the readout and nothing
+    else, so the length of a frozen tower says nothing about how far it moves
+    the policy. An untrained readout is zero and takes the fallback of one.
+    That length moves no choice: a positive scaling of the readout scales
+    every score by one factor.
     """
+    span = trainable_span(policy, readout_only)
     if choice_survives_scaling(policy):
         return sigma
-    return sigma * centre_scale(centre)
+    if not readout_only:
+        return sigma * centre_scale(centre)
+    return sigma * centre_scale(centre[span])
 
 
 def layer_sizes(policy: Trainable) -> tuple[int, ...]:
@@ -275,7 +365,9 @@ def layer_scale(block: np.ndarray, fallback: float) -> float:
     return length / math.sqrt(block.size)
 
 
-def layer_weighting(policy: Trainable, centre: np.ndarray) -> np.ndarray:
+def layer_weighting(
+    policy: Trainable, centre: np.ndarray, readout_only: bool = False
+) -> np.ndarray:
     """Return the multiplier each coordinate of a perturbation carries.
 
     The search draws a perturbation isotropically and multiplies it by this,
@@ -315,6 +407,12 @@ def layer_weighting(policy: Trainable, centre: np.ndarray) -> np.ndarray:
     Such a kind then multiplies its draw by 1.0 and keeps the perturbation it
     drew before this rule existed, bit for bit.
 
+    **A search that trains the readout alone weights every other coordinate
+    by zero.** The perturbation then has no component in a frozen layer, and
+    the readout is one layer, so it takes one weight throughout. The draw
+    under the weighting does not change, so the readout coordinates read the
+    numbers the generator gives them in a run of every weight.
+
     Raises ``ValueError`` when the layers do not cover the centre. That is the
     layout of the policy disagreeing with the vector the search holds, and a
     silent answer there would weight the wrong coordinates.
@@ -323,6 +421,7 @@ def layer_weighting(policy: Trainable, centre: np.ndarray) -> np.ndarray:
     ----------
     [^1]: Findings register, FND-713. ``docs/FINDINGS.md``
     """
+    span = trainable_span(policy, readout_only)
     sizes = layer_sizes(policy)
     covered = int(sum(sizes))
     if covered != centre.size:
@@ -338,11 +437,20 @@ def layer_weighting(policy: Trainable, centre: np.ndarray) -> np.ndarray:
         scales[index] = layer_scale(centre[walked : walked + size], fallback)
         walked += size
     weighting = np.repeat(scales, sizes)
+    if readout_only:
+        held = np.zeros_like(weighting)
+        held[span] = weighting[span]
+        weighting = held
     return np.asarray(weighting / weighting.max())
 
 
 def generation_noise(
-    seed: int, generation: int, pairs: int, policy: Trainable, centre: np.ndarray
+    seed: int,
+    generation: int,
+    pairs: int,
+    policy: Trainable,
+    centre: np.ndarray,
+    readout_only: bool = False,
 ) -> np.ndarray:
     """Draw the perturbation of every pair of one generation.
 
@@ -363,9 +471,15 @@ def generation_noise(
     draw a perturbation that ignores the layers. The generator reads the run
     seed and the generation alone, so the weighting changes where a
     perturbation points and never which numbers the generator produced.
+
+    **A search that trains the readout alone draws the same matrix.** The
+    weighting is zero outside the readout, so every row is zero there and has
+    unit length inside it. The draw is still a function of the run seed and
+    the generation, and the span is a function of the shell, so a worker
+    process draws the rows the trainer draws.
     """
     rng = np.random.default_rng([seed, generation])
-    weighting = layer_weighting(policy, centre)
+    weighting = layer_weighting(policy, centre, readout_only)
     noise = rng.standard_normal((pairs, weighting.size)) * weighting
     return np.asarray(noise / np.linalg.norm(noise, axis=1, keepdims=True))
 
@@ -377,6 +491,7 @@ def pair_candidates(
     sigma: float,
     first_pair: int,
     last_pair: int,
+    readout_only: bool = False,
 ) -> list[Trainable]:
     """Build the candidates of a range of pairs, in candidate index order.
 
@@ -392,8 +507,11 @@ def pair_candidates(
     Sigma is a fraction of the centre and never a length. The policy states
     its kind and the centre states its length, so the perturbation of a kind
     that keeps an unnormalised centre stays the same fraction of it.
+
+    A search that trains the readout alone passes noise that is zero outside
+    the readout, so every candidate holds the frozen layers of the centre.
     """
-    step = perturbation_scale(policy, centre, sigma)
+    step = perturbation_scale(policy, centre, sigma, readout_only)
     return [
         policy.rebuild(centre + sign * step * noise[index])
         for index in range(first_pair, last_pair)
@@ -620,7 +738,12 @@ def worlds_a_sigma_needs(sigma: float) -> tuple[float, int]:
 
 
 def configuration_notes(
-    sigma: float, worlds: int, pairs: int, trainable: int, generations: int
+    sigma: float,
+    worlds: int,
+    pairs: int,
+    trainable: int,
+    generations: int,
+    total: int | None = None,
 ) -> list[str]:
     """Say what this configuration can and cannot reach, before a run spends.
 
@@ -634,6 +757,11 @@ def configuration_notes(
     needs before its climb passes its wander. **Neither note fails a run.** A
     figure a reader can act on is worth more than a refusal, because the
     reader may want the run anyway.
+
+    The total entry is the weight count of the whole policy. **A run that
+    moves fewer weights than its policy holds says so**, and it names both
+    counts, so a reader never takes the trainable count for the size of the
+    policy.
 
     References
     ----------
@@ -653,6 +781,11 @@ def configuration_notes(
             f"this run is under-sampled for its sigma: the spread between "
             f"the candidates does not exceed the noise on one candidate at "
             f"{given}"
+        )
+    if total is not None and trainable < total:
+        notes.append(
+            f"this run trains {trainable} of the {total} weights of its "
+            f"policy, and every other weight keeps the draw it started from"
         )
     alignment = step_alignment(pairs, trainable)
     breaks = generations_before_a_climb_beats_a_wander(alignment)
@@ -734,6 +867,12 @@ class EvolutionStrategy:
     An evolution strategy needs no gradient through the step. It scores a
     whole episode with one number, so a long run with a sparse reward costs it
     nothing.
+
+    The readout entry says whether the search moves the readout alone. It
+    then holds every other weight of the centre where the centre holds it.
+
+    Raises ``ValueError`` when the readout entry is set for a policy that
+    holds no readout block.
     """
 
     shell: Trainable
@@ -741,6 +880,16 @@ class EvolutionStrategy:
     sigma: float
     learning_rate: float
     seed: int
+    readout_only: bool = False
+
+    def __post_init__(self) -> None:
+        """Refuse a readout setting the shell cannot honour, before any draw."""
+        trainable_span(self.shell, self.readout_only)
+
+    @property
+    def trainable(self) -> int:
+        """How many weights this search may move."""
+        return trainable_count(self.shell, self.readout_only)
 
     @property
     def population(self) -> int:
@@ -781,7 +930,9 @@ class EvolutionStrategy:
 
     def noise(self, centre: np.ndarray, generation: int) -> np.ndarray:
         """Draw the perturbations of one generation, one row for each pair."""
-        return generation_noise(self.seed, generation, self.pairs, self.shell, centre)
+        return generation_noise(
+            self.seed, generation, self.pairs, self.shell, centre, self.readout_only
+        )
 
     def propose(self, centre: np.ndarray, generation: int) -> list[Trainable]:
         """Build the whole population of one generation, in candidate order."""
@@ -792,6 +943,7 @@ class EvolutionStrategy:
             self.sigma,
             0,
             self.pairs,
+            self.readout_only,
         )
 
     @property
@@ -879,6 +1031,20 @@ class EvolutionStrategy:
         the length of the centre, and the search holds that length under a
         ceiling rather than letting it rise over a run.
 
+        **A search that trains the readout alone writes the readout and
+        nothing else**, whatever the gradient holds outside it. The frozen
+        weights of the centre then come back bit for bit. The fraction comes
+        from the length of the readout, as the perturbation does.
+
+        **That search applies no ceiling.** The ceiling exists because a
+        longer centre saturates a ``tanh`` layer, and the readout feeds no
+        ``tanh``. A positive scaling of the readout scales every score by one
+        factor, so it moves no choice. The perturbation and the step are both
+        fractions of the readout length, so a longer readout changes nothing
+        that a candidate chooses. A ceiling over the whole centre would also
+        scale the frozen weights, which is the one thing this search must not
+        do.
+
         References
         ----------
         [^1]: Report on what is wrong with training and evaluation, items 5 and
@@ -888,7 +1054,14 @@ class EvolutionStrategy:
         travel = self.learning_rate * agreement
         if self.holds_unit_centre:
             return unit(centre + travel * direction)
-        return self.bounded(centre + travel * centre_scale(centre) * direction)
+        if not self.readout_only:
+            return self.bounded(centre + travel * centre_scale(centre) * direction)
+        span = trainable_span(self.shell, self.readout_only)
+        moved = centre.copy()
+        moved[span] = (
+            centre[span] + travel * centre_scale(centre[span]) * direction[span]
+        )
+        return moved
 
     def update(self, centre: np.ndarray, generation: int, scores: np.ndarray) -> Update:
         """Rank the scores, step as far as they agreed, and report both.
@@ -908,7 +1081,7 @@ class EvolutionStrategy:
         the last bits, and a run that moved in the last bits no longer
         compares against a stored score.
         """
-        alignment = step_alignment(self.pairs, centre.size)
+        alignment = step_alignment(self.pairs, self.trainable)
         spread = float(scores.max() - scores.min())
         if not carries_information(spread):
             return Update(
@@ -972,8 +1145,11 @@ __all__ = [
     "perfect_agreement_sum",
     "perturbation_scale",
     "rank_shape",
+    "refuse_readout_only",
     "shell_policy",
     "step_alignment",
+    "trainable_count",
+    "trainable_span",
     "unit",
     "worlds_a_sigma_needs",
 ]

@@ -346,7 +346,12 @@ def play_episode(task: EpisodeTask) -> EpisodeScore:
     probe = Env(task.env_config, task.scoring)
     shell = shell_policy(task.kind, probe, task.normalizer)
     noise = generation_noise(
-        config.seed, task.generation, config.pairs, shell, task.centre
+        config.seed,
+        task.generation,
+        config.pairs,
+        shell,
+        task.centre,
+        config.readout_only,
     )
     # The candidate index carries the sign: candidate ``2 * pair`` is the plus
     # half of its pair and ``2 * pair + 1`` is the minus half. A task may
@@ -355,7 +360,13 @@ def play_episode(task: EpisodeTask) -> EpisodeScore:
     first_pair = task.first_candidate // 2
     last_pair = -(-task.last_candidate // 2)
     built = pair_candidates(
-        shell, task.centre, noise, config.sigma, first_pair, last_pair
+        shell,
+        task.centre,
+        noise,
+        config.sigma,
+        first_pair,
+        last_pair,
+        config.readout_only,
     )
     held = built[
         task.first_candidate - 2 * first_pair : task.last_candidate - 2 * first_pair

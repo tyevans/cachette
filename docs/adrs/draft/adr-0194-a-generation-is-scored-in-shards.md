@@ -68,7 +68,12 @@ perturbations from the trainer.
 The search scales that draw by the layers of the centre, so that it revises
 each layer of a policy by the same fraction of what that layer holds. The
 centre reaches the worker, so the worker derives the same scaling the trainer
-derives and no second input joins the draw.
+derives.
+
+A run may hold every layer but the readout at its starting draw. The scaling
+is then zero outside the readout. That setting is a field of the run
+configuration, and the configuration reaches the worker in the task. **No
+input that the task does not carry joins the draw.**
 
 ### D3. The combination sorts on the strategy, the candidate and the seed
 

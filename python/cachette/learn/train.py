@@ -129,7 +129,9 @@ from .search import (
     generation_noise,
     pair_candidates,
     rank_shape,
+    refuse_readout_only,
     shell_policy,
+    trainable_count,
     unit,
 )
 from .shard import ShardPool, run_sharded_generation
@@ -166,6 +168,10 @@ class TrainResult(TypedDict):
     thing: it is the four-way comparison the report writer adds after the run
     ends, and it is absent while the run lives.
 
+    The parameters entry is the size of the policy. The trainable entry is
+    how many of those weights the search may move, and the readout entry says
+    whether the run trained the readout alone.
+
     References
     ----------
     [^1]: What is wrong with training and evaluation, items 1 and 2.
@@ -179,6 +185,8 @@ class TrainResult(TypedDict):
     weights: str
     latest_weights: str
     parameters: int
+    trainable: int
+    readout_only: bool
     best_generation: int
     best_selection_won: float | None
     best_selection_return: float | None
@@ -189,6 +197,17 @@ class TrainResult(TypedDict):
     held_out_generation: int
     degenerate_generations: list[int]
     holdout: NotRequired[dict[str, dict[str, float]]]
+
+
+READOUT_ONLY_KEY = "readout_only"
+"""The key of a weight file that says whether its run trained the readout alone."""
+
+
+def describe_readout_setting(readout_only: bool) -> str:
+    """Say which part of the policy a run trains, as a clause of a sentence."""
+    if readout_only:
+        return "trained the readout alone and held the towers at their seeded draw"
+    return "trained every weight of the policy"
 
 
 def _figure_meta(prefix: str, score: ValidationScore | None) -> dict[str, object]:
@@ -267,6 +286,10 @@ class Checkpoint:
     the fit of every file this writes, and a resumed run refuses a checkpoint
     that was written under another one.
 
+    The readout entry says whether the run trains the readout alone. Every
+    file this writes states it, and a resumed run refuses a checkpoint that
+    states the other setting.
+
     References
     ----------
     [^1]: Findings register, FND-760. ``docs/FINDINGS.md``
@@ -278,6 +301,7 @@ class Checkpoint:
     probe: Env
     kind: str
     normalizer: FeatureNormalizer | None = None
+    readout_only: bool = False
 
     @property
     def best_path(self) -> Path:
@@ -342,11 +366,16 @@ class Checkpoint:
         and its candidate coordinates, so a change to one verb no longer
         retires the whole file.[^2]
 
-        **A file names the fit and the episode shape, and nothing about the
+        **A file names the fit and the episode shape, and one fact about the
         search that produced it.** The written entries used to carry a hidden
         width as well. Nothing read it back, so it was one number declared in
         a file and answered nowhere, which is the shape this project has paid
         for before.[^1]
+
+        The one fact is whether the run trained the readout alone. **The
+        resume reads it back and refuses the other setting**, so the entry
+        has a reader. A file that states nothing was written before the
+        setting existed, and such a run trained every weight.
 
         The reader builds what a file names from the keys the file holds, so
         it neither needs this key nor refuses a file that carries it. A file
@@ -385,6 +414,7 @@ class Checkpoint:
                 "tick_limit": self.env_config.tick_limit,
                 "horizon": self.env_config.horizon,
                 "decision_interval": self.env_config.decision_interval,
+                READOUT_ONLY_KEY: self.readout_only,
             },
         )
 
@@ -443,6 +473,7 @@ class Checkpoint:
             layout_of(shell),
         )
         self._refuse_without_normalizer(stored)
+        self._refuse_other_readout_setting(meta)
         policy = shell.rebuild(np.asarray(stored.flat()))
         first_generation = 0
         written = meta.get("generation")
@@ -484,6 +515,31 @@ class Checkpoint:
             "one, so a resume would read the wrong quantity from every "
             "weight. Start a fresh run rather than resuming across that "
             "boundary."
+        )
+        raise PolicyFitError(message)
+
+    def _refuse_other_readout_setting(self, meta: Mapping[str, object]) -> None:
+        """Refuse a checkpoint that trained another part of the policy.
+
+        **A run that trained the readout alone holds its towers at the seeded
+        draw, and a run of every weight moved them.** A resume across the two
+        settings would continue neither run. It would either freeze towers
+        that another run moved, or move towers the stored run promised to
+        hold, and the log of the resumed run would describe an experiment
+        that nobody ran.
+
+        A file that states no setting was written before the setting existed.
+        Every such run trained every weight, so this reads it as that.
+        """
+        stored = bool(meta.get(READOUT_ONLY_KEY, False))
+        if stored == self.readout_only:
+            return
+        message = (
+            f"the checkpoint at {self.latest_path} "
+            f"{describe_readout_setting(stored)}, and this run "
+            f"{describe_readout_setting(self.readout_only)}. A resume across "
+            "the two settings continues neither run. Resume with the setting "
+            "the checkpoint states, or start a fresh run."
         )
         raise PolicyFitError(message)
 
@@ -813,6 +869,8 @@ def train(
     trained on, and the record of the episode read both when the episode
     ended.
     """
+    if train_config.readout_only:
+        refuse_readout_only(kind)
     fixed = first_scoring(scoring)
     probe = Env(env_config, fixed)
     # **The run derives the normalizer once, before the first generation.**
@@ -827,6 +885,7 @@ def train(
         probe=probe,
         kind=kind,
         normalizer=normalizer,
+        readout_only=train_config.readout_only,
     )
     shell = shell_policy(kind, probe, normalizer)
     optimiser: Optimiser = EvolutionStrategy(
@@ -835,8 +894,10 @@ def train(
         sigma=train_config.sigma,
         learning_rate=train_config.learning_rate,
         seed=train_config.seed,
+        readout_only=train_config.readout_only,
     )
-    report_configuration(name, train_config, shell.flat().size)
+    trainable = trainable_count(shell, train_config.readout_only)
+    report_configuration(name, train_config, shell)
     policy: Trainable = shell
     first_generation = 0
     resumed_best: ValidationScore | None = None
@@ -1009,6 +1070,8 @@ def train(
         "weights": str(checkpoint.best_path),
         "latest_weights": str(checkpoint.latest_path),
         "parameters": int(judge.best_policy.flat().size),
+        "trainable": trainable,
+        "readout_only": train_config.readout_only,
         "best_generation": judge.best_generation,
         "best_selection_won": None if judge.best is None else judge.best.won,
         "best_selection_return": None if judge.best is None else judge.best.mean,
@@ -1135,7 +1198,30 @@ def play_generation(
     )
 
 
-def report_configuration(name: str, train_config: TrainConfig, trainable: int) -> None:
+def configuration_lines(train_config: TrainConfig, shell: Trainable) -> list[str]:
+    """Return what this configuration can reach over this policy shell.
+
+    **The trainer prints these on its first lines, and the plan of a run
+    prints them before a machine exists.** Both read this function, so the
+    two cannot state two alignments for one run.
+
+    The trainable count is what the search may move, and the shell states the
+    size of the policy. A run that trains the readout alone moves fewer
+    weights than its policy holds, and the lines name both counts.
+    """
+    return configuration_notes(
+        train_config.sigma,
+        train_config.seeds_per_generation,
+        train_config.pairs,
+        trainable_count(shell, train_config.readout_only),
+        train_config.generations,
+        int(shell.flat().size),
+    )
+
+
+def report_configuration(
+    name: str, train_config: TrainConfig, shell: Trainable
+) -> None:
     """Say what this configuration can reach, before the run spends anything.
 
     **A run that gives each candidate fewer worlds than its sigma needs ranks
@@ -1153,13 +1239,7 @@ def report_configuration(name: str, train_config: TrainConfig, trainable: int) -
     section 7.
     ``docs/research/how-sigma-trades-against-worlds-for-each-candidate.md``
     """
-    for note in configuration_notes(
-        train_config.sigma,
-        train_config.seeds_per_generation,
-        train_config.pairs,
-        trainable,
-        train_config.generations,
-    ):
+    for note in configuration_lines(train_config, shell):
         print(f"  {name} {note}", flush=True)
 
 
@@ -1414,6 +1494,7 @@ def write_report(path: Path, payload: Mapping[str, object]) -> None:
 # buys nothing that a re-export does not.
 __all__ = [
     "HEARTBEAT_SECONDS",
+    "READOUT_ONLY_KEY",
     "Checkpoint",
     "EnvConfig",
     "EpisodeRecord",
@@ -1435,6 +1516,8 @@ __all__ = [
     "Weighting",
     "asdict",
     "carries_information",
+    "configuration_lines",
+    "describe_readout_setting",
     "evaluate",
     "generation_figures",
     "generation_noise",
