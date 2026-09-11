@@ -133,7 +133,8 @@ DECISION_INTERVAL = 10
 
 # The tick limit of one episode. The engine compares held ground at the
 # limit and records a winner, so an episode that reaches the limit still
-# ends won or lost.
+# ends won or lost. A run under the limit rule counts that episode as a loss
+# for the learner, whoever the engine names.
 #
 # **This is the world a run trains in, and it is declared here only.** The
 # launcher asks the trainer for it and holds no copy, because a launcher that
@@ -174,6 +175,7 @@ def use_world(
     faction_count: int,
     tick_limit: int,
     interval: int,
+    limit_is_loss: bool = False,
 ) -> None:
     """Set the world every strategy plays, everywhere the run reads it.
 
@@ -220,6 +222,14 @@ def use_world(
     if tick_limit < interval:
         message = "the tick limit must cover one decision or more"
         raise ValueError(message)
+    if limit_is_loss and tick_limit % interval:
+        message = (
+            f"the tick limit {tick_limit} is not a whole number of decisions "
+            f"of {interval} ticks. The horizon then ends every episode before "
+            "the limit, and an unfinished episode pays nothing where the limit "
+            "rule asks for a loss. Choose a limit that the interval divides"
+        )
+        raise ValueError(message)
     horizon = tick_limit // interval
     WORLD = replace(
         WORLD,
@@ -229,6 +239,7 @@ def use_world(
         tick_limit=tick_limit,
         decision_interval=interval,
         horizon=horizon,
+        limit_is_loss=limit_is_loss,
     )
     CONTROLLER_WORLD = replace(WORLD, controlled=False)
     STRATEGIES = strategy_table(WORLD)
@@ -258,8 +269,23 @@ def world_lines(world: EnvConfig) -> str:
         "tick_limit": world.tick_limit,
         "decision_interval": world.decision_interval,
         "horizon": world.horizon,
+        LIMIT_RULE_ROW: int(world.limit_is_loss),
     }
     return "\n".join(f"{name}\t{value}" for name, value in fields.items())
+
+
+# The name of the row that states whether a game at the tick limit is a loss.
+# The world lines and the plan lines both print it, so the name is declared
+# once. A launcher reads a row by its name.
+LIMIT_RULE_ROW = "limit_is_loss"
+
+# The sentence a person reads when a run counts the tick limit as a loss. The
+# plan prints it as a note and the training log prints it on its first lines.
+LIMIT_RULE_NOTE = (
+    "only a win before the tick limit is a win. A game that reaches the limit "
+    "and a draw are both a loss for the learner, in the reward, in every win "
+    "share and in the controller bar"
+)
 
 
 def controller_weighting_line(name: str) -> str:
@@ -363,7 +389,13 @@ def use_decision_interval(interval: int) -> None:
     derives nothing of its own, so the interval and the horizon cannot
     disagree between the two entry points.
     """
-    use_world(WORLD.width, WORLD.faction_count, WORLD.tick_limit, interval)
+    use_world(
+        WORLD.width,
+        WORLD.faction_count,
+        WORLD.tick_limit,
+        interval,
+        WORLD.limit_is_loss,
+    )
 
 
 def use_play_styles(
@@ -1013,6 +1045,16 @@ def main() -> int:
             f"every game at the limit. Default {TICK_LIMIT}"
         ),
     )
+    parser.add_argument(
+        "--limit-is-loss",
+        action="store_true",
+        help=(
+            "count a game that reaches the tick limit as a loss for the "
+            "learner, whoever the engine names there, and count a draw as a "
+            "loss. Only a win before the limit is then a win, in the reward, "
+            "in every win share and in the controller bar. Off by default"
+        ),
+    )
     # **The candidate pass answers one question, and it has answered it.**
     # The highest candidate of a generation is the highest of many draws on
     # a few worlds, so it is usually the luckiest and not the best. Playing
@@ -1191,6 +1233,7 @@ def main() -> int:
         arguments.factions,
         arguments.tick_limit,
         arguments.decision_interval,
+        arguments.limit_is_loss,
     )
 
     # The play styles replace the strategy table, so they are chosen before
@@ -1233,8 +1276,11 @@ def main() -> int:
         # name never meets one.
         plan = run_plan(arguments, names)
         print(plan_lines(plan))
+        print(f"{LIMIT_RULE_ROW}\t{int(WORLD.limit_is_loss)}")
         for note in [*plan_notes(plan), *strategy_notes(arguments, names)]:
             print(f"# note {note}")
+        if WORLD.limit_is_loss:
+            print(f"# note {LIMIT_RULE_NOTE}")
         return 0
     # **One number sizes the whole run.** The queue holds one worker process
     # for each core, and the passes that no queue splits step one batch of
@@ -1263,6 +1309,8 @@ def main() -> int:
     # The training pool and the holdout share no seed, so a reported figure
     # comes from a world the policy never trained on.
     holdout = viable_seeds(WORLD, arguments.holdout, 50_000)
+    if WORLD.limit_is_loss:
+        print(f"  {LIMIT_RULE_NOTE}", flush=True)
 
     # **The pass that only fills the cache trains nothing, so it takes no
     # training pool.** The pool holds one set of seeds for each generation,
