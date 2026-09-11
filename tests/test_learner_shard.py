@@ -54,7 +54,7 @@ import sys
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 import numpy as np
 import pytest
@@ -71,6 +71,7 @@ from cachette.learn.shard import (
     SHARD_FAULT,
     EpisodeScore,
     Pending,
+    Scored,
     ShardPool,
     candidate_stride,
     combine_episodes,
@@ -680,11 +681,16 @@ def test_a_line_of_one_strategy_never_holds_the_text_of_another(
     assert log.read_text(encoding="utf-8") == "first half and the rest\n"
 
 
-def finished(results: Sequence[object]) -> list[Future[object]]:
+# A result a pool holds. A pending submission takes only a result that reports
+# its ticks, so a finished future carries the same bound.
+Result = TypeVar("Result", bound=Scored)
+
+
+def finished(results: Sequence[Result]) -> list[Future[Result]]:
     """Return one finished future for each result, in the order given."""
-    futures: list[Future[object]] = []
+    futures: list[Future[Result]] = []
     for result in results:
-        future: Future[object] = Future()
+        future: Future[Result] = Future()
         future.set_result(result)
         futures.append(future)
     return futures

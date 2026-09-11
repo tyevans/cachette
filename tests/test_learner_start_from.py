@@ -32,6 +32,7 @@ import subprocess
 import sys
 from dataclasses import replace
 from pathlib import Path
+from typing import TypedDict, cast
 
 import numpy as np
 import pytest
@@ -186,7 +187,9 @@ def test_a_started_run_begins_at_the_stored_centre_at_generation_zero(
     """
     _, stated = load_policy(source)
     assert stated["generation"] == SOURCE_GENERATION
-    assert math.isfinite(stated["best_selection_won"]), "the source chose nothing"
+    assert math.isfinite(cast(float, stated["best_selection_won"])), (
+        "the source chose nothing"
+    )
     stored = centre_of(source)
     seeded = np.asarray(shell_policy("linear", Env(WORLD, TARGET_REWARD)).flat())
     assert not np.allclose(stored, seeded), "the source never moved its centre"
@@ -221,7 +224,7 @@ def test_every_file_of_a_started_run_names_its_source(
         assert meta["started_from"] == "wonder-latest.npz", name
         assert meta["started_from_strategy"] == "wonder", name
         assert meta["started_from_generation"] == SOURCE_GENERATION, name
-        assert math.isnan(meta["best_selection_won"]), name
+        assert math.isnan(cast(float, meta["best_selection_won"])), name
 
 
 def test_a_run_from_a_seeded_draw_names_no_source(source: Path) -> None:
@@ -270,9 +273,25 @@ def write_other_centre(
     )
 
 
+class OtherCentre(TypedDict, total=False):
+    """The ways a written centre differs from the run that starts from it."""
+
+    world: EnvConfig
+    kind: str
+    readout_only: bool
+    normalized: bool
+
+
+class StartingRun(TypedDict, total=False):
+    """The settings of the run that reads the written centre."""
+
+    kind: str
+    readout_only: bool
+
+
 # One case for each refusal a resume makes. Each names the file, the run that
 # reads it, and the words of the refusal.
-REFUSALS = {
+REFUSALS: dict[str, tuple[OtherCentre, StartingRun, str]] = {
     "another world": (
         {"world": replace(WORLD, width=32, height=32), "normalized": False},
         {},

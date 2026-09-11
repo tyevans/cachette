@@ -19,9 +19,13 @@ import sys
 from concurrent.futures import Future
 from pathlib import Path
 from types import ModuleType
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
+
+if TYPE_CHECKING:
+    from cachette.learn.shard import EpisodeScore
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -505,7 +509,7 @@ OLD_BEAT = (
 )
 
 
-def heartbeat(label: str, results: list[object]) -> str:
+def heartbeat(label: str, results: list[EpisodeScore]) -> str:
     """Return the last heartbeat the trainer prints for these finished results.
 
     The trainer prints the line, so the reader is tested against the producer
@@ -513,9 +517,9 @@ def heartbeat(label: str, results: list[object]) -> str:
     """
     from cachette.learn.shard import Pending
 
-    futures: list[Future[object]] = []
+    futures: list[Future[EpisodeScore]] = []
     for result in results:
-        future: Future[object] = Future()
+        future: Future[EpisodeScore] = Future()
         future.set_result(result)
         futures.append(future)
     printed = io.StringIO()
@@ -524,7 +528,7 @@ def heartbeat(label: str, results: list[object]) -> str:
     return printed.getvalue().splitlines()[-1] + "\n"
 
 
-def episode(wins: int, rewards: list[float], ticks: int) -> object:
+def episode(wins: int, rewards: list[float], ticks: int) -> EpisodeScore:
     """Build one finished task of a generation, with one game for each reward."""
     from cachette.learn.shard import EpisodeScore
 
