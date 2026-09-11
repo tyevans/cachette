@@ -908,8 +908,13 @@ derivation beside the function that computes it.
 """
 
 
-def isotropic_weighting(policy: Trainable, centre: np.ndarray) -> np.ndarray:
+def isotropic_weighting(
+    policy: Trainable, centre: np.ndarray, readout_only: bool = False
+) -> np.ndarray:
     """Weight every coordinate the same, whatever layer it sits in.
+
+    The readout setting is accepted and not read. The defect this restates
+    belongs to a run of every weight, and the search now passes the setting.
 
     **This is the defect, restated so that a test can put it back.** The
     search drew an isotropic perturbation over the whole flat vector, so a
@@ -924,8 +929,13 @@ def isotropic_weighting(policy: Trainable, centre: np.ndarray) -> np.ndarray:
     return np.ones(centre.size)
 
 
-def bare_layer_weighting(policy: Trainable, centre: np.ndarray) -> np.ndarray:
+def bare_layer_weighting(
+    policy: Trainable, centre: np.ndarray, readout_only: bool = False
+) -> np.ndarray:
     """Weight each layer by its own scale, and give a layer of zeros nothing.
+
+    The readout setting is accepted and not read. The defect this restates
+    belongs to a run of every weight, and the search now passes the setting.
 
     **This is the second defect, restated so that a test can put it back.** A
     rule that reads the current scale of a layer and states no fallback gives
