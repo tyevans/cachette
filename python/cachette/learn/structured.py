@@ -59,10 +59,18 @@ share a weight across, so no kernel and no pool applies to them. Its width is
 therefore the largest single term of the three towers, and it is the knob that
 buys reading power against alignment.[^2]
 
-**No layer of this policy is frozen.** A layer the trainer never moves states
-a rule the run cannot revise, and this project rejects that shape. Every layer
-except the readout starts at a draw, because a layer of zeros behind another
-layer of zeros gives no change under any perturbation.
+**A run trains every layer of this policy unless it asks otherwise.** A layer
+the trainer never moves states a rule the run cannot revise, so the default
+trains every layer. Every layer except the readout starts at a draw, because a
+layer of zeros behind another layer of zeros gives no change under any
+perturbation.
+
+A run may ask the search to train the readout alone. The towers and the trunk
+then keep the seeded draw they start from, and the policy is a readout over a
+fixed random projection of the observation. One measurement could not
+separate such a run from a run of every layer on twelve held-out worlds, and
+the step of a smaller trainable count aligns better.[^5] The search holds that
+option, and this module states only where the readout sits in the flat vector.
 
 # The trunk and the readout
 
@@ -84,6 +92,9 @@ table, decision D4.
 
 [^4]: ADR-0195, decision D3.
 ``docs/adrs/draft/adr-0195-the-observation-of-a-faction-is-a-fixed-width-scale-free-table.md``
+
+[^5]: Whether the structured towers learn, section 6.
+``docs/research/whether-the-structured-towers-learn.md``
 """
 
 from __future__ import annotations
@@ -671,6 +682,20 @@ class StructuredPolicy:
         shapes.append(self.trunk.shape)
         shapes.append(self.readout.shape)
         return tuple(shapes)
+
+    @property
+    def readout_span(self) -> slice:
+        """Where the readout sits in the flat vector, as one slice.
+
+        **The span comes from the shapes, and the shapes name the readout
+        last.** The flat vector and the rebuild read the same order, so this
+        adds no second statement of where a layer sits. A search that trains
+        the readout alone reads this, and it holds every weight outside the
+        span where the weight started.
+        """
+        sizes = [int(np.prod(shape)) for shape in self.shapes]
+        start = int(sum(sizes[:-1]))
+        return slice(start, start + sizes[-1])
 
     def flat(self) -> npt.NDArray[np.float64]:
         """Return every trainable weight as one vector.
