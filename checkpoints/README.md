@@ -48,6 +48,10 @@ started from generation 14 of a conquer-structured run. Both runs trained on a
 that reached the limit as a loss. Both trained the readout only, which is 3780
 of the 10542 weights.
 
+| File | Elo against the controller | Win share | Generation | Kind |
+|---|---|---|---|---|
+| `land/obs8-act2-land-structured-gen4` | +130.7 | 0.411 | 4 | structured |
+
 A rating run chose it. The run seated six players, and it played every group
 of three over six worlds. Each world played three rotations, so every player
 held every seat an equal number of times. That is 360 games over 120 worlds,
