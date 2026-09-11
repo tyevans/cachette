@@ -993,12 +993,25 @@ class EvolutionStrategy:
         which is the price of any bound on a kind whose choice does not
         survive a scaling. Such a centre is the saturated case this bound
         exists to prevent, so the search shortens it rather than leaving it.
+
+        **The bound holds the ceiling exactly, and not to within a rounding.**
+        The factor ``ceiling / length`` rounds, and so does the norm of the
+        scaled centre. The norm of the scaled centre then often lands one unit
+        in the last place above the ceiling. The search therefore lowers the
+        factor by one representable step until the norm is at or under the
+        ceiling. Each step is a fixed float operation, so the result is the
+        same on every machine and at every worker count.
         """
         length = float(np.linalg.norm(centre))
         ceiling = self.norm_ceiling
         if length <= ceiling:
             return centre
-        return centre * (ceiling / length)
+        factor = ceiling / length
+        scaled = centre * factor
+        while float(np.linalg.norm(scaled)) > ceiling:
+            factor = math.nextafter(factor, 0.0)
+            scaled = centre * factor
+        return scaled
 
     def step(
         self, centre: np.ndarray, gradient: np.ndarray, agreement: float
