@@ -51,7 +51,7 @@ import io
 import json
 import subprocess
 import sys
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -63,12 +63,14 @@ from cachette.learn import Weighting
 from cachette.learn.config import TrainConfig
 from cachette.learn.env import Env, EnvConfig, viable_seeds
 from cachette.learn.journal import strategy_logs
+from cachette.learn.measure import MeasurementScore
 from cachette.learn.policy import load_policy
 from cachette.learn.rollout import score_generation
 from cachette.learn.search import generation_noise, pair_candidates, shell_policy
 from cachette.learn.shard import (
     SHARD_FAULT,
     EpisodeScore,
+    Pending,
     ShardPool,
     candidate_stride,
     combine_episodes,
@@ -676,3 +678,63 @@ def test_a_line_of_one_strategy_never_holds_the_text_of_another(
 
     assert combined.getvalue() == "second whole\nfirst half and the rest\n"
     assert log.read_text(encoding="utf-8") == "first half and the rest\n"
+
+
+def finished(results: Sequence[object]) -> list[Future[object]]:
+    """Return one finished future for each result, in the order given."""
+    futures: list[Future[object]] = []
+    for result in results:
+        future: Future[object] = Future()
+        future.set_result(result)
+        futures.append(future)
+    return futures
+
+
+def test_the_running_result_follows_the_fields_an_older_reader_knew(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A training generation adds its running result after the elapsed time.
+
+    The fields before the elapsed time keep their order, so a reader of the
+    older line still reads each one. Each task here holds two games, so the
+    wins, the reward and the ticks divide by six games and not by three tasks.
+    """
+    held = [
+        replace(
+            score(candidate, 0, rewards[0]),
+            absolute=np.asarray(rewards),
+            wins=wins,
+            games=2,
+            ticks=ticks,
+        )
+        for candidate, (rewards, wins, ticks) in enumerate(
+            [([10.0, 20.0], 2, 600), ([0.0, 30.0], 0, 1000), ([40.0, 0.0], 1, 400)]
+        )
+    ]
+    Pending(finished(held)).results("conquer generation  2")
+    line = capsys.readouterr().out.splitlines()[-1]
+    before, after = line.split("] ", 1)
+    assert before.startswith(
+        "  conquer generation  2 working  episodes     3 live    0/3"
+    )
+    assert " t/s [" in before
+    assert after == "wins 3/6 won 0.500 mean 16.7 game 333"
+
+
+def test_a_measured_pass_prints_no_running_result(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """A measured episode carries no win count, so its heartbeat keeps the old shape."""
+    measured = MeasurementScore(
+        policy_index=0,
+        repeat=0,
+        seed_position=0,
+        returns={},
+        episodes={},
+        ticks=5,
+    )
+    Pending(finished([measured])).results("baseline")
+    line = capsys.readouterr().out.splitlines()[-1]
+    assert line.startswith("  baseline working  episodes     1 live    0/1")
+    assert line.endswith("s]")
+    assert " wins " not in line
