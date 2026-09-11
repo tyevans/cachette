@@ -76,7 +76,27 @@ upgrade and for work toward a row that carries no claim.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Part-built wonder work is fragile. The item stays in `refined/` until the
+integrator runs the gate and regenerates the golden state hash. Then it moves to
+`complete/`.
+
+**What was done.** The rule reads the victory claim column of the row above an
+entry, so in the default table it touches the wonder alone.[^3] Each entry
+stores the holder that its work belongs to. A new serial pass runs after the
+last stage that writes the holder column. It resets wonder work whose holder
+changed, and it takes the decay from wonder work that the build did not advance
+on that tick. An entry at no level that reaches nothing is removed.
+
+**What changed from the plan.** The decay is a value of the upgrade table and
+not a column of a row, because only a row with a claim reads it. A world setter
+writes it, and the table hash covers it.
+
+**What was left undone.** No binding exposes the decay setter to Python. No
+event marks a reset or a removal of wonder work. ADR-0150 is not edited, because
+another owner holds it. ADR-0206 states the clause it changes.
+
+**Registers.** DEC-284 is closed. FND-765 is recorded. The balance register holds
+the wonder decay row. No blocker opened or closed.
 
 ## References
 
