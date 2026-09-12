@@ -816,6 +816,29 @@ def strategy_table(world: EnvConfig) -> StrategyTable:
         lost=-LOSS,
         drawn=0.0,
     )
+    # Hold the ground, and take the clock as well. The levels and the outcome
+    # weights are those of the ground row above, and the early weight is the
+    # one thing added.
+    #
+    # **A game decided on held ground at the tick limit is a win the engine
+    # records.** A run that counts the limit as a loss pays a flat loss for
+    # every such game, and a measurement of that shape reached the limit in
+    # almost every game against a strong seat. Every candidate then scored the
+    # same loss, so the search ranked nothing. A run of this row states no
+    # limit rule, so the engine's own reading decides the game.
+    #
+    # The early weight is then what separates a fast win from a slow one. The
+    # ground row carries none, because a stored policy was trained against it
+    # and the row must not move under that policy.[^1]
+    #
+    # [^1]: Findings register, FND-692. `docs/FINDINGS.md`
+    holding = Weighting(
+        levels=dict(ground.levels),
+        won=ground.won,
+        lost=ground.lost,
+        drawn=ground.drawn,
+        won_early=EARLY,
+    )
     # Fill the stores. Ground scores a little, because a faction with no
     # ground fills nothing.
     riches = Weighting(
@@ -875,6 +898,13 @@ def strategy_table(world: EnvConfig) -> StrategyTable:
         #
         # [^1]: Findings register, FND-650. `docs/FINDINGS.md`
         "land-structured": (world, ground, STRUCTURED_KIND),
+        # The ground scoring with the early weight added. The pair beside it
+        # holds the early weight fixed at nothing, so the two pairs measure
+        # what the clock is worth to a faction that plays for ground.
+        "land-hold": (world, holding, "linear"),
+        # The same scoring as the land-hold strategy, over the structured
+        # policy.
+        "land-hold-structured": (world, holding, STRUCTURED_KIND),
         "wealth": (world, riches, "linear"),
         # The same scoring as the wealth strategy, over the structured policy.
         "wealth-structured": (world, riches, STRUCTURED_KIND),
