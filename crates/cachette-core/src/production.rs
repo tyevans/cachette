@@ -224,7 +224,11 @@ impl BuildCostRow {
     pub const PLACEHOLDER: Self = Self {
         work: PLACEHOLDER_BUILD_WORK,
         people: PLACEHOLDER_BUILD_PEOPLE,
-        goods: [PLACEHOLDER_BUILD_GOODS; COMMODITY_COUNT],
+        goods: {
+            let mut goods = [Fix32::ZERO; COMMODITY_COUNT];
+            goods[0] = PLACEHOLDER_BUILD_GOODS;
+            goods
+        },
     };
 }
 
@@ -445,7 +449,11 @@ impl QueueTable {
     pub const fn new() -> Self {
         Self {
             entries: Vec::new(),
-            charge: [PLACEHOLDER_ADVANCE_CHARGE; COMMODITY_COUNT],
+            charge: {
+                let mut charge = [Fix32::ZERO; COMMODITY_COUNT];
+                charge[0] = PLACEHOLDER_ADVANCE_CHARGE;
+                charge
+            },
             bound: QUEUE_BOUND,
             produced: 0,
             refused_without_a_person: 0,
