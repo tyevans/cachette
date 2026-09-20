@@ -444,7 +444,7 @@ impl PlanRegister {
         }
     }
 
-    /// Counts one refusal that a verb or a pass gave.
+    /// Counts one write refusal that the verb gave.
     pub fn count_refusal(&mut self) {
         self.refused += 1;
     }
@@ -480,13 +480,14 @@ impl PlanRegister {
         self.dropped
     }
 
-    /// Returns how many writes and builds the plan refused for any reason
-    /// other than a full plan.
+    /// Returns how many writes the plan refused for any reason other than a
+    /// full plan.
     ///
     /// **This count and the drop count are disjoint.** One act raises one of
-    /// them, so their sum is every write and build the plan turned away. The
-    /// two once overlapped, and a reader that added them counted a full plan
-    /// twice.[^1]
+    /// them, so their sum is every write the plan turned away. The two once
+    /// overlapped, and a reader that added them counted a full plan twice.[^1]
+    /// Build refusals are counted apart in the subsystem census under
+    /// `builds_refused`.
     ///
     /// # References
     ///

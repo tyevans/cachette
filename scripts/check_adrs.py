@@ -231,7 +231,12 @@ def main(argv: list[str]) -> int:
     # source file.[^1] The three sibling checks already name paths.
     #
     # [^1]: Findings register, FND-194. `docs/FINDINGS.md`
-    skip = (ROOT / ".git", ROOT / "target", ROOT / ".claude" / "worktrees")
+    skip = (
+        ROOT / ".git",
+        ROOT / "target",
+        ROOT / ".claude" / "worktrees",
+        ROOT / ".agents" / "worktrees",
+    )
     code = [
         p
         for ext in ("*.rs", "*.py")

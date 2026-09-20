@@ -85,6 +85,7 @@ SKIP_PATHS = {
     # A worktree holds another checkout of this repository. Reading it reports
     # one failure against two paths and blames the wrong tree.
     ROOT / ".claude" / "worktrees",
+    ROOT / ".agents" / "worktrees",
     # Deliberately broken. The probe recipe scans these on purpose and fails
     # when the check passes over them.
     ROOT / "tests" / "fixtures",
