@@ -563,6 +563,36 @@ class ActionTable:
                 return verb
         return None
 
+    def decode(self, action: int) -> tuple[str, tuple[int, ...]]:
+        """Decode an action integer into the verb name and coordinates.
+
+        The decoding is arithmetic over this schema alone.
+        """
+        for verb in self.verbs:
+            if verb.first <= action < verb.first + verb.rows:
+                return verb.name, verb.coordinates(action)
+        message = (
+            f"the action {action} is at or above the length {self.length} "
+            "of the action table"
+        )
+        raise ValueError(message)
+
+    def encode(self, name: str, coordinates: Sequence[int] = ()) -> int:
+        """Encode a verb name and coordinates into an action integer.
+
+        The encoding is arithmetic over this schema alone.
+        """
+        verb = self.named(name)
+        if verb is None:
+            message = f"the verb {name!r} is not a known verb of the action table"
+            raise ValueError(message)
+        if not verb.holds(coordinates):
+            message = (
+                f"the coordinates {coordinates!r} are invalid for the verb {name!r}"
+            )
+            raise ValueError(message)
+        return verb.row_of(coordinates)
+
     def as_meta(self) -> dict[str, list[object]]:
         """Return the table as the entries a weight file stores.
 

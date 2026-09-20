@@ -693,6 +693,65 @@ impl PyWorld {
         Ok(world.act(FactionId(faction), action))
     }
 
+    /// Returns the action integer of one verb and its arguments under the
+    /// action schema of this world.
+    ///
+    /// `verb` is the name of the verb (such as `"gather"`, `"build"`,
+    /// `"relation"`, `"no_op"`). `arguments` is a sequence of integers
+    /// giving the value of each argument position the verb declares, in
+    /// order.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the verb name is unknown, when the count of
+    /// arguments does not equal the count of positions the verb declares, or
+    /// when an argument is at or above the bound of its position.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D1. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+    #[pyo3(signature = (verb, arguments = Vec::new()))]
+    fn encode_action(&self, verb: &str, arguments: Vec<u32>) -> PyResult<u32> {
+        let world = self.lock();
+        let schema = world.action_schema();
+        let row = schema.row_named(verb).ok_or_else(|| {
+            VerbError::new_err(format!(
+                "the verb {verb:?} is not a known verb of the action table"
+            ))
+        })?;
+        schema.encode(row.verb, &arguments).ok_or_else(|| {
+            VerbError::new_err(format!(
+                "the arguments {arguments:?} are invalid for the verb {verb:?}"
+            ))
+        })
+    }
+
+    /// Decodes one action integer into the verb name and its arguments, as a
+    /// tuple `(str, list[int])`.
+    ///
+    /// The decoding is arithmetic over the action schema of this world
+    /// alone.[^1]
+    ///
+    /// # Errors
+    ///
+    /// Raises `VerbError` when the action integer is at or above the length
+    /// of the action table.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D1. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+    fn decode_action(&self, action: u32) -> PyResult<(String, Vec<u32>)> {
+        let world = self.lock();
+        let schema = world.action_schema();
+        let (verb, arguments) = schema.decode(action).ok_or_else(|| {
+            VerbError::new_err(format!(
+                "the action {action} is at or above the length {} of the action table",
+                schema.length()
+            ))
+        })?;
+        Ok((verb.name().to_string(), arguments))
+    }
+
     /// Returns why one unit chose the intent it carries, as a `dict`.
     ///
     /// The unit is one soldier identity, as a Python integer.

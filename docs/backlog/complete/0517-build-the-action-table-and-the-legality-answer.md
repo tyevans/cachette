@@ -1,7 +1,7 @@
 ---
 id: 0517
 title: Build the action table and the legality answer, and let a caller act by one integer
-status: refined
+status: complete
 created: 2026-09-06
 implements: [ADR-0154 D4, ADR-0154 D5, ADR-0154 D6, ADR-0176 D1, ADR-0176 D2, ADR-0176 D3, ADR-0176 D4]
 changes: []
@@ -127,7 +127,20 @@ cannot pass by measuring a world that refuses nothing.[^12]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**The action table and legality answer are built.** The engine declares one
+bounded table of actions as a mixed radix over the positions each verb declares
+per ADR-0154 and ADR-0176. No bound follows the population.
+
+Refusal check functions (`build_refusal`, `move_relation_refusal`,
+`campaign_cohort`, `settle_refusal`, and `project_partition`) sit beside each
+verb so that the legality checks evaluate the exact same rules without
+duplicating logic or mutating simulated state.
+
+The public interface exposes `action_schema`, `legal_actions`, `act`,
+`encode_action`, and `decode_action` in `cachette-core` and in the Python
+bindings in `crates/cachette-py/`. Unit tests in Rust and Python verify round-trip
+mixed-radix encoding/decoding, legality answering, and agreement with the verbs
+over a seed set.
 
 ## References
 
