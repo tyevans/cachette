@@ -126,7 +126,7 @@ slot.[^1]
 create_exception!(
     _core,
     ArenaMismatchError,
-    CachetteError,
+    ViewError,
     "An identity belonged to the wrong arena.
 
 The engine raises this class when an identity tagged with one arena is passed
