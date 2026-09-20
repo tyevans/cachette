@@ -176,7 +176,7 @@ plainly that nothing implements it yet.[^1]
 [^19]: Review 0204, the two corrected records. `docs/reviews/0204-the-two-corrected-records.md`
 [^20]: Findings register, FND-202. `docs/FINDINGS.md`
 [^PRI97]: Backlog item 0295, fail a check when the toolchain names a floating channel. `docs/backlog/complete/0295-fail-a-check-when-the-toolchain-names-a-floating-channel.md`
-[^PRI97B]: Backlog item 0296, prove that the Miri gate can fail. `docs/backlog/refined/0296-prove-that-the-miri-gate-can-fail.md`
+[^PRI97B]: Backlog item 0296, prove that the Miri gate can fail. `docs/backlog/complete/0296-prove-that-the-miri-gate-can-fail.md`
 [^PRI105]: Findings register, FND-306. `docs/FINDINGS.md`
 [^PRI106]: Findings register, FND-318. `docs/FINDINGS.md`
 [^PRI107]: Decisions register, DEC-112 and DEC-113. `docs/DECISIONS.md`

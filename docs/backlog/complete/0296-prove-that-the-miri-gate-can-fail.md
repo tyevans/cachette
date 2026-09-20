@@ -1,7 +1,7 @@
 ---
 id: 0296
 title: Prove that the Miri gate can fail
-status: refined
+status: complete
 created: 2026-09-02
 implements: [ADR-0097 D4]
 changes: []
@@ -101,6 +101,22 @@ does not reach the case, that is a finding and a separate item.
 It does not measure what the gate costs. No figure for it exists in any
 register, and the record that created the gate says a register owns any such
 figure.[^5]
+
+## Outcome
+
+**The probe feature was implemented and verified.** The feature
+`probe-undeclared-padding` in `cachette-core` perturbs `CarryLoad` by adding a
+single `u8` field, which introduces three undeclared compiler padding bytes due
+to `u32` alignment.[^1]
+
+**The Miri gate fails when the probe feature is enabled.** Running `cargo miri
+test` detects an uninitialised memory read in `StateHash::write` while hashing
+the soldier arena carries column.[^1] Ordinary `cargo test` passes and waves the
+padding bytes through, proving that Miri catches what ordinary tests miss.[^2]
+
+**Continuous integration runs the probe.** The `miri-probe` target in the
+justfile asserts failure under Miri and success under ordinary test, and the
+continuous integration `miri` job executes it.
 
 ## References
 
