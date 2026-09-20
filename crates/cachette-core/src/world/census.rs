@@ -56,6 +56,8 @@ pub(super) struct CensusTotals {
     pub(super) builds_refused: i64,
     /// The people the growth stage added, over the run.
     pub(super) births: i64,
+    /// The units that fell in combat, over the run.
+    pub(super) units_fallen: i64,
 }
 
 /// One row of the subsystem census: a name and the reader that counts it.
@@ -127,6 +129,21 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         name: "units",
         basis: CensusBasis::Held,
         read: |world| i64::from(world.soldiers.len()),
+    },
+    CensusRow {
+        name: "workers",
+        basis: CensusBasis::Held,
+        read: |world| i64::from(world.population_of_type(crate::unit_type::WORKER)),
+    },
+    CensusRow {
+        name: "soldiers",
+        basis: CensusBasis::Held,
+        read: |world| i64::from(world.population_of_type(crate::unit_type::SOLDIER)),
+    },
+    CensusRow {
+        name: "merchants",
+        basis: CensusBasis::Held,
+        read: |world| i64::from(world.population_of_type(crate::unit_type::MERCHANT)),
     },
     CensusRow {
         name: "settlements",
@@ -218,6 +235,11 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         name: "units_burned",
         basis: CensusBasis::Total,
         read: |world| world.fire.burned_units_total(),
+    },
+    CensusRow {
+        name: "units_fallen",
+        basis: CensusBasis::Total,
+        read: |world| world.census.units_fallen,
     },
     CensusRow {
         name: "upgrades_complete",
