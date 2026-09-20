@@ -73,7 +73,7 @@
 
 use crate::hex::{Axial, Grid};
 use crate::soldier::SoldierArena;
-use crate::sort::{self, BoundedKey, SortError};
+use crate::sort::{self, SortError};
 use crate::types::{Entity, TileIdx};
 
 /// The largest block edge exponent that a layout accepts.
@@ -367,6 +367,12 @@ pub struct TileCursor {
 /// # References
 ///
 /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D1. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct BridgeEntry {
+    key: u64,
+    unit: Entity,
+}
+
 #[derive(Clone, Debug)]
 pub struct UnitTileBridge {
     layout: BlockLayout,
@@ -381,6 +387,8 @@ pub struct UnitTileBridge {
     ranges: Vec<BlockRange>,
     /// One bit for each block. The bit is set when the block holds a unit.
     occupancy: Vec<u64>,
+    entries: Vec<BridgeEntry>,
+    scratch: Vec<BridgeEntry>,
 }
 
 impl UnitTileBridge {
@@ -399,6 +407,8 @@ impl UnitTileBridge {
             units: Vec::new(),
             ranges: vec![BlockRange::default(); blocks],
             occupancy: vec![0u64; blocks.div_ceil(64)],
+            entries: Vec::new(),
+            scratch: Vec::new(),
         }
     }
 
@@ -457,14 +467,30 @@ impl UnitTileBridge {
             return Err(BridgeError::GridMismatch);
         }
 
+        let count = arena.len() as usize;
+        if count == 0 {
+            self.keys.clear();
+            self.units.clear();
+            self.entries.clear();
+            for range in &mut self.ranges {
+                *range = BlockRange::default();
+            }
+            self.occupancy.fill(0);
+            self.built = Some(arena.revision());
+            self.source = Some(arena.identity());
+            return Ok(());
+        }
+
         // The arena is read in slot order, which is explicit and stable.[^1]
         // The arena is not sorted: the slot index is half of the identity.[^2]
         //
         // [^1]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
         // [^2]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
         let column = arena.tile_column();
-        let mut units: Vec<Entity> = Vec::with_capacity(arena.len() as usize);
-        let mut keys: Vec<BoundedKey> = Vec::with_capacity(arena.len() as usize);
+        let ceiling = self.layout.key_ceiling();
+        self.entries.clear();
+        self.entries.reserve(count);
+
         for unit in arena.iter() {
             let tile = column[unit.index() as usize];
             let Some(key) = self.layout.key_of(tile) else {
@@ -473,20 +499,132 @@ impl UnitTileBridge {
                 // caller mistake.
                 return Err(BridgeError::GridMismatch);
             };
-            units.push(unit);
-            keys.push(BoundedKey::new(key, unit.to_bits()));
+            if key > ceiling {
+                return Err(BridgeError::Sort(SortError::KeyAboveCeiling {
+                    key,
+                    ceiling,
+                }));
+            }
+            self.entries.push(BridgeEntry { key, unit });
         }
 
-        let order = sort::order_bounded(&keys, self.layout.key_ceiling())?;
-        self.keys.clear();
-        self.units.clear();
-        for index in &order {
-            let item = *index as usize;
-            self.keys.push(keys[item].order());
-            self.units.push(units[item]);
+        let count = self.entries.len();
+        self.keys.resize(count, 0);
+        let dummy = Entity::new(0, 1).expect("a dummy entity can be constructed");
+        self.units.resize(count, dummy);
+
+        let digits = sort::digit_count(ceiling);
+        if digits > 1 && self.scratch.len() < count {
+            self.scratch.resize(
+                count,
+                BridgeEntry {
+                    key: 0,
+                    unit: dummy,
+                },
+            );
         }
 
-        self.rebuild_ranges();
+        for range in &mut self.ranges {
+            *range = BlockRange::default();
+        }
+        self.occupancy.fill(0);
+
+        for digit in 0..digits {
+            let is_final = digit == digits - 1;
+            let shift = digit * sort::DIGIT_BITS;
+            let mut starts = [0u32; sort::DIGIT_VALUES];
+
+            if digit == 0 {
+                for entry in &self.entries {
+                    starts[sort::digit_of(entry.key, shift)] += 1;
+                    let block = self.layout.block_of_key(entry.key) as usize;
+                    if block < self.ranges.len() {
+                        self.ranges[block].length += 1;
+                    }
+                }
+                let mut total = 0u32;
+                for (block, range) in self.ranges.iter_mut().enumerate() {
+                    if range.length > 0 {
+                        range.start = total;
+                        self.occupancy[block / 64] |= 1u64 << (block % 64);
+                        total += range.length;
+                    }
+                }
+            } else if digit % 2 == 1 {
+                for entry in &self.scratch[..count] {
+                    starts[sort::digit_of(entry.key, shift)] += 1;
+                }
+            } else {
+                for entry in &self.entries {
+                    starts[sort::digit_of(entry.key, shift)] += 1;
+                }
+            }
+
+            let mut total = 0u32;
+            for start in &mut starts {
+                let first = total;
+                total += *start;
+                *start = first;
+            }
+
+            if is_final {
+                if digit % 2 == 1 {
+                    for entry in &self.scratch[..count] {
+                        let value = sort::digit_of(entry.key, shift);
+                        let dest = starts[value] as usize;
+                        self.keys[dest] = entry.key;
+                        self.units[dest] = entry.unit;
+                        starts[value] += 1;
+                    }
+                } else {
+                    for entry in &self.entries {
+                        let value = sort::digit_of(entry.key, shift);
+                        let dest = starts[value] as usize;
+                        self.keys[dest] = entry.key;
+                        self.units[dest] = entry.unit;
+                        starts[value] += 1;
+                    }
+                }
+            } else if digit % 2 == 0 {
+                for entry in &self.entries {
+                    let value = sort::digit_of(entry.key, shift);
+                    let dest = starts[value] as usize;
+                    self.scratch[dest] = *entry;
+                    starts[value] += 1;
+                }
+            } else {
+                for entry in &self.scratch[..count] {
+                    let value = sort::digit_of(entry.key, shift);
+                    let dest = starts[value] as usize;
+                    self.entries[dest] = *entry;
+                    starts[value] += 1;
+                }
+            }
+        }
+
+        // The radix passes are stable on the tile key. Items that share a tile
+        // key are ordered by entity identity, and adjacent inspection checks
+        // that no key ties, resolving DEC-111 without a full sort pass.
+        let mut start = 0usize;
+        while start < count {
+            let key = self.keys[start];
+            let mut end = start + 1;
+            while end < count && self.keys[end] == key {
+                end += 1;
+            }
+            if end - start > 1 {
+                self.units[start..end].sort_unstable_by_key(|entity| entity.to_bits());
+                for i in (start + 1)..end {
+                    if self.units[i - 1] == self.units[i] {
+                        return Err(BridgeError::Sort(SortError::RepeatedKey(
+                            self.units[i].to_bits(),
+                        )));
+                    }
+                }
+            }
+            start = end;
+        }
+
         self.built = Some(arena.revision());
         self.source = Some(arena.identity());
         Ok(())
@@ -500,6 +638,7 @@ impl UnitTileBridge {
     /// # References
     ///
     /// [^1]: ADR-0018, the unit-to-tile bridge is derived, and it rebuilds at the barrier, decision D2. `docs/adrs/accepted/adr-0018-the-unit-to-tile-bridge-is-derived-and-rebuilds-at-the-barrier.md`
+    #[cfg(test)]
     fn rebuild_ranges(&mut self) {
         for range in &mut self.ranges {
             *range = BlockRange::default();
@@ -1067,5 +1206,80 @@ mod tests {
         bridge.rebuild_ranges();
         assert!(bridge.check_structure());
         assert_eq!(bridge.check_invariants(&arena), Ok(false));
+    }
+
+    #[test]
+    fn unsorted_inputs_produce_correct_and_equivalent_bridge_layout() {
+        let grid = Grid::new(16, 16).expect("a small extent describes a grid");
+        let layout = BlockLayout::new(grid, 2).expect("the exponent is inside the ceiling");
+
+        // Spawn soldiers in unsorted, scattered tile order across multiple blocks,
+        // with some tiles having multiple soldiers and some blocks empty.
+        let addresses = [
+            Axial::new(15, 15),
+            Axial::new(3, 2),
+            Axial::new(8, 7),
+            Axial::new(3, 2),
+            Axial::new(0, 0),
+            Axial::new(8, 7),
+            Axial::new(1, 5),
+            Axial::new(14, 12),
+            Axial::new(0, 1),
+            Axial::new(3, 2),
+            Axial::new(10, 10),
+        ];
+
+        let mut arena = SoldierArena::new(grid, 64);
+        for &address in &addresses {
+            arena
+                .spawn(address, FactionId(0))
+                .expect("the spawn must succeed");
+        }
+
+        let mut bridge = UnitTileBridge::new(layout);
+        bridge.rebuild(&arena).expect("the rebuild must succeed");
+
+        assert!(bridge.check_structure());
+        assert_eq!(bridge.check_invariants(&arena), Ok(true));
+
+        // Ground-truth check against scanning the arena: on every tile, units
+        // returned by bridge match the ground truth sorted by identity.
+        for index in 0..grid.tile_count() {
+            let tile = TileIdx(index);
+            let address = grid
+                .address_of(tile)
+                .expect("the index is inside the world");
+            let mut expected: Vec<Entity> = arena
+                .iter()
+                .filter(|unit| {
+                    let unit_tile = arena.tile_column()[unit.index() as usize];
+                    unit_tile == tile
+                })
+                .collect();
+            expected.sort_by_key(|unit| unit.to_bits());
+
+            let on_tile = bridge
+                .on_tile(&arena, address)
+                .expect("bridge describes the arena");
+            assert_eq!(on_tile, expected.as_slice(), "disagreement on tile {index}");
+
+            let unguard = bridge.on_tile_unguarded(tile);
+            assert_eq!(unguard, expected.as_slice());
+        }
+
+        // Verify that block ranges and occupancy agree with the unit count in each block.
+        for block in 0..layout.block_count() {
+            let range = bridge.block_range(block).expect("valid block range");
+            let is_occupied = bridge.block_is_occupied(block);
+            let units_in_block = bridge.in_block(&arena, block).expect("valid block");
+
+            assert_eq!(units_in_block.len(), range.length as usize);
+            assert_eq!(is_occupied, range.length > 0);
+            for unit in units_in_block {
+                let tile = arena.tile_column()[unit.index() as usize];
+                let key = layout.key_of(tile).expect("tile is in grid");
+                assert_eq!(layout.block_of_key(key), block);
+            }
+        }
     }
 }
