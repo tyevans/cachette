@@ -307,6 +307,7 @@ impl World {
             let result = self.found_one(group, faction, &taken);
             if let Ok(founding) = &result {
                 taken.push(founding.place());
+                self.assign_founding_unit_types(founding.people(), faction);
             }
             outcomes.push(FoundingOutcome::new(faction, result));
         }
@@ -698,7 +699,6 @@ impl World {
         for person in &people {
             self.set_home_site(*person, Some(settlement));
         }
-        self.assign_founding_unit_types(&people, faction);
         Ok((settlement, people))
     }
 
@@ -711,7 +711,7 @@ impl World {
     /// # References
     ///
     /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
-    fn assign_founding_unit_types(&mut self, people: &[Entity], faction: FactionId) {
+    pub fn assign_founding_unit_types(&mut self, people: &[Entity], faction: FactionId) {
         let weights = self
             .faction_weights(faction)
             .unwrap_or_else(|| FactionWeights::from_seed(self.config.seed, faction));
