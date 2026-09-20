@@ -44,6 +44,10 @@ jobs:
       - name: Check the crate split
         run: ./scripts/check-crate-split.sh
 
+      # ADR-0097 D2: the toolchain must pin a dated nightly, never a floating channel.
+      - name: Check the toolchain pin
+        run: ./scripts/check-toolchain-pin.sh
+
       # This covers the unit tests, the property tests, and the two
       # determinism tests of ADR-0001 D4.
       - name: Test

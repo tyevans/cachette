@@ -1,9 +1,9 @@
 ---
 id: 0295
 title: Fail a check when the toolchain names a floating channel
-status: proposed
+status: refined
 created: 2026-09-02
-implements: [ADR-0097]
+implements: [ADR-0097 D2]
 changes: []
 creates: []
 serves: []
@@ -40,6 +40,21 @@ The check is small: the channel must match a dated form, and a bare `stable`,
 `beta`, `nightly` or a bare release name must fail. It is a check about one
 file, so it needs no whole-tree search.
 
+## Impact review
+
+**Governed by.** ADR-0097 D2 requires that the toolchain file names a dated
+nightly, and never a floating channel.[^1]
+
+**Changes.** None.
+
+**Creates.** None.
+
+**Blockers.** None.
+
+**Precedent.** ADR-0001 D4 requires that one binary gives one answer at any
+thread count.[^3] A compiler is an input to the golden state hash. The testing
+rules require a broken fixture to prove each check can fail.[^4]
+
 ## What good looks like
 
 The gate rejects a toolchain file whose channel carries no date, and the
@@ -63,6 +78,21 @@ chose.[^5]
 It does not check that the installed compiler matches the file. The toolchain
 manager already does that, and a second check of it would be a second
 declaration site.
+
+## Done when
+
+- `scripts/check-toolchain-pin.sh` inspects the channel in the toolchain file.
+- The check passes on `rust-toolchain.toml` with exit status zero.
+- The check fails on a floating channel or an undated channel with a non-zero exit status.
+- The failure output cites ADR-0097 D2 and explains why the date is necessary.
+- Broken fixtures in `tests/fixtures/toolchain-broken/` demonstrate the failure modes.
+- A probe proves that the check fails on each broken fixture.
+- The invariant check runs in `just invariants` and in continuous integration under the `rust` job.
+- The whole check command runs green.
+
+## Outcome
+
+Filled in when the item moves to `complete/`.
 
 ## References
 
