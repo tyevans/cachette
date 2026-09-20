@@ -184,7 +184,9 @@ declare_stages! {
     HoldingApply,             "holding_apply",              true,  1, true;
     FactionEliminate,         "faction_eliminate",          true,  1, false;
     StampHolders,             "stamp_holders",              false, 1, false;
+    Deliver,                  "deliver",                    false, 1, false;
     Contest,                  "contest",                    true,  1, false;
+    TradeSettle,              "trade_settle",               false, 1, false;
     WonderFragility,          "wonder_fragility",           false, 1, false;
     ApplyRates,               "apply_rates",                true,  1, false;
     Consume,                  "consume",                    true,  1, false;

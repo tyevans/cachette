@@ -311,4 +311,48 @@ fn a_nested_stage_stays_out_of_the_frame_total() {
         counted.contains(&"observe"),
         "the observation pass must be in the frame total"
     );
+    assert!(
+        counted.contains(&"deliver"),
+        "the delivery pass must be in the frame total"
+    );
+    assert!(
+        counted.contains(&"trade_settle"),
+        "the trade settlement pass must be in the frame total"
+    );
+}
+
+#[test]
+fn the_two_quantity_passes_open_once_and_declare_no_threads() {
+    let _alone = alone();
+    let mut world = world_with_units(32);
+    world.step(1).expect("the step must run");
+
+    stage::reset();
+    world.step(1).expect("the step must run");
+    let costs = stage::costs();
+
+    for stage in [Stage::Deliver, Stage::TradeSettle] {
+        assert_eq!(
+            costs.cost(stage).entries,
+            1,
+            "one frame must open {} exactly once",
+            stage.name()
+        );
+        assert_eq!(
+            stage.entries_for_each_frame(),
+            1,
+            "{} must declare 1 entry for each frame",
+            stage.name()
+        );
+        assert!(
+            !stage.takes_threads(),
+            "{} must declare takes_threads = false because it runs on the calling thread",
+            stage.name()
+        );
+        assert!(
+            !stage.is_nested(),
+            "{} is a top-level stage of the step and must not be nested",
+            stage.name()
+        );
+    }
 }

@@ -398,7 +398,10 @@ impl World {
         //
         // [^16]: ADR-0062, production and upkeep are rates attached to a site, decision D5. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
         // [^17]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D5. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
-        self.deliver(threads)?;
+        {
+            let _span = stage::open(Stage::Deliver);
+            self.deliver(threads)?;
+        }
 
         // The meeting resolves here, after the barrier of this frame and
         // after the holding spread. It reads where each unit stands, and the
@@ -428,7 +431,10 @@ impl World {
         //
         // [^18]: ADR-0062, production and upkeep are rates attached to a site, decision D5. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
         // [^19]: ADR-0128, a contract moves a quantity only when a unit carries it onto the ground of the other party, decision D3. `docs/adrs/draft/adr-0128-a-contract-moves-a-quantity-only-when-a-unit-carries-it.md`
-        self.settle_trades(threads)?;
+        {
+            let _span = stage::open(Stage::TradeSettle);
+            self.settle_trades(threads)?;
+        }
 
         {
             let _span = stage::open(Stage::WonderFragility);
