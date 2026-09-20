@@ -1,12 +1,12 @@
 ---
 id: 0296
 title: Prove that the Miri gate can fail
-status: proposed
+status: refined
 created: 2026-09-02
-implements: [ADR-0097]
+implements: [ADR-0097 D4]
 changes: []
 creates: []
-serves: []
+serves: [PRD-0002]
 blocked-by: []
 ---
 
@@ -37,6 +37,23 @@ world is deliberately small, because a world at the target unit population does
 not finish under interpretation.[^4] Small was chosen for cost. Nothing has
 shown that small still reaches the defect.
 
+## Impact review
+
+**Governed by.** ADR-0097 D4 establishes the Miri gate over operations that read
+the simulation state as raw bytes.[^5] ADR-0006 D1 and D3 require every event
+and every hashed type to use a declared layout without undeclared padding.[^6]
+Hard invariant 5 requires every event and hashed type to be `bytemuck::Pod` with
+declared padding.[^7] Undeclared padding causes false nondeterminism in state
+hashes.
+
+**Changes.** None.
+
+**Creates.** None.
+
+**Blockers.** None.
+
+**Serves.** PRD-0002.[^8]
+
 ## What the work does
 
 Add a build switch that puts an undeclared padding byte into a type the state
@@ -56,6 +73,15 @@ suite passes in both.
 **Put the defect back and watch the gate stay green.** If the perturbed build
 passes the Miri gate, the fixture does not reach the case, and widening the
 fixture is then the work rather than an afterthought.
+
+## Done when
+
+- The `probe-undeclared-padding` feature compiles in `cachette-core`.
+- Under the probe feature, `CarryLoad` contains an uninitialised padding byte.
+- The ordinary test passes when the probe feature is on.
+- The Miri test fails and detects an uninitialised byte read when the probe feature is on.
+- The `miri-probe` recipe in the justfile runs both assertions and exits with zero.
+- The continuous integration miri job runs `just miri-probe`.
 
 ## What it costs at the target scale
 
@@ -83,3 +109,6 @@ figure.[^5]
 [^3]: ADR-0001, one binary gives one answer at any thread count, decision D5. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^4]: Findings register, FND-285. `docs/FINDINGS.md`
 [^5]: ADR-0097, the toolchain is a dated nightly, decision D4. `docs/adrs/draft/adr-0097-the-toolchain-is-a-dated-nightly.md`
+[^6]: ADR-0006, an event is plain data and applying it is pure, decisions D1 and D3. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+[^7]: Project orientation, the hard invariants, rule 5. `CLAUDE.md`
+[^8]: PRD-0002, a developer watches the world run. `docs/product/shipped/prd-0002-a-developer-watches-the-world-run.md`

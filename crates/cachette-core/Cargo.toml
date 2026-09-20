@@ -52,6 +52,11 @@ census-holding = []
 # parallel fan-out creates, so a test can prove that a stage of one chunk
 # creates none. It compiles to nothing when it is off.
 probe-spawn-count = []
+# `probe-undeclared-padding` is a test-only switch. It adds undeclared
+# padding bytes into a type read as raw bytes by the state hash. That proves
+# that the Miri gate can fail when uninitialised memory reaches the hash.
+# ADR-0097 D4. A test with no proven failure mode is decoration.
+probe-undeclared-padding = []
 
 [dev-dependencies]
 bytemuck.workspace = true
