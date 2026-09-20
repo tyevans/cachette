@@ -206,6 +206,11 @@ miri:
     cargo miri test --package cachette-core --test event_layout
     cargo miri test --package cachette-core --test value_types
 
+# Prove that the Miri gate rejects an undeclared padding byte that ordinary tests wave through.
+miri-probe:
+    ! cargo miri test --package cachette-core --features probe-undeclared-padding --test state_bytes_are_initialised the_state_hash_reads_no_uninitialised_byte
+    cargo test --package cachette-core --features probe-undeclared-padding --test state_bytes_are_initialised the_state_hash_reads_no_uninitialised_byte
+
 # Record the golden state hash files. Read the difference before you commit.
 golden:
     CACHETTE_UPDATE_GOLDEN=1 cargo test --package cachette-core --test golden_state_hash

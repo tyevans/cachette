@@ -136,7 +136,9 @@ jobs:
       - uses: extractions/setup-just@v3
 
       - name: Check the unsafe code
-        run: just miri
+        run: |
+          just miri
+          just miri-probe
 
   audit:
     name: licences and advisories

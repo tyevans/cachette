@@ -1175,6 +1175,7 @@ const fn new_entry(run: (u64, u32), tick: Tick) -> LedgerEntry {
 /// # References
 ///
 /// [^1]: ADR-0006, an event is plain data and applying it is pure, decision D1. `docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md`
+#[cfg(not(feature = "probe-undeclared-padding"))]
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 pub struct CarryLoad {
@@ -1182,10 +1183,41 @@ pub struct CarryLoad {
     pub amounts: [u32; RESOURCE_KIND_COUNT],
 }
 
+/// The perturbed load with undeclared padding.
+///
+/// This definition adds a single tag byte after the amounts array. The alignment
+/// of `u32` is four bytes, so the compiler inserts three bytes of undeclared
+/// padding after the tag byte.
+///
+/// The state hash reads the carry column as raw bytes. This perturbed type
+/// proves that the Miri gate can fail when uninitialised padding bytes reach
+/// the state hash.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0097, the toolchain is a dated nightly, decision D4. `docs/adrs/draft/adr-0097-the-toolchain-is-a-dated-nightly.md`
+#[cfg(feature = "probe-undeclared-padding")]
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct CarryLoad {
+    /// One amount for each kind.
+    pub amounts: [u32; RESOURCE_KIND_COUNT],
+    /// A single byte that forces three bytes of undeclared compiler padding.
+    pub tag: u8,
+}
+
+#[cfg(feature = "probe-undeclared-padding")]
+unsafe impl bytemuck::Zeroable for CarryLoad {}
+
+#[cfg(feature = "probe-undeclared-padding")]
+unsafe impl bytemuck::Pod for CarryLoad {}
+
 impl CarryLoad {
     /// The empty load.
     pub const EMPTY: Self = Self {
         amounts: [0; RESOURCE_KIND_COUNT],
+        #[cfg(feature = "probe-undeclared-padding")]
+        tag: 0,
     };
 
     /// Returns what the load holds of one kind.
@@ -1214,7 +1246,25 @@ impl CarryLoad {
     pub const fn with(self, kind: ResourceKind, amount: Amount) -> Self {
         let mut amounts = self.amounts;
         amounts[kind.index()] = amounts[kind.index()].saturating_add(amount.0);
-        Self { amounts }
+        #[cfg(not(feature = "probe-undeclared-padding"))]
+        {
+            Self { amounts }
+        }
+        #[cfg(feature = "probe-undeclared-padding")]
+        {
+            Self {
+                amounts,
+                tag: self.tag,
+            }
+        }
+    }
+
+    /// Returns the load with an amount of one kind added.
+    ///
+    /// Alias for [`CarryLoad::with`].
+    #[must_use]
+    pub const fn with_added(self, kind: ResourceKind, amount: Amount) -> Self {
+        self.with(kind, amount)
     }
 
     /// Returns the load with one kind reduced by an amount.
@@ -1234,7 +1284,17 @@ impl CarryLoad {
     pub const fn less(self, kind: ResourceKind, amount: Amount) -> Self {
         let mut amounts = self.amounts;
         amounts[kind.index()] = amounts[kind.index()].saturating_sub(amount.0);
-        Self { amounts }
+        #[cfg(not(feature = "probe-undeclared-padding"))]
+        {
+            Self { amounts }
+        }
+        #[cfg(feature = "probe-undeclared-padding")]
+        {
+            Self {
+                amounts,
+                tag: self.tag,
+            }
+        }
     }
 }
 
