@@ -3980,6 +3980,18 @@ pub struct WeatherField {
     /// The plane is empty while no storm stands, and every reader takes zero
     /// for a cell it does not hold.
     depression: Vec<i32>,
+    /// The capacity bound that the settle pass applied to each cell of the whole
+    /// lattice.
+    ///
+    /// **This is derived and never carried.** The settle pass rebuilds it on
+    /// each solve from cell warmth, cooling, slope and storm depression, so it
+    /// enters no state hash. It is stored so a watcher or test can read the bound
+    /// that bounded the air plane.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: Findings register, FND-730. `docs/FINDINGS.md`
+    settle_capacity: Vec<Drops>,
     /// Every drop that has ever left the ground.
     evaporated: i64,
     /// The first tick at which each faction may inflict weather again.
@@ -4090,6 +4102,7 @@ impl WeatherField {
             cyclones: Vec::new(),
             next_cyclone: 0,
             depression: Vec::new(),
+            settle_capacity: Vec::new(),
             evaporated: 0,
             ready: vec![Tick(0); faction_count as usize],
             passes: 0,
@@ -4349,19 +4362,43 @@ impl WeatherField {
         (held * CLOUD_SHARE_WHOLE / capacity).clamp(0, CLOUD_SHARE_WHOLE)
     }
 
-    /// Returns the water that the air above one cell holds when it is full.
+    /// Returns the water that the air above one cell holds when it is full at rest.
     ///
-    /// The answer follows the temperature of that cell. Warm air holds a lot
+    /// The answer follows the temperature of that cell alone. Warm air holds a lot
     /// and cold air holds very little, so a polar cell reports a small
     /// figure. It is the figure a watcher needs beside the air of a cell,
     /// because the air alone does not say whether the sky is grey.
     ///
-    /// The figure is the capacity of a cell that the air has stood over. Air
-    /// that cooled or climbed on its way holds less than this, and the settle
-    /// pass rains that difference out.
+    /// The figure is the capacity of air at rest over that cell. Air that cooled
+    /// or climbed on its way holds less than this, while air that descended a slope
+    /// warms and holds more. The settle pass bounds the air at that travelling figure,
+    /// which [`WeatherField::settle_capacity_at_cell`] reports.
     #[must_use]
     pub fn capacity_at_cell(&self, cell: u32) -> Drops {
         capacity_at(self.warmth.get(cell as usize).copied().unwrap_or(0))
+    }
+
+    /// Returns the capacity bound that the settle pass applied to one cell.
+    ///
+    /// The answer combines the warmth of the cell, the cooling met along the
+    /// wind, the slope the parcel climbed or descended, and the cyclone
+    /// depression above it. Air that descended a slope warms and holds more
+    /// than rest capacity, so this figure can stand above [`WeatherField::capacity_at_cell`].
+    ///
+    /// When the settle pass has not run, or when the cell is out of bounds,
+    /// this falls back to [`WeatherField::capacity_at_cell`].
+    #[must_use]
+    pub fn settle_capacity_at_cell(&self, cell: u32) -> Drops {
+        self.settle_capacity
+            .get(cell as usize)
+            .copied()
+            .unwrap_or_else(|| self.capacity_at_cell(cell))
+    }
+
+    /// Returns the capacity bounds that the settle pass applied to the whole lattice.
+    #[must_use]
+    pub fn settle_capacity_plane(&self) -> &[Drops] {
+        &self.settle_capacity
     }
 
     /// Returns every drop that has ever entered the air.
@@ -5365,6 +5402,9 @@ impl WeatherField {
     /// [^1]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
     fn settle(&mut self, ground: &[CellGround]) {
         let mut dried = 0i64;
+        if self.settle_capacity.len() != ground.len() {
+            self.settle_capacity.resize(ground.len(), Drops::ZERO);
+        }
         for cell in 0..ground.len() {
             let heat = self.warmth.get(cell).copied().unwrap_or(0);
 
@@ -5414,6 +5454,7 @@ impl WeatherField {
                 travelling_capacity(capacity_at(heat), cooling, climb),
                 self.depression.get(cell).copied().unwrap_or(0),
             );
+            self.settle_capacity[cell] = capacity;
             let held = self.air[cell];
             let poured = Drops((held.0 - capacity.0).max(0));
             self.air[cell] = Drops(held.0 - poured.0);
