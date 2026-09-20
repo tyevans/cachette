@@ -186,6 +186,23 @@ fn every_action_encodes_and_decodes_back_to_itself() {
 }
 
 #[test]
+fn world_encodes_and_decodes_actions_through_its_schema() {
+    let world = warm(3, 42, 2);
+    let schema = world.action_schema();
+    for action in 0..schema.length() {
+        let decoded = world
+            .decode_action(action)
+            .expect("the world decodes every action within its length");
+        let (verb, arguments) = decoded;
+        let encoded = world
+            .encode_action(verb, &arguments)
+            .expect("the world encodes the verb and arguments back");
+        assert_eq!(encoded, action);
+    }
+    assert!(world.decode_action(schema.length()).is_none());
+}
+
+#[test]
 fn a_learner_acts_by_one_integer_and_the_world_changes() {
     let mut world = warm(2, 41, 6);
     let schema = world.action_schema();

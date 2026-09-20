@@ -177,6 +177,37 @@ impl World {
         })
     }
 
+    /// Encodes one verb and its arguments into an action integer, under the
+    /// action schema of this world.
+    ///
+    /// The decoding and encoding are arithmetic over the action schema
+    /// alone.[^1] Returns `None` when the argument count does not match the
+    /// position count, or when an argument is at or above the bound of its
+    /// position.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D1. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+    #[must_use]
+    pub fn encode_action(&self, verb: Verb, arguments: &[u32]) -> Option<u32> {
+        self.action_schema().encode(verb, arguments)
+    }
+
+    /// Decodes one action integer into its verb and arguments, under the
+    /// action schema of this world.
+    ///
+    /// The decoding is arithmetic over the action schema alone.[^1] Returns
+    /// `None` when the action integer is at or above the length of the action
+    /// table.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D1. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
+    #[must_use]
+    pub fn decode_action(&self, action: u32) -> Option<(Verb, Vec<u32>)> {
+        self.action_schema().decode(action)
+    }
+
     /// Returns one byte for each row of the action table of this world.
     ///
     /// The byte is one when the verb would take that row at this tick, and
