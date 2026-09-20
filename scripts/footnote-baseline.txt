@@ -70,10 +70,6 @@ docs/adrs/accepted/adr-0006-an-event-is-plain-data-and-applying-it-is-pure.md	un
 docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md	uncited	1
 docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md	uncited	2
 docs/adrs/accepted/adr-0056-movement-is-tile-discrete-and-admitted-by-sort-then-admit.md	repeated	13
-docs/backlog/PRIORITY.md	uncited	4
-docs/backlog/PRIORITY.md	uncited	7
-docs/backlog/PRIORITY.md	uncited	8
-docs/backlog/PRIORITY.md	uncited	9
 docs/backlog/README.md	uncited	1
 docs/backlog/README.md	uncited	2
 docs/backlog/README.md	uncited	3
