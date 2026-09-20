@@ -58,11 +58,11 @@ pub struct Accum(pub i64);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ArenaKind {
     /// The mobile soldier arena.
-    Soldier = 1,
+    Soldier = 0,
     /// The character arena.
-    Character = 2,
+    Character = 1,
     /// The settlement arena.
-    Settlement = 3,
+    Settlement = 2,
 }
 
 impl ArenaKind {
@@ -70,9 +70,9 @@ impl ArenaKind {
     #[must_use]
     pub const fn from_tag(tag: u8) -> Option<Self> {
         match tag {
-            1 => Some(Self::Soldier),
-            2 => Some(Self::Character),
-            3 => Some(Self::Settlement),
+            0 => Some(Self::Soldier),
+            1 => Some(Self::Character),
+            2 => Some(Self::Settlement),
             _ => None,
         }
     }
@@ -155,9 +155,9 @@ impl Entity {
     #[must_use]
     pub const fn arena(&self) -> ArenaKind {
         match (self.0.get() >> 56) as u8 {
-            1 => ArenaKind::Soldier,
-            2 => ArenaKind::Character,
-            3 => ArenaKind::Settlement,
+            0 => ArenaKind::Soldier,
+            1 => ArenaKind::Character,
+            2 => ArenaKind::Settlement,
             _ => unreachable!(),
         }
     }
@@ -206,7 +206,7 @@ impl Entity {
     #[must_use]
     pub(crate) const fn from_bits(bits: u64) -> Option<Self> {
         let tag = (bits >> 56) as u8;
-        if tag >= 1 && tag <= 3 {
+        if tag <= 2 {
             match core::num::NonZeroU64::new(bits) {
                 Some(value) => Some(Self(value)),
                 None => None,

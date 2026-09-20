@@ -126,21 +126,22 @@ def test_a_raised_unit_stays_a_unit_and_names_its_character(seed: int) -> None:
             )
 
 
-def test_a_unit_identity_and_a_character_identity_share_one_number(
+def test_a_unit_identity_and_a_character_identity_do_not_share_one_number(
     seed: int,
 ) -> None:
-    # The two arenas number their slots separately, so one number names a
-    # unit in one arena and a person in the other. Nothing reports it. The
-    # doc comments say so, and this test pins the sentence.
+    # DEC-266, FND-472: each arena encodes its kind tag into the identity,
+    # so a unit identity and a character identity never share the same number.
+    # Passing an identity from one arena to a query expecting another raises
+    # ArenaMismatchError.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     addresses = _open_addresses(world, 2)
     units = world.spawn_soldiers(addresses, faction=0)
     people = world.create_characters(0, 2)
-    assert units.tolist() == people.tolist()
-    # Each call answers for its own arena, and neither refuses the other's
-    # number.
-    world.soldier_tile(int(people[0]))
-    world.character_lineage(int(units[0]))
+    assert units.tolist() != people.tolist()
+    with pytest.raises(cachette.ArenaMismatchError):
+        world.soldier_tile(int(people[0]))
+    with pytest.raises(cachette.ArenaMismatchError):
+        world.character_lineage(int(units[0]))
 
 
 def test_a_unit_that_was_never_raised_names_no_character(seed: int) -> None:
