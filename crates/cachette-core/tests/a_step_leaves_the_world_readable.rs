@@ -79,7 +79,6 @@ fn viewer_world(seed: u64) -> World {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         latitude_centre: Latitudes::PLANET.centre(),
         latitude_span: Latitudes::PLANET.span(),
-        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     let outcomes = world.seed_world().expect("the world seeds once");
@@ -206,7 +205,6 @@ fn small_config(seed: u64) -> WorldConfig {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         latitude_centre: Latitudes::PLANET.centre(),
         latitude_span: Latitudes::PLANET.span(),
-        ..WorldConfig::DEFAULT
     }
 }
 
