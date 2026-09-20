@@ -951,6 +951,12 @@ impl Wind {
         }
         Some(best)
     }
+
+    /// Returns what drag leaves of this wind.
+    #[must_use]
+    pub fn drag(self) -> Self {
+        drag(self)
+    }
 }
 
 /// Returns the direction that faces the other way.
@@ -1058,7 +1064,7 @@ fn bleed(part: i32) -> i32 {
 /// # References
 ///
 /// [^1]: ADR-0160, the wind is carried state, and the pressure gradient accelerates it, decision D3. `docs/adrs/accepted/adr-0160-the-wind-is-carried-state-and-the-pressure-gradient-accelerates-it.md`
-fn drag(wind: Wind) -> Wind {
+pub fn drag(wind: Wind) -> Wind {
     Wind {
         q: bleed(wind.q),
         r: bleed(wind.r),
@@ -4322,6 +4328,29 @@ impl WeatherField {
         &self.ground
     }
 
+    /// Sets the air plane across the lattice.
+    pub fn set_air_plane(&mut self, air: &[Drops]) {
+        self.prepare();
+        if air.len() == self.air.len() {
+            self.air.copy_from_slice(air);
+        }
+    }
+
+    /// Sets the wind plane across the lattice.
+    pub fn set_wind_plane(&mut self, wind: &[Wind]) {
+        if wind.len() == self.wind.len() {
+            self.wind.copy_from_slice(wind);
+        }
+    }
+
+    /// Sets the ground water plane across the lattice.
+    pub fn set_ground_plane(&mut self, ground: &[Drops]) {
+        self.prepare();
+        if ground.len() == self.ground.len() {
+            self.ground.copy_from_slice(ground);
+        }
+    }
+
     /// Returns the largest quantity of water the air above any cell holds.
     ///
     /// It is the capacity of a cell at the top of the temperature scale. No
@@ -5374,7 +5403,7 @@ impl WeatherField {
     /// [^1]: ADR-0009, parallel stages write disjoint outputs, because the memory model is weak. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
     /// [^2]: ADR-0161, water rides the wind, and every transfer is an exact integer move, decisions D1 and D2. `docs/adrs/accepted/adr-0161-water-rides-the-wind-and-every-transfer-is-an-exact-integer-move.md`
     /// [^3]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
-    fn transport(&mut self, threads: usize) {
+    pub fn transport(&mut self, threads: usize) {
         let count = self.air.len();
         if count == 0 {
             return;
@@ -5400,7 +5429,8 @@ impl WeatherField {
     /// # References
     ///
     /// [^1]: ADR-0141, a weather pass moves water and never scales it, decision D2. `docs/adrs/draft/adr-0141-a-weather-pass-moves-water-and-never-scales-it.md`
-    fn settle(&mut self, ground: &[CellGround]) {
+    pub fn settle(&mut self, ground: &[CellGround]) {
+        self.prepare();
         let mut dried = 0i64;
         if self.settle_capacity.len() != ground.len() {
             self.settle_capacity.resize(ground.len(), Drops::ZERO);
