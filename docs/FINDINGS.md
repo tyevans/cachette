@@ -17403,7 +17403,7 @@ is stated in.
 [^F591B]: Findings register, FND-029, in this document.
 [^F591C]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
 [^F470D]: Findings register, FND-360, in this document.
-[^F471A]: Backlog item 0461, tell a caller which arena an identity belongs to. `docs/backlog/refined/0461-tell-a-caller-which-arena-an-identity-belongs-to.md`
+[^F471A]: Backlog item 0461, tell a caller which arena an identity belongs to. `docs/backlog/complete/0461-tell-a-caller-which-arena-an-identity-belongs-to.md`
 [^F471B]: Decisions register, DEC-265. `docs/DECISIONS.md`
 [^F472A]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 [^F472C]: Decisions register, DEC-266. `docs/DECISIONS.md`
