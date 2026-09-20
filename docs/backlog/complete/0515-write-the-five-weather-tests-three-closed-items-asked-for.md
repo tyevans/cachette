@@ -1,7 +1,7 @@
 ---
 id: 0515
 title: Write the five weather tests three closed items asked for
-status: refined
+status: complete
 created: 2026-09-06
 implements: [ADR-0160 D2, ADR-0160 D3, ADR-0161 D1, ADR-0162 D1, ADR-0162 D2]
 changes: []
@@ -84,7 +84,21 @@ cooling, and orographic precipitation.[^7]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**Complete.** The integration suite `crates/cachette-core/tests/weather_evidence.rs`
+asserts all five physical invariants:
+- `wind_lags_pressure`: wind persists on the tick following pressure gradient
+  cessation (decayed only by drag), proving wind is carried momentum state (ADR-0160 D2).
+- `drag_brings_wind_to_rest`: under zero pressure gradient, drag bleeds momentum
+  monotonically to rest within a finite tick count (ADR-0160 D3).
+- `air_total_conserved_over_random_winds_and_air_planes`: `proptest!` property test
+  asserting exact drop conservation across directional advection (ADR-0161 D1).
+- `some_cells_wet_and_some_dry_without_storm`: coastal world without storms develops
+  heterogeneous ground wetness with `0 < wet_cells < total_cells` (ADR-0162 D1).
+- `near_side_of_high_ground_holds_more_water_than_far_side`: climbing windward air
+  sheds capacity while descending lee air warms, leaving more ground water on the
+  near side (ADR-0162 D2).
+
+Each test was proved able to fail by reintroducing its defect.
 
 ## References
 
