@@ -1,7 +1,7 @@
 ---
 id: 0421
 title: Put the two quantity passes into the stage table
-status: refined
+status: complete
 created: 2026-09-03
 implements: [ADR-0001 D4, ADR-0009 D1, ADR-0062 D5, ADR-0128 D3]
 changes: []
@@ -74,7 +74,22 @@ and pass accounting accuracy).[^7]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Completed in pull request #63 (commit `81f06f2f`, merged as `281bce0e`).
+
+1. `declare_stages!` in `crates/cachette-core/src/stage.rs` declares `Deliver`
+   (`"deliver"`) and `TradeSettle` (`"trade_settle"`), each with
+   `takes_threads = false`, `entries_for_each_frame = 1`, and
+   `is_nested = false`.
+2. `crates/cachette-core/src/world/step.rs` wraps `self.deliver(threads)?` in
+   `let _span = stage::open(Stage::Deliver);` and `self.settle_trades(threads)?`
+   in `let _span = stage::open(Stage::TradeSettle);`.
+3. The test `the_two_quantity_passes_open_once_and_declare_no_threads` in
+   `crates/cachette-core/tests/stage_cost.rs` verifies that both stages open once
+   per frame, have `takes_threads = false`, and participate in the non-nested
+   total.
+4. Proven able to fail: omitting the `Deliver` span failed the suite with
+   `deliver: declared 1, opened 0`.
+5. Resolves finding FND-431.
 
 ## References
 
