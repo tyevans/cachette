@@ -26,11 +26,14 @@
 //! one faction that keeps the rule beside one that gives it up, and reads the
 //! two relations apart.
 //!
+//! A polar latitude keeps the sky dry and quiet.[^4]
+//!
 //! # References
 //!
 //! [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
 //! [^2]: Testing Rules, sections 5 and 6. `.agents/rules/testing.md`
 //! [^3]: Testing Rules, section 2a. `.agents/rules/testing.md`
+//! [^4]: Findings register, FND-747. `docs/FINDINGS.md`
 
 use cachette_core::controller::{prey_of, FactionWeights, WEIGHT_HIGH};
 use cachette_core::{Axial, FactionId, Fix32, World, WorldConfig};
@@ -54,6 +57,16 @@ const TICKS: usize = 400;
 /// change to the default moves the test with it.
 const RATIO: i32 = cachette_core::controller::OVERMATCH_RATIO_DEFAULT;
 
+/// The latitude of the middle row of every world under test, in hundredths of
+/// a degree.
+///
+/// **Seventy degrees south is half of what makes the sky quiet.** Cold air
+/// carries little water, and the ground stays dry.
+const QUIET_CENTRE: i32 = -7000;
+
+/// The latitude span of the sky that leaves the ground dry and clear.
+const QUIET_SPAN: i32 = 3000;
+
 fn config(factions: u16, seed: u64) -> WorldConfig {
     WorldConfig {
         width: 48,
@@ -61,7 +74,8 @@ fn config(factions: u16, seed: u64) -> WorldConfig {
         seed,
         faction_count: factions,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
-        ..WorldConfig::DEFAULT
+        latitude_centre: QUIET_CENTRE,
+        latitude_span: QUIET_SPAN,
     }
 }
 

@@ -16,11 +16,14 @@
 //! values are placeholders that the balance harness will change, and a test
 //! that read them would measure the register.[^3]
 //!
+//! A polar latitude keeps the sky dry and quiet.[^4]
+//!
 //! # References
 //!
 //! [^1]: Testing rules, drive the real caller. `.agents/rules/testing.md`
 //! [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
 //! [^3]: Balance register, the population. `docs/reference/balance.md`
+//! [^4]: Findings register, FND-747. `docs/FINDINGS.md`
 
 use cachette_core::cohort::NeedRule;
 use cachette_core::growth;
@@ -29,7 +32,8 @@ use cachette_core::sim_math;
 use cachette_core::site::CommodityId;
 use cachette_core::unit_type::WORKER;
 use cachette_core::{
-    Axial, Entity, FactionId, Fix32, World, WorldConfig, FOUNDING_GROUP_DEFAULT, SUBSYSTEM_CENSUS,
+    Axial, Entity, FactionId, Fix32, Latitudes, World, WorldConfig, FOUNDING_GROUP_DEFAULT,
+    SUBSYSTEM_CENSUS,
 };
 
 /// Returns one census count by name.
@@ -62,6 +66,16 @@ const BOUND: Fix32 = Fix32::from_int(4);
 /// below one, and it is the test of the draw.
 const CERTAIN: Fix32 = Fix32::ONE;
 
+/// The latitude of the middle row of every world under test, in hundredths of
+/// a degree.
+///
+/// **Seventy degrees south is half of what makes the sky quiet.** Cold air
+/// carries little water, and the ground stays dry.
+const QUIET_CENTRE: i32 = -7000;
+
+/// The latitude span of the sky that leaves the ground dry and clear.
+const QUIET_SPAN: i32 = 3000;
+
 /// A world that holds ground on every tile the built fixtures need.
 const CONFIG: WorldConfig = WorldConfig {
     // The coarsest lattice of the terrain generator spans sixty-four tiles.
@@ -75,7 +89,8 @@ const CONFIG: WorldConfig = WorldConfig {
     seed: 0x0cac_4e77_0060,
     faction_count: 2,
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
-    ..WorldConfig::DEFAULT
+    latitude_centre: QUIET_CENTRE,
+    latitude_span: QUIET_SPAN,
 };
 
 /// Returns the first address of the world whose ground carries a unit.
@@ -310,7 +325,8 @@ fn run_a_demonstration_world(seed: u64) -> (u32, u32, Option<u32>) {
         seed,
         faction_count: RUN_FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
-        ..WorldConfig::DEFAULT
+        latitude_centre: Latitudes::PLANET.centre(),
+        latitude_span: Latitudes::PLANET.span(),
     })
     .expect("the extent must describe a world");
     // The engine seeds itself, as the demonstration does. No verb of this

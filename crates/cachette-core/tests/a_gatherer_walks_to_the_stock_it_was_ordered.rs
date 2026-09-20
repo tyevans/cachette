@@ -32,7 +32,7 @@ use cachette_core::choose::{self, SCORE_FLOOR};
 use cachette_core::cohort::{NeedRule, NEED_FULL};
 use cachette_core::pyramid::AT_SEED;
 use cachette_core::resource::{Amount, ResourceKind};
-use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, Fix32, Latitudes, World, WorldConfig};
 
 /// The extent of every fixture world.
 const EXTENT: u32 = 256;
@@ -64,7 +64,8 @@ fn world() -> World {
         seed: SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
-        ..WorldConfig::DEFAULT
+        latitude_centre: Latitudes::PLANET.centre(),
+        latitude_span: Latitudes::PLANET.span(),
     })
     .expect("the extent must describe a world");
     world

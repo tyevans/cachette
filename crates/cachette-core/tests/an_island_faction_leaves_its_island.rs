@@ -32,7 +32,7 @@ use cachette_core::site::CommodityId;
 use cachette_core::terrain::{TileKind, SOME_WATER_CROSSING};
 use cachette_core::types::Fix32;
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, MARINER, UNIT_TYPE_COUNT, WORKER};
-use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, Latitudes, World, WorldConfig};
 
 /// The extent of the fixture world.
 ///
@@ -117,6 +117,8 @@ fn fixture_world(crossing: bool) -> World {
         height: EXTENT,
         seed: SEED,
         faction_count: 2,
+        latitude_centre: Latitudes::PLANET.centre(),
+        latitude_span: Latitudes::PLANET.span(),
         ..WorldConfig::default()
     })
     .expect("the fixture config must build a world");

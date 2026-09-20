@@ -26,11 +26,14 @@
 //! Every test drives the world step, so each value comes from the observation
 //! pass and not from a fixture.[^3]
 //!
+//! A polar latitude keeps the sky dry and quiet.[^4]
+//!
 //! # References
 //!
 //! [^1]: The audit of the observation, sections 3.1 and 4.3. `docs/research/what-a-policy-cannot-see.md`
 //! [^2]: PRD-0001, a faction sees only what it observes. `docs/product/accepted/prd-0001-a-faction-sees-only-what-it-observes.md`
 //! [^3]: Testing Rules, section 5. `.agents/rules/testing.md`
+//! [^4]: Findings register, FND-747. `docs/FINDINGS.md`
 
 use cachette_core::faction_observation::observation_schema;
 use cachette_core::{Axial, Entity, FactionId, SightRules, TileKind, WinPath, World, WorldConfig};
@@ -56,6 +59,16 @@ const FAR_LIMIT: u64 = 100_000;
 /// The exponent that keeps a unit still, so a fixture holds its shape.
 const KEEP_STILL: u32 = 12;
 
+/// The latitude of the middle row of every world under test, in hundredths of
+/// a degree.
+///
+/// **Seventy degrees south is half of what makes the sky quiet.** Cold air
+/// carries little water, and the ground stays dry.
+const QUIET_CENTRE: i32 = -7000;
+
+/// The latitude span of the sky that leaves the ground dry and clear.
+const QUIET_SPAN: i32 = 3000;
+
 /// Builds a world of three seated factions whose territory reader never
 /// fires.
 fn a_still_world(extent: u32, seed: u64) -> World {
@@ -65,7 +78,8 @@ fn a_still_world(extent: u32, seed: u64) -> World {
         seed,
         faction_count: 3,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
-        ..WorldConfig::DEFAULT
+        latitude_centre: QUIET_CENTRE,
+        latitude_span: QUIET_SPAN,
     })
     .expect("the extent describes a world");
     world.set_tick_limit(FAR_LIMIT);
@@ -173,7 +187,7 @@ fn the_domination_progress_reads_one_when_the_seat_clause_fires() {
             assert!(world.despawn_soldier(unit), "the unit is alive");
         }
     }
-    world
+    let rival = world
         .spawn_soldier(refuge, RIVAL)
         .expect("the refuge admits a unit");
     let rival_city = world
@@ -188,6 +202,10 @@ fn the_domination_progress_reads_one_when_the_seat_clause_fires() {
     let mut progress_at_the_end = None;
     for _ in 0..200 {
         world.step(1).expect("the step runs");
+        assert!(
+            world.soldiers().address(rival).is_some(),
+            "the rival unit must live so domination ends by seat and not by extermination"
+        );
         let progress = scalar(&world, READER, "domination_progress");
         if world.game_end().is_set() {
             progress_at_the_end = Some(progress);

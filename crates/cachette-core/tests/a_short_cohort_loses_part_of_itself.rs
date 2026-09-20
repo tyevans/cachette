@@ -23,6 +23,8 @@
 //! cohort draws, so a rate that stated the rations alone would hand the cohort
 //! less than the fixture named.[^5]
 //!
+//! A polar latitude keeps the sky dry and quiet.[^6]
+//!
 //! # References
 //!
 //! [^1]: Findings register, FND-318. `docs/FINDINGS.md`
@@ -30,6 +32,7 @@
 //! [^3]: Testing rules, section 5. `.claude/rules/testing.md`
 //! [^4]: Testing rules, section 2a. `.claude/rules/testing.md`
 //! [^5]: ADR-0062, production and upkeep are rates attached to a site, decision D2. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
+//! [^6]: Findings register, FND-747. `docs/FINDINGS.md`
 
 use cachette_core::cohort::{NeedRule, NEED_FULL};
 use cachette_core::effective::RESIDENT_SHARE_OF_RATION;
@@ -41,6 +44,16 @@ const EXTENT: u32 = 64;
 
 /// The seed of every fixture world.
 const SEED: u64 = 7;
+
+/// The latitude of the middle row of every world under test, in hundredths of
+/// a degree.
+///
+/// **Seventy degrees south is half of what makes the sky quiet.** Cold air
+/// carries little water, and the ground under the site stays dry.
+const QUIET_CENTRE: i32 = -7000;
+
+/// The latitude span of the sky that leaves the ground dry and clear.
+const QUIET_SPAN: i32 = 3000;
 
 /// The commodity that the ration draws against.
 const FOOD: CommodityId = cachette_core::WORK_COMMODITY[0];
@@ -106,7 +119,8 @@ fn short_cohort_under(rule: NeedRule, fed: u32, threads: usize) -> (World, Entit
         seed: SEED,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
-        ..WorldConfig::DEFAULT
+        latitude_centre: QUIET_CENTRE,
+        latitude_span: QUIET_SPAN,
     })
     .expect("the extent must describe a world");
     world.set_need_rule(rule);

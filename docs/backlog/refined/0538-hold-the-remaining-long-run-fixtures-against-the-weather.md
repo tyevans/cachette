@@ -117,32 +117,23 @@ to fail. The commit bodies hold the probes and their output.
 | `crates/cachette-view/tests/the_water_draws_in_one_colour.rs` | The sea draws in one colour, over a fixture that states the span, so wet water and dry water both exist |
 | `crates/cachette-view/tests/draws_what_a_unit_suffers.rs` | The panel counts what ended, over a sky that is asserted storm-free after every step |
 | `crates/cachette-view/tests/shows_the_upgrades_the_weather_and_the_luxuries.rs` | The build glyph and the air overlay, each against a control drawn on the same tick under a stated clear sky |
-
-None of these files was on the list below. Every one was red at the tip.
+| `crates/cachette-core/tests/a_city_changes_hands.rs` | A road and a siege run under a quiet polar sky, with builder and defender liveness asserted on each tick |
+| `crates/cachette-core/tests/a_short_cohort_loses_part_of_itself.rs` | A cohort thins over a quiet polar sky, where attrition is from combat alone |
+| `crates/cachette-core/tests/a_faction_remembers_what_happened_to_it.rs` | Two casualty equalities hold under a quiet polar sky, isolating battlefield losses from weather |
+| `crates/cachette-core/tests/ground_changes_hands.rs` | A lease claim and war admission hold under a quiet polar sky, with invader and guest liveness asserted |
+| `crates/cachette-core/tests/a_game_ends_on_three_paths.rs` | A wonder finishes and seat domination fires under a quiet polar sky, with rival and builder liveness asserted |
+| `crates/cachette-core/tests/a_faction_reads_its_way_to_a_win.rs` | Domination progress reads one on seat capture under a quiet polar sky, with rival liveness asserted |
+| `crates/cachette-core/tests/a_faction_that_does_nothing_is_hunted.rs` | An idle faction reaches the war band under a quiet polar sky |
+| `crates/cachette-core/tests/a_faction_reads_what_conflict_costs_it.rs` | Fire burns wood under the span of a planet and military strength reads under a quiet polar sky |
+| `crates/cachette-core/tests/the_population_grows.rs` | A demonstration world grows to a cohort under the span of a planet, and fed sites hold population under a quiet polar sky |
+| `crates/cachette-core/tests/an_island_faction_leaves_its_island.rs` | A mariner crosses open water and founds a second site under the span of a planet |
+| `crates/cachette-core/tests/a_gatherer_walks_to_the_stock_it_was_ordered.rs` | A gatherer reaches food and tile stock agrees under the span of a planet |
+| `crates/cachette-core/tests/a_step_leaves_the_world_readable.rs` | Cities are founded and the world remains readable under the span of a planet |
+| `crates/cachette-core/tests/relation.rs` | Relations move and speakers act under a quiet polar sky |
 
 ### The rows that remain, highest risk first
 
-| Rank | File | What it assumes |
-|---|---|---|
-| 1 | `crates/cachette-core/tests/a_city_changes_hands.rs` | A road finishes in the work plus one tick, and the road and the defender both stand through a 200 tick siege |
-| 2 | `crates/cachette-core/tests/a_short_cohort_loses_part_of_itself.rs` | A cohort of 32 on one open tile keeps somebody after 400 ticks, against a measured fall to three |
-| 3 | `crates/cachette-core/tests/a_faction_remembers_what_happened_to_it.rs` | Two exact casualty equalities hold over 240 ticks |
-| 4 | `crates/cachette-core/tests/ground_changes_hands.rs` | One invader stands on an island for 325 ticks and holds a lease |
-| 5 | `crates/cachette-core/tests/a_game_ends_on_three_paths.rs` | One rival unit lives through 200 ticks, and a wonder finishes in the work plus eight ticks |
-| 6 | `crates/cachette-core/tests/a_faction_reads_its_way_to_a_win.rs` | The same rival-lives assumption, under a fixture that freezes movement and not the sky |
-| 7 | `crates/cachette-core/tests/a_faction_that_does_nothing_is_hunted.rs` | Three factions cross a relation band inside 400 ticks, one of them asserted negative |
-| 8 | `crates/cachette-core/tests/a_faction_reads_what_conflict_costs_it.rs` | A fire reaches a unit inside 400 ticks, while rain is the antagonist of the mechanism under test |
-| 9 | `crates/cachette-core/tests/the_population_grows.rs` | Eight of eight seeds reach a cohort in 2500 ticks, and a fed site holds the population it grew |
-| 10 | `crates/cachette-core/tests/an_island_faction_leaves_its_island.rs` | A mariner cohort lives on open water for 400 ticks and founds a second site |
-| 11 | `crates/cachette-core/tests/a_gatherer_walks_to_the_stock_it_was_ordered.rs` | A gatherer lives 64 frames, and the exit field agrees with a tile column the storm ledger writes |
-| 12 | `crates/cachette-core/tests/a_step_leaves_the_world_readable.rs` | One seed founds a city inside 600 ticks |
-| 13 | `crates/cachette-core/tests/relation.rs` | A leader of one faction lives to move a relation inside 200 ticks |
-
-Every one of these thirteen passes today, measured over a whole run of the
-suite that does not stop at its first failing binary. **The earlier reading of
-this line came from a run that did stop there**, so it stated a lower bound and
-read like a complete list.[^8] Nine files above were red at the tip while that
-reading stood.
+All thirteen rows from the original sweep are repaired and verified.[^8] No open rows remain in this list.
 
 ## What this item does not do
 
