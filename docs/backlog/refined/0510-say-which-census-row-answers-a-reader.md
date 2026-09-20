@@ -1,7 +1,7 @@
 ---
 id: 0510
 title: Say which census row answers a reader
-status: proposed
+status: refined
 created: 2026-09-05
 implements: []
 changes: []
@@ -30,24 +30,37 @@ harness, which folds every row of every game and reports the rows that read
 zero in all of them, or for the demonstration deck, which prints every row. A
 reader of either is a reader.
 
-## What is missing before this is refined
+## What was missing before this was refined
 
 A refiner answers these before this item leaves `proposed/`.
 
-- **Which of them the balance harness or the demonstration deck needs.** Read
-  both. A row either serves one of them or serves nobody.
-- **What a row that serves nobody costs.** Say whether the answer is to delete
-  it, or to give it a test that fails when it stops counting.
+- **Which of them the balance harness or the demonstration deck needs.** The
+  balance harness (`scripts/balance_summary.py`) reads `wars_declared`,
+  `upgrades_complete`, and `seats_filled`. The demonstration deck
+  (`python/cachette/demo/app.py`) reads every row through
+  `subsystem_census()`. The other four rows (`characters`, `contracts`,
+  `contracts_bound`, and `controller_refused`) report the state and acts of
+  characters, trade, and controller commands. All seven rows serve readers.
+- **What a row that serves nobody costs.** Deleting diagnostic rows that report
+  active subsystems removes observability. Instead, every surviving row must
+  have a test that asserts its count changes when the corresponding event or
+  state occurs.
 - **Whether the two declaration sites should stay two.** The Rust table
-  declares the list and a Python test declares it again. The test is the check
-  that fails when the two disagree, and a refiner says whether that is the
-  right shape or whether the test should read the table.[^2]
-- **What test each surviving row gets.** A row that counts an act needs a test
-  that goes red when it stops counting.[^4]
+  `SUBSYSTEM_CENSUS` in `crates/cachette-core/src/world/census.rs` is the single
+  source of truth. Tests dynamically read the table rather than maintaining
+  stale duplicate lists.
+- **What test each surviving row gets.** Each of the seven rows gets a test
+  driving its corresponding subsystem that fails if the row stops counting.[^4]
 
 ## Done when
 
-Not written. Refine the item first.
+1. A test suite in `crates/cachette-core/tests/subsystem_census.rs` asserts that
+   each of the seven rows (`seats_filled`, `characters`, `upgrades_complete`,
+   `contracts`, `controller_refused`, `contracts_bound`, `wars_declared`)
+   accurately counts its simulated state or cumulative acts.
+2. Each test is proven able to fail if the census reader stops counting or reads
+   zero.
+3. All tests pass and CI is green.
 
 ## Outcome
 

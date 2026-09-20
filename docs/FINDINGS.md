@@ -15068,7 +15068,7 @@ was taken on 7 September 2026 on one development machine (x86-64).
 [^F539B]: ADR-0157, a site's free places are its built housing less the residents the engine counts, decision D1. `docs/adrs/accepted/adr-0157-a-sites-free-places-are-its-built-housing-less-the-residents-the-engine-counts.md`
 [^F548P]: Findings register, FND-498. `docs/FINDINGS.md`
 [^F548Q]: The growth stage, which counts the people it added on one tick. `crates/cachette-core/src/world/growth.rs`
-[^F548S]: Backlog item 0510. `docs/backlog/proposed/0510-say-which-census-row-answers-a-reader.md`
+[^F548S]: Backlog item 0510. `docs/backlog/refined/0510-say-which-census-row-answers-a-reader.md`
 [^F520B]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 [^F520C]: The type stub of the compiled module. `python/cachette/_core.pyi`
 [^F520D]: The Python bindings. `crates/cachette-py/src/lib.rs`
