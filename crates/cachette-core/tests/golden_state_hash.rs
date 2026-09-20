@@ -617,7 +617,7 @@ fn gather(world: &mut World) {
     // a guard that has already stopped working, and the promotion pass closed
     // the same gap the same way.[^2]
     //
-    // [^2]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/proposed/0279-let-a-golden-scenario-reach-the-position-pass.md`
+    // [^2]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/refined/0279-let-a-golden-scenario-reach-the-position-pass.md`
     let mut home = None;
     for (address, kind) in deposits {
         let capacity = world.tile_kind(address).map_or(0, TileKind::capacity);
@@ -654,6 +654,14 @@ fn gather(world: &mut World) {
         world
             .set_settlement_store(site, WORK_COMMODITY[ResourceKind::Food.index()], STOCKED)
             .expect("the site takes a store");
+        // **The store target is a parameter of the scenario for the same
+        // reason.** All work commodities share one slot. The food store
+        // exceeds the default target of 1.0, so the site lacks nothing and
+        // opens no positions. Stating a target above the store opens positions
+        // and seats the homed applicants.[^2]
+        world
+            .prefer_at_sites(&[site], ResourceKind::Wood, Fix32(3000 << 16))
+            .expect("the site takes a target");
     }
 }
 
@@ -878,6 +886,16 @@ fn golden_path(name: &str) -> PathBuf {
         .join(format!("state-hash-{name}.txt"))
 }
 
+/// Returns one count of the subsystem census by name.
+fn census(world: &World, name: &str) -> i64 {
+    world
+        .subsystem_census()
+        .into_iter()
+        .find(|(row, _)| *row == name)
+        .map(|(_, count)| count)
+        .expect("the census holds the row")
+}
+
 /// Runs a scenario and returns one hash line for each frame.
 fn hash_sequence(config: WorldConfig, population: Population, frames: u64) -> String {
     let mut world = World::new(config).expect("the extent must describe a world");
@@ -926,6 +944,13 @@ fn hash_sequence(config: WorldConfig, population: Population, frames: u64) -> St
         assert!(
             !world.characters().is_empty(),
             "the gathering scenario promoted nobody"
+        );
+        // The position pass seats homed units at open positions. A file
+        // recorded from a run that seated nobody would move for every
+        // reason except the seating.[^1]
+        assert!(
+            census(&world, "seats_filled") > 0,
+            "the gathering scenario seated nobody"
         );
     }
     if population == Population::Building {
