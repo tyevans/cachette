@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import pathlib
 
+from typing import Any, Generator
+
 import pytest
 
 from learner_shapes import (
@@ -83,7 +85,7 @@ def world_shaped_inputs(engine_shapes: EngineShapes) -> WorldShapedInputs:
 
 
 @pytest.hookimpl(wrapper=True)
-def pytest_runtest_call(item: pytest.Item):  # noqa: ANN201
+def pytest_runtest_call(item: pytest.Item) -> Generator[None, Any, Any]:
     """Skip tests that require a display context when running headless."""
     try:
         return (yield)
