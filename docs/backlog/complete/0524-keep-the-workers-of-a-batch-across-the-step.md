@@ -78,4 +78,4 @@ It does not change what any world computes.
 
 ## References
 
-[^1]: Backlog item 0525, build the stage workers of a world once. `docs/backlog/proposed/0525-build-the-stage-workers-of-a-world-once.md`
+[^1]: Backlog item 0525, build the stage workers of a world once. `docs/backlog/refined/0525-build-the-stage-workers-of-a-world-once.md`

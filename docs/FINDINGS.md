@@ -12383,7 +12383,7 @@ index against the set of open items and never against what an item says.
 [^F190A]: What a unit does in a tick, section 5. `docs/research/what-a-unit-does-in-a-tick.md`
 [^F190B]: The option score. `crates/cachette-core/src/choose.rs`
 [^F190C]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
-[^F191A]: Backlog item 0181, give a kind of work the commodity it fills. `docs/backlog/proposed/0181-give-a-kind-of-work-the-commodity-it-fills.md`
+[^F191A]: Backlog item 0181, give a kind of work the commodity it fills. `docs/backlog/refined/0181-give-a-kind-of-work-the-commodity-it-fills.md`
 [^F191B]: The founding provisions a site, and the consumption pass draws a ration. `crates/cachette-core/src/world/founding.rs`, `crates/cachette-core/src/world/rates.rs`
 [^F192A]: ADR Registry, the retired numbers. `docs/adrs/REGISTRY.md`
 [^F192B]: The record check script. `scripts/check_adrs.py`
@@ -12804,7 +12804,7 @@ public interface, and everyone would learn to ignore it.
 [^F486K]: Findings register, FND-483, in this document.
 [^F486L]: Testing Rules, rule 2a. `.agents/rules/testing.md`
 [^F486M]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
-[^F486N]: Backlog item 0491, seed the demonstration world with unit types that can fight, gather and carry. `docs/backlog/proposed/0491-seed-the-demonstration-world-with-unit-types-that-can-fight-gather-and-carry.md`
+[^F486N]: Backlog item 0491, seed the demonstration world with unit types that can fight, gather and carry. `docs/backlog/refined/0491-seed-the-demonstration-world-with-unit-types-that-can-fight-gather-and-carry.md`
 
 ## H. The trading controller
 
@@ -17403,7 +17403,7 @@ is stated in.
 [^F591B]: Findings register, FND-029, in this document.
 [^F591C]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
 [^F470D]: Findings register, FND-360, in this document.
-[^F471A]: Backlog item 0461, tell a caller which arena an identity belongs to. `docs/backlog/proposed/0461-tell-a-caller-which-arena-an-identity-belongs-to.md`
+[^F471A]: Backlog item 0461, tell a caller which arena an identity belongs to. `docs/backlog/refined/0461-tell-a-caller-which-arena-an-identity-belongs-to.md`
 [^F471B]: Decisions register, DEC-265. `docs/DECISIONS.md`
 [^F472A]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 [^F472C]: Decisions register, DEC-266. `docs/DECISIONS.md`
@@ -18314,7 +18314,7 @@ verb answers one byte and names nothing.
 ## References
 
 [^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
-[^F638B]: Backlog item 0525, build the stage workers of a world once. `docs/backlog/proposed/0525-build-the-stage-workers-of-a-world-once.md`
+[^F638B]: Backlog item 0525, build the stage workers of a world once. `docs/backlog/refined/0525-build-the-stage-workers-of-a-world-once.md`
 [^F641A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F641B]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^F641E]: ADR-0192, a window of controller commands is one label distribution over the action table, decisions D2 and D4. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`

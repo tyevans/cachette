@@ -417,5 +417,5 @@ behaviour changed, and the golden state hash did not move.
 [^11]: Decisions register, DEC-264. `docs/DECISIONS.md`
 [^12]: Findings register, FND-471. `docs/FINDINGS.md`
 [^13]: Decisions register, DEC-265. `docs/DECISIONS.md`
-[^14]: Backlog item 0461, tell a caller which arena an identity belongs to. `docs/backlog/proposed/0461-tell-a-caller-which-arena-an-identity-belongs-to.md`
+[^14]: Backlog item 0461, tell a caller which arena an identity belongs to. `docs/backlog/refined/0461-tell-a-caller-which-arena-an-identity-belongs-to.md`
 [^15]: Recurring Defect Shapes, shape 1. `.claude/rules/recurring-defects.md`
