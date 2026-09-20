@@ -10,7 +10,7 @@
 //! [^1]: ADR-0011, every value type is a newtype with a declared size and alignment. `docs/adrs/REGISTRY.md`
 
 use cachette_core::sim_math;
-use cachette_core::types::{Accum, FIX_FRACTIONAL_BITS};
+use cachette_core::types::{Accum, ArenaKind, FIX_FRACTIONAL_BITS};
 use cachette_core::{Axial, Entity, FactionId, Fix32, Grid, SoldierArena, StateHash};
 
 #[test]
@@ -29,9 +29,12 @@ fn an_entity_carries_an_index_and_a_generation() {
         .expect("the spawn must succeed");
     assert_eq!(entity.index(), 0);
     assert_eq!(entity.generation(), 1);
+    assert_eq!(entity.arena(), ArenaKind::Soldier);
     assert_eq!(
         entity.to_bits(),
-        (u64::from(entity.generation()) << 32) | u64::from(entity.index())
+        (u64::from(ArenaKind::Soldier.tag()) << 56)
+            | (u64::from(entity.generation()) << 32)
+            | u64::from(entity.index())
     );
 }
 

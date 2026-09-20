@@ -440,9 +440,11 @@ fn a_raze_resets_wonder_work_beyond_the_tile_of_the_site() {
         ..
     } = built;
     assert!(work_at(&field, ground).is_some_and(|work| work > 0));
-    field
-        .spawn_soldier(seat, FactionId(1))
-        .expect("the island admits a unit");
+    for _ in 0..2 {
+        field
+            .spawn_soldier(seat, FactionId(1))
+            .expect("the island admits a unit");
+    }
     field.step(1).expect("the step must run");
     field
         .order_raze(site, FactionId(1))

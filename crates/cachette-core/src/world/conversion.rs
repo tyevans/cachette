@@ -8,7 +8,7 @@ use super::errors::{ConvertError, StepError};
 use super::World;
 use crate::conversion::{self, Convert, UnitConverted};
 use crate::event_memory::MemoryKind;
-use crate::types::{Entity, FactionId};
+use crate::types::{ArenaKind, Entity, FactionId};
 
 impl World {
     /// Returns the units that changed faction in the last step.
@@ -174,7 +174,7 @@ impl World {
             let from = self.soldiers.faction_column()[index];
             let tile = self.soldiers.tile_column()[index];
             let generation = self.soldiers.generation_of(mark.slot);
-            let Some(unit) = Entity::new(mark.slot, generation) else {
+            let Some(unit) = Entity::new(ArenaKind::Soldier, mark.slot, generation) else {
                 continue;
             };
             if !self.soldiers.set_faction(unit, mark.faction) {

@@ -171,7 +171,7 @@ pub use trade::{
     KIND_RELATION, KIND_RESOURCE, TRADE_BOUND, TRADE_COUNTERED, TRADE_DEFAULTED, TRADE_IDLE,
     TRADE_OFFERED, TRADE_ROW_BYTES, TRADE_SETTLED, TRADE_STATUS_COUNT,
 };
-pub use types::{Accum, Entity, FactionId, Fix32, Tick, TileIdx};
+pub use types::{Accum, ArenaKind, Entity, FactionId, Fix32, Tick, TileIdx};
 pub use unit_type::{
     UnitTypeError, UnitTypeId, UnitTypeRow, UnitTypeTable, DEFAULT_UNIT_TYPE,
     DEFAULT_UNIT_TYPE_TABLE, UNIT_TYPE_COLUMN_COUNT, UNIT_TYPE_COUNT,
@@ -188,8 +188,8 @@ pub use weather::{
     WARMTH_FLOOR, WET_MARK,
 };
 pub use world::{
-    CampaignError, CensusBasis, CensusRow, ConvertError, IdentityError, MoveRelationError,
-    RazeError, SeedError, Standing, StepError, WonderSite, World, WorldConfig, WorldError,
-    FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, STOCK_CEILING_OF_ONE_SETTLEMENT,
+    ArenaMismatchError, CampaignError, CensusBasis, CensusRow, ConvertError, IdentityError,
+    MoveRelationError, RazeError, SeedError, Standing, StepError, WonderSite, World, WorldConfig,
+    WorldError, FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, STOCK_CEILING_OF_ONE_SETTLEMENT,
     SUBSYSTEM_CENSUS,
 };

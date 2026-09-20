@@ -1049,10 +1049,12 @@ mod tests {
     //! this crate could reach it.
 
     use super::*;
+    use crate::types::ArenaKind;
 
     /// Builds an identity without an arena.
     fn entity(index: u32) -> Entity {
-        Entity::new(index, 1).expect("a generation of one makes the identity non-zero")
+        Entity::new(ArenaKind::Character, index, 1)
+            .expect("a generation of one makes the identity non-zero")
     }
 
     #[test]

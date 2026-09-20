@@ -133,8 +133,8 @@ pub use self::carry::CARRY_MARK_DEFAULT;
 pub use self::census::{CensusBasis, CensusRow, SUBSYSTEM_CENSUS};
 pub use self::config::WorldConfig;
 pub use self::errors::{
-    CampaignError, ConvertError, IdentityError, MoveRelationError, RazeError, SeedError, SendError,
-    StepError, WorldError,
+    ArenaMismatchError, CampaignError, ConvertError, IdentityError, MoveRelationError, RazeError,
+    SeedError, SendError, StepError, WorldError,
 };
 pub use self::founding::FOUNDING_GROUP_DEFAULT;
 pub use self::luxuries::LUXURY_DEPOSITS_DEFAULT;

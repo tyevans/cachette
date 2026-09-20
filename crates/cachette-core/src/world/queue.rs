@@ -10,7 +10,7 @@ use crate::rates::RateSchedule;
 use crate::sim_math;
 use crate::site::{CommodityId, COMMODITY_COUNT};
 use crate::soldier::NO_HOME;
-use crate::types::{Entity, FactionId, Fix32};
+use crate::types::{ArenaKind, Entity, FactionId, Fix32};
 use crate::unit_type::UnitTypeId;
 
 impl World {
@@ -363,7 +363,7 @@ impl World {
                     continue;
                 }
                 let generation = self.soldiers.generation_of(slot as u32);
-                if let Some(unit) = Entity::new(slot as u32, generation) {
+                if let Some(unit) = Entity::new(ArenaKind::Soldier, slot as u32, generation) {
                     residents[index].push(unit);
                 }
             }
