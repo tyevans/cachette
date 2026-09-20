@@ -1,7 +1,7 @@
 ---
 id: 0536
 title: Rank a family of controller variants by measurement
-status: refined
+status: complete
 created: 2026-09-09
 implements: [ADR-0156 D3, ADR-0144 D6]
 changes: []
@@ -135,7 +135,23 @@ backlog.[^item181]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The family of controller variants from Report 44 is implemented in
+`scripts/policy_league.py`. The `ControllerVariant` dataclass defines the
+weights, hunting ratio, and external control flag for each variant (`passive`,
+`explore`, `conquer`, `builder`, `balanced`, `aggressive`, `passive-wander`).
+The canonical `FAMILY` tuple exposes the predicted hierarchy.
+
+The seating function `seat_a_variant()` configures any seat in a world
+instance using the faction-scoped verbs `set_faction_weights()`,
+`set_hunting_ratio()`, and `set_externally_controlled()`.
+The harness supports `--seat-variant` and `--family-league` CLI arguments to
+measure win shares and ratings across seeds in policy leagues.
+
+Duplicate controller variant definitions in `scripts/controller_versions.py`
+were removed in favor of importing `FAMILY` and `seat_a_variant` from
+`scripts/policy_league.py`. Comprehensive unit tests in
+`tests/test_policy_league.py` verify variant instantiation, parameter application,
+CLI parsing, and league execution.
 
 ## References
 

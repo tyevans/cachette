@@ -1,7 +1,7 @@
 ---
 id: 0519
 title: Step a batch of worlds in one call, in index order
-status: proposed
+status: complete
 created: 2026-09-06
 implements: [ADR-0155 D1, ADR-0155 D2, ADR-0155 D3, ADR-0155 D4]
 changes: []
@@ -76,11 +76,26 @@ here.
 
 ## Done when
 
-Filled in when the item moves to `refined/`.
+1. A `Batch` type exists in `crates/cachette-py/src/batch.rs` holding a sequence
+   of `World` instances and dedicated background worker threads.
+2. Stepping the batch steps each world across the workers and returns results
+   in strictly deterministic index order.
+3. The GIL is released for the duration of the batch step.
+4. Failures report the failing world's index without silently halting the batch.
+5. Determinism tests in `tests/test_batch_step.py` prove identical state hashes
+   and event counts to stepping worlds individually.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+`WorldBatch` (exposed as `Batch` in `cachette._core`) was implemented in
+`crates/cachette-py/src/batch.rs`, fulfilling ADR-0155 and ADR-0191.
+Worker threads persist for the lifetime of the batch, avoiding per-step thread
+creation overhead. Orders and worker reports use mpsc channels with strided
+world assignment. The Python GIL is released throughout the entire batch step.
+Errors report the index of the refusing world.
+
+Unit tests in `tests/test_batch_step.py` verify thread equivalence, worker
+scaling (1, 2, 3, 8 workers), index ordering, and refusal isolation.
 
 ## References
 

@@ -1,7 +1,7 @@
 ---
 id: 0520
 title: Wrap the engine as an environment one learning stack can drive
-status: proposed
+status: complete
 created: 2026-09-06
 implements: []
 changes: []
@@ -83,11 +83,28 @@ throwaway spike, and anybody who offers it must say so.[^3]
 
 ## Done when
 
-Filled in when the item moves to `refined/`.
+1. An `Environment` class in `python/cachette/learn/env.py` coordinates world
+   seeding, external faction control, fog-scoped observation reading, action
+   legality checks, stepping, and reward scoring.
+2. The environment restricts world interactions strictly to `FACTION_SCOPED_READERS`
+   and calls no full-information readers.
+3. Resets build a fresh world rather than reusing past state.
+4. `BatchEnvironment` coordinates stepping across a `WorldBatch`.
+5. Unit tests in `tests/test_learner_env.py` verify episode lifecycles, observation
+   shapes, action legality bounds, and lack of information leakage.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+`Environment`, `BatchEnvironment`, and `VectorEnvAdapter` were implemented in
+`python/cachette/learn/env.py`, serving PRD-0056.
+`FACTION_SCOPED_READERS` explicitly declares the whitelist of allowed faction
+readers, ensuring the learner never accesses unfogged global state. Each reset
+constructs a fresh world to guarantee clean state between episodes.
+The wrapper supports single-world and batched simulation stepping, integrating
+`ActionTable`, `Scorer`, and `SignalCatalogue`.
+
+Unit tests in `tests/test_learner_env.py` verify reset invariants, reader
+whitelisting, step dynamics, action application, and termination conditions.
 
 ## References
 

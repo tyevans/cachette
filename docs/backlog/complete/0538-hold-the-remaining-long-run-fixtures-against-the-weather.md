@@ -1,7 +1,7 @@
 ---
 id: 0538
 title: Hold the remaining long-run fixtures against the weather
-status: refined
+status: complete
 created: 2026-09-10
 implements: []
 changes: []
@@ -144,6 +144,19 @@ The cause is the span and not the latitude. A probe over a world of 64 tiles
 clouded every tile at a span of three degrees, at each latitude from thirty
 degrees south to seventy-five degrees north. The same probe at the span of a
 planet clouded few of them. The latitude decides only whether a storm forms.
+
+## Outcome
+
+All thirteen long-run fixture test files in `crates/cachette-core/tests/` were
+held against the weather. Fixtures that test combat, attrition, sieges, and
+territory capture are positioned at quiet polar latitudes (-70 degrees south,
+30 degrees span), preventing storm and rain casualties from interfering with
+assertion logic. Fixtures testing broad world behaviour, such as mariner open
+water crossings, gathering, and population growth, configure the planet latitude
+span.
+
+All tests compile cleanly with no clippy footnote warnings or struct update
+redundancies, and pass completely across all thread counts and CI suites.
 
 ## References
 
