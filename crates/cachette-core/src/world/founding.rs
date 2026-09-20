@@ -318,7 +318,9 @@ impl World {
             let result = self.found_one(group, faction, &taken);
             if let Ok(founding) = &result {
                 taken.push(founding.place());
-                self.assign_founding_unit_types(founding.people(), faction);
+                if group == FOUNDING_GROUP_DEFAULT {
+                    self.assign_founding_unit_types(founding.people(), faction);
+                }
             }
             outcomes.push(FoundingOutcome::new(faction, result));
         }
