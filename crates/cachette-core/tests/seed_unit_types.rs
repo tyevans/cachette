@@ -58,7 +58,8 @@ fn distribution_allocates_by_weights_using_largest_remainder() {
     assert_eq!(types.iter().filter(|&&t| t == WORKER).count(), 1);
     assert_eq!(types.iter().filter(|&&t| t == SOLDIER).count(), 1);
 
-    // Heavy warrior faction gets two soldiers at group 2.
+    // Heavy warrior faction gets at least one worker to sustain the settlement,
+    // plus one soldier at group 2.
     let warrior = FactionWeights {
         build: 1,
         war: 8,
@@ -67,8 +68,8 @@ fn distribution_allocates_by_weights_using_largest_remainder() {
         settle: 1,
     };
     let warrior_types = founding_unit_type_distribution(2, warrior);
-    assert_eq!(warrior_types.iter().filter(|&&t| t == SOLDIER).count(), 2);
-    assert_eq!(warrior_types.iter().filter(|&&t| t == WORKER).count(), 0);
+    assert_eq!(warrior_types.iter().filter(|&&t| t == SOLDIER).count(), 1);
+    assert_eq!(warrior_types.iter().filter(|&&t| t == WORKER).count(), 1);
 
     // Heavy builder faction gets two workers at group 2.
     let builder = FactionWeights {

@@ -101,6 +101,17 @@ pub fn founding_unit_type_distribution(group: u32, weights: FactionWeights) -> V
         }
     }
 
+    // Every founded settlement requires at least one worker to gather food
+    // and build, otherwise the settlement starves immediately and performs no work.
+    if group >= 1 && counts[0] == 0 {
+        counts[0] = 1;
+        if counts[1] > 0 {
+            counts[1] -= 1;
+        } else if counts[2] > 0 {
+            counts[2] -= 1;
+        }
+    }
+
     let mut types = Vec::with_capacity(group as usize);
     types.resize(counts[0] as usize, WORKER);
     types.resize((counts[0] + counts[1]) as usize, SOLDIER);
