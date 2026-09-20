@@ -708,7 +708,7 @@ impl World {
         //
         // [^lg]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
         if let Err(refusal) = self.build_refusal(entity, category) {
-            // The plan counts the refusals the permission rule makes, and
+            // The census counts the refusals the permission rule makes, and
             // not the ones the table or the identity make. The split is the
             // one the verb kept before the check moved out of it.
             if matches!(
@@ -717,7 +717,7 @@ impl World {
                     | BuildRefusal::NoProject { .. }
                     | BuildRefusal::GroundNotHeld { .. }
             ) {
-                self.plan.count_refusal();
+                self.census.builds_refused += 1;
             }
             return Err(refusal);
         }
@@ -811,6 +811,12 @@ impl World {
     #[must_use]
     pub fn build_order(&self, entity: Entity) -> Option<Option<UpgradeCategory>> {
         self.soldiers.build_order(entity)
+    }
+
+    /// Returns how many build orders the permission rule refused over the run.
+    #[must_use]
+    pub fn builds_refused(&self) -> i64 {
+        self.census.builds_refused
     }
 
     /// Removes the upgrade from one tile and reports whether it removed one.

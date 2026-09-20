@@ -753,12 +753,6 @@ impl World {
                 continue;
             }
             let refused = self.order_build_set(&group, category);
-            // The plan counts a project refusal beside the one the build
-            // verb counts. The two counts were here before the check moved
-            // out of the build verb, and this call keeps them.
-            for _ in 0..refused {
-                self.plan.count_refusal();
-            }
             applied |= refused < group.len();
         }
         applied

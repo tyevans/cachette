@@ -268,6 +268,72 @@ fn a_drop_and_a_refusal_are_counted_apart() {
         dropped + 1,
         "a refusal that is not a drop raised the drop row"
     );
+    assert_eq!(
+        census(&world, "builds_refused"),
+        0,
+        "plan write operations must not raise builds_refused"
+    );
+    assert!(world.check_invariants());
+}
+
+#[test]
+fn a_build_refusal_and_a_plan_write_refusal_are_counted_apart() {
+    let mut world = bare(SEED);
+    let address = open_from(&world, Axial::new(10, 10));
+    let unit = world
+        .spawn_soldier(address, ZERO)
+        .expect("the ground admits a unit");
+
+    let initial_dropped = census(&world, "projects_dropped");
+    let initial_projects = census(&world, "projects_refused");
+    let initial_builds = census(&world, "builds_refused");
+
+    // 1. A build refusal increments builds_refused and leaves projects_refused unchanged.
+    assert!(
+        world.order_build(unit, UpgradeCategory::ROAD).is_err(),
+        "the verb took a road that no project zones"
+    );
+    assert_eq!(
+        census(&world, "builds_refused"),
+        initial_builds + 1,
+        "the build refusal must raise builds_refused"
+    );
+    assert_eq!(
+        census(&world, "projects_refused"),
+        initial_projects,
+        "a build refusal must not raise projects_refused"
+    );
+    assert_eq!(
+        census(&world, "projects_dropped"),
+        initial_dropped,
+        "a build refusal must not raise projects_dropped"
+    );
+
+    // 2. A plan write refusal increments projects_refused and leaves builds_refused unchanged.
+    let stranger = FactionId(4);
+    assert!(
+        world
+            .zone_project(stranger, address, UpgradeCategory::ROAD)
+            .is_err(),
+        "a stranger faction cannot zone a project"
+    );
+    assert_eq!(
+        census(&world, "projects_refused"),
+        initial_projects + 1,
+        "the plan refusal must raise projects_refused"
+    );
+    assert_eq!(
+        census(&world, "builds_refused"),
+        initial_builds + 1,
+        "a plan write refusal must not raise builds_refused"
+    );
+    assert_eq!(
+        census(&world, "projects_dropped"),
+        initial_dropped,
+        "a plan write refusal must not raise projects_dropped"
+    );
+
+    assert_eq!(world.builds_refused(), census(&world, "builds_refused"));
     assert!(world.check_invariants());
 }
 
@@ -576,7 +642,8 @@ fn a_build_that_no_project_zones_is_refused_by_the_verb_and_ignored_by_the_pass(
         .expect("the ground admits a unit");
 
     // **The verb refuses.** A caller learns at once, and the refusal counts.
-    let before = census(&world, "projects_refused");
+    let before_builds = census(&world, "builds_refused");
+    let before_projects = census(&world, "projects_refused");
     assert!(
         world.order_build(unit, UpgradeCategory::ROAD).is_err(),
         "the verb took a road that no project zones"
@@ -586,7 +653,8 @@ fn a_build_that_no_project_zones_is_refused_by_the_verb_and_ignored_by_the_pass(
         Some(None),
         "a refused order was stored"
     );
-    assert!(census(&world, "projects_refused") > before);
+    assert_eq!(census(&world, "builds_refused"), before_builds + 1);
+    assert_eq!(census(&world, "projects_refused"), before_projects);
 
     // **The pass ignores.** The order is given while a project stands, and
     // the project is then cleared. The pass drops the intent, so no entry

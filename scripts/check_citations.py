@@ -76,6 +76,7 @@ SKIP_PATHS = {
     # checked by the run that owns them, and reading them here reports one
     # failure against two paths and blames the wrong tree.
     ROOT / ".claude" / "worktrees",
+    ROOT / ".agents" / "worktrees",
     ROOT / "scripts" / "check_citations.py",
     # Deliberately broken. Continuous integration runs the check against this
     # directory on purpose and fails when the check passes.

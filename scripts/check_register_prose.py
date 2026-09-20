@@ -108,6 +108,7 @@ SKIP_DIRS = {".git", "target", ".venv", "node_modules", "__pycache__", ".ruff_ca
 SKIP_PATHS = {
     # A worktree holds another checkout of this repository.
     ROOT / ".claude" / "worktrees",
+    ROOT / ".agents" / "worktrees",
     # Deliberately broken. The probe recipe scans these on purpose.
     ROOT / "tests" / "fixtures",
     # A tool's session scratch, not project prose.
