@@ -187,7 +187,7 @@ class Dataset:
 
     def label_counts(self) -> np.ndarray:
         """Return the weight each action row carries over the whole set."""
-        return self.targets.sum(axis=0)
+        return np.asarray(self.targets.sum(axis=0))
 
     def baseline(self) -> dict[str, float]:
         """Return what one constant answer scores on this set.
