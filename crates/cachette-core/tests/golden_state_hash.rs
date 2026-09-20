@@ -392,7 +392,7 @@ fn build_units(world: &mut World) {
             BuildCostRow {
                 work: QUEUE_WORK_OF_THE_SCENARIO,
                 people: 1,
-                goods: [Fix32::from_int(2)],
+                goods: [Fix32::from_int(2), Fix32::ZERO, Fix32::ZERO],
             },
         )
         .expect("the soldier row is inside the table");

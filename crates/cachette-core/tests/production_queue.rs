@@ -70,7 +70,7 @@ fn one_site(stock: Fix32, residents: u32) -> (World, Entity, Vec<Entity>) {
             BuildCostRow {
                 work: WORK,
                 people: PEOPLE,
-                goods: [GOODS],
+                goods: [GOODS, Fix32::ZERO, Fix32::ZERO],
             },
         )
         .expect("the soldier row is inside the table");

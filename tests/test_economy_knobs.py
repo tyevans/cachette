@@ -524,11 +524,11 @@ def test_a_commodity_the_world_does_not_hold_raises(seed: int) -> None:
     site = a_site(world)
 
     with pytest.raises(cachette.VerbError):
-        world.set_production_rate([site], ONE, 1)
+        world.set_production_rate([site], ONE, 3)
     with pytest.raises(cachette.VerbError):
-        world.set_upkeep_rate([site], ONE, 1)
+        world.set_upkeep_rate([site], ONE, 3)
     with pytest.raises(cachette.VerbError):
-        world.set_settlement_store([site], ONE, 1)
+        world.set_settlement_store([site], ONE, 3)
 
 
 def test_a_stale_site_in_the_set_leaves_every_other_site_alone(seed: int) -> None:

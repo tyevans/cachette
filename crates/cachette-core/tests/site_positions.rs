@@ -612,3 +612,93 @@ fn the_position_tables_agree_at_every_thread_count() {
         "the fixture must open a position, or the test compares two empty tables"
     );
 }
+
+#[test]
+fn draining_one_commodity_increases_positions_only_for_its_work_kind() {
+    let (mut world, site) = one_site();
+    let target = Fix32::from_int(10);
+    // Set equal preferences across all three resource kinds.
+    for kind in ResourceKind::ALL {
+        world
+            .prefer_at_sites(&[site], kind, target)
+            .expect("the site is live");
+    }
+    // Initially, supply all 3 commodities to meet the preferences in full.
+    for kind in ResourceKind::ALL {
+        let commodity = cachette_core::position::WORK_COMMODITY[kind.index()];
+        world
+            .set_settlement_store(site, commodity, target)
+            .expect("the commodity is in the set");
+    }
+    run(&mut world, 1, 1);
+    let row = world.site_positions(site).expect("the site must be live");
+    assert!(
+        row.iter().all(|entry| !entry.exists()),
+        "a site holding all wanted commodities opens no positions"
+    );
+
+    // Drain only Wood (commodity 1). Food (0) and Stone (2) remain fully stocked.
+    let wood_commodity = cachette_core::position::WORK_COMMODITY[ResourceKind::Wood.index()];
+    world
+        .set_settlement_store(site, wood_commodity, Fix32::ZERO)
+        .expect("the commodity is in the set");
+    run(&mut world, 1, 1);
+
+    let row = world.site_positions(site).expect("the site must be live");
+    let wood_positions = row
+        .iter()
+        .filter(|entry| entry.kind() == Some(ResourceKind::Wood))
+        .count();
+    let food_positions = row
+        .iter()
+        .filter(|entry| entry.kind() == Some(ResourceKind::Food))
+        .count();
+    let stone_positions = row
+        .iter()
+        .filter(|entry| entry.kind() == Some(ResourceKind::Stone))
+        .count();
+
+    assert!(
+        wood_positions > 0,
+        "positions must open for the drained commodity"
+    );
+    assert_eq!(
+        food_positions, 0,
+        "food positions must remain zero when food is stocked"
+    );
+    assert_eq!(
+        stone_positions, 0,
+        "stone positions must remain zero when stone is stocked"
+    );
+
+    // Now also partially drain Food (commodity 0).
+    let food_commodity = cachette_core::position::WORK_COMMODITY[ResourceKind::Food.index()];
+    world
+        .set_settlement_store(site, food_commodity, Fix32::from_int(5))
+        .expect("the commodity is in the set");
+    run(&mut world, 1, 1);
+
+    let row = world.site_positions(site).expect("the site must be live");
+    let wood_after = row
+        .iter()
+        .filter(|entry| entry.kind() == Some(ResourceKind::Wood))
+        .count();
+    let food_after = row
+        .iter()
+        .filter(|entry| entry.kind() == Some(ResourceKind::Food))
+        .count();
+    let stone_after = row
+        .iter()
+        .filter(|entry| entry.kind() == Some(ResourceKind::Stone))
+        .count();
+
+    assert!(
+        food_after > 0,
+        "food positions must now open in response to food deficit"
+    );
+    assert!(wood_after > 0, "wood positions must remain open");
+    assert_eq!(
+        stone_after, 0,
+        "stone positions must still remain zero when stone is stocked"
+    );
+}

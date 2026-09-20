@@ -120,7 +120,7 @@ fn one_site(stock: Fix32, housing: u32, residents: u32) -> (World, Entity) {
     let mut world = World::new(CONFIG).expect("the extent must describe a world");
     let place = open_ground(&world);
     world.set_growth_schedule(RateSchedule::new(1, 0).expect("one is inside the range"));
-    world.set_food_per_birth([FOOD]);
+    world.set_food_per_birth([FOOD, Fix32::ZERO, Fix32::ZERO]);
     world.set_housing_per_person(1);
     // **The fixture states a need rule that takes nothing.** These tests
     // measure growth, and a unit that eats would take the store that growth
@@ -223,7 +223,10 @@ fn one_birth_site(housing: u32, residents: u32) -> (World, Entity) {
     let (world, site) = one_site(stock, housing, residents);
     let reaches = store_at_the_grow_stage(&world, site);
     assert_eq!(
-        growth::proposals(&[reaches], &[FOOD]),
+        growth::proposals(
+            &[reaches, Fix32::ZERO, Fix32::ZERO],
+            &[FOOD, Fix32::ZERO, Fix32::ZERO]
+        ),
         1,
         "the fixture must afford exactly one birth when the grow stage reads it"
     );
@@ -609,7 +612,10 @@ fn one_free_place_admits_exactly_one_of_many_proposals() {
     // The store affords more than one birth, and the housing holds one
     // person. The refusal is therefore the free place and not the store.
     assert!(
-        growth::proposals(&[Fix32::from_int(4)], &[FOOD]) > 1,
+        growth::proposals(
+            &[Fix32::from_int(4), Fix32::ZERO, Fix32::ZERO],
+            &[FOOD, Fix32::ZERO, Fix32::ZERO]
+        ) > 1,
         "the fixture must propose more than once"
     );
     run(&mut world, 1, 1);

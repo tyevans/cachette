@@ -25,9 +25,8 @@ impl PyWorld {
     /// defaults to zero.
     ///
     /// **A commodity is not a resource kind.** The numbers name different
-    /// things. The world holds one commodity today, and its number is zero.
-    /// Every other number raises `ViewError`, so the resource kinds one and
-    /// two name no commodity.
+    /// things. The world holds three commodities: food (0), wood (1), and
+    /// stone (2). A number at or above three raises `ViewError`.
     ///
     /// - `q` and `r`, integers. The address of the site.
     /// - `faction`, an integer. The faction that owns the site.
@@ -378,8 +377,8 @@ impl PyWorld {
     /// of `numpy.uint64` that `found_settlements` returned. Returns `None`.
     ///
     /// The `commodity` is the number of a commodity. A commodity is not a
-    /// resource kind. The world holds one commodity today, and its number is
-    /// zero. The argument has that number by default.
+    /// resource kind. The world holds three commodities: food (0), wood (1),
+    /// and stone (2). The argument has that number zero by default.
     ///
     /// **The rate is a Q16.16 value as its raw integer.** Multiply the amount
     /// you want by 65536. The rate is what one tick spends. The schedule
@@ -477,7 +476,7 @@ impl PyWorld {
     /// `production`. This call publishes no reader of its own, because the
     /// value would then have two places to come from.[^4]
     ///
-    /// The commodity defaults to zero, and the world holds one commodity.
+    /// The commodity defaults to zero, and the world holds three commodities.
     ///
     /// **The set is all or nothing.** Every identity resolves before anything
     /// is written. The engine refuses the rate and the commodity before it
