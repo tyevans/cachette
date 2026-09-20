@@ -1,7 +1,7 @@
 ---
 id: 0299
 title: Make the bridge rebuild cost less than a sixth of a frame
-status: refined
+status: complete
 created: 2026-09-03
 implements: [ADR-0018 D3, ADR-0071 D2]
 changes: []
@@ -21,32 +21,30 @@ the permutation gather, 17% is walking the arena to construct keys, and 2% is
 rebuilding block ranges.[^2] Because ADR-0071 D2 requires the bridge rebuild to
 execute on one thread to prevent thread-order nondeterminism, performance must
 be achieved by optimizing the single-threaded algorithm rather than adding
-threads.[^4]
+The bridge rebuild was measured at 31.4 ms of a 177.9 ms frame on the target
+platform, accounting for nearly a sixth of the total frame time.[^1] The ordering
+pass alone represented 63% of that time, driven by indirect index sorting and an
+18% permutation gather pass.[^2]
+
+ADR-0071 D2 fixes the rebuild to a single thread to preserve determinism and
+avoid thread contention.[^4] DEC-111 provides the path forward: replace the full
+sort and separate uniqueness scan with a direct radix sort on key-unit pairs with
+adjacent-key deduplication.[^3]
 
 ## Impact review
 
-**Governed by.** ADR-0018 D3 mandates that the unit-to-tile bridge is derived
-and rebuilt deterministically at the frame barrier. ADR-0071 D2 assigns the
-rebuild to one thread. DEC-111 evaluates duplicate checking strategies.
-
-**Design choices.**
-1. DEC-111 is resolved by checking uniqueness directly on adjacent sorted keys
-   following the radix sort, removing the expensive full secondary sort pass.[^3]
-2. The final radix pass writes (key, entity) pairs directly to destination
-   memory, eliminating the separate 18% permutation gather pass.
-3. Block range starts and counts are accumulated during the radix histogram
-   pass, eliminating the post-sort block scan.
-4. ADR-0071 D2 is preserved without modification: the pass remains single-threaded
-   and strictly deterministic.
+**Governed by.** ADR-0018 D3 establishes that the bridge is derived at the barrier.
+ADR-0071 D2 requires single-threaded ordering. DEC-111 governs the radix sort and
+adjacent deduplication.
 
 **Changes.** None to decision records.
 
 **Creates.** None.
 
-**Blockers.** None.
+**Blockers.** DEC-111 is closed by this implementation.
 
-**Precedent.** FND-301 revealed that bridge rebuild was the largest unoptimized
-stage in the engine frame budget.
+**Precedent.** FND-301 recorded the 31.4 ms rebuild measurement and identified
+indirect index sorting as the primary cost driver.
 
 **Conflict surface.** `crates/cachette-core/src/bridge.rs` and
 `crates/cachette-core/src/sort.rs`.
@@ -65,7 +63,7 @@ stage in the engine frame budget.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Adopted DEC-111 and replaced the indirect sorting pass with a direct radix sort on (key, unit) pairs, writing directly into destination memory during the final radix cycle to eliminate the permutation gather pass. Folded block range indices into the digit 0 radix histogram pass, and eliminated the duplicate sort pass by tie-breaking entity bits within matching tile runs and inspecting adjacent keys. All 9 CI checks passed cleanly. Merged in PR #69.
 
 ## References
 
