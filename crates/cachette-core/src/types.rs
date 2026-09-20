@@ -53,11 +53,66 @@ pub struct Tick(pub u64);
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Pod, Zeroable)]
 pub struct Accum(pub i64);
 
-/// A generational entity handle.
+/// The arena that an entity belongs to.
+#[repr(u8)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ArenaKind {
+    /// The mobile soldier arena.
+    Soldier = 1,
+    /// The character arena.
+    Character = 2,
+    /// The settlement arena.
+    Settlement = 3,
+}
+
+impl ArenaKind {
+    /// Returns the arena kind corresponding to a tag byte, or `None` if unknown.
+    #[must_use]
+    pub const fn from_tag(tag: u8) -> Option<Self> {
+        match tag {
+            1 => Some(Self::Soldier),
+            2 => Some(Self::Character),
+            3 => Some(Self::Settlement),
+            _ => None,
+        }
+    }
+
+    /// The tag byte encoded into an identity.
+    #[must_use]
+    pub const fn tag(self) -> u8 {
+        self as u8
+    }
+
+    /// The human-readable name of the arena.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Soldier => "soldier",
+            Self::Character => "character",
+            Self::Settlement => "settlement",
+        }
+    }
+
+    /// Returns the arena kind of an identity value, or `None` if untagged or unknown.
+    #[must_use]
+    pub const fn of(identity: u64) -> Option<Self> {
+        Self::from_tag((identity >> 56) as u8)
+    }
+}
+
+impl core::fmt::Display for ArenaKind {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        formatter.write_str(self.name())
+    }
+}
+
+/// A generational entity handle tagged with its arena.
 ///
 /// The handle is never a bare index. The generation field is what makes a
-/// stale reference detectable instead of silently wrong. The value is never
-/// zero, so `Option<Entity>` stays 8 bytes wide.[^1]
+/// stale reference detectable instead of silently wrong. The arena tag
+/// distinguishes identities across arenas so that cross-arena calls refuse
+/// immediately. The value is never zero, so `Option<Entity>` stays 8 bytes
+/// wide.[^1]
 ///
 /// # References
 ///
@@ -67,7 +122,7 @@ pub struct Accum(pub i64);
 pub struct Entity(core::num::NonZeroU64);
 
 impl Entity {
-    /// Builds a handle from an index and a generation.
+    /// Builds a handle from an arena kind, an index and a generation.
     ///
     /// The entity storage is the only thing that builds an identity. Every
     /// other caller receives one and reads its parts through the accessors
@@ -78,21 +133,39 @@ impl Entity {
     /// The visibility is therefore restricted to this crate, and the arena
     /// is the only caller inside it.
     ///
-    /// Returns `None` when both parts are zero, because the handle may not
-    /// hold the value zero. A generation starts at one, so the arena never
-    /// meets that case.[^2]
+    /// Returns `None` when the packed integer is zero, which cannot happen
+    /// for any valid arena tag.
     ///
     /// # References
     ///
     /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D1. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D6. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     #[must_use]
-    pub(crate) const fn new(index: u32, generation: u32) -> Option<Self> {
-        let raw = ((generation as u64) << 32) | (index as u64);
+    pub(crate) const fn new(arena: ArenaKind, index: u32, generation: u32) -> Option<Self> {
+        let raw = ((arena.tag() as u64) << 56)
+            | (((generation as u64) & 0x00FF_FFFF) << 32)
+            | (index as u64);
         match core::num::NonZeroU64::new(raw) {
             Some(value) => Some(Self(value)),
             None => None,
         }
+    }
+
+    /// Returns the arena that the entity belongs to.
+    #[must_use]
+    pub const fn arena(&self) -> ArenaKind {
+        match (self.0.get() >> 56) as u8 {
+            1 => ArenaKind::Soldier,
+            2 => ArenaKind::Character,
+            3 => ArenaKind::Settlement,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Returns the arena that the entity belongs to.
+    #[must_use]
+    pub const fn arena_kind(&self) -> ArenaKind {
+        self.arena()
     }
 
     /// Returns the index part of the handle.
@@ -104,7 +177,7 @@ impl Entity {
     /// Returns the generation part of the handle.
     #[must_use]
     pub const fn generation(self) -> u32 {
-        (self.0.get() >> 32) as u32
+        ((self.0.get() >> 32) & 0x00FF_FFFF) as u32
     }
 
     /// Returns the whole handle as one integer. The sort key uses this.
@@ -124,8 +197,7 @@ impl Entity {
     /// The visibility is restricted to this crate, so no caller outside it
     /// can build a handle at all.[^2]
     ///
-    /// Returns `None` when the value is zero, because the handle may not
-    /// hold that value.
+    /// Returns `None` when the value is zero or carries an unknown arena tag.
     ///
     /// # References
     ///
@@ -133,9 +205,14 @@ impl Entity {
     /// [^2]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D2. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
     #[must_use]
     pub(crate) const fn from_bits(bits: u64) -> Option<Self> {
-        match core::num::NonZeroU64::new(bits) {
-            Some(value) => Some(Self(value)),
-            None => None,
+        let tag = (bits >> 56) as u8;
+        if tag >= 1 && tag <= 3 {
+            match core::num::NonZeroU64::new(bits) {
+                Some(value) => Some(Self(value)),
+                None => None,
+            }
+        } else {
+            None
         }
     }
 }

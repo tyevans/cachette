@@ -4,14 +4,14 @@
 //! the other. The readers here answer which units a tile carries and how many
 //! people a faction holds.
 
-use super::errors::{IdentityError, StepError};
+use super::errors::{ArenaMismatchError, IdentityError, StepError};
 use super::World;
 use crate::bridge::{BridgeError, UnitTileBridge};
 use crate::hex::Axial;
 use crate::resource::{CarryLoad, ResourceKind};
 use crate::sim_math;
 use crate::soldier::{SoldierArena, SoldierError};
-use crate::types::{Accum, Entity, FactionId, FACTION_CEILING};
+use crate::types::{Accum, ArenaKind, Entity, FactionId, FACTION_CEILING};
 use crate::unit_type::{UnitTypeId, UNIT_TYPE_COUNT};
 
 impl World {
@@ -74,6 +74,13 @@ impl World {
     /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     pub fn resolve_soldier(&self, identity: u64) -> Result<Entity, IdentityError> {
         let entity = Entity::from_bits(identity).ok_or(IdentityError::NotAnIdentity)?;
+        if entity.arena() != ArenaKind::Soldier {
+            return Err(ArenaMismatchError {
+                expected: ArenaKind::Soldier,
+                found: entity.arena(),
+            }
+            .into());
+        }
         let slot = entity.index();
         if slot >= self.soldiers.slot_count() {
             return Err(IdentityError::NoSuchSlot { slot });

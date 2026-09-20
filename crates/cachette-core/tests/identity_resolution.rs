@@ -19,7 +19,10 @@
 //! [^3]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 //! [^4]: Testing policy. `docs/TESTING.md`
 
-use cachette_core::{Amount, Axial, FactionId, IdentityError, ResourceKind, World, WorldConfig};
+use cachette_core::{
+    Amount, ArenaKind, ArenaMismatchError, Axial, FactionId, IdentityError, ResourceKind, World,
+    WorldConfig,
+};
 
 /// Builds a small world that admits a soldier at the origin.
 fn world() -> World {
@@ -134,7 +137,9 @@ fn a_slot_the_arena_never_opened_refuses() {
 
     // The same generation, one slot past the end. A caller that composed an
     // identity from an index it chose lands here.
-    let composed = (u64::from(unit.generation()) << 32) | u64::from(unit.index() + 1);
+    let composed = (u64::from(ArenaKind::Soldier.tag()) << 56)
+        | (u64::from(unit.generation()) << 32)
+        | u64::from(unit.index() + 1);
 
     assert_eq!(
         world.resolve_soldier(composed),
@@ -218,4 +223,55 @@ fn deposits(world: &World) -> (ResourceKind, Vec<Axial>) {
         }
     }
     (ResourceKind::Food, Vec::new())
+}
+
+#[test]
+fn passing_an_entity_with_the_wrong_arena_kind_produces_arena_mismatch_error() {
+    let mut world = world();
+    let soldier = world
+        .spawn_soldier(Axial::new(0, 0), FactionId(1))
+        .expect("the origin admits a soldier");
+    let character = world
+        .create_character(FactionId(1))
+        .expect("creating a character must succeed");
+
+    assert_eq!(soldier.arena(), ArenaKind::Soldier);
+    assert_eq!(character.arena(), ArenaKind::Character);
+
+    // Passing a character identity to resolve_soldier fails with ArenaMismatchError
+    assert_eq!(
+        world.resolve_soldier(character.to_bits()),
+        Err(IdentityError::ArenaMismatch(ArenaMismatchError {
+            expected: ArenaKind::Soldier,
+            found: ArenaKind::Character,
+        }))
+    );
+
+    // Passing a soldier identity to resolve_character fails with ArenaMismatchError
+    assert_eq!(
+        world.resolve_character(soldier.to_bits()),
+        Err(IdentityError::ArenaMismatch(ArenaMismatchError {
+            expected: ArenaKind::Character,
+            found: ArenaKind::Soldier,
+        }))
+    );
+
+    // Passing a soldier identity to resolve_settlement fails with ArenaMismatchError
+    assert_eq!(
+        world.resolve_settlement(soldier.to_bits()),
+        Err(IdentityError::ArenaMismatch(ArenaMismatchError {
+            expected: ArenaKind::Settlement,
+            found: ArenaKind::Soldier,
+        }))
+    );
+
+    // The display output describes the mismatch with both arena names
+    let mismatch = ArenaMismatchError {
+        expected: ArenaKind::Soldier,
+        found: ArenaKind::Character,
+    };
+    assert_eq!(
+        mismatch.to_string(),
+        "the identity belongs to the character arena, not the soldier arena"
+    );
 }

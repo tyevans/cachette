@@ -11,10 +11,10 @@
 
 use super::PyWorld;
 use crate::errors::{VerbError, ViewError};
-use crate::world::identity::{resolve, resolve_site};
+use crate::world::identity::{resolve, resolve_character, resolve_site};
 use cachette_core::character::CharacterArena;
 use cachette_core::descent::{DescentId, DESCENT_CEILING};
-use cachette_core::{Axial, Entity, FactionId, Fix32, Influence, World as CoreWorld};
+use cachette_core::{Axial, FactionId, Fix32, Influence, World as CoreWorld};
 use numpy::{PyArray1, ToPyArray};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -867,20 +867,6 @@ const MOTHER_ROLE: u8 = 0;
 
 /// The role value that names the father of a character.
 const FATHER_ROLE: u8 = 1;
-
-/// Resolves a character identity that Python handed back, or raises.
-///
-/// The engine compares the generation, so a character who is gone never
-/// answers for the character made next in their slot.[^1]
-///
-/// # References
-///
-/// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
-fn resolve_character(world: &CoreWorld, character: u64) -> PyResult<Entity> {
-    world
-        .resolve_character(character)
-        .map_err(|error| ViewError::new_err(error.to_string()))
-}
 
 /// Pairs each row of a walk with the role value that means no one role.
 ///

@@ -14,9 +14,16 @@
 //! [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 //! [^2]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`
 
-use crate::errors::ViewError;
-use cachette_core::{Entity, World as CoreWorld};
+use crate::errors::{ArenaMismatchError, ViewError};
+use cachette_core::{Entity, IdentityError, World as CoreWorld};
 use pyo3::prelude::*;
+
+fn map_identity_error(error: IdentityError) -> PyErr {
+    match error {
+        IdentityError::ArenaMismatch(mismatch) => ArenaMismatchError::new_err(mismatch.to_string()),
+        _ => ViewError::new_err(error.to_string()),
+    }
+}
 
 /// Resolves an identity that Python handed back, or raises.
 ///
@@ -29,9 +36,7 @@ use pyo3::prelude::*;
 ///
 /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 pub(crate) fn resolve(world: &CoreWorld, unit: u64) -> PyResult<Entity> {
-    world
-        .resolve_soldier(unit)
-        .map_err(|error| ViewError::new_err(error.to_string()))
+    world.resolve_soldier(unit).map_err(map_identity_error)
 }
 
 /// Resolves a settlement identity that Python handed back, or raises.
@@ -43,9 +48,21 @@ pub(crate) fn resolve(world: &CoreWorld, unit: u64) -> PyResult<Entity> {
 ///
 /// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
 pub(crate) fn resolve_site(world: &CoreWorld, site: u64) -> PyResult<Entity> {
+    world.resolve_settlement(site).map_err(map_identity_error)
+}
+
+/// Resolves a character identity that Python handed back, or raises.
+///
+/// The engine compares the generation, so a character who is gone never
+/// answers for the character made next in their slot.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decision D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+pub(crate) fn resolve_character(world: &CoreWorld, character: u64) -> PyResult<Entity> {
     world
-        .resolve_settlement(site)
-        .map_err(|error| ViewError::new_err(error.to_string()))
+        .resolve_character(character)
+        .map_err(map_identity_error)
 }
 
 /// Resolves every settlement identity of a set, or raises on the first stale

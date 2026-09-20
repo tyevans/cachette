@@ -5,14 +5,14 @@
 //! sit together, because each one is a stage of the same story. The store
 //! readers sit here too, because a store belongs to a site.
 
-use super::errors::{IdentityError, RazeError};
+use super::errors::{ArenaMismatchError, IdentityError, RazeError};
 use super::World;
 use crate::controller::FactionRow;
 use crate::event::{FactionEliminated, SiteTaken, TAKE_KIND_CAPTURED, TAKE_KIND_RAZED};
 use crate::hex::Axial;
 use crate::sim_math;
 use crate::site::{CommodityId, SettlementArena, SettlementError, COMMODITY_COUNT};
-use crate::types::{Accum, Entity, FactionId, Fix32, TileIdx, FACTION_CEILING};
+use crate::types::{Accum, ArenaKind, Entity, FactionId, Fix32, TileIdx, FACTION_CEILING};
 
 /// What the siege pass does to one site on one tick.
 ///
@@ -827,6 +827,13 @@ impl World {
     /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     pub fn resolve_settlement(&self, identity: u64) -> Result<Entity, IdentityError> {
         let entity = Entity::from_bits(identity).ok_or(IdentityError::NotAnIdentity)?;
+        if entity.arena() != ArenaKind::Settlement {
+            return Err(ArenaMismatchError {
+                expected: ArenaKind::Settlement,
+                found: entity.arena(),
+            }
+            .into());
+        }
         let slot = entity.index();
         if slot >= self.settlements.slot_count() {
             return Err(IdentityError::NoSuchSlot { slot });

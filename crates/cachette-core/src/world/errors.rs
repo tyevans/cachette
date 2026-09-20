@@ -18,8 +18,29 @@ use crate::promotion::PromotionError;
 use crate::rates::RateError;
 use crate::relation::RelationError;
 use crate::sort::SortError;
-use crate::types::{Entity, FACTION_CEILING};
+use crate::types::{ArenaKind, Entity, FACTION_CEILING};
 use crate::weather::WeatherError;
+
+/// The reason that an identity did not belong to the expected arena.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ArenaMismatchError {
+    /// The arena the call expected.
+    pub expected: ArenaKind,
+    /// The arena the identity belongs to.
+    pub found: ArenaKind,
+}
+
+impl core::fmt::Display for ArenaMismatchError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            formatter,
+            "the identity belongs to the {} arena, not the {} arena",
+            self.found, self.expected
+        )
+    }
+}
+
+impl std::error::Error for ArenaMismatchError {}
 
 /// The reason that a value did not name a live entity.
 ///
@@ -35,6 +56,8 @@ use crate::weather::WeatherError;
 pub enum IdentityError {
     /// The value is not an identity at all. The engine never gives out zero.
     NotAnIdentity,
+    /// The identity belongs to a different arena than expected.
+    ArenaMismatch(ArenaMismatchError),
     /// The value names a slot that the arena does not hold.
     NoSuchSlot {
         /// The slot that the value named.
@@ -58,10 +81,17 @@ pub enum IdentityError {
     },
 }
 
+impl From<ArenaMismatchError> for IdentityError {
+    fn from(error: ArenaMismatchError) -> Self {
+        Self::ArenaMismatch(error)
+    }
+}
+
 impl core::fmt::Display for IdentityError {
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::NotAnIdentity => write!(formatter, "the value is not an identity"),
+            Self::ArenaMismatch(mismatch) => mismatch.fmt(formatter),
             Self::NoSuchSlot { slot } => {
                 write!(formatter, "the arena holds no slot {slot}")
             }

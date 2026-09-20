@@ -80,7 +80,7 @@ mod tests {
 
     use super::*;
     use crate::hex::Grid;
-    use crate::types::FactionId;
+    use crate::types::{ArenaKind, FactionId};
 
     #[test]
     fn no_home_names_no_household() {
@@ -94,7 +94,8 @@ mod tests {
                 .spawn(address, FactionId(0))
                 .expect("the arena holds three units");
         }
-        let mut members = vec![Entity::new(1, 1).expect("the identity is not zero")];
+        let mut members =
+            vec![Entity::new(ArenaKind::Character, 1, 1).expect("the identity is not zero")];
         residents_of(&units, NO_HOME, &mut members);
         assert!(
             members.is_empty(),
