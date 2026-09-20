@@ -538,7 +538,7 @@ def test_supplying_a_character_id_to_a_unit_inspection_method_raises_arena_misma
     unit_id = int(units[0])
 
     with pytest.raises(cachette.ArenaMismatchError) as exc_info:
-        world.character(unit_id)
+        world.character_lineage(unit_id)
 
     assert "the identity belongs to the soldier arena, not the character arena" in str(
         exc_info.value
