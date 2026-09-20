@@ -126,21 +126,22 @@ def test_a_raised_unit_stays_a_unit_and_names_its_character(seed: int) -> None:
             )
 
 
-def test_a_unit_identity_and_a_character_identity_share_one_number(
+def test_a_unit_identity_and_a_character_identity_do_not_share_one_number(
     seed: int,
 ) -> None:
-    # The two arenas number their slots separately, so one number names a
-    # unit in one arena and a person in the other. Nothing reports it. The
-    # doc comments say so, and this test pins the sentence.
+    # DEC-266, FND-472: each arena encodes its kind tag into the identity,
+    # so a unit identity and a character identity never share the same number.
+    # Passing an identity from one arena to a query expecting another raises
+    # ArenaMismatchError.
     world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
     addresses = _open_addresses(world, 2)
     units = world.spawn_soldiers(addresses, faction=0)
     people = world.create_characters(0, 2)
-    assert units.tolist() == people.tolist()
-    # Each call answers for its own arena, and neither refuses the other's
-    # number.
-    world.soldier_tile(int(people[0]))
-    world.character_lineage(int(units[0]))
+    assert units.tolist() != people.tolist()
+    with pytest.raises(cachette.ArenaMismatchError):
+        world.soldier_tile(int(people[0]))
+    with pytest.raises(cachette.ArenaMismatchError):
+        world.character_lineage(int(units[0]))
 
 
 def test_a_unit_that_was_never_raised_names_no_character(seed: int) -> None:
@@ -514,3 +515,32 @@ def test_the_documented_numbers_hold(seed: int) -> None:
     assert world.character_lineage(child)["parent_role"].tolist() == [MOTHER, FATHER]
     # An ancestor and a descendant hold no role, so the column is zero.
     assert world.character_lineage(child)["ancestor_role"].tolist() == [MOTHER, MOTHER]
+
+
+def test_supplying_a_character_id_to_a_unit_inspection_method_raises_arena_mismatch(
+    seed: int,
+) -> None:
+    # ADR-0014 D1, ADR-0046 D1, item 0461: cross-arena identity use raises
+    # ArenaMismatchError.
+    world = cachette.World(width=16, height=16, seed=seed, faction_count=2)
+    characters = world.create_characters(count=1, faction=0)
+    assert len(characters) == 1
+    character_id = int(characters[0])
+
+    with pytest.raises(cachette.ArenaMismatchError) as exc_info:
+        world.unit_type(character_id)
+
+    assert "the identity belongs to the character arena, not the soldier arena" in str(
+        exc_info.value
+    )
+
+    addresses = _open_addresses(world, 1)
+    units = world.spawn_soldiers(addresses, faction=0)
+    unit_id = int(units[0])
+
+    with pytest.raises(cachette.ArenaMismatchError) as exc_info:
+        world.character_lineage(unit_id)
+
+    assert "the identity belongs to the soldier arena, not the character arena" in str(
+        exc_info.value
+    )

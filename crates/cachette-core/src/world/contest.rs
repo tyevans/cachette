@@ -8,7 +8,7 @@ use super::errors::StepError;
 use super::World;
 use crate::cohort;
 use crate::contest::{self, UnitFell};
-use crate::types::Entity;
+use crate::types::{ArenaKind, Entity};
 
 impl World {
     /// Returns the units that a meeting ended at the last resolution, in slot
@@ -89,7 +89,7 @@ impl World {
             let faction = self.soldiers.faction_column()[index];
             let unit_type = self.soldiers.type_column()[index];
             let generation = self.soldiers.generation_of(slot);
-            let unit = Entity::new(slot, generation)
+            let unit = Entity::new(ArenaKind::Soldier, slot, generation)
                 .expect("a marked slot is live, so it holds a generation of one or more");
             self.fell_log.push(UnitFell::new(
                 tick,

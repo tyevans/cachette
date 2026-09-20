@@ -106,6 +106,7 @@ def test_every_error_type_sits_under_one_root() -> None:
         cachette.SelectorError,
         cachette.VerbError,
         cachette.ViewError,
+        cachette.ArenaMismatchError,
         cachette.DeterminismError,
         cachette.EnginePanic,
     ):

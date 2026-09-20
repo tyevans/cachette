@@ -47,7 +47,7 @@ use crate::hash::StateHash;
 use crate::sim_math;
 use crate::site::{CommodityId, Store, StoreUpdate, COMMODITY_COUNT};
 use crate::slots::Slots;
-use crate::types::{Accum, Entity, Fix32, Tick};
+use crate::types::{Accum, ArenaKind, Entity, Fix32, Tick};
 
 /// The largest period that a schedule holds.
 ///
@@ -663,7 +663,7 @@ fn apply_span(
             if shortfall != Fix32::ZERO {
                 pass.ledger.shortfall[index] =
                     sim_math::accumulate(pass.ledger.shortfall[index], shortfall);
-                let site = Entity::new(slot, generations[offset])
+                let site = Entity::new(ArenaKind::Settlement, slot, generations[offset])
                     .expect("a live slot holds a generation of one or more");
                 pass.shortfalls.push(SiteShortfall::new(
                     tick,
