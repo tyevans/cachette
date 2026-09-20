@@ -1,7 +1,7 @@
 ---
 id: 0534
 title: Say which reader states the capacity of a weather cell
-status: refined
+status: complete
 created: 2026-09-09
 implements: [ADR-0141 D1, ADR-0141 D2, ADR-0162 D2]
 changes: []
@@ -101,6 +101,19 @@ the clamp is correct whichever figure it divides by.
 - A test proves that descending air can exceed `capacity_at_cell` while
   respecting `settle_capacity_at_cell`.
 - All priority checks pass.
+
+## Outcome
+
+Complete. `settle_capacity_at_cell(&self, cell: u32) -> Drops` and
+`settle_capacity_plane(&self) -> &[Drops]` publish the bound applied by the
+settle pass as derived state. The doc comment on `capacity_at_cell` states that
+it answers rest capacity and explicitly notes that descending air warms and holds
+more. `the_air_never_stands_above_the_capacity_of_its_own_cell()` asserts
+against `settle_capacity_at_cell` and passes, and
+`descending_air_can_exceed_rest_capacity_within_settle_capacity()` proves the
+failure mode by demonstrating that descending air legitimately exceeds rest
+capacity while respecting settle capacity. State hashes and the water account are
+unchanged.
 
 ## References
 
