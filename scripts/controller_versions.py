@@ -163,20 +163,13 @@ NO_WINNER = "none"
 # would report a run made to prove the tool as if it ranked the family.
 LEAST_DECIDED = 10
 
-# The raw value of one, at the fixed-point scale this project holds every
-# simulated number at. The hunting ratio is a factor, so this raw value means
-# parity: a faction hunts another that holds the same ground as it does.[^1]
-#
-# [^1]: Project orientation, the fixed-point scale. ``CLAUDE.md``
-RATIO_ONE = 65536
-
 
 def _sibling(name: str) -> ModuleType:
     """Import a script that sits beside this one, because there is no package.
 
     The rating tool of the stored policies already holds the seat schedule, the
-    balance check, the clearance bar and the spread of a set of numbers. **A
-    second copy of any of them would be one rule stored twice**, with nothing
+    balance check, the clearance bar and the spread of a set of numbers. A
+    second copy of any of them would be one rule stored twice, with nothing
     that fails when the copies disagree.
     """
     path = Path(__file__).resolve().parent / f"{name}.py"
@@ -197,6 +190,12 @@ require_balance = _league.require_balance
 balance_of = _league.balance_of
 HELDOUT_START = _league.HELDOUT_START
 CLEARANCE = _league.CLEARANCE
+Weights = _league.Weights
+Version = _league.ControllerVariant
+FAMILY = _league.FAMILY
+RATIO_ONE = _league.RATIO_ONE
+seat_a_version = _league.seat_a_variant
+family_versions = _league.family_variants
 
 
 class Seating(Protocol):
@@ -222,135 +221,6 @@ class Seating(Protocol):
     @property
     def players(self) -> tuple[int, ...]:
         """Give back the version each seat holds, in seat order."""
-
-
-@dataclass(frozen=True)
-class Weights:
-    """The five option weights of one faction.
-
-    The engine draws every weight from the seed, and it holds each of them
-    between one and eight. The verb that writes the vector refuses a weight
-    outside that bound, so this holds no copy of the bound.[^1]
-
-    The war weight biases the relation move. The renown weight biases the
-    campaign raise. The build weight splits an evaluation between a gather
-    order and a build order. The settle weight biases the founding draw.
-    **The trade weight reaches no decision that changes the world today.**[^2]
-
-    References
-    ----------
-    [^1]: The faction bindings, the weight verb.
-    ``crates/cachette-py/src/world/faction_view.rs``
-
-    [^2]: Report 44, the settings that steer nothing.
-    ``docs/research/reports/44-a-family-of-tunable-controllers.md``
-    """
-
-    war: int
-    trade: int
-    build: int
-    renown: int
-    settle: int
-
-    def as_dict(self) -> dict[str, int]:
-        """Return this vector as plain values, for a report file."""
-        return {
-            "war": self.war,
-            "trade": self.trade,
-            "build": self.build,
-            "renown": self.renown,
-            "settle": self.settle,
-        }
-
-
-@dataclass(frozen=True)
-class Version:
-    """One version of the built-in controller, and the name the report gives it.
-
-    A weight vector of ``None`` leaves the vector the seed drew. A ratio of
-    ``None`` leaves the ratio the engine gives every new faction. **The
-    external flag takes the seat away from the controller**, and this tool
-    sends no action, so a version that raises the flag plays no move at all.
-
-    The ratio is the raw fixed-point factor the engine takes.
-    """
-
-    name: str
-    weights: Weights | None = None
-    ratio: int | None = None
-    external: bool = False
-
-    def steering(self) -> tuple[object, ...]:
-        """Return the part of this version that reaches a decision.
-
-        Two versions with one steering value are one player twice. The trade
-        weight is out of the answer, because no decision that changes the
-        world reads it. The renown weight is in the answer, because it biases
-        the campaign raise. A version under external control makes no
-        decision at all, so its whole configuration is out.
-        """
-        drawn = self.weights
-        if self.external:
-            return ("external",)
-        return (
-            "played",
-            None if drawn is None else drawn.war,
-            None if drawn is None else drawn.build,
-            None if drawn is None else drawn.renown,
-            None if drawn is None else drawn.settle,
-            self.ratio,
-        )
-
-    def as_dict(self) -> dict[str, Any]:
-        """Return this version as plain values, for a report file."""
-        return {
-            "name": self.name,
-            "weights": None if self.weights is None else self.weights.as_dict(),
-            "overmatch_ratio": self.ratio,
-            "external_control": self.external,
-        }
-
-
-# The family the design report proposes, in the order the report predicts.[^1]
-# The weakest member comes first. Each entry names only the settings that
-# member writes, so a member with no weight vector plays the vector the seed
-# drew for its seat.
-#
-# **Every member carries its war weight in its renown weight as well.** The
-# war weight decided the relation move and the campaign raise together when
-# the report wrote this family. The engine now takes the campaign raise from
-# the renown weight, so an equal pair keeps each member playing as the report
-# describes it.[^2]
-#
-# [^1]: Report 44, the proposed variants.
-# ``docs/research/reports/44-a-family-of-tunable-controllers.md``
-#
-# [^2]: Findings register, FND-738. ``docs/FINDINGS.md``
-FAMILY: dict[str, Version] = {
-    "mute": Version(name="mute", external=True),
-    "quietist": Version(
-        name="quietist",
-        weights=Weights(war=1, trade=8, build=1, renown=1, settle=1),
-    ),
-    "settler": Version(
-        name="settler",
-        weights=Weights(war=1, trade=1, build=2, renown=1, settle=8),
-    ),
-    "mason": Version(
-        name="mason",
-        weights=Weights(war=1, trade=1, build=8, renown=1, settle=4),
-    ),
-    "default": Version(name="default"),
-    "warlord": Version(
-        name="warlord",
-        weights=Weights(war=8, trade=1, build=3, renown=8, settle=4),
-    ),
-    "hunter": Version(
-        name="hunter",
-        weights=Weights(war=8, trade=1, build=1, renown=8, settle=1),
-        ratio=RATIO_ONE,
-    ),
-}
 
 
 @dataclass(frozen=True)
@@ -418,19 +288,6 @@ def default_versions() -> list[Version]:
     ]
 
 
-def family_versions(named: Sequence[str]) -> list[Version]:
-    """Return the named members of the family, and refuse a name it lacks."""
-    versions: list[Version] = []
-    for name in named:
-        member = FAMILY.get(name)
-        if member is None:
-            known = ", ".join(FAMILY)
-            message = f"{name!r} names no member of the family. Take one of: {known}"
-            raise ValueError(message)
-        versions.append(member)
-    return versions
-
-
 def parse_versions(named: Sequence[str]) -> list[Version]:
     """Read a version list of the form ``name=ratio``, and refuse a bad entry.
 
@@ -484,27 +341,6 @@ def require_steering_apart(versions: Sequence[Version]) -> None:
             )
             raise ValueError(message)
         seen[key] = version.name
-
-
-def seat_a_version(world: World, seat: int, version: Version) -> None:
-    """Write one version onto one seat of a world the engine has seeded.
-
-    **The seeding draws the weight vector, so this writes after it.** Each verb
-    names one faction, so nothing here touches a seat the caller did not name.
-    """
-    if version.weights is not None:
-        world.set_faction_weights(
-            seat,
-            war=version.weights.war,
-            trade=version.weights.trade,
-            build=version.weights.build,
-            renown=version.weights.renown,
-            settle=version.weights.settle,
-        )
-    if version.ratio is not None:
-        world.set_faction_overmatch_ratio(seat, int(version.ratio))
-    if version.external:
-        world.set_externally_controlled(seat, True)
 
 
 def build_world(seed: int, seated: Sequence[Version]) -> World:
