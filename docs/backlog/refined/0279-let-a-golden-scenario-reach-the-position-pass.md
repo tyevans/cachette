@@ -1,9 +1,9 @@
 ---
 id: 0279
 title: Let a golden scenario reach the position pass
-status: proposed
+status: refined
 created: 2026-09-02
-implements: []
+implements: [ADR-0001 D4]
 changes: []
 creates: []
 serves: []
@@ -39,7 +39,7 @@ records for the build pass, seen in a second subsystem.[^2]
 half the units it spawns. With the default schedule period, three ticks of the
 run reach the seating pass, and the homed units are applicants. The scenario
 stocks food only, so positions for the other kinds open and there is somewhere
-to seat.[^A1]
+to seat.[^3]
 
 **Nothing asserts that a seat was written.** The scenario reaches the pass and
 then says nothing about the result, so it measures the fixture. No mutation
@@ -47,14 +47,14 @@ proves that the golden file guards the seating.
 
 **That assertion is the whole of the remaining work.** Put the defect back and
 watch the test stay green, because that is the only proof the scenario reaches
-the case.[^A2]
+the case.[^4]
 
 ## The same gap was found and closed for the promotion pass
 
 The promotion work met this exactly. All eight golden files moved when it
 landed, and none of the eight promoted anybody: the files moved because new
 unit columns entered the state hash, which happens whatever the pass does.
-FND-293 records it.[^4]
+FND-293 records it.[^5]
 
 **The repair there was three lines in the scenario, and it is the shape this
 item should copy.** The gathering scenario already states its own recovery
@@ -63,30 +63,33 @@ engine holds no test value. It now states its own promotion threshold in the
 same place, at a value that world reaches, and asserts that it produced a
 character. Two mutations confirm the file guards the behaviour.
 
-That answers one of the two questions below for this item as well: **the
-scenario states the parameter, rather than the engine changing its default.**
-What it does not answer is which scenario should carry the positions, because
-the gathering scenario founds no site and the settled scenario spawns units
-that name no home.
+## Impact review
 
-## What is missing before this is refined
+**Governed by.** ADR-0001 D4 requires the golden state hash test.[^1] A
+scenario that misses a pass cannot detect simulation changes in that pass.
 
-- The impact review.
-- **Which of the two reasons to fix.** Founding a scenario gives units homes
-  and covers the pass at the default schedule if the scenario runs long
-  enough. Shortening the period covers it sooner and states a schedule that no
-  other scenario states. The item must choose one and say why, rather than
-  doing both.
-- **What the added frames cost.** The gate suite has a development budget and
-  the golden test collects most of its cost from the wide scenarios.[^3] A
-  scenario that runs longer is paid for by every worker on every run.
-- Whether this is one scenario or a change to an existing one. A new row costs
-  a new golden file; a changed row moves an existing one, and a moved golden
-  file must be read before it is committed.
+**Changes.** None.
+
+**Creates.** None.
+
+**Blockers.** None.
+
+**Serves.** None.
+
+**Fixture choice.** The gathering scenario already founds a settlement and
+assigns homes to units.[^3] All work commodities share one slot. The food store
+exceeds the default target of 1.0, so the site opens no position without a
+stated target. Setting a wood target above the store opens positions and seats
+the units. The scenario runs 32 frames at the default 10-frame settling period.
+The test needs no added frames, no schedule change, and no new scenario row.
+The gate suite budget remains unaffected.[^6]
 
 ## Done when
 
-Stated when the item is refined.
+- The gathering scenario in the golden state hash test asserts
+  `census(&world, "seats_filled") > 0`.
+- Suppressing unit seating causes the assertion to fail.
+- The recorded golden state hash file matches without drift.
 
 ## Outcome
 
@@ -96,7 +99,7 @@ Filled in when the item moves to `complete/`.
 
 [^1]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^2]: Backlog item 0179, give a golden scenario a build. `docs/backlog/complete/0179-give-a-golden-scenario-a-build.md`
-[^3]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`
-[^4]: Findings register, FND-293. `docs/FINDINGS.md`
-[^A1]: The gathering scenario of the golden state hash. `crates/cachette-core/tests/golden_state_hash.rs`
-[^A2]: Testing Rules, section 2a. `.agents/rules/testing.md`
+[^3]: The gathering scenario of the golden state hash. `crates/cachette-core/tests/golden_state_hash.rs`
+[^4]: Testing Rules, section 2a. `.agents/rules/testing.md`
+[^5]: Findings register, FND-293. `docs/FINDINGS.md`
+[^6]: Development budgets, the gate suite budget. `docs/reference/development-budgets.md`

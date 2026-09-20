@@ -212,5 +212,5 @@ when a second commodity exists.
 [^17]: Findings register, FND-043. `docs/FINDINGS.md`
 [^18]: Testing Rules, sections 2a and 5. `.claude/rules/testing.md`
 [^19]: Decisions register, DEC-074. `docs/DECISIONS.md`
-[^20]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/proposed/0279-let-a-golden-scenario-reach-the-position-pass.md`
+[^20]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/refined/0279-let-a-golden-scenario-reach-the-position-pass.md`
 [^21]: Decisions register, DEC-073. `docs/DECISIONS.md`
