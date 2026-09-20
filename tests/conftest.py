@@ -19,8 +19,8 @@ Testing policy. ``docs/TESTING.md``
 from __future__ import annotations
 
 import pathlib
-
-from typing import Any, Generator
+from collections.abc import Generator
+from typing import Any
 
 import pytest
 
