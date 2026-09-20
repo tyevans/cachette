@@ -510,7 +510,8 @@ impl UnitTileBridge {
 
         let count = self.entries.len();
         self.keys.resize(count, 0);
-        let dummy = Entity::new(ArenaKind::Soldier, 0, 1).expect("a dummy entity can be constructed");
+        let dummy =
+            Entity::new(ArenaKind::Soldier, 0, 1).expect("a dummy entity can be constructed");
         self.units.resize(count, dummy);
 
         let digits = sort::digit_count(ceiling);
