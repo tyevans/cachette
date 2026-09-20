@@ -80,3 +80,24 @@ def world_shaped_inputs(engine_shapes: EngineShapes) -> WorldShapedInputs:
     return world_shaped_stack(
         engine_shapes.action_length, engine_shapes.observation_length
     )
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item: pytest.Item):  # noqa: ANN201
+    """Skip tests that require a display context when running headless."""
+    try:
+        return (yield)
+    except Exception as exc:
+        from cachette.demo.glpage import DeviceGap
+
+        gap_types: list[type[BaseException]] = [DeviceGap]
+        try:
+            from pyglet.display.xlib import NoSuchDisplayException
+
+            gap_types.append(NoSuchDisplayException)
+        except Exception:
+            pass
+
+        if isinstance(exc, tuple(gap_types)):
+            pytest.skip(f"this machine gives no graphics context: {exc}")
+        raise
