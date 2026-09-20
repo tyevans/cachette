@@ -1,7 +1,7 @@
 ---
 id: 0490
 title: Let the control plane read the store of a seeded settlement
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0014 D1, ADR-0014 D7, ADR-0062 D1, ADR-0062 D5, ADR-0063 D1]
 changes: []
@@ -70,7 +70,17 @@ settlement holds from Python and reads it back).[^4]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**The founding reports include the settlement identity.** The seeding verb
+`World.seed_world` and `World.found_run_for_every_faction` populate `"site"` as
+an integer holding the 64-bit entity identity (`founding.settlement().to_bits()`)
+for seated foundings.[^2]
+
+**The Python type stub declares the key.** `FoundingReport` in
+`python/cachette/_core.pyi` declares `site: int`.[^10]
+
+**The control plane reads and writes seeded stores.** `World.site_economy` and
+`World.set_settlement_store` accept the reported site identities, and a negative
+test verifies that raw slot indices are refused with `ViewError`.[^11]
 
 ## References
 
@@ -83,3 +93,6 @@ Filled in when the item moves to `complete/`.
 [^7]: ADR-0014, an identity is a slot index and a generation, decision D7. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 [^8]: ADR-0062, production and upkeep are rates attached to a site, decisions D1 and D5. `docs/adrs/accepted/adr-0062-production-and-upkeep-are-rates-attached-to-a-site.md`
 [^9]: ADR-0063, a need is a rate with a threshold, and crossing it is a fact, decision D1. `docs/adrs/accepted/adr-0063-a-need-is-a-rate-with-a-threshold-and-crossing-it-is-a-fact.md`
+[^10]: Python type stubs. `python/cachette/_core.pyi`
+[^11]: Economy tuning knob tests. `tests/test_economy_knobs.py`
+

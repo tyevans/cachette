@@ -17413,7 +17413,7 @@ is stated in.
 [^F485C]: The type stub of the compiled module, the founding verbs and the site columns. `python/cachette/_core.pyi`
 [^F485D]: The type stub of the compiled module, the founding report of the seeding verb. `python/cachette/_core.pyi`
 [^F485E]: The demonstration application, the seeding call. `python/cachette/demo/app.py`
-[^F485F]: Backlog item 0490, let the control plane read the store of a seeded settlement. `docs/backlog/refined/0490-let-the-control-plane-read-the-store-of-a-seeded-settlement.md`
+[^F485F]: Backlog item 0490, let the control plane read the store of a seeded settlement. `docs/backlog/complete/0490-let-the-control-plane-read-the-store-of-a-seeded-settlement.md`
 [^F485G]: PRD-0047, a game states its own economy. `docs/product/shaped/prd-0047-a-game-states-its-own-economy.md`
 [^F484J]: ADR-0146, a faction relation is one signed integer per ordered pair and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
 [^F484H]: ADR-0142, a god inflicts weather only on ground its own faction holds, decision D1. `docs/adrs/draft/adr-0142-a-god-inflicts-weather-only-on-ground-it-holds.md`
