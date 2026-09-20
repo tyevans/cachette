@@ -1,7 +1,7 @@
 ---
 id: 0295
 title: Fail a check when the toolchain names a floating channel
-status: refined
+status: complete
 created: 2026-09-02
 implements: [ADR-0097 D2]
 changes: []
@@ -92,7 +92,19 @@ declaration site.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**The invariant check enforces the toolchain pin.** `scripts/check-toolchain-pin.sh`
+verifies that `[toolchain].channel` in `rust-toolchain.toml` matches
+`nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}`, and fails on bare channels or missing dates
+with an error citing ADR-0097 D2.[^1]
+
+**Broken fixtures prove the check fails.** Five fixtures under
+`tests/fixtures/toolchain-broken/` cover bare nightly, stable, beta, undated,
+and missing channel cases. `scripts/toolchain-pin-probe.sh` tests all five and
+confirms the failure status.[^6]
+
+**The check runs in local gates and continuous integration.** It is wired into
+`just invariants` and `.github/workflows/ci.yml`, and the probe runs under
+`just records-probe`.[^7]
 
 ## References
 
@@ -101,3 +113,5 @@ Filled in when the item moves to `complete/`.
 [^3]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^4]: Testing rules, section 1. `.claude/rules/testing.md`
 [^5]: Decisions register, DEC-106. `docs/DECISIONS.md`
+[^6]: Toolchain pin probe. `scripts/toolchain-pin-probe.sh`
+[^7]: Project recipes. `justfile`
