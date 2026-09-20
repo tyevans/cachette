@@ -133,7 +133,7 @@ to fail. The commit bodies hold the probes and their output.
 
 ### The rows that remain, highest risk first
 
-All thirteen rows from the original sweep are repaired and verified. No open rows remain in this list.
+All thirteen rows from the original sweep are repaired and verified.[^8] No open rows remain in this list.
 
 ## What this item does not do
 
