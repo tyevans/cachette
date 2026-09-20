@@ -965,6 +965,7 @@ class WindowCensus(TypedDict):
 class FoundingReport(TypedDict, total=False):
     """What one faction got when the run was founded."""
 
+    site: int
     faction: int
     seated: bool
     q: int
