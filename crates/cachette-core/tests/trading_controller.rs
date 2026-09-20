@@ -33,14 +33,6 @@ use cachette_core::{
 /// The people each founding settles.
 const GROUP: u32 = 8;
 
-/// The commodity that every kind of work fills. It is read from the declared
-/// map, so this file holds no second copy of the number.[^1]
-///
-/// # References
-///
-/// [^1]: Findings register, FND-191. `docs/FINDINGS.md`
-const GOODS: CommodityId = WORK_COMMODITY[0];
-
 /// The store the seller holds.
 ///
 /// **It is far above the mark and below the stock target.** A store at the
@@ -129,9 +121,11 @@ fn set_store(world: &mut World, faction: FactionId, quantity: Fix32) {
     let site = world
         .trading_site_of(faction)
         .expect("the faction holds a site");
-    world
-        .set_settlement_store(site, GOODS, quantity)
-        .expect("the commodity is inside the set");
+    for &commodity in &WORK_COMMODITY {
+        world
+            .set_settlement_store(site, commodity, quantity)
+            .expect("the commodity is inside the set");
+    }
 }
 
 /// Puts a unit of each faction on ground the other holds.

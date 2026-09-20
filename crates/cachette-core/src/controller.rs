@@ -1074,6 +1074,53 @@ pub fn asking_good_of(
     tied[picked.min(count - 1)]
 }
 
+/// Picks the good that a faction pays with in return for a wanted good.
+///
+/// The answer is the good the faction holds most of, and never the good the
+/// row is about. The scan draws nothing while one good is highest. Two
+/// goods that tie are separated by one keyed draw, because a tie broken by
+/// the index would always name the same good and the board would never offer
+/// the other.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0003, every random draw is keyed, never stateful, decision D1. `docs/adrs/accepted/adr-0003-every-random-draw-is-keyed-never-stateful.md`
+#[must_use]
+pub fn payment_good_of(
+    seed: u64,
+    tick: Tick,
+    faction: FactionId,
+    draw: u32,
+    stores: &[i64; RESOURCE_KIND_COUNT],
+    good: u8,
+) -> u8 {
+    let mut highest = i64::MIN;
+    let mut tied = [0u8; RESOURCE_KIND_COUNT];
+    let mut count = 0usize;
+    for (index, held) in stores.iter().enumerate() {
+        if index as u8 == good {
+            continue;
+        }
+        if *held > highest {
+            highest = *held;
+            count = 0;
+        }
+        if *held == highest {
+            tied[count] = index as u8;
+            count += 1;
+        }
+    }
+    if count == 0 {
+        return good;
+    }
+    if count == 1 {
+        return tied[0];
+    }
+    let raw = rng::draw(seed, rng::SYSTEM_CONTROLLER, tick.0, faction.0 as u64, draw);
+    let picked = ((u128::from(raw) * count as u128) >> 64) as usize;
+    tied[picked.min(count - 1)]
+}
+
 /// Builds the whole board of one faction from what its sites hold.
 ///
 /// The goods are visited in index order. A good above the mark becomes an
@@ -1101,15 +1148,16 @@ pub fn board_of(
     let mut rows = Vec::with_capacity(RESOURCE_KIND_COUNT);
     for (index, held) in stores.iter().enumerate() {
         let good = index as u8;
-        let (side, quantity) = if *held > mark {
-            (ADVERT_OFFERS, held.saturating_sub(mark))
+        let (side, quantity, asking) = if *held > mark {
+            let asking = asking_good_of(seed, tick, faction, draw, stores, good);
+            (ADVERT_OFFERS, held.saturating_sub(mark), asking)
         } else if *held < mark {
-            (ADVERT_WANTS, mark.saturating_sub(*held))
+            let asking = payment_good_of(seed, tick, faction, draw, stores, good);
+            (ADVERT_WANTS, mark.saturating_sub(*held), asking)
         } else {
             continue;
         };
         let quantity = u32::try_from(quantity).unwrap_or(u32::MAX);
-        let asking = asking_good_of(seed, tick, faction, draw, stores, good);
         rows.push(Advert::new(good, quantity, side, asking, quantity));
     }
     rows.truncate(bound);
