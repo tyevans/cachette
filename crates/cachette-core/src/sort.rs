@@ -400,10 +400,10 @@ fn merge_runs<const N: usize>(runs: &[&[u32]], keys: &[SortKey<N>]) -> Vec<u32> 
 /// Eight bits give a histogram of 256 counters, which is one kilobyte. A
 /// histogram of that size stays in the first level cache, so one pass reads
 /// the keys once and writes the indices once.
-const DIGIT_BITS: u32 = 8;
+pub(crate) const DIGIT_BITS: u32 = 8;
 
 /// The number of counters in one radix histogram.
-const DIGIT_VALUES: usize = 1 << DIGIT_BITS;
+pub(crate) const DIGIT_VALUES: usize = 1 << DIGIT_BITS;
 
 /// A key of two fields, whose first field lies below a stated ceiling.
 ///
@@ -506,7 +506,7 @@ pub fn order_bounded(keys: &[BoundedKey], ceiling: u64) -> Result<Vec<u32>, Sort
 /// Returns the number of radix digits that a ceiling needs.
 ///
 /// A ceiling of zero still needs one digit, because the set holds keys.
-const fn digit_count(ceiling: u64) -> u32 {
+pub(crate) const fn digit_count(ceiling: u64) -> u32 {
     let bits = u64::BITS - ceiling.leading_zeros();
     if bits == 0 {
         1
@@ -548,7 +548,7 @@ fn radix_order(keys: &[BoundedKey], digits: u32) -> Vec<u32> {
 }
 
 /// Returns one digit of an ordering field.
-const fn digit_of(order: u64, shift: u32) -> usize {
+pub(crate) const fn digit_of(order: u64, shift: u32) -> usize {
     ((order >> shift) & (DIGIT_VALUES as u64 - 1)) as usize
 }
 
