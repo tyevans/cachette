@@ -21,6 +21,8 @@
 //!
 //! The tests see only the public crate interface.[^4]
 //!
+//! A polar latitude keeps the sky dry and quiet.[^5]
+//!
 //! # References
 //!
 //! [^1]: Findings register, FND-694. `docs/FINDINGS.md`
@@ -42,10 +44,10 @@ const LAND_SEED: u64 = 1;
 /// a degree.
 ///
 /// **Seventy degrees south is half of what makes the sky quiet.** Cold air
-/// carries little water, and the ground stays dry.[^5]
+/// carries little water, and the ground stays dry.
 const QUIET_CENTRE: i32 = -7000;
 
-/// The latitude span of the sky that leaves the ground dry and clear.[^5]
+/// The latitude span of the sky that leaves the ground dry and clear.
 const QUIET_SPAN: i32 = 3000;
 
 /// The type number of the unit that carries an attack and no armour.

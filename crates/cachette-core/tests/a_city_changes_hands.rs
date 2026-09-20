@@ -15,6 +15,8 @@
 //! The tests drive the world step and the public verbs, because the step and
 //! the verbs are what must invoke the rules.[^4]
 //!
+//! A polar latitude keeps the sky dry and quiet.[^5]
+//!
 //! # References
 //!
 //! [^1]: ADR-0180, a site changes hands or the taker destroys it. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`
@@ -44,10 +46,10 @@ const GRAIN: CommodityId = CommodityId(0);
 /// a degree.
 ///
 /// **Seventy degrees south is half of what makes the sky quiet.** Cold air
-/// carries little water, and the ground under the site stays dry.[^5]
+/// carries little water, and the ground under the site stays dry.
 const QUIET_CENTRE: i32 = -7000;
 
-/// The latitude span of the sky that leaves the ground dry and clear.[^5]
+/// The latitude span of the sky that leaves the ground dry and clear.
 const QUIET_SPAN: i32 = 3000;
 
 fn world(seed: u64, factions: u16, reach: u32) -> World {

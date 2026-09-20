@@ -15,6 +15,8 @@
 //! target scale. Each of them steps the world and asserts that the record
 //! stays empty, while the standing still reports the quantity.
 //!
+//! A polar latitude keeps the sky dry and quiet.[^3]
+//!
 //! # References
 //!
 //! [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
@@ -70,10 +72,10 @@ const FAR_LIMIT: u64 = 100_000;
 /// a degree.
 ///
 /// **Seventy degrees south is half of what makes the sky quiet.** Cold air
-/// carries little water, and the ground stays dry.[^3]
+/// carries little water, and the ground stays dry.
 const QUIET_CENTRE: i32 = -7000;
 
-/// The latitude span of the sky that leaves the ground dry and clear.[^3]
+/// The latitude span of the sky that leaves the ground dry and clear.
 const QUIET_SPAN: i32 = 3000;
 
 fn config(factions: u16, seed: u64, extent: u32) -> WorldConfig {

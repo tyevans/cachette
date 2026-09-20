@@ -23,6 +23,8 @@
 //! cohort draws, so a rate that stated the rations alone would hand the cohort
 //! less than the fixture named.[^5]
 //!
+//! A polar latitude keeps the sky dry and quiet.[^6]
+//!
 //! # References
 //!
 //! [^1]: Findings register, FND-318. `docs/FINDINGS.md`
@@ -47,10 +49,10 @@ const SEED: u64 = 7;
 /// a degree.
 ///
 /// **Seventy degrees south is half of what makes the sky quiet.** Cold air
-/// carries little water, and the ground under the site stays dry.[^6]
+/// carries little water, and the ground under the site stays dry.
 const QUIET_CENTRE: i32 = -7000;
 
-/// The latitude span of the sky that leaves the ground dry and clear.[^6]
+/// The latitude span of the sky that leaves the ground dry and clear.
 const QUIET_SPAN: i32 = 3000;
 
 /// The commodity that the ration draws against.

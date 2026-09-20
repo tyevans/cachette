@@ -26,6 +26,8 @@
 //! Every test drives the world step, so each value comes from the observation
 //! pass and not from a fixture.[^3]
 //!
+//! A polar latitude keeps the sky dry and quiet.[^4]
+//!
 //! # References
 //!
 //! [^1]: The audit of the observation, sections 3.1 and 4.3. `docs/research/what-a-policy-cannot-see.md`
@@ -61,10 +63,10 @@ const KEEP_STILL: u32 = 12;
 /// a degree.
 ///
 /// **Seventy degrees south is half of what makes the sky quiet.** Cold air
-/// carries little water, and the ground stays dry.[^4]
+/// carries little water, and the ground stays dry.
 const QUIET_CENTRE: i32 = -7000;
 
-/// The latitude span of the sky that leaves the ground dry and clear.[^4]
+/// The latitude span of the sky that leaves the ground dry and clear.
 const QUIET_SPAN: i32 = 3000;
 
 /// Builds a world of three seated factions whose territory reader never

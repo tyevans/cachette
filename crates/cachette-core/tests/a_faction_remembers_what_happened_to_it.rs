@@ -25,6 +25,8 @@
 //!
 //! The tests see only the public crate interface.[^5]
 //!
+//! A polar latitude keeps the sky dry and quiet.[^6]
+//!
 //! # References
 //!
 //! [^1]: The event history. `crates/cachette-core/src/event_memory.rs`
@@ -56,10 +58,10 @@ const LAND_SEED: u64 = 1;
 /// a degree.
 ///
 /// **Seventy degrees south is half of what makes the sky quiet.** Cold air
-/// carries little water, and the ground stays dry.[^6]
+/// carries little water, and the ground stays dry.
 const QUIET_CENTRE: i32 = -7000;
 
-/// The latitude span of the sky that leaves the ground dry and clear.[^6]
+/// The latitude span of the sky that leaves the ground dry and clear.
 const QUIET_SPAN: i32 = 3000;
 
 /// The type number of the light unit. It never reaches the heavy unit.

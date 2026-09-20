@@ -26,6 +26,8 @@
 //! one faction that keeps the rule beside one that gives it up, and reads the
 //! two relations apart.
 //!
+//! A polar latitude keeps the sky dry and quiet.[^4]
+//!
 //! # References
 //!
 //! [^1]: Balance register, the overmatch ratio. `docs/reference/balance.md`
@@ -59,10 +61,10 @@ const RATIO: i32 = cachette_core::controller::OVERMATCH_RATIO_DEFAULT;
 /// a degree.
 ///
 /// **Seventy degrees south is half of what makes the sky quiet.** Cold air
-/// carries little water, and the ground stays dry.[^4]
+/// carries little water, and the ground stays dry.
 const QUIET_CENTRE: i32 = -7000;
 
-/// The latitude span of the sky that leaves the ground dry and clear.[^4]
+/// The latitude span of the sky that leaves the ground dry and clear.
 const QUIET_SPAN: i32 = 3000;
 
 fn config(factions: u16, seed: u64) -> WorldConfig {

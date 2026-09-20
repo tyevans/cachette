@@ -11,6 +11,8 @@
 //!
 //! The tests see only the public crate API.[^4]
 //!
+//! A polar latitude keeps the sky dry and quiet.[^5]
+//!
 //! # References
 //!
 //! [^1]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decisions D3, D4, D5 and D6. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
@@ -39,10 +41,10 @@ const LAND_SEED: u64 = 1;
 /// a degree.
 ///
 /// **Seventy degrees south is half of what makes the sky quiet.** Cold air
-/// carries little water, and the ground stays dry.[^5]
+/// carries little water, and the ground stays dry.
 const QUIET_CENTRE: i32 = -7000;
 
-/// The latitude span of the sky that leaves the ground dry and clear.[^5]
+/// The latitude span of the sky that leaves the ground dry and clear.
 const QUIET_SPAN: i32 = 3000;
 
 const A: FactionId = FactionId(0);

@@ -16,6 +16,8 @@
 //! values are placeholders that the balance harness will change, and a test
 //! that read them would measure the register.[^3]
 //!
+//! A polar latitude keeps the sky dry and quiet.[^4]
+//!
 //! # References
 //!
 //! [^1]: Testing rules, drive the real caller. `.agents/rules/testing.md`
@@ -68,10 +70,10 @@ const CERTAIN: Fix32 = Fix32::ONE;
 /// a degree.
 ///
 /// **Seventy degrees south is half of what makes the sky quiet.** Cold air
-/// carries little water, and the ground stays dry.[^4]
+/// carries little water, and the ground stays dry.
 const QUIET_CENTRE: i32 = -7000;
 
-/// The latitude span of the sky that leaves the ground dry and clear.[^4]
+/// The latitude span of the sky that leaves the ground dry and clear.
 const QUIET_SPAN: i32 = 3000;
 
 /// A world that holds ground on every tile the built fixtures need.

@@ -21,6 +21,8 @@
 //! The tests drive the world step and the public verbs, because the step and
 //! the verbs are what must invoke the rules.[^5]
 //!
+//! A polar latitude keeps the sky dry and quiet.[^8]
+//!
 //! # References
 //!
 //! [^1]: ADR-0153, a tile's lease follows the units that stand on it, decisions D1, D2, D3, D4 and D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
@@ -48,10 +50,10 @@ const EXTENT: u32 = 192;
 /// a degree.
 ///
 /// **Seventy degrees south is half of what makes the sky quiet.** Cold air
-/// carries little water, and the ground stays dry.[^8]
+/// carries little water, and the ground stays dry.
 const QUIET_CENTRE: i32 = -7000;
 
-/// The latitude span of the sky that leaves the ground dry and clear.[^8]
+/// The latitude span of the sky that leaves the ground dry and clear.
 const QUIET_SPAN: i32 = 3000;
 
 /// Builds a world of the extent.
