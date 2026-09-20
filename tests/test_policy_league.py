@@ -640,3 +640,112 @@ def test_a_game_with_no_winner_reaches_no_seat_count() -> None:
         _game(index=1, world=1, players=(0, 1, 2), winner=1),
     ]
     assert league.seat_wins(results) == {1: 1}
+
+
+def test_the_family_holds_every_variant_the_design_report_names() -> None:
+    """The rating tool holds every member of the family the report proposes."""
+    named = [
+        "mute",
+        "quietist",
+        "settler",
+        "mason",
+        "default",
+        "warlord",
+        "hunter",
+    ]
+    assert list(league.FAMILY) == named
+    assert [v.name for v in league.family_variants(named)] == named
+
+
+def test_a_variant_name_the_family_lacks_is_refused() -> None:
+    """A misspelled member names no variant, and the refusal lists the family."""
+    with pytest.raises(ValueError, match="names no member of the family"):
+        league.family_variants(["masson"])
+
+
+def test_the_rating_tool_seats_a_named_controller_variant() -> None:
+    """Seat controller variants in the rating tool and read settings back.
+
+    The test asserts that the weight vector of that seat holds the named values
+    after the world is built.
+    """
+    from cachette.learn.env import EnvConfig
+
+    config = EnvConfig(
+        width=24,
+        height=24,
+        faction_count=3,
+        tick_limit=600,
+        horizon=60,
+        decision_interval=10,
+        threads=1,
+    )
+    players = [
+        league.Player.from_variant(league.FAMILY["warlord"]),
+        league.Player.from_variant(league.FAMILY["hunter"]),
+        league.Player.from_variant(league.FAMILY["mute"]),
+    ]
+    _game_obj, world = league.build_seated_world(config, 50_000, players)
+    assert world.faction_weights(0) == league.FAMILY["warlord"].weights.as_dict()
+    assert world.faction_weights(1) == league.FAMILY["hunter"].weights.as_dict()
+    assert int(world.faction_overmatch_ratio(1)) == league.RATIO_ONE
+    assert world.is_externally_controlled(0) is False
+    assert world.is_externally_controlled(1) is False
+    assert world.is_externally_controlled(2) is True
+
+
+def test_two_variants_seated_in_one_world_hold_different_weight_vectors() -> None:
+    """Two seats of one world hold the two vectors the schedule gave them.
+
+    **This is the test that proves the seating reaches the engine**, and it must
+    be shown to fail when the write is removed.
+    """
+    from cachette.learn.env import EnvConfig
+
+    config = EnvConfig(
+        width=24,
+        height=24,
+        faction_count=3,
+        tick_limit=600,
+        horizon=60,
+        decision_interval=10,
+        threads=1,
+    )
+    players = [
+        league.Player.from_variant(league.FAMILY["warlord"]),
+        league.Player.from_variant(league.FAMILY["mason"]),
+        league.Player.from_variant(league.FAMILY["mute"]),
+    ]
+    _game_obj, world = league.build_seated_world(config, 50_000, players)
+    assert world.faction_weights(0) != world.faction_weights(1)
+    assert world.faction_weights(0)["war"] == 8
+    assert world.faction_weights(1)["build"] == 8
+
+
+def test_the_tool_can_seat_both_a_policy_and_a_controller_variant() -> None:
+    """A league can seat both a stored policy and a controller variant."""
+    from cachette.learn.env import Env, EnvConfig
+    from cachette.learn.policy import LinearPolicy
+
+    config = EnvConfig(
+        width=24,
+        height=24,
+        faction_count=3,
+        tick_limit=600,
+        horizon=60,
+        decision_interval=10,
+        threads=1,
+    )
+    scoring = league.probe_scoring()
+    probe = Env(config, scoring)
+    policy = LinearPolicy.zeros(probe.action_length, probe.observation_length)
+    players = [
+        league.Player(name="policy-player", policy=policy),
+        league.Player.from_variant(league.FAMILY["warlord"]),
+        league.Player(name=league.CONTROLLER, policy=None),
+    ]
+    _game_obj, world = league.build_seated_world(config, 50_000, players, scoring)
+    assert world.is_externally_controlled(0) is True
+    assert world.is_externally_controlled(1) is False
+    assert world.is_externally_controlled(2) is False
+    assert world.faction_weights(1) == league.FAMILY["warlord"].weights.as_dict()

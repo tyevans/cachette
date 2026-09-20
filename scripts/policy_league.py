@@ -133,7 +133,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 import numpy as np
 
-from cachette._core import Batch
+from cachette._core import Batch, World
 from cachette.learn.env import Env, EnvConfig, viable_seeds
 from cachette.learn.league import SeatAssignment, SeatedGame, seat_counts
 from cachette.learn.policy import PolicyFit, load_policy
@@ -265,22 +265,214 @@ def reached_the_limit(world: EndedWorld, end_tick: int) -> bool:
     return limit > 0 and end_tick >= limit
 
 
+# The raw value of one, at the fixed-point scale this project holds every
+# simulated number at (Q16.16). Parity hunting ratio: 1.0 = 65536.
+RATIO_ONE = 65536
+
+
+@dataclass(frozen=True)
+class Weights:
+    """The five option weights of one faction.
+
+    The engine draws every weight from the seed, and it holds each of them
+    between one and eight. The verb that writes the vector refuses a weight
+    outside that bound, so this holds no copy of the bound.[^1]
+
+    The war weight biases the relation move. The renown weight biases the
+    campaign raise. The build weight splits an evaluation between a gather
+    order and a build order. The settle weight biases the founding draw.
+    The trade weight reaches no decision that changes the world today.[^2]
+
+    References
+    ----------
+    [^1]: The faction bindings, the weight verb.
+    ``crates/cachette-py/src/world/faction_view.rs``
+
+    [^2]: Report 44, the settings that steer nothing.
+    ``docs/research/reports/44-a-family-of-tunable-controllers.md``
+    """
+
+    war: int
+    trade: int
+    build: int
+    renown: int
+    settle: int
+
+    def as_dict(self) -> dict[str, int]:
+        """Return this vector as plain values, for a report file."""
+        return {
+            "war": self.war,
+            "trade": self.trade,
+            "build": self.build,
+            "renown": self.renown,
+            "settle": self.settle,
+        }
+
+
+@dataclass(frozen=True)
+class ControllerVariant:
+    """One seat configuration of the built-in controller.
+
+    A weight vector of ``None`` leaves the vector the seed drew. A ratio of
+    ``None`` leaves the ratio the engine gives every new faction. The external
+    flag takes the seat away from the controller, and this tool sends no
+    action, so a variant that raises the flag plays no move at all.
+
+    The ratio is the raw fixed-point factor the engine takes.
+    """
+
+    name: str
+    weights: Weights | None = None
+    ratio: int | None = None
+    external: bool = False
+
+    def steering(self) -> tuple[object, ...]:
+        """Return the part of this variant that reaches a decision.
+
+        Two variants with one steering value are one player twice. The trade
+        weight is out of the answer, because no decision that changes the world
+        reads it. The renown weight is in the answer, because it biases the
+        campaign raise. A variant under external control makes no decision at
+        all, so its whole configuration is out.
+        """
+        drawn = self.weights
+        if self.external:
+            return ("external",)
+        return (
+            "played",
+            None if drawn is None else drawn.war,
+            None if drawn is None else drawn.build,
+            None if drawn is None else drawn.renown,
+            None if drawn is None else drawn.settle,
+            self.ratio,
+        )
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return this variant as plain values, for a report file."""
+        return {
+            "name": self.name,
+            "weights": None if self.weights is None else self.weights.as_dict(),
+            "overmatch_ratio": self.ratio,
+            "external_control": self.external,
+        }
+
+
+# An alias for callers that name this a version.
+Version = ControllerVariant
+
+
+# The family the design report proposes, in the order the report predicts.[^1]
+# The weakest member comes first. Each entry names only the settings that
+# member writes, so a member with no weight vector plays the vector the seed
+# drew for its seat.
+#
+# Every member carries its war weight in its renown weight as well. The war
+# weight decided the relation move and the campaign raise together when the
+# report wrote this family. The engine now takes the campaign raise from the
+# renown weight, so an equal pair keeps each member playing as the report
+# describes it.[^2]
+#
+# References
+# ----------
+# [^1]: Report 44, the proposed variants.
+# ``docs/research/reports/44-a-family-of-tunable-controllers.md``
+#
+# [^2]: Findings register, FND-738. ``docs/FINDINGS.md``
+FAMILY: dict[str, ControllerVariant] = {
+    "mute": ControllerVariant(name="mute", external=True),
+    "quietist": ControllerVariant(
+        name="quietist",
+        weights=Weights(war=1, trade=8, build=1, renown=1, settle=1),
+    ),
+    "settler": ControllerVariant(
+        name="settler",
+        weights=Weights(war=1, trade=1, build=2, renown=1, settle=8),
+    ),
+    "mason": ControllerVariant(
+        name="mason",
+        weights=Weights(war=1, trade=1, build=8, renown=1, settle=4),
+    ),
+    "default": ControllerVariant(name="default"),
+    "warlord": ControllerVariant(
+        name="warlord",
+        weights=Weights(war=8, trade=1, build=3, renown=8, settle=4),
+    ),
+    "hunter": ControllerVariant(
+        name="hunter",
+        weights=Weights(war=8, trade=1, build=1, renown=8, settle=1),
+        ratio=RATIO_ONE,
+    ),
+}
+
+
+def family_variants(named: Sequence[str]) -> list[ControllerVariant]:
+    """Return the named members of the family, and refuse a name it lacks."""
+    variants: list[ControllerVariant] = []
+    for name in named:
+        member = FAMILY.get(name)
+        if member is None:
+            known = ", ".join(FAMILY)
+            message = f"{name!r} names no member of the family. Take one of: {known}"
+            raise ValueError(message)
+        variants.append(member)
+    return variants
+
+
+family_versions = family_variants
+
+
+def seat_a_variant(world: World, seat: int, variant: ControllerVariant) -> None:
+    """Write one controller variant onto one seat of a seeded world.
+
+    The seeding draws the weight vector, so this writes after it. Each verb
+    names one faction, so nothing here touches a seat the caller did not name.
+    """
+    if variant.weights is not None:
+        world.set_faction_weights(
+            seat,
+            war=variant.weights.war,
+            trade=variant.weights.trade,
+            build=variant.weights.build,
+            renown=variant.weights.renown,
+            settle=variant.weights.settle,
+        )
+    if variant.ratio is not None:
+        world.set_faction_overmatch_ratio(seat, int(variant.ratio))
+    if variant.external:
+        world.set_externally_controlled(seat, True)
+
+
+seat_a_version = seat_a_variant
+
+
 @dataclass(frozen=True)
 class Player:
     """One thing that takes a seat, and how the engine drives that seat.
 
     A player with a policy takes the seat away from the built-in controller
-    and chooses one action for each decision. **A player with no policy is
-    the built-in controller itself.** Its seat is never taken, so the engine
-    drives it. The tool sends no action for it at all.
+    and chooses one action for each decision. A player with no policy and no
+    variant is the built-in controller under its defaults. A player with a
+    variant configures per-faction settings (weights, hunting ratio, external
+    control) on that seat before the world runs.[^1]
 
     The strategy entry names the row of the strategy table the policy was
-    trained under. It is empty for the controller, which no objective shaped.
+    trained under. It is empty for a controller variant.
+
+    References
+    ----------
+    [^1]: Report 44, a family of tunable controllers, and how to rank them.
+    ``docs/research/reports/44-a-family-of-tunable-controllers.md``
     """
 
     name: str
-    policy: Policy | None
+    policy: Policy | None = None
     strategy: str = ""
+    variant: ControllerVariant | None = None
+
+    @classmethod
+    def from_variant(cls, variant: ControllerVariant) -> Player:
+        """Return a player that seats a named controller variant."""
+        return cls(name=variant.name, policy=None, variant=variant)
 
     @property
     def seated(self) -> bool:
@@ -474,6 +666,58 @@ def read_game(
     )
 
 
+def build_world(
+    config: EnvConfig,
+    scoring: Scoring,
+    seed: int,
+    seating: Seating,
+    players: Sequence[Player],
+) -> tuple[SeatedGame, World]:
+    """Build one game and its world, and configure every seat.
+
+    Each seat holding a controller variant is configured with that variant's
+    option weights, hunting ratio and external control flag.[^1]
+
+    References
+    ----------
+    [^1]: Report 44, a family of tunable controllers, and how to rank them.
+    ``docs/research/reports/44-a-family-of-tunable-controllers.md``
+    """
+    game = SeatedGame(
+        config,
+        scoring,
+        [seat for seat, player in enumerate(seating.players) if players[player].seated],
+    )
+    world = game.reset(seed)
+    for seat, player_idx in enumerate(seating.players):
+        player = players[player_idx]
+        if player.variant is not None:
+            seat_a_variant(world, seat, player.variant)
+    return game, world
+
+
+def build_seated_world(
+    config: EnvConfig,
+    seed: int,
+    players: Sequence[Player],
+    scoring: Scoring | None = None,
+) -> tuple[SeatedGame, World]:
+    """Build one game and its world from a player list, in seat order."""
+    seating = Seating(
+        world=0,
+        seed=seed,
+        rotation=0,
+        players=tuple(range(len(players))),
+    )
+    return build_world(
+        config,
+        probe_scoring() if scoring is None else scoring,
+        seed,
+        seating,
+        players,
+    )
+
+
 def play_chunk(
     config: EnvConfig,
     scoring: Scoring,
@@ -500,21 +744,12 @@ def play_chunk(
     [^1]: The seated game of the league module.
     ``python/cachette/learn/league.py``
     """
-    games = [
-        SeatedGame(
-            config,
-            scoring,
-            [
-                seat
-                for seat, player in enumerate(seating.players)
-                if players[player].seated
-            ],
-        )
+    built = [
+        build_world(config, scoring, seating.seed, seating, players)
         for seating in seatings
     ]
-    worlds = [
-        game.reset(seating.seed) for game, seating in zip(games, seatings, strict=True)
-    ]
+    games = [game for game, _ in built]
+    worlds = [world for _, world in built]
     batch = Batch(worlds, workers)
     live = list(range(len(games)))
     decisions = [0] * len(games)
@@ -1163,6 +1398,7 @@ def report(
     found: Sequence[Ending],
     wins: np.ndarray,
     together: np.ndarray,
+    players: Sequence[Player] | None = None,
 ) -> dict[str, Any]:
     """Return every game and every figure, so a later reader asks a new question.
 
@@ -1195,6 +1431,16 @@ def report(
         ],
         "endings": [row.as_dict() for row in found],
         "head_to_head": {"wins": wins.tolist(), "together": together.tolist()},
+        "players": [
+            {
+                "name": p.name,
+                "strategy": p.strategy,
+                "variant": (None if p.variant is None else p.variant.as_dict()),
+            }
+            for p in players
+        ]
+        if players is not None
+        else [],
         "results": [row.as_dict() for row in results],
     }
 
@@ -1207,6 +1453,23 @@ def main() -> None:
         type=Path,
         default=Path("checkpoints/place"),
         help="the directory of stored policies. Every checkpoint plays.",
+    )
+    parser.add_argument(
+        "--variant",
+        action="append",
+        default=[],
+        choices=list(FAMILY),
+        metavar="NAME",
+        help=(
+            "a named controller variant to seat as a player. Repeat the flag "
+            f"for each variant. The names are: {', '.join(FAMILY)}"
+        ),
+    )
+    parser.add_argument(
+        "--anchor",
+        type=str,
+        default=None,
+        help="the player to anchor at zero Elo (defaults to 'controller' or 'default')",
     )
     parser.add_argument(
         "--seeds",
@@ -1246,11 +1509,38 @@ def main() -> None:
     config = replace(one_world(strategies), threads=arguments.threads)
     scoring = probe_scoring()
     probe = Env(config, scoring)
-    players = [
-        *stored_players(arguments.checkpoints, strategies, PolicyFit.of_env(probe)),
-        Player(name=CONTROLLER, policy=None),
-    ]
-    anchor = len(players) - 1
+    policy_players: list[Player] = []
+    if arguments.checkpoints.is_dir():
+        policy_players = stored_players(
+            arguments.checkpoints, strategies, PolicyFit.of_env(probe)
+        )
+    variant_players = [Player.from_variant(FAMILY[name]) for name in arguments.variant]
+    players = [*policy_players, *variant_players]
+    if not variant_players and not any(p.name == CONTROLLER for p in players):
+        players.append(Player(name=CONTROLLER, policy=None))
+
+    if arguments.anchor is not None:
+        try:
+            anchor = next(
+                i for i, p in enumerate(players) if p.name == arguments.anchor
+            )
+        except StopIteration:
+            known = [p.name for p in players]
+            message = (
+                f"{arguments.anchor!r} names no player in the league. "
+                f"Available players: {known}"
+            )
+            raise ValueError(message) from None
+    else:
+        anchor = next(
+            (
+                index
+                for index, p in enumerate(players)
+                if p.name in (CONTROLLER, "default")
+            ),
+            len(players) - 1,
+        )
+
     seats = config.faction_count
     seeds = viable_seeds(config, arguments.seeds, arguments.seed_start)
     seatings = schedule(len(players), seats, seeds, arguments.worlds_per_triple)
@@ -1293,7 +1583,7 @@ def main() -> None:
     for seat, count in seats_won.items():
         print(f"  seat {seat} won {count:4d}/{rated:<4d} {count / rated:7.3f}")
 
-    print(f"\nthe rating, with the {CONTROLLER} anchored at zero")
+    print(f"\nthe rating, with {players[anchor].name} anchored at zero")
     print(
         "the anchor holds an error of zero by construction. Read the pairwise "
         "errors below.\n"
@@ -1310,7 +1600,16 @@ def main() -> None:
 
     if arguments.out is not None:
         payload = report(
-            config, seeds, seatings, results, ratings, errors, found, wins, together
+            config,
+            seeds,
+            seatings,
+            results,
+            ratings,
+            errors,
+            found,
+            wins,
+            together,
+            players,
         )
         arguments.out.parent.mkdir(parents=True, exist_ok=True)
         arguments.out.write_text(json.dumps(payload, indent=2), encoding="utf-8")
