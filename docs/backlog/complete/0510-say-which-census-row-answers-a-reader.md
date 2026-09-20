@@ -1,7 +1,7 @@
 ---
 id: 0510
 title: Say which census row answers a reader
-status: refined
+status: complete
 created: 2026-09-05
 implements: []
 changes: []
@@ -64,7 +64,21 @@ A refiner answers these before this item leaves `proposed/`.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+All seven rows serve active consumers (the demonstration deck, the balance
+summary harness, or diagnostic monitoring). An integration test suite was added
+in `crates/cachette-core/tests/subsystem_census.rs` exercising all seven rows:
+- `seats_filled`: asserts occupied positions increment the count and return to
+  zero when vacated.
+- `characters`: asserts character creation increments the count.
+- `upgrades_complete`: asserts completed road upgrades increment the count while
+  under-construction upgrades do not.
+- `contracts` and `contracts_bound`: asserts negotiated trade contracts increment
+  both held and total contract counters.
+- `controller_refused`: asserts refused actions increment the counter and
+  preserve the count across the frame barrier.
+- `wars_declared`: asserts crossings into the war band increment the count and
+  preserve the total across frame boundaries.
+All tests pass in CI under PR #61.
 
 ## References
 
