@@ -17,6 +17,7 @@
 //! [^2]: Testing rules, section 2a. `.agents/rules/testing.md`
 //! [^3]: Testing rules, section 2. `.agents/rules/testing.md`
 //! [^4]: Testing policy. `docs/TESTING.md`
+//! [^5]: Findings register, FND-747. `docs/FINDINGS.md`
 
 use cachette_core::controller::{self, FactionWeights, WEIGHT_HIGH, WEIGHT_LOW};
 use cachette_core::holding::Holder;
@@ -33,6 +34,16 @@ const THREAD_COUNTS: [usize; 3] = [1, 2, 12];
 /// The seed of a world whose first tiles admit a unit. Each builder asserts
 /// that the ground it uses admits one.
 const LAND_SEED: u64 = 1;
+
+/// The latitude of the middle row of every world under test, in hundredths of
+/// a degree.
+///
+/// **Seventy degrees south is half of what makes the sky quiet.** Cold air
+/// carries little water, and the ground stays dry.[^5]
+const QUIET_CENTRE: i32 = -7000;
+
+/// The latitude span of the sky that leaves the ground dry and clear.[^5]
+const QUIET_SPAN: i32 = 3000;
 
 const A: FactionId = FactionId(0);
 const B: FactionId = FactionId(1);
@@ -54,6 +65,8 @@ fn row_world(width: u32, unit_capacity: u32) -> World {
         seed: LAND_SEED,
         faction_count: 2,
         unit_capacity,
+        latitude_centre: QUIET_CENTRE,
+        latitude_span: QUIET_SPAN,
         ..WorldConfig::DEFAULT
     })
     .expect("a row of tiles is a world");
@@ -488,6 +501,8 @@ fn speaker_run(b_speaks: bool) -> SpeakerRun {
         seed: 3,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        latitude_centre: QUIET_CENTRE,
+        latitude_span: QUIET_SPAN,
         ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
@@ -725,6 +740,8 @@ fn a_leader_at_peace_converts_nobody() {
             seed: 0x0cac_4e77_0132,
             faction_count: 2,
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            latitude_centre: QUIET_CENTRE,
+            latitude_span: QUIET_SPAN,
             ..WorldConfig::DEFAULT
         })
         .expect("the extent must describe a world");

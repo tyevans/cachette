@@ -19,6 +19,7 @@
 //!
 //! [^1]: ADR-0148, a game end is recorded once and stops the controllers, decisions D2 and D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
 //! [^2]: ADR-0174, a wonder is a win path and a stock total is not, decisions D1 and D2. `docs/adrs/draft/adr-0174-a-wonder-is-a-win-path-and-a-stock-total-is-not.md`
+//! [^3]: Findings register, FND-747. `docs/FINDINGS.md`
 
 use cachette_core::choose;
 use cachette_core::sim_math::combine;
@@ -65,6 +66,16 @@ const GROUP: u32 = 8;
 /// A limit no fixture here reaches, so the territory reader stays quiet.
 const FAR_LIMIT: u64 = 100_000;
 
+/// The latitude of the middle row of every world under test, in hundredths of
+/// a degree.
+///
+/// **Seventy degrees south is half of what makes the sky quiet.** Cold air
+/// carries little water, and the ground stays dry.[^3]
+const QUIET_CENTRE: i32 = -7000;
+
+/// The latitude span of the sky that leaves the ground dry and clear.[^3]
+const QUIET_SPAN: i32 = 3000;
+
 fn config(factions: u16, seed: u64, extent: u32) -> WorldConfig {
     WorldConfig {
         width: extent,
@@ -72,6 +83,8 @@ fn config(factions: u16, seed: u64, extent: u32) -> WorldConfig {
         seed,
         faction_count: factions,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        latitude_centre: QUIET_CENTRE,
+        latitude_span: QUIET_SPAN,
         ..WorldConfig::DEFAULT
     }
 }
@@ -209,7 +222,7 @@ fn a_faction_that_holds_every_seat_wins_by_domination_while_a_rival_lives() {
             assert!(world.despawn_soldier(unit));
         }
     }
-    world
+    let rival = world
         .spawn_soldier(refuge, FactionId(1))
         .expect("the refuge admits a unit");
     let room = world
@@ -237,6 +250,10 @@ fn a_faction_that_holds_every_seat_wins_by_domination_while_a_rival_lives() {
     let mut ended_on = None;
     for _ in 0..200 {
         step(&mut world);
+        assert!(
+            world.soldiers().address(rival).is_some(),
+            "the rival unit must live so domination ends by seat and not by extermination"
+        );
         let standing = world.standing(FactionId(0)).expect("faction 0 exists");
         if world.game_end().is_set() {
             assert_eq!(standing.seats_held, 2, "the winner holds both seats");
@@ -416,7 +433,7 @@ fn a_wonder_finished_on_held_ground_ends_the_game_and_one_short_does_not() {
         .into_iter()
         .find(|address| *address != site && world.admits_a_unit(*address))
         .expect("the world holds a second open tile");
-    world
+    let rival = world
         .spawn_soldier(elsewhere, FactionId(1))
         .expect("the ground admits a unit");
     // The work comes from the table the world holds, which this fixture
@@ -426,6 +443,14 @@ fn a_wonder_finished_on_held_ground_ends_the_game_and_one_short_does_not() {
     let mut slowed = false;
     for _ in 0..(work as u64 + 8) {
         step(&mut world);
+        assert!(
+            world.soldiers().address(rival).is_some(),
+            "the rival unit must live so domination stays quiet"
+        );
+        assert!(
+            world.soldiers().address(builders[0]).is_some(),
+            "the builder must live to finish the wonder"
+        );
         let progress = world.upgrade_at(site).map_or(0, |built| built.progress.0);
         if !slowed && progress + i64::from(room) >= work {
             for unit in &builders[1..] {

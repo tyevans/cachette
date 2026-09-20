@@ -30,17 +30,29 @@
 //! [^5]: Testing rules, section 5. `.agents/rules/testing.md`
 //! [^6]: ADR-0005, a solver runs a fixed iteration count, decision D1. `docs/adrs/accepted/adr-0005-a-solver-runs-a-fixed-iteration-count.md`
 //! [^7]: ADR-0125, one plane names the seed set of a destination field, decision D4. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+//! [^8]: Findings register, FND-747. `docs/FINDINGS.md`
 
 use cachette_core::campaign;
+use cachette_core::cohort::NeedRule;
 use cachette_core::holding::{Holder, LeaseRules, ReachRules};
 use cachette_core::relation::RelationRules;
-use cachette_core::{Axial, Entity, FactionId, Tick, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, Fix32, Tick, World, WorldConfig};
 
 /// The extent of the worlds below.
 ///
 /// The extent is wide enough that the generator puts water in it, because two
 /// fixtures here need a tile whose every neighbour refuses a unit.
 const EXTENT: u32 = 192;
+
+/// The latitude of the middle row of every world under test, in hundredths of
+/// a degree.
+///
+/// **Seventy degrees south is half of what makes the sky quiet.** Cold air
+/// carries little water, and the ground stays dry.[^8]
+const QUIET_CENTRE: i32 = -7000;
+
+/// The latitude span of the sky that leaves the ground dry and clear.[^8]
+const QUIET_SPAN: i32 = 3000;
 
 /// Builds a world of the extent.
 fn world(seed: u64, factions: u16) -> World {
@@ -50,6 +62,8 @@ fn world(seed: u64, factions: u16) -> World {
         seed,
         faction_count: factions,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        latitude_centre: QUIET_CENTRE,
+        latitude_span: QUIET_SPAN,
         ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world")
@@ -131,6 +145,10 @@ fn a_cohort_that_stands_on_enemy_ground_takes_it_and_gives_it_back_when_it_leave
         // needs more ticks than the threshold alone.
         for _ in 0..(rules.claim_threshold() * rules.decay_period() as i32) {
             field.step(2).expect("the step must run");
+            assert!(
+                field.soldiers().address(invader).is_some(),
+                "the invader must live to hold the lease"
+            );
         }
         assert!(field.check_invariants());
         assert_eq!(
@@ -281,6 +299,10 @@ fn a_holder_at_war_admits_the_guest_it_refuses_in_tension() {
             for _ in 0..TICKS {
                 assert!(field.set_relation(FactionId(0), FactionId(1), value));
                 field.step(2).expect("the step must run");
+                assert!(
+                    field.soldiers().address(guest).is_some(),
+                    "the guest must live to walk"
+                );
                 let stands_inside = field
                     .soldiers()
                     .address(guest)
@@ -338,10 +360,22 @@ fn war_world(seed: u64) -> World {
         seed,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        latitude_centre: QUIET_CENTRE,
+        latitude_span: QUIET_SPAN,
         ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     field.set_reach_rules(ReachRules::new(6, 1, 8));
+    field.set_need_rule(
+        NeedRule::new(
+            Fix32::ZERO,
+            Fix32::ZERO,
+            Fix32::ZERO,
+            Fix32::ZERO,
+            Fix32::from_int(1),
+        )
+        .expect("no rate of the rule is below zero"),
+    );
     field
         .set_choice_schedule(0)
         .expect("the exponent is inside the range");

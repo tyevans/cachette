@@ -27,15 +27,26 @@
 //! [^2]: Testing rules, section 2. `.agents/rules/testing.md`
 //! [^3]: Blockers register, BLK-158. `docs/BLOCKERS.md`
 //! [^4]: Testing rules, section 6. `.agents/rules/testing.md`
+//! [^5]: Findings register, FND-747. `docs/FINDINGS.md`
 
 use cachette_core::cohort::NeedRule;
 use cachette_core::event_memory::MemoryKind;
 use cachette_core::faction_observation::{observation_schema, FieldRow, ObsField};
 use cachette_core::unit_type::{UnitTypeId, UnitTypeRow, WORKER_ROW};
-use cachette_core::{Axial, Entity, FactionId, Fix32, TileKind, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, Fix32, Latitudes, TileKind, World, WorldConfig};
 
 /// The seed of a world whose one tile admits a unit.
 const LAND_SEED: u64 = 1;
+
+/// The latitude of the middle row of every world under test, in hundredths of
+/// a degree.
+///
+/// **Seventy degrees south is half of what makes the sky quiet.** Cold air
+/// carries little water, and the ground stays dry.[^5]
+const QUIET_CENTRE: i32 = -7000;
+
+/// The latitude span of the sky that leaves the ground dry and clear.[^5]
+const QUIET_SPAN: i32 = 3000;
 
 /// The type number of the unit that carries an attack and no armour.
 const STRIKER: u8 = 0;
@@ -70,6 +81,8 @@ fn arena(unit_capacity: u32) -> World {
         seed: LAND_SEED,
         faction_count: 3,
         unit_capacity,
+        latitude_centre: QUIET_CENTRE,
+        latitude_span: QUIET_SPAN,
         ..WorldConfig::DEFAULT
     })
     .expect("a world of one tile is a world");
@@ -508,6 +521,8 @@ fn burning_wood() -> World {
         seed: FOREST_SEED,
         faction_count: 2,
         unit_capacity: 4096,
+        latitude_centre: Latitudes::PLANET.centre(),
+        latitude_span: Latitudes::PLANET.span(),
         ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");

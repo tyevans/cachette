@@ -21,7 +21,9 @@
 //! [^2]: ADR-0181, a faction that holds no site and no unit leaves the game. `docs/adrs/draft/adr-0181-a-faction-that-holds-no-site-and-no-unit-leaves-the-game.md`
 //! [^3]: Testing rules, section 2a. `.agents/rules/testing.md`
 //! [^4]: Testing rules, section 5. `.agents/rules/testing.md`
+//! [^5]: Findings register, FND-747. `docs/FINDINGS.md`
 
+use cachette_core::cohort::NeedRule;
 use cachette_core::event::{TAKE_KIND_CAPTURED, TAKE_KIND_RAZED};
 use cachette_core::holding::{Holder, LeaseRules, ReachRules};
 use cachette_core::site::CommodityId;
@@ -38,6 +40,16 @@ const EXTENT: u32 = 192;
 /// The commodity every fixture writes and reads.
 const GRAIN: CommodityId = CommodityId(0);
 
+/// The latitude of the middle row of every world under test, in hundredths of
+/// a degree.
+///
+/// **Seventy degrees south is half of what makes the sky quiet.** Cold air
+/// carries little water, and the ground under the site stays dry.[^5]
+const QUIET_CENTRE: i32 = -7000;
+
+/// The latitude span of the sky that leaves the ground dry and clear.[^5]
+const QUIET_SPAN: i32 = 3000;
+
 fn world(seed: u64, factions: u16, reach: u32) -> World {
     let mut field = World::new(WorldConfig {
         width: EXTENT,
@@ -45,9 +57,20 @@ fn world(seed: u64, factions: u16, reach: u32) -> World {
         seed,
         faction_count: factions,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        latitude_centre: QUIET_CENTRE,
+        latitude_span: QUIET_SPAN,
         ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
+    let never_hungry = NeedRule::new(
+        Fix32::ZERO,
+        Fix32::ZERO,
+        Fix32::ZERO,
+        Fix32::ZERO,
+        Fix32::from_int(1),
+    )
+    .expect("no rate of the rule is below zero");
+    field.set_need_rule(never_hungry);
     // The reach decides whether a taker keeps a captured city or burns it, so
     // each fixture states the reach it needs. The test never reads a reach
     // value, so this is a fixture choice and not a balance figure.
@@ -186,7 +209,11 @@ fn fixture_with_reach(seed: u64, reach: u32) -> Option<Fixture> {
         .zone_project(FactionId(0), seat, UpgradeCategory::ROAD)
         .ok()?;
     field.order_build(builder, UpgradeCategory::ROAD).ok()?;
-    for _ in 0..=cachette_core::DEFAULT_UPGRADE_TABLE.work_above(UpgradeCategory::ROAD, 0) {
+    for tick in 0..=cachette_core::DEFAULT_UPGRADE_TABLE.work_above(UpgradeCategory::ROAD, 0) {
+        assert!(
+            field.soldiers().contains(builder),
+            "the world ended the builder on tick {tick}"
+        );
         field.step(1).expect("the step must run");
     }
     if field.finished_upgrade(seat) != Some(UpgradeCategory::ROAD) {
@@ -338,7 +365,7 @@ fn a_garrison_of_one_refuses_the_capture() {
         site,
         ..
     } = fixture_with_reach(any_seed(), REACH_TOGETHER).expect("the seed builds the fixture");
-    field
+    let defender = field
         .spawn_soldier(seat, FactionId(0))
         .expect("the island admits a unit");
     for _ in 0..2 {
@@ -346,7 +373,11 @@ fn a_garrison_of_one_refuses_the_capture() {
             .spawn_soldier(seat, FactionId(1))
             .expect("the island admits a unit");
     }
-    for _ in 0..PRESS_BOUND {
+    for tick in 0..PRESS_BOUND {
+        assert!(
+            field.soldiers().contains(defender),
+            "a storm ended the defender on tick {tick}, so the run measures the sky"
+        );
         field.step(1).expect("the step must run");
     }
     assert!(field.check_invariants());

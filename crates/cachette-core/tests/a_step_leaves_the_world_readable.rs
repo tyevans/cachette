@@ -44,7 +44,7 @@ use cachette_core::action::Verb;
 use cachette_core::bridge::BridgeError;
 use cachette_core::faction_view::FactionViewError;
 use cachette_core::unit_type::SETTLER;
-use cachette_core::{Axial, Entity, FactionId, World, WorldConfig};
+use cachette_core::{Axial, Entity, FactionId, Latitudes, World, WorldConfig};
 
 /// The extent of the world the viewer draws.
 const EXTENT: u32 = 256;
@@ -77,6 +77,8 @@ fn viewer_world(seed: u64) -> World {
         seed,
         faction_count: FACTIONS,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        latitude_centre: Latitudes::PLANET.centre(),
+        latitude_span: Latitudes::PLANET.span(),
         ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
@@ -202,6 +204,8 @@ fn small_config(seed: u64) -> WorldConfig {
         seed,
         faction_count: 2,
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+        latitude_centre: Latitudes::PLANET.centre(),
+        latitude_span: Latitudes::PLANET.span(),
         ..WorldConfig::DEFAULT
     }
 }
