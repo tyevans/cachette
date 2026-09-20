@@ -33,10 +33,12 @@ lint-python:
     uv run ruff check python tests
     uv run mypy
 
-# Check the float ban of ADR-0002 D2 and the crate split of ADR-0041.
+# Check the float ban of ADR-0002 D2, the crate split of ADR-0041,
+# and the toolchain pin of ADR-0097 D2.
 invariants:
     ./scripts/check-float-ban.sh
     ./scripts/check-crate-split.sh
+    ./scripts/check-toolchain-pin.sh
 
 # Run the fast tests on both sides.
 test: test-rust census probe test-python smoke
@@ -473,6 +475,7 @@ records-probe:
     ! CACHETTE_REGISTER_PROSE_BASELINE=tests/fixtures/register-prose-stale/baseline.txt ./scripts/check-register-prose.sh tests/fixtures/register-prose-stale
     ! ./scripts/check-orientation.sh tests/fixtures/orientation-broken
     ./scripts/merge-defect-probe.sh
+    ./scripts/toolchain-pin-probe.sh
 
 # Everything a commit must pass. The wrapper times the run and reports the
 # cost against the local budget for this architecture. It reports; it does
