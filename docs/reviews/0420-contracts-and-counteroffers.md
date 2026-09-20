@@ -326,6 +326,6 @@ a change of game rule changes one branch.
 [^9]: Decisions register, DEC-212. `docs/DECISIONS.md`
 [^10]: Blockers register, BLK-121. `docs/BLOCKERS.md`
 [^11]: Findings register, FND-431. `docs/FINDINGS.md`
-[^12]: Backlog item 0421, put the two quantity passes into the stage table. `docs/backlog/proposed/0421-put-the-two-quantity-passes-into-the-stage-table.md`
+[^12]: Backlog item 0421, put the two quantity passes into the stage table. `docs/backlog/refined/0421-put-the-two-quantity-passes-into-the-stage-table.md`
 [^13]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^14]: Testing Rules, section 2a. `.claude/rules/testing.md`

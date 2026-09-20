@@ -17427,7 +17427,7 @@ is stated in.
 [^F411C]: The sent set test of the core. `crates/cachette-core/tests/a_sent_set_walks_to_its_destination.rs`
 [^F411D]: Backlog item 0401, decide how a sent unit gets around a barrier the field cannot see. `docs/backlog/proposed/0401-decide-how-a-sent-unit-gets-around-a-barrier.md`
 [^F410D]: ADR-0125, the control plane names the seed set of a destination field, decision D2. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
-[^F431A]: Backlog item 0421, put the two quantity passes into the stage table. `docs/backlog/proposed/0421-put-the-two-quantity-passes-into-the-stage-table.md`
+[^F431A]: Backlog item 0421, put the two quantity passes into the stage table. `docs/backlog/refined/0421-put-the-two-quantity-passes-into-the-stage-table.md`
 
 [^F326A]: The head-up display, the row drawing. `crates/cachette-view/src/hud.rs`
 [^F218B]: ADR-0067, the viewer reads the world and never writes to it, decision D4. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
