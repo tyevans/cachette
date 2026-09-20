@@ -1,7 +1,7 @@
 ---
 id: 0509
 title: Count a build refusal apart from a plan write refusal
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0152 D1]
 changes: []
@@ -70,7 +70,22 @@ A refiner answers these before this item leaves `proposed/`.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The build order refusals and plan write refusals are now counted apart in the
+subsystem census.
+
+1. `CensusTotals` holds `builds_refused: i64`, and `SUBSYSTEM_CENSUS` exposes
+   the row `builds_refused` with basis `CensusBasis::Total`. `World` exposes
+   the reader `builds_refused(&self) -> i64`.
+2. `order_build` increments `builds_refused` upon each permission refusal
+   (`ProjectHoldsAnother`, `NoProject`, or `GroundNotHeld`), and no longer
+   calls `self.plan.count_refusal()`.
+3. `controller_take_projects` no longer double-counts build refusals across the
+   group set evaluation.
+4. `PlanRegister::refused_count()` and census row `projects_refused` count plan
+   write refusals alone.
+5. Added test `a_build_refusal_and_a_plan_write_refusal_are_counted_apart` in
+   `crates/cachette-core/tests/plan.rs`, proving that build refusals and plan
+   write refusals increment disjoint counters and each act is counted once.
 
 ## References
 
