@@ -617,7 +617,7 @@ fn gather(world: &mut World) {
     // a guard that has already stopped working, and the promotion pass closed
     // the same gap the same way.[^2]
     //
-    // [^2]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/refined/0279-let-a-golden-scenario-reach-the-position-pass.md`
+    // [^2]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/complete/0279-let-a-golden-scenario-reach-the-position-pass.md`
     let mut home = None;
     for (address, kind) in deposits {
         let capacity = world.tile_kind(address).map_or(0, TileKind::capacity);

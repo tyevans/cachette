@@ -1,7 +1,7 @@
 ---
 id: 0279
 title: Let a golden scenario reach the position pass
-status: refined
+status: complete
 created: 2026-09-02
 implements: [ADR-0001 D4]
 changes: []
@@ -93,7 +93,17 @@ The gate suite budget remains unaffected.[^6]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+**The position pass is covered in the gathering scenario.** A wood preference
+target of 3000 in `gather()` opens 8 positions, and the homed applicants fill
+them across the frames of the scenario.[^3]
+
+**The test asserts that seats are filled.** `hash_sequence()` in
+`golden_state_hash.rs` asserts `census(&world, "seats_filled") > 0`, and
+the golden file `tests/golden/state-hash-gathering.txt` records the sequence
+with the active position allocations.[^3]
+
+**The failure mode was verified.** Suppressing the preference target leaves
+`seats_filled` at 0 and fails the test with "the gathering scenario seated nobody".
 
 ## References
 

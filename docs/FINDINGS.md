@@ -17439,7 +17439,7 @@ is stated in.
 [^F317A]: Backlog item 0187, give a carried load somewhere to go. `docs/backlog/complete/0187-give-a-carried-load-somewhere-to-go.md`
 [^F317C]: Testing rules, section 5. `.claude/rules/testing.md`
 [^F317D]: Backlog item 0305, give a laden unit a reason to go home. `docs/backlog/complete/0305-give-a-laden-unit-a-reason-to-go-home.md`
-[^F316A]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/refined/0279-let-a-golden-scenario-reach-the-position-pass.md`
+[^F316A]: Backlog item 0279, let a golden scenario reach the position pass. `docs/backlog/complete/0279-let-a-golden-scenario-reach-the-position-pass.md`
 
 ### FND-673 — Two tests read a cropped weather array as if it were the whole account
 
