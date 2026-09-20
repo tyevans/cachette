@@ -1394,10 +1394,9 @@ fn a_sky_that_loses_capacity_puts_its_water_on_the_ground() {
 
 /// The air over a cell never stands above the capacity of that cell.
 ///
-/// The capacity replaced one mark that every cell shared, so the bound is now
-/// a different figure for each cell. A cell above its own capacity would
-/// paint as more than a whole sky, and the excess would be water that the
-/// field forgot to rain out.
+/// The settle capacity is the bound that the settle pass applies to each cell,
+/// taking warmth, cooling, slope and cyclone depression together. A cell above
+/// its settle capacity would be water that the field forgot to rain out.
 #[test]
 fn the_air_never_stands_above_the_capacity_of_its_own_cell() {
     let mut world = World::with_weather_scale(
@@ -1407,7 +1406,8 @@ fn the_air_never_stands_above_the_capacity_of_its_own_cell() {
             seed: WET_SEED,
             faction_count: 2,
             unit_capacity: 1024,
-            ..WorldConfig::DEFAULT
+            latitude_centre: cachette_core::weather::Latitudes::PLANET.centre(),
+            latitude_span: cachette_core::weather::Latitudes::PLANET.span(),
         },
         weather::WeatherScale::PER_TILE,
     )
@@ -1419,7 +1419,7 @@ fn the_air_never_stands_above_the_capacity_of_its_own_cell() {
     let mut worst = 0i64;
     let mut worst_cell = 0u32;
     for cell in 0..field.air_plane().len() as u32 {
-        let over = field.air_at(cell).0 - field.capacity_at_cell(cell).0;
+        let over = field.air_at(cell).0 - field.settle_capacity_at_cell(cell).0;
         if over > worst {
             worst = over;
             worst_cell = cell;
@@ -1427,7 +1427,7 @@ fn the_air_never_stands_above_the_capacity_of_its_own_cell() {
     }
     assert!(
         worst <= 0,
-        "cell {worst_cell} stands {worst} drops above its own capacity"
+        "cell {worst_cell} stands {worst} drops above its own settle capacity"
     );
     // The share that the overlay paints follows from the same pair, so it
     // never passes a whole sky.
@@ -1439,6 +1439,49 @@ fn the_air_never_stands_above_the_capacity_of_its_own_cell() {
         highest <= weather::CLOUD_SHARE_WHOLE,
         "a cell painted {highest} of a whole sky of {}",
         weather::CLOUD_SHARE_WHOLE
+    );
+}
+
+/// Descending air can exceed rest capacity while staying within settle capacity.
+///
+/// Air that descends a slope warms and holds what it carries, so its travelling
+/// capacity stands above the rest capacity of that cell. The settle bound
+/// accommodates that warming, while rest capacity does not.
+#[test]
+fn descending_air_can_exceed_rest_capacity_within_settle_capacity() {
+    let mut world = World::with_weather_scale(
+        WorldConfig {
+            width: WET_EXTENT,
+            height: WET_EXTENT,
+            seed: WET_SEED,
+            faction_count: 2,
+            unit_capacity: 1024,
+            latitude_centre: cachette_core::weather::Latitudes::PLANET.centre(),
+            latitude_span: cachette_core::weather::Latitudes::PLANET.span(),
+        },
+        weather::WeatherScale::PER_TILE,
+    )
+    .expect("the extent must describe a world");
+    for _ in 0..20 {
+        world.step(4).expect("the step must run");
+    }
+    let field = world.weather();
+    let mut saw_exceeding_rest = false;
+    for cell in 0..field.air_plane().len() as u32 {
+        let air = field.air_at(cell).0;
+        let rest_cap = field.capacity_at_cell(cell).0;
+        let settle_cap = field.settle_capacity_at_cell(cell).0;
+        assert!(
+            air <= settle_cap,
+            "cell {cell} air {air} exceeds settle capacity {settle_cap}"
+        );
+        if air > rest_cap {
+            saw_exceeding_rest = true;
+        }
+    }
+    assert!(
+        saw_exceeding_rest,
+        "expected at least one cell where descending air exceeds rest capacity"
     );
 }
 

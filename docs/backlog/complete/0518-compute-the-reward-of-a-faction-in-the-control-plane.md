@@ -158,6 +158,6 @@ ran no Rust command, because the item writes no Rust.
 [^12]: Reinforcement learning parameters, the reward rows. `docs/reference/rl-costs.md`
 [^13]: Findings register, FND-568. `docs/FINDINGS.md`
 [^14]: Findings register, FND-583. `docs/FINDINGS.md`
-[^15]: Backlog item 0520, wrap the engine as an environment one learning stack can drive. `docs/backlog/proposed/0520-wrap-the-engine-as-an-environment-one-learning-stack-can-drive.md`
+[^15]: Backlog item 0520, wrap the engine as an environment one learning stack can drive. `docs/backlog/complete/0520-wrap-the-engine-as-an-environment-one-learning-stack-can-drive.md`
 [^16]: Findings register, FND-582. `docs/FINDINGS.md`
 [^17]: Recurring Defect Shapes, shape 1. `.agents/rules/recurring-defects.md`

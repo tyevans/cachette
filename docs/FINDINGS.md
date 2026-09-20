@@ -21427,7 +21427,7 @@ already stated.
 [^F747B]: Findings register, FND-744. `docs/FINDINGS.md`
 [^F748A]: Findings register, FND-747. `docs/FINDINGS.md`
 [^F750A]: Findings register, FND-745. `docs/FINDINGS.md`
-[^F751A]: Backlog item 0538, hold the remaining long-run fixtures against the weather. `docs/backlog/refined/0538-hold-the-remaining-long-run-fixtures-against-the-weather.md`
+[^F751A]: Backlog item 0538, hold the remaining long-run fixtures against the weather. `docs/backlog/complete/0538-hold-the-remaining-long-run-fixtures-against-the-weather.md`
 [^F752A]: The recovery rule, the moisture curve of a period. `crates/cachette-core/src/resource.rs`
 [^F752B]: The production pipeline, the resident term. `crates/cachette-core/src/effective.rs`
 [^F752C]: Blockers register, BLK-162. `docs/BLOCKERS.md`

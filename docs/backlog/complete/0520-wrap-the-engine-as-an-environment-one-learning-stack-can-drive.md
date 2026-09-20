@@ -115,6 +115,6 @@ whitelisting, step dynamics, action application, and termination conditions.
 [^5]: Design, one environment core serves every learning stack. `docs/superpowers/specs/2026-09-05-reinforcement-learning-interfaces-design.md`
 [^6]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`
 [^7]: ADR-0148, a game end is recorded once and stops the controllers, decision D2. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
-[^8]: Backlog item 0519, step a batch of worlds in one call, in index order. `docs/backlog/proposed/0519-step-a-batch-of-worlds-in-one-call.md`
+[^8]: Backlog item 0519, step a batch of worlds in one call, in index order. `docs/backlog/complete/0519-step-a-batch-of-worlds-in-one-call.md`
 [^9]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^10]: Testing Rules, section 5. `.agents/rules/testing.md`
