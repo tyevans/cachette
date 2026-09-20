@@ -30,7 +30,7 @@ use crate::cohort::NEED_FULL;
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
 use crate::resource::{Amount, CarryLoad, ResourceKind};
-use crate::types::{Entity, FactionId, Fix32, TileIdx, FACTION_CEILING};
+use crate::types::{ArenaKind, Entity, FactionId, Fix32, TileIdx, FACTION_CEILING};
 use crate::unit_type::{UnitTypeId, DEFAULT_UNIT_TYPE, UNIT_TYPE_COUNT};
 use crate::upgrade::UpgradeCategory;
 
@@ -187,7 +187,7 @@ const fn build_of(value: u8) -> Option<UpgradeCategory> {
 /// # References
 ///
 /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D5. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
-const LAST_GENERATION: u32 = u32::MAX;
+const LAST_GENERATION: u32 = 0x00FF_FFFF;
 
 /// The reason that the arena refused a caller.
 ///
@@ -824,8 +824,10 @@ impl SoldierArena {
         debug_assert_eq!(self.characters[index], 0);
         self.live_count += 1;
         self.revision = self.revision.wrapping_add(1);
-        Ok(Entity::new(slot, self.generations[index])
-            .expect("a generation of one or more makes the identity non-zero"))
+        Ok(
+            Entity::new(ArenaKind::Soldier, slot, self.generations[index])
+                .expect("a generation of one or more makes the identity non-zero"),
+        )
     }
 
     /// Opens one new slot and returns its index.
@@ -1061,7 +1063,7 @@ impl SoldierArena {
             .enumerate()
             .filter(|(_, live)| **live == 1)
             .map(|(index, _)| {
-                Entity::new(index as u32, self.generations[index])
+                Entity::new(ArenaKind::Soldier, index as u32, self.generations[index])
                     .expect("a live slot holds a generation of one or more")
             })
     }
@@ -1464,7 +1466,7 @@ impl SoldierArena {
             .enumerate()
             .filter(move |(index, live)| **live == 1 && self.factions[*index] == faction)
             .map(|(index, _)| {
-                Entity::new(index as u32, self.generations[index])
+                Entity::new(ArenaKind::Soldier, index as u32, self.generations[index])
                     .expect("a live slot holds a generation of one or more")
             })
     }
@@ -1908,7 +1910,8 @@ mod tests {
             .spawn(Axial::new(0, 0), FactionId(0))
             .expect("the spawn must succeed");
         arena.generations[0] = LAST_GENERATION;
-        let aged = Entity::new(0, LAST_GENERATION).expect("the identity is not zero");
+        let aged =
+            Entity::new(ArenaKind::Soldier, 0, LAST_GENERATION).expect("the identity is not zero");
         assert!(!arena.contains(first));
         assert!(arena.despawn(aged));
         assert_eq!(arena.retired_count(), 1);
@@ -1968,7 +1971,8 @@ mod tests {
             .spawn(Axial::new(0, 0), FactionId(0))
             .expect("the spawn must succeed");
         arena.generations[0] = LAST_GENERATION;
-        let aged = Entity::new(0, LAST_GENERATION).expect("the identity is not zero");
+        let aged =
+            Entity::new(ArenaKind::Soldier, 0, LAST_GENERATION).expect("the identity is not zero");
         assert!(arena.despawn(aged));
 
         let next = arena
@@ -1986,7 +1990,8 @@ mod tests {
             .spawn(Axial::new(0, 0), FactionId(0))
             .expect("the spawn must succeed");
         arena.generations[0] = LAST_GENERATION;
-        let aged = Entity::new(0, LAST_GENERATION).expect("the identity is not zero");
+        let aged =
+            Entity::new(ArenaKind::Soldier, 0, LAST_GENERATION).expect("the identity is not zero");
         assert!(arena.despawn(aged));
         assert!(!arena.contains(aged));
         assert_eq!(arena.tile(aged), None);

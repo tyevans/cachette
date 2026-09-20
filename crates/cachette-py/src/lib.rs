@@ -24,8 +24,8 @@ pub use crate::world::PyWorld;
 
 use crate::batch::{PyBatch, StepRow};
 use crate::errors::{
-    CachetteError, ConfigError, DeterminismError, EnginePanic, FrameError, SelectorError,
-    StepError, VerbError, ViewError,
+    ArenaMismatchError, CachetteError, ConfigError, DeterminismError, EnginePanic, FrameError,
+    SelectorError, StepError, VerbError, ViewError,
 };
 use cachette_core::event_layout::declared_event_layouts;
 use pyo3::prelude::*;
@@ -276,6 +276,7 @@ fn cachette_core_module(module: &Bound<'_, PyModule>) -> PyResult<()> {
     add_error::<SelectorError>(module, "SelectorError")?;
     add_error::<VerbError>(module, "VerbError")?;
     add_error::<ViewError>(module, "ViewError")?;
+    add_error::<ArenaMismatchError>(module, "ArenaMismatchError")?;
     add_error::<DeterminismError>(module, "DeterminismError")?;
     add_error::<EnginePanic>(module, "EnginePanic")?;
     Ok(())

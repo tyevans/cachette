@@ -125,6 +125,16 @@ slot.[^1]
 );
 create_exception!(
     _core,
+    ArenaMismatchError,
+    ViewError,
+    "An identity belonged to the wrong arena.
+
+The engine raises this class when an identity tagged with one arena is passed
+to an operation expecting another, such as passing a character identity to a
+soldier query."
+);
+create_exception!(
+    _core,
     DeterminismError,
     CachetteError,
     "The engine detected a determinism defect.

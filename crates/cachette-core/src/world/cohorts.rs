@@ -10,7 +10,7 @@ use crate::cohort::{
     self, CohortTable, DrawLedger, NeedCondition, NeedRule, SiteRationed, UnitStarved,
 };
 use crate::event_memory::MemoryKind;
-use crate::types::Entity;
+use crate::types::{ArenaKind, Entity};
 
 impl World {
     /// Returns the rule that says what a unit needs.
@@ -175,7 +175,7 @@ impl World {
             let deficit = self.soldiers.deficit_column()[index];
             self.remember_the_starved_unit(index);
             let generation = self.soldiers.generation_of(slot);
-            let unit = Entity::new(slot, generation)
+            let unit = Entity::new(ArenaKind::Soldier, slot, generation)
                 .expect("a marked slot is live, so it holds a generation of one or more");
             self.starved_log
                 .push(UnitStarved::new(tick, unit.to_bits(), deficit));

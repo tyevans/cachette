@@ -39,6 +39,7 @@ module, decision D1.
 """
 
 from cachette._core import (
+    ArenaMismatchError,
     Batch,
     CachetteError,
     Camera,
@@ -59,6 +60,7 @@ from cachette._core import (
 )
 
 __all__ = [
+    "ArenaMismatchError",
     "Batch",
     "CachetteError",
     "Camera",

@@ -4,14 +4,14 @@
 //! from deeds, and a promotion spends it. The whole life of one character
 //! sits in one module, because each part reads the others.
 
-use super::errors::{IdentityError, StepError};
+use super::errors::{ArenaMismatchError, IdentityError, StepError};
 use super::World;
 use crate::character::{CharacterArena, CharacterError};
 use crate::descent::{DescentId, Parents};
 use crate::promotion::{self, UnitPromoted};
 use crate::rates::{RateError, RateSchedule};
 use crate::sim_math;
-use crate::types::{Accum, Entity, FactionId, Fix32};
+use crate::types::{Accum, ArenaKind, Entity, FactionId, Fix32};
 
 impl World {
     /// Returns the promotions of the last frame that ran the pass.
@@ -140,6 +140,13 @@ impl World {
     /// [^2]: ADR-0014, entity identity is an index plus a generation, decision D2. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
     pub fn resolve_character(&self, identity: u64) -> Result<Entity, IdentityError> {
         let entity = Entity::from_bits(identity).ok_or(IdentityError::NotAnIdentity)?;
+        if entity.arena() != ArenaKind::Character {
+            return Err(ArenaMismatchError {
+                expected: ArenaKind::Character,
+                found: entity.arena(),
+            }
+            .into());
+        }
         let slot = entity.index();
         if slot >= self.characters.slot_count() {
             return Err(IdentityError::NoSuchSlot { slot });

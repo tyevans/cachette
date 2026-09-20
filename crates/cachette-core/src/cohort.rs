@@ -48,7 +48,7 @@ use crate::sim_math;
 use crate::site::{CommodityId, Store, StoreUpdate, COMMODITY_COUNT};
 use crate::slots::Slots;
 use crate::soldier::{NeedUpdate, NO_HOME};
-use crate::types::{Accum, Entity, FactionId, Fix32, Tick, FACTION_CEILING};
+use crate::types::{Accum, ArenaKind, Entity, FactionId, Fix32, Tick, FACTION_CEILING};
 
 /// The number of cohorts that one site holds.
 ///
@@ -852,8 +852,12 @@ fn draw_span(
         if handed.0 < demanded.0 {
             let unmet = sim_math::combine(demanded, Accum(-handed.0));
             ledger.unmet[index] = sim_math::combine(ledger.unmet[index], unmet);
-            let site = Entity::new(start + offset as u32, generations[offset])
-                .expect("a live slot holds a generation of one or more");
+            let site = Entity::new(
+                ArenaKind::Settlement,
+                start + offset as u32,
+                generations[offset],
+            )
+            .expect("a live slot holds a generation of one or more");
             log.push(SiteRationed::new(
                 tick,
                 site.to_bits(),

@@ -53,11 +53,13 @@ use crate::descent::{Descent, DescentError, DescentId, HouseId, Parents, DESCENT
 use crate::hash::StateHash;
 use crate::rng;
 use crate::tier::{EntityTier, Shape};
-use crate::types::{Entity, FactionId, Fix32, Tick, FACTION_CEILING};
+use crate::types::{ArenaKind, Entity, FactionId, Fix32, Tick, FACTION_CEILING};
 
 /// The generation that means a slot carries no identity.
 ///
 /// A generation starts at one, so no handle ever holds this value.[^1]
+/// The arena writes it into a slot that it has never used, and into a slot
+/// that it has retired.
 ///
 /// # References
 ///
@@ -65,14 +67,6 @@ use crate::types::{Entity, FactionId, Fix32, Tick, FACTION_CEILING};
 const NO_GENERATION: u32 = 0;
 
 /// The first generation of a slot.
-///
-/// The record starts a generation at one, never at zero. Slot zero at
-/// generation zero packs to the value zero, which the identity cannot
-/// hold.[^1]
-///
-/// # References
-///
-/// [^1]: ADR-0014, entity identity is an index plus a generation, decision D6. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
 const FIRST_GENERATION: u32 = 1;
 
 /// The largest generation that a slot can hold.
@@ -84,7 +78,7 @@ const FIRST_GENERATION: u32 = 1;
 /// # References
 ///
 /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D5. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
-const LAST_GENERATION: u32 = u32::MAX;
+const LAST_GENERATION: u32 = 0x00FF_FFFF;
 
 /// The reason that the arena refused a caller.
 ///
@@ -554,8 +548,10 @@ impl CharacterArena {
         self.births[index] = birth;
         self.renown[index] = Fix32::ZERO;
         self.live_count += 1;
-        Ok(Entity::new(slot, self.generations[index])
-            .expect("a generation of one or more makes the identity non-zero"))
+        Ok(
+            Entity::new(ArenaKind::Character, slot, self.generations[index])
+                .expect("a generation of one or more makes the identity non-zero"),
+        )
     }
 
     /// Opens one new slot and returns its index.
@@ -875,7 +871,7 @@ impl CharacterArena {
             .enumerate()
             .filter(|(_, live)| **live == 1)
             .map(|(index, _)| {
-                Entity::new(index as u32, self.generations[index])
+                Entity::new(ArenaKind::Character, index as u32, self.generations[index])
                     .expect("a live slot holds a generation of one or more")
             })
     }
@@ -1017,7 +1013,9 @@ impl CharacterArena {
                 // descent row of the character before it would do.[^1]
                 //
                 // [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
-                let Some(entity) = Entity::new(slot as u32, self.generations[slot]) else {
+                let Some(entity) =
+                    Entity::new(ArenaKind::Character, slot as u32, self.generations[slot])
+                else {
                     return false;
                 };
                 let Some(id) = self.descent.id_at(self.descent_of_slot[slot]) else {
@@ -1072,11 +1070,14 @@ mod tests {
     /// context. A count could not. This item fails to compile if the tier
     /// ever becomes a run-time value.[^1]
     ///
+    /// # References
+    ///
     /// [^1]: ADR-0054, an entity belongs to one of three tiers, declared at creation, decision D2. `docs/adrs/accepted/adr-0054-an-entity-belongs-to-one-of-three-tiers-declared-at-creation.md`
-    const TIER_AT_COMPILE_TIME: EntityTier = <CharacterArena as Shape>::TIER;
-
     #[test]
-    fn the_shape_declares_the_character_tier_at_compile_time() {
+    fn the_tier_matches_the_type() {
+        // ADR-0054: the shape declares the tier at compile time and at the
+        // arena.
+        const TIER_AT_COMPILE_TIME: EntityTier = CharacterArena::TIER;
         assert_eq!(TIER_AT_COMPILE_TIME, EntityTier::Character);
         assert_eq!(CharacterArena::tier(), EntityTier::Character);
     }
@@ -1088,7 +1089,8 @@ mod tests {
             .create(0, FactionId(0), Tick(0))
             .expect("the creation must succeed");
         arena.generations[0] = LAST_GENERATION;
-        let aged = Entity::new(0, LAST_GENERATION).expect("the identity is not zero");
+        let aged = Entity::new(ArenaKind::Character, 0, LAST_GENERATION)
+            .expect("the identity is not zero");
         assert!(!arena.contains(first));
         assert!(arena.remove(aged));
         assert_eq!(arena.retired_count(), 1);
@@ -1103,7 +1105,8 @@ mod tests {
             .create(0, FactionId(0), Tick(0))
             .expect("the creation must succeed");
         arena.generations[0] = LAST_GENERATION;
-        let aged = Entity::new(0, LAST_GENERATION).expect("the identity is not zero");
+        let aged = Entity::new(ArenaKind::Character, 0, LAST_GENERATION)
+            .expect("the identity is not zero");
         assert!(arena.remove(aged));
 
         let next = arena

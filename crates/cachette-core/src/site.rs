@@ -45,7 +45,7 @@ use std::collections::VecDeque;
 
 use crate::hash::StateHash;
 use crate::hex::{Axial, Grid};
-use crate::types::{Entity, FactionId, Fix32, TileIdx, FACTION_CEILING};
+use crate::types::{ArenaKind, Entity, FactionId, Fix32, TileIdx, FACTION_CEILING};
 
 /// The generation that means a slot carries no identity.
 ///
@@ -76,7 +76,7 @@ const FIRST_GENERATION: u32 = 1;
 /// # References
 ///
 /// [^1]: ADR-0014, entity identity is an index plus a generation, decision D5. `docs/adrs/accepted/adr-0014-entity-identity-is-an-index-plus-a-generation.md`
-const LAST_GENERATION: u32 = u32::MAX;
+const LAST_GENERATION: u32 = 0x00FF_FFFF;
 
 /// The number of slots that an arena opens when the caller states no limit.
 ///
@@ -647,7 +647,7 @@ impl SettlementArena {
         self.siege_work[index] = 0;
         self.siege_intents[index] = SIEGE_INTENT_REACH;
         self.live_count += 1;
-        let entity = Entity::new(slot, self.generations[index])
+        let entity = Entity::new(ArenaKind::Settlement, slot, self.generations[index])
             .expect("a generation of one or more makes the identity non-zero");
         self.holders[tile.0 as usize] = Some(entity);
         Ok(entity)
@@ -780,7 +780,7 @@ impl SettlementArena {
         if *self.live.get(slot as usize)? != 1 {
             return None;
         }
-        Entity::new(slot, self.generations[slot as usize])
+        Entity::new(ArenaKind::Settlement, slot, self.generations[slot as usize])
     }
 
     /// Returns the tile of a settlement, or `None` when the identity is
@@ -1056,7 +1056,7 @@ impl SettlementArena {
             .enumerate()
             .filter(|(_, live)| **live == 1)
             .map(|(index, _)| {
-                Entity::new(index as u32, self.generations[index])
+                Entity::new(ArenaKind::Settlement, index as u32, self.generations[index])
                     .expect("a live slot holds a generation of one or more")
             })
     }
@@ -1290,7 +1290,8 @@ mod tests {
             .found(Axial::new(0, 0), FactionId(0))
             .expect("the founding must succeed");
         arena.generations[0] = LAST_GENERATION;
-        let aged = Entity::new(0, LAST_GENERATION).expect("the identity is not zero");
+        let aged = Entity::new(ArenaKind::Settlement, 0, LAST_GENERATION)
+            .expect("the identity is not zero");
         arena.holders[0] = Some(aged);
         assert!(!arena.contains(first));
         assert!(arena.destroy(aged));
@@ -1306,7 +1307,8 @@ mod tests {
             .found(Axial::new(0, 0), FactionId(0))
             .expect("the founding must succeed");
         arena.generations[0] = LAST_GENERATION;
-        let aged = Entity::new(0, LAST_GENERATION).expect("the identity is not zero");
+        let aged = Entity::new(ArenaKind::Settlement, 0, LAST_GENERATION)
+            .expect("the identity is not zero");
         arena.holders[0] = Some(aged);
         assert!(arena.destroy(aged));
 

@@ -34,7 +34,7 @@ use bytemuck::{Pod, Zeroable};
 use crate::character::{CharacterArena, CharacterError};
 use crate::soldier::SoldierArena;
 use crate::sort::{self, SortError, SortKey};
-use crate::types::{Entity, FactionId, Tick};
+use crate::types::{ArenaKind, Entity, FactionId, Tick};
 
 /// The reason that a promotion pass refused to run.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -171,7 +171,7 @@ pub fn promote(
             continue;
         }
         let generation = units.generation_of(slot);
-        let Some(unit) = Entity::new(slot, generation) else {
+        let Some(unit) = Entity::new(ArenaKind::Soldier, slot, generation) else {
             continue;
         };
         candidates.push((deeds[index], unit));
