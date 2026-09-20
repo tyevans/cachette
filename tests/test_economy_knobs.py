@@ -682,3 +682,49 @@ def _expected_tuning(seed: int) -> tuple[int, int]:
     for _ in range(6):
         world.step(threads=1)
     return (world.state_hash(), store_of(world, site))
+
+
+def test_seeded_settlement_reports_site_identity_and_allows_economy_reads_and_writes(
+    seed: int,
+) -> None:
+    """The seeding verb names the settlement identity and Python can read its store.
+
+    A readability report found that the seeding report previously returned no
+    site key, leaving the control plane unable to read or tune the economy of any
+    settlement on a seeded world (FND-485, item 0490). PRD-0047 requires that a
+    developer can set what a settlement holds from Python and read the value
+    back.
+    """
+    world = cachette.World(width=32, height=32, seed=seed, faction_count=2)
+    reports = world.seed_world()
+    assert reports, "seeding must return reports"
+
+    seated = [r for r in reports if r["seated"]]
+    assert seated, "at least one faction must be seated"
+
+    for report in seated:
+        assert "site" in report, "seated report must contain site identity"
+        site = int(report["site"])
+        assert site > 0, "site identity must be non-zero"
+
+        # Reading the site economy must accept the site identity without error
+        economy = world.site_economy(site)
+        assert "store" in economy
+        assert "production" in economy
+        assert "upkeep" in economy
+
+        # Setting the site store must update the store and be readable
+        new_store = 42 * ONE
+        world.set_settlement_store([site], new_store)
+        assert store_of(world, site) == new_store
+
+
+def test_site_economy_reader_refuses_bare_slot_indices() -> None:
+    """A bare slot index is not an entity identity and must be refused.
+
+    Proves the reader rejects invalid slot indices (ADR-0014 D1, FND-485).
+    """
+    world = cachette.World(width=32, height=32, seed=42, faction_count=2)
+    world.seed_world()
+    with pytest.raises(cachette.ViewError):
+        world.site_economy(0)

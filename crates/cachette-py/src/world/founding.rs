@@ -461,6 +461,8 @@ impl PyWorld {
     ///
     /// A report whose `seated` entry is `True` holds these as well.
     ///
+    /// - `site`, an integer. The identity of the settlement the founding made.
+    ///   Pass it to `site_economy`, `site_positions` or `prefer_at_sites`.
     /// - `q` and `r`, integers. The address the founding took.
     /// - `people`, an integer. How many people it seated.
     /// - `considered`, an integer. How many distinct places the survey read.
@@ -471,9 +473,6 @@ impl PyWorld {
     ///
     /// A report whose `seated` entry is `False` holds `refusal` instead, a
     /// `str` that says why the faction got no place.
-    ///
-    /// **A report holds no site identity.** Call `found_group` for a founding
-    /// that hands one back.
     ///
     /// # Errors
     ///
@@ -552,6 +551,7 @@ fn founding_reports<'py>(
         match outcome.result() {
             Ok(founding) => {
                 let place = founding.place();
+                report.set_item("site", founding.settlement().to_bits())?;
                 report.set_item("seated", true)?;
                 report.set_item("q", place.q)?;
                 report.set_item("r", place.r)?;
