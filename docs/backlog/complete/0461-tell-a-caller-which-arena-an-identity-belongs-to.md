@@ -1,7 +1,7 @@
 ---
 id: 0461
 title: Tell a caller which arena an identity belongs to
-status: refined
+status: complete
 created: 2026-09-03
 implements: [ADR-0014 D1, ADR-0046 D1]
 changes: []
@@ -68,7 +68,7 @@ passed silently through both the engine and test suites.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Tagged boundary entity identities with their arena tag (`Soldier = 0`, `Character = 1`, `Settlement = 2`), preserving bit-level soldier representations while distinguishing character and settlement identities. Added typed `ArenaMismatchError` inheriting from `ViewError`, and verified cross-arena query rejections across the Rust core and Python bindings.
 
 ## References
 
