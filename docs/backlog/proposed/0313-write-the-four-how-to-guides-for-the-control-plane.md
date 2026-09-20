@@ -66,7 +66,7 @@ item draws the line between the two.
 [^1]: Product requirement record 0021, a developer can use the control plane without reading its source. `docs/product/accepted/prd-0021-a-developer-can-use-the-control-plane-without-reading-its-source.md`
 [^2]: ADR-0001, one binary gives one answer at any thread count. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
 [^3]: Decisions register, DEC-060. `docs/DECISIONS.md`
-[^4]: Backlog item 0311, execute every documentation example from the test suite. `docs/backlog/proposed/0311-execute-every-documentation-example-from-the-test-suite.md`
+[^4]: Backlog item 0311, execute every documentation example from the test suite. `docs/backlog/refined/0311-execute-every-documentation-example-from-the-test-suite.md`
 [^5]: Product requirement record 0019, an agent can ask the running engine what it holds. `docs/product/shaped/prd-0019-an-agent-can-ask-the-running-engine-what-it-holds.md`
 [^6]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^7]: Blockers register, BLK-034. `docs/BLOCKERS.md`
