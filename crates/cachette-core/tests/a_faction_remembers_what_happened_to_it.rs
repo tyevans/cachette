@@ -110,7 +110,6 @@ fn battlefield(unit_capacity: u32) -> World {
         unit_capacity,
         latitude_centre: QUIET_CENTRE,
         latitude_span: QUIET_SPAN,
-        ..WorldConfig::DEFAULT
     })
     .expect("a world of one tile is a world");
     assert!(

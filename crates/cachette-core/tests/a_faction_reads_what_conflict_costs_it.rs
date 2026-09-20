@@ -83,7 +83,6 @@ fn arena(unit_capacity: u32) -> World {
         unit_capacity,
         latitude_centre: QUIET_CENTRE,
         latitude_span: QUIET_SPAN,
-        ..WorldConfig::DEFAULT
     })
     .expect("a world of one tile is a world");
     assert!(
@@ -523,7 +522,6 @@ fn burning_wood() -> World {
         unit_capacity: 4096,
         latitude_centre: Latitudes::PLANET.centre(),
         latitude_span: Latitudes::PLANET.span(),
-        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     let middle = thickest_wood(&world);

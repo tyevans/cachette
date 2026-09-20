@@ -66,7 +66,6 @@ fn world() -> World {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         latitude_centre: Latitudes::PLANET.centre(),
         latitude_span: Latitudes::PLANET.span(),
-        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     world

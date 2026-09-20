@@ -89,7 +89,6 @@ const CONFIG: WorldConfig = WorldConfig {
     unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
     latitude_centre: QUIET_CENTRE,
     latitude_span: QUIET_SPAN,
-    ..WorldConfig::DEFAULT
 };
 
 /// Returns the first address of the world whose ground carries a unit.
@@ -326,7 +325,6 @@ fn run_a_demonstration_world(seed: u64) -> (u32, u32, Option<u32>) {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         latitude_centre: Latitudes::PLANET.centre(),
         latitude_span: Latitudes::PLANET.span(),
-        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     // The engine seeds itself, as the demonstration does. No verb of this

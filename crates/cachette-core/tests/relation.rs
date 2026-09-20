@@ -67,7 +67,6 @@ fn row_world(width: u32, unit_capacity: u32) -> World {
         unit_capacity,
         latitude_centre: QUIET_CENTRE,
         latitude_span: QUIET_SPAN,
-        ..WorldConfig::DEFAULT
     })
     .expect("a row of tiles is a world");
     for q in 0..width as i32 {
@@ -503,7 +502,6 @@ fn speaker_run(b_speaks: bool) -> SpeakerRun {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         latitude_centre: QUIET_CENTRE,
         latitude_span: QUIET_SPAN,
-        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     world.seed_world().expect("the world seeds once");
@@ -742,7 +740,6 @@ fn a_leader_at_peace_converts_nobody() {
             unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
             latitude_centre: QUIET_CENTRE,
             latitude_span: QUIET_SPAN,
-            ..WorldConfig::DEFAULT
         })
         .expect("the extent must describe a world");
         let seat = (16..(EDGE as i32 - 16))

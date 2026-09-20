@@ -59,7 +59,6 @@ fn world(seed: u64, factions: u16, reach: u32) -> World {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         latitude_centre: QUIET_CENTRE,
         latitude_span: QUIET_SPAN,
-        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     let never_hungry = NeedRule::new(

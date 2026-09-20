@@ -85,7 +85,6 @@ fn config(factions: u16, seed: u64, extent: u32) -> WorldConfig {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         latitude_centre: QUIET_CENTRE,
         latitude_span: QUIET_SPAN,
-        ..WorldConfig::DEFAULT
     }
 }
 

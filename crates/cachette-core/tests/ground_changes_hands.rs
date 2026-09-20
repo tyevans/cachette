@@ -64,7 +64,6 @@ fn world(seed: u64, factions: u16) -> World {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         latitude_centre: QUIET_CENTRE,
         latitude_span: QUIET_SPAN,
-        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world")
 }
@@ -362,7 +361,6 @@ fn war_world(seed: u64) -> World {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         latitude_centre: QUIET_CENTRE,
         latitude_span: QUIET_SPAN,
-        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     field.set_reach_rules(ReachRules::new(6, 1, 8));

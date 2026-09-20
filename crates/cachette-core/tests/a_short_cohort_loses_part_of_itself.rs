@@ -119,7 +119,6 @@ fn short_cohort_under(rule: NeedRule, fed: u32, threads: usize) -> (World, Entit
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         latitude_centre: QUIET_CENTRE,
         latitude_span: QUIET_SPAN,
-        ..WorldConfig::DEFAULT
     })
     .expect("the extent must describe a world");
     world.set_need_rule(rule);

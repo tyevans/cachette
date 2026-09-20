@@ -78,7 +78,6 @@ fn a_still_world(extent: u32, seed: u64) -> World {
         unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
         latitude_centre: QUIET_CENTRE,
         latitude_span: QUIET_SPAN,
-        ..WorldConfig::DEFAULT
     })
     .expect("the extent describes a world");
     world.set_tick_limit(FAR_LIMIT);
