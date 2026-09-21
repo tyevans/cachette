@@ -15037,7 +15037,7 @@ was taken on 7 September 2026 on one development machine (x86-64).
 [^F496L]: ADR-0125, the control plane names the seed set of a destination field, decision D3. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
 [^F496F]: Testing rules, section 5. `.agents/rules/testing.md`
 [^F496G]: The plan tests. `crates/cachette-core/tests/plan.rs`
-[^F496I]: Backlog item 0502. `docs/backlog/proposed/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
+[^F496I]: Backlog item 0502. `docs/backlog/refined/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
 [^F494A]: Balance register, the stock target, the wonder work, the tick limit, the founding group and the campaign cohort size. `docs/reference/balance.md`
 [^F494B]: The census row that counts a filled seat. `crates/cachette-core/src/world/census.rs`
 [^F492A]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D3. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`

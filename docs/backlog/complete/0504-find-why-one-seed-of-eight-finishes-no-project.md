@@ -108,7 +108,7 @@ on its tile, and it names the questions a refiner answers first.[^8]
 
 [^1]: Findings register, the road chain finished nothing in a run. `docs/FINDINGS.md`
 [^2]: Testing Rules, a fixture supplies the input. `.agents/rules/testing.md`
-[^3]: Backlog item 0502. `docs/backlog/proposed/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
+[^3]: Backlog item 0502. `docs/backlog/refined/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
 [^4]: ADR-0152, a faction plans its roads and zones with one solver, decision D3. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
 [^5]: Findings register, FND-545. `docs/FINDINGS.md`
 [^6]: The seed sweep example. `crates/cachette-core/examples/seed_sweep.rs`

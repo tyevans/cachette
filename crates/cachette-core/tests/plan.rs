@@ -865,7 +865,7 @@ const RUN_SEEDS: [u64; 8] = [
 ///
 /// # References
 ///
-/// [^1]: Backlog item 0502. `docs/backlog/proposed/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
+/// [^1]: Backlog item 0502. `docs/backlog/refined/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
 const RUN_SEEDS_THAT_MUST_CLOSE: usize = 4;
 
 /// Seeds a demonstration world, runs it, and reports what it finished.

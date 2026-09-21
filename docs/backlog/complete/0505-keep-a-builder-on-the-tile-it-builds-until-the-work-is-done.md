@@ -110,7 +110,7 @@ the reading, and FND-550 holds the correction to FND-545.
 [^1]: The build pass and the build intents. `crates/cachette-core/src/world/upgrades.rs`
 [^2]: Balance register, the road work by level and the build rate. `docs/reference/balance.md`
 [^4]: Findings register, FND-545. `docs/FINDINGS.md`
-[^5]: Backlog item 0502. `docs/backlog/proposed/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
+[^5]: Backlog item 0502. `docs/backlog/refined/0502-let-a-faction-re-aim-its-project-order-and-keep-its-plan-live.md`
 [^6]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D1. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
 [^7]: ADR-0095, a behavioural strategy arrives as a field over cells, never as a search from a unit, decisions D1 and D2. `docs/adrs/draft/adr-0095-a-behavioural-strategy-arrives-as-a-field-over-cells.md`
 [^8]: ADR-0152, a faction plans its roads and zones with one solver, decisions D3 and D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
