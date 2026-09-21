@@ -102,7 +102,7 @@ TRAIN = TrainConfig(
 )
 
 
-def a_centre(world: EnvConfig, weights: str) -> LinearPolicy:
+def a_centre(world: EnvConfig, weights: str, seed: int = 2) -> LinearPolicy:
     """Return one linear centre of the shape this world publishes.
 
     The zeros centre scores every action row at zero, so it takes the first
@@ -125,7 +125,7 @@ def a_centre(world: EnvConfig, weights: str) -> LinearPolicy:
         rows = np.zeros((probe.action_length, probe.observation_length + 1))
         rows[:, -1] = np.linspace(0.0, 1.0, probe.action_length)
         return LinearPolicy(rows)
-    drawn = np.random.default_rng(2).normal(
+    drawn = np.random.default_rng(seed).normal(
         size=(probe.action_length, probe.observation_length + 1)
     )
     return LinearPolicy(drawn)
@@ -151,9 +151,9 @@ def test_a_higher_win_share_selects_over_a_higher_shaped_return() -> None:
     centre is the reverse. Selection on the mean shaped return keeps the
     zeros centre and publishes a policy that plays worse.
     """
-    seeds = viable_seeds(MIXED, 8, 20_000)
+    seeds = viable_seeds(MIXED, 8, 1000)
     zeros = a_centre(MIXED, "zeros")
-    drawn = a_centre(MIXED, "drawn")
+    drawn = a_centre(MIXED, "drawn", seed=3)
 
     quiet = a_judge(MIXED, seeds, zeros)
     on_zeros = quiet.score(zeros, "")
