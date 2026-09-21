@@ -1,7 +1,7 @@
 ---
 id: 0525
 title: Build the stage workers of a world once
-status: refined
+status: complete
 created: 2026-09-07
 implements: [ADR-0001 D1, ADR-0004 D1, ADR-0009 D1, ADR-0047 D2]
 changes: []
@@ -69,7 +69,13 @@ retention to intra-world stages.[^2]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The world now owns a persistent `StagePool` constructed at initialization or
+retained on the first step. Parallel stages execute their disjoint chunks
+across the persistent worker threads and calling thread without opening
+per-stage thread scopes. Single-threaded configurations execute inline on the
+calling thread with zero dispatch overhead. Operating system thread creations
+drop to zero during steady-state simulation stepping. Thread equivalence tests
+pass byte-for-byte across 1, 2, and 12 threads.
 
 ## References
 

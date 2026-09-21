@@ -18314,7 +18314,7 @@ verb answers one byte and names nothing.
 ## References
 
 [^F487B]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
-[^F638B]: Backlog item 0525, build the stage workers of a world once. `docs/backlog/refined/0525-build-the-stage-workers-of-a-world-once.md`
+[^F638B]: Backlog item 0525, build the stage workers of a world once. `docs/backlog/complete/0525-build-the-stage-workers-of-a-world-once.md`
 [^F641A]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D6. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
 [^F641B]: ADR-0176, an action integer is a mixed radix over the argument positions each verb declares, decision D2. `docs/adrs/accepted/adr-0176-an-action-integer-is-a-mixed-radix-over-the-positions-a-verb-declares.md`
 [^F641E]: ADR-0192, a window of controller commands is one label distribution over the action table, decisions D2 and D4. `docs/adrs/draft/adr-0192-a-window-of-controller-commands-is-one-label-distribution.md`
