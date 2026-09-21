@@ -60,29 +60,34 @@ present in the cell. The Python bindings and stubs expose the three new fields.
 
 **Creates.** None.
 
-**Blockers.** BLK-050 governs the downstream balance values. The three weights
-are expressed as balance parameters with provisional defaults.
-
-**Precedent.** FND-569 records that the weight vector reader and setter must
-expose every weight that the simulated state holds.
+**Blockers.** BLK-050 governs the downstream balance values.[^5] [^6]
 
 **Architectural review answers:**
 1. **The three weights:** Expressed as `u8` parameters in `FactionWeights` within
    `WEIGHT_LOW..=WEIGHT_HIGH`. The built-in controller sets `own_ground > unheld_ground > rival_ground >= WEIGHT_LOW`
    using a keyed draw from the seed for the preference delta.
 2. **Laden units returning home:** Options with `Ranked::Carry` (`deliver`) do
-   not rank the ground and receive a neutral ground factor (`Fix32::ONE`).
+   not rank the ground and receive a neutral ground factor (`Fix32::ONE`).[^7]
    A laden unit returning home is never penalized for traversing unheld or
    rival ground.
 3. **No pull field:** Per ADR-0156 D5, the own-ground term is a score multiplier
-   and never a fence or pull field. Units on foreign ground simply score options
-   on that ground lower.
-4. **Campaign cohorts:** Campaign orders assign objectives directly; regular
-   unit options use the policy weights without special-cased physics.
+   and never a fence or pull field. A pull needs a direction toward held ground,
+   which is a field, and the return field gives the direction to the nearest site
+   rather than to the nearest held tile.[^8] Units on foreign ground simply score
+   options on that ground lower.
+4. **Campaign cohorts:** A faction at war raises a campaign, and the campaign
+   sends a cohort onto ground the other faction holds.[^9] Campaign orders assign
+   objectives directly; regular unit options use the policy weights without
+   special-cased physics.
 5. **Learner observation:** The learner reads its own faction's weights through
-   `Reading.weights` in `faction_observation.rs`. It does not read rival weights.
+   `Reading.weights` in `faction_observation.rs`. A learner that reads another
+   faction's weights reads something that faction never showed it, and the
+   observation rule refuses that.[^10]
 6. **Census reporting:** `SUBSYSTEM_CENSUS` reports `units_on_own_ground` and
    `units_on_rival_ground`.
+
+**Precedent.** FND-569 records that the weight vector reader and setter must
+expose every weight that the simulated state holds.[^11]
 
 ## Done when
 
