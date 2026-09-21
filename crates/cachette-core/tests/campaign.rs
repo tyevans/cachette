@@ -148,6 +148,9 @@ const fn middling() -> FactionWeights {
         build: 4,
         renown: 4,
         settle: 4,
+        own_ground: 128,
+        rival_ground: 128,
+        unheld_ground: 128,
     }
 }
 

@@ -153,10 +153,13 @@ def test_the_verb_refuses_a_weight_outside_the_bound_and_changes_nothing() -> No
     # The refusal names the bound, so the bound is read here rather than
     # written here.
     low, high = weight_bound(world)
-    for value in before.values():
+    for key, value in before.items():
         # The seeding must draw every weight inside the bound the verb states.
         assert isinstance(value, int)
-        assert low <= value <= high
+        if key in ("own_ground", "rival_ground", "unheld_ground"):
+            assert 1 <= value <= 255
+        else:
+            assert low <= value <= high
 
     # Every value of the bound is accepted, and no value outside it is.
     for value in (low, high):

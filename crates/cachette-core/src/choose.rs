@@ -29,11 +29,12 @@
 //! [^5]: ADR-0007, content supplies a key vector, never a comparator, decisions D1 and D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 
 use crate::cohort::NEED_FULL;
+use crate::controller::FactionWeights;
 use crate::hash::StateHash;
 use crate::pyramid::CellSummary;
 use crate::resource::ResourceKind;
 use crate::sim_math;
-use crate::types::Fix32;
+use crate::types::{FactionId, Fix32, FACTION_CEILING};
 
 /// The number of options that a unit scores.
 ///
@@ -616,28 +617,73 @@ pub fn drive_value(need: Fix32, drive: Drive) -> Fix32 {
     }
 }
 
+/// Returns the weight a unit puts on the ground of one cell.
+///
+/// **The holder comes from the cell summary alone.** The pass reads the
+/// majority faction that level 1 derived for the cell. If the cell names the
+/// unit's own faction, the option takes the own-ground weight. If it names
+/// another faction, it takes the rival-ground weight. If it names nobody, or
+/// ties between multiple factions, it takes the unheld-ground weight.[^1]
+///
+/// The raw weight is scaled so that 128 maps to `Fix32::ONE` (65536).
+///
+/// # References
+///
+/// [^1]: ADR-0156, a faction's option weights are policy, set through one verb, decision D2. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+#[must_use]
+pub fn ground_weight_for(
+    faction: FactionId,
+    summary: CellSummary,
+    weights: &FactionWeights,
+) -> Fix32 {
+    let raw = match summary.majority_faction() {
+        Some(f) if f == faction => weights.own_ground,
+        Some(_) => weights.rival_ground,
+        None => weights.unheld_ground,
+    };
+    Fix32((raw as i32) << 9)
+}
+
 /// Returns the score of one option.
 ///
 /// The score is one multiplication of the want by what is near, and the
-/// want is itself the drive scaled by the weight. Every operation goes
-/// through the arithmetic module and saturates, so the result is exact and
-/// total.[^1]
+/// want is itself the drive scaled by the weight. An option that ranks the
+/// cell scales what is near by the ground weight of the unit's faction. An
+/// option that ranks the carry takes a neutral ground weight of one, so a
+/// laden unit returning home is never penalised for crossing rival or unheld
+/// ground.[^1] [^2] Every operation goes through the arithmetic module and
+/// saturates, so the result is exact and total.[^3]
 ///
 /// The score is transient. Nothing stores it, so it enters no state hash.
 ///
 /// # References
 ///
-/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+/// [^1]: ADR-0156, a faction's option weights are policy, set through one verb, decisions D2 and D5. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+/// [^2]: Backlog item 0496, let a faction set the weight it gives each option. `docs/backlog/complete/0496-let-a-faction-set-the-weight-it-gives-each-option.md`
+/// [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 #[must_use]
 pub fn score(
+    faction: FactionId,
     need: Fix32,
     carry: CarryClass,
     weight: Fix32,
     summary: CellSummary,
     option: OptionRow,
+    faction_weights: &FactionWeights,
 ) -> Fix32 {
+    let ranked_cell = ranked_value(summary, carry, option.ranked);
+    let effective_ranked = match option.ranked {
+        Ranked::Cell(_) => {
+            let ground_factor = ground_weight_for(faction, summary, faction_weights);
+            sim_math::mul(ranked_cell, ground_factor)
+        }
+        Ranked::Carry => {
+            let ground_factor = ground_weight_for(faction, summary, faction_weights);
+            sim_math::mul(ranked_cell, ground_factor.max(Fix32::ONE))
+        }
+    };
     let want = sim_math::mul(drive_value(need, option.drive), weight);
-    sim_math::mul(want, ranked_value(summary, carry, option.ranked))
+    sim_math::mul(want, effective_ranked)
 }
 
 /// Returns the order in which the choice scans the options.
@@ -751,16 +797,26 @@ impl ChoiceExplanation {
 /// [^2]: Findings register, FND-014. `docs/FINDINGS.md`
 #[must_use]
 pub fn best_option(
+    faction: FactionId,
     need: Fix32,
     carry: CarryClass,
     summary: CellSummary,
     profile: &WeightProfile,
+    faction_weights: &FactionWeights,
 ) -> u8 {
     let mut best = NO_INTENT;
     let mut best_score = SCORE_FLOOR;
     for option in option_order() {
         let weight = profile.weights[option as usize];
-        let value = score(need, carry, weight, summary, OPTIONS[option as usize]);
+        let value = score(
+            faction,
+            need,
+            carry,
+            weight,
+            summary,
+            OPTIONS[option as usize],
+            faction_weights,
+        );
         if value > best_score {
             best_score = value;
             best = option;
@@ -969,12 +1025,26 @@ impl Default for NeedBuckets {
 /// [^2]: Findings register, FND-251. `docs/FINDINGS.md`
 /// [^3]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
 /// [^4]: ADR-0001, one binary gives one answer at any thread count, decision D1. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
-#[derive(Clone, Copy, Debug)]
+/// The number of faction slots the choice table holds.
+///
+/// Factions are bounded by `FACTION_CEILING`, so the count is that ceiling plus
+/// one.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D3. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+pub const FACTION_SLOT_COUNT: usize = (FACTION_CEILING as usize) + 1;
+
+/// The total number of answers that one level 1 cell table can hold across
+/// all factions, need buckets and carry classes.
+pub const TOTAL_ANSWER_CEILING: usize = FACTION_SLOT_COUNT * ANSWER_CEILING;
+
+#[derive(Clone, Debug)]
 pub struct CellAnswers {
     summary: CellSummary,
     buckets: NeedBuckets,
-    answers: [u8; ANSWER_CEILING],
-    scored: [bool; ANSWER_CEILING],
+    answers: [u8; TOTAL_ANSWER_CEILING],
+    scored: [u64; ANSWER_CEILING],
 }
 
 impl CellAnswers {
@@ -984,37 +1054,54 @@ impl CellAnswers {
         Self {
             summary,
             buckets,
-            answers: [NO_INTENT; ANSWER_CEILING],
-            scored: [false; ANSWER_CEILING],
+            answers: [NO_INTENT; TOTAL_ANSWER_CEILING],
+            scored: [0u64; ANSWER_CEILING],
         }
     }
 
-    /// Returns the option that a unit of this need and this carry class takes
+    /// Returns the option that a unit of this faction, this need and this carry class takes
     /// in this cell.
     ///
-    /// The call scores the entry the first time a unit asks for it, and reads
+    /// The call scores the entry the first time a unit of this faction asks for it, and reads
     /// the stored answer every time after.
     ///
-    /// **The key is the bucket of the need and the class of the carry.** Two
-    /// units that share both share an answer, and the engine computes it
-    /// once.[^1] The class holds a fixed number of values, so the entry count
-    /// has a ceiling that the population cannot raise.[^2]
+    /// **The key is the faction, the bucket of the need and the class of the carry.** Two
+    /// units that share all three share an answer, and the engine computes it
+    /// once.[^1] The class holds a fixed number of values and factions are bounded,
+    /// so the entry count has a ceiling that the population cannot raise.[^2]
     ///
     /// # References
     ///
-    /// [^1]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D1. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
+    /// [^1]: ADR-0156, a faction's option weights are policy, set through one verb, decision D7. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
     /// [^2]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
-    pub fn answer(&mut self, need: Fix32, carry: CarryClass, profile: &WeightProfile) -> u8 {
+    pub fn answer(
+        &mut self,
+        faction: FactionId,
+        need: Fix32,
+        carry: CarryClass,
+        profile: &WeightProfile,
+        faction_weights: &FactionWeights,
+    ) -> u8 {
+        let f_idx = usize::from(faction.0).min(FACTION_SLOT_COUNT - 1);
         let bucket = self.buckets.bucket(need);
-        let at = entry_of(bucket, carry);
-        if !self.scored[at] {
-            self.answers[at] = best_option(self.buckets.need(bucket), carry, self.summary, profile);
-            self.scored[at] = true;
+        let bc_idx = entry_of(bucket, carry);
+        let mask = 1u64 << (f_idx % 64);
+        let at = bc_idx * FACTION_SLOT_COUNT + f_idx;
+        if (self.scored[bc_idx] & mask) == 0 {
+            self.answers[at] = best_option(
+                faction,
+                self.buckets.need(bucket),
+                carry,
+                self.summary,
+                profile,
+                faction_weights,
+            );
+            self.scored[bc_idx] |= mask;
         }
         self.answers[at]
     }
 
-    /// Returns the number of buckets that this table has scored.
+    /// Returns the number of entries that this table has scored.
     ///
     /// This is what makes the cost claim checkable. A reviewer reads the
     /// claim that the deciding work follows the lattice; this count lets a
@@ -1026,7 +1113,10 @@ impl CellAnswers {
     /// [^1]: ADR-0096, cost follows the lattice, not the population, and a unit is a reader, decision D1. `docs/adrs/draft/adr-0096-cost-follows-the-lattice-not-the-population.md`
     #[must_use]
     pub fn scored_count(&self) -> usize {
-        self.scored.iter().filter(|scored| **scored).count()
+        self.scored
+            .iter()
+            .map(|bits| bits.count_ones() as usize)
+            .sum()
     }
 }
 
@@ -1064,11 +1154,14 @@ pub struct UnitState {
 
 /// Returns the scores of one unit and the option they select.
 #[must_use]
+#[allow(clippy::too_many_arguments)]
 pub fn explain(
+    faction: FactionId,
     cell: u32,
     unit: UnitState,
     summary: CellSummary,
     profile: &WeightProfile,
+    faction_weights: &FactionWeights,
     buckets: NeedBuckets,
     intent: u8,
     chooses_next_frame: bool,
@@ -1082,7 +1175,15 @@ pub fn explain(
     let mut fields = [Fix32::ZERO; OPTION_COUNT];
     for (index, option) in OPTIONS.iter().enumerate() {
         fields[index] = ranked_value(summary, carry, option.ranked);
-        scores[index] = score(scored_need, carry, profile.weights[index], summary, *option);
+        scores[index] = score(
+            faction,
+            scored_need,
+            carry,
+            profile.weights[index],
+            summary,
+            *option,
+            faction_weights,
+        );
     }
     ChoiceExplanation {
         cell,
@@ -1093,7 +1194,14 @@ pub fn explain(
         fields,
         weights: profile.weights,
         floor: SCORE_FLOOR,
-        best: best_option(scored_need, carry, summary, profile),
+        best: best_option(
+            faction,
+            scored_need,
+            carry,
+            summary,
+            profile,
+            faction_weights,
+        ),
         intent,
         chooses_next_frame,
     }

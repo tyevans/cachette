@@ -61,11 +61,20 @@ def test_a_world_seeds_itself_once_and_the_seeding_verbs_still_serve() -> None:
 
 
 def test_the_faction_weights_are_whole_numbers_from_the_seed() -> None:
-    """The vector has five whole weights, and a wrong faction number raises."""
+    """The vector has eight whole weights, and a wrong faction number raises."""
     world = World(width=EXTENT, height=EXTENT, seed=SEED, faction_count=FACTIONS)
     same = World(width=EXTENT, height=EXTENT, seed=SEED, faction_count=FACTIONS)
     weights = world.faction_weights(0)
-    assert set(weights) == {"war", "trade", "build", "renown", "settle"}
+    assert set(weights) == {
+        "war",
+        "trade",
+        "build",
+        "renown",
+        "settle",
+        "own_ground",
+        "rival_ground",
+        "unheld_ground",
+    }
     assert all(isinstance(value, int) and value > 0 for value in weights.values())
     assert weights == same.faction_weights(0)
     with pytest.raises(VerbError):

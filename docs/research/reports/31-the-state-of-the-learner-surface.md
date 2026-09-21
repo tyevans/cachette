@@ -697,7 +697,7 @@ which are derived, and this report states no cost figure.[^25]
 [^4]: ADR-0156, a faction's option weights are policy, set through one verb, decisions D1 to D7. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
 [^5]: ADR Registry. `docs/adrs/REGISTRY.md`
 [^6]: Backlog item 0495, build the observation plane and let every reader answer for one faction. `docs/backlog/proposed/0495-build-the-observation-plane-and-let-every-reader-answer-for-one-faction.md`
-[^7]: Backlog item 0496, let a faction set the weight it gives each option. `docs/backlog/proposed/0496-let-a-faction-set-the-weight-it-gives-each-option.md`
+[^7]: Backlog item 0496, let a faction set the weight it gives each option. `docs/backlog/complete/0496-let-a-faction-set-the-weight-it-gives-each-option.md`
 [^8]: Backlog priority index. `docs/backlog/PRIORITY.md`
 [^9]: Testing Rules, section 5. `.agents/rules/testing.md`
 [^10]: Recurring Defect Shapes, shape 3. `.agents/rules/recurring-defects.md`

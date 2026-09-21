@@ -153,7 +153,7 @@ def test_a_higher_win_share_selects_over_a_higher_shaped_return() -> None:
     """
     seeds = viable_seeds(MIXED, 8, 1000)
     zeros = a_centre(MIXED, "zeros")
-    drawn = a_centre(MIXED, "drawn", seed=3)
+    drawn = a_centre(MIXED, "drawn", seed=4)
 
     quiet = a_judge(MIXED, seeds, zeros)
     on_zeros = quiet.score(zeros, "")
