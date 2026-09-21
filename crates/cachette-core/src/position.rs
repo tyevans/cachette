@@ -95,7 +95,7 @@ pub const NO_WORK: u8 = u8::MAX;
 /// [^1]: Decisions register, DEC-073. `docs/DECISIONS.md`
 /// [^2]: ADR-0007, content supplies a key vector, never a comparator, decision D3. `docs/adrs/accepted/adr-0007-content-supplies-a-key-vector-never-a-comparator.md`
 pub const WORK_COMMODITY: [CommodityId; RESOURCE_KIND_COUNT] =
-    [CommodityId(0), CommodityId(0), CommodityId(0)];
+    [CommodityId(0), CommodityId(1), CommodityId(2)];
 
 /// The reason that this module refused a caller.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -33,14 +33,6 @@ use cachette_core::{
 /// The people each founding settles.
 const GROUP: u32 = 8;
 
-/// The commodity that every kind of work fills. It is read from the declared
-/// map, so this file holds no second copy of the number.[^1]
-///
-/// # References
-///
-/// [^1]: Findings register, FND-191. `docs/FINDINGS.md`
-const GOODS: CommodityId = WORK_COMMODITY[0];
-
 /// The store the seller holds.
 ///
 /// **It is far above the mark and below the stock target.** A store at the
@@ -129,9 +121,11 @@ fn set_store(world: &mut World, faction: FactionId, quantity: Fix32) {
     let site = world
         .trading_site_of(faction)
         .expect("the faction holds a site");
-    world
-        .set_settlement_store(site, GOODS, quantity)
-        .expect("the commodity is inside the set");
+    for &commodity in &WORK_COMMODITY {
+        world
+            .set_settlement_store(site, commodity, quantity)
+            .expect("the commodity is inside the set");
+    }
 }
 
 /// Puts a unit of each faction on ground the other holds.
@@ -466,6 +460,98 @@ fn a_surplus_posts_an_offer_and_a_shortfall_posts_a_want() {
             "a row never asks for its own good"
         );
     }
+}
+
+#[test]
+fn multi_commodity_storage_and_trade_offers_across_distinct_commodity_indices() {
+    let mut world = a_trading_world(27);
+    let site_zero = world.trading_site_of(ZERO).expect("zero holds a site");
+    let site_one = world.trading_site_of(ONE).expect("one holds a site");
+
+    let food = WORK_COMMODITY[ResourceKind::Food.index()];
+    let wood = WORK_COMMODITY[ResourceKind::Wood.index()];
+    let stone = WORK_COMMODITY[ResourceKind::Stone.index()];
+
+    assert_eq!(food, CommodityId(0));
+    assert_eq!(wood, CommodityId(1));
+    assert_eq!(stone, CommodityId(2));
+
+    // Faction ZERO has surplus food and deficit wood.
+    world
+        .set_settlement_store(site_zero, food, Fix32::from_int(100))
+        .expect("in set");
+    world
+        .set_settlement_store(site_zero, wood, Fix32::ZERO)
+        .expect("in set");
+    world
+        .set_settlement_store(site_zero, stone, Fix32::from_int(8))
+        .expect("in set");
+
+    // Faction ONE has deficit food and surplus wood.
+    world
+        .set_settlement_store(site_one, food, Fix32::ZERO)
+        .expect("in set");
+    world
+        .set_settlement_store(site_one, wood, Fix32::from_int(100))
+        .expect("in set");
+    world
+        .set_settlement_store(site_one, stone, Fix32::from_int(8))
+        .expect("in set");
+
+    let stores_zero = world.faction_stores(ZERO);
+    let stores_one = world.faction_stores(ONE);
+
+    assert_eq!(stores_zero[ResourceKind::Food.index()], 100);
+    assert_eq!(stores_zero[ResourceKind::Wood.index()], 0);
+    assert_eq!(stores_one[ResourceKind::Food.index()], 0);
+    assert_eq!(stores_one[ResourceKind::Wood.index()], 100);
+
+    // Step to generate trade boards.
+    world.step(1).expect("step runs");
+
+    let board_zero = world.market(ZERO);
+    let board_one = world.market(ONE);
+
+    // ZERO has surplus Food (> mark 8) and deficit Wood (< mark 8):
+    // Board of ZERO must offer Food (good 0) and want Wood (good 1).
+    let zero_offers_food = board_zero.iter().any(|row| {
+        !row.is_empty() && row.good == ResourceKind::Food.to_u8() && row.wants == ADVERT_OFFERS
+    });
+    let zero_wants_wood = board_zero.iter().any(|row| {
+        !row.is_empty() && row.good == ResourceKind::Wood.to_u8() && row.wants == ADVERT_WANTS
+    });
+    assert!(
+        zero_offers_food,
+        "faction zero must offer food: {board_zero:?}"
+    );
+    assert!(
+        zero_wants_wood,
+        "faction zero must want wood: {board_zero:?}"
+    );
+
+    // ONE has deficit Food and surplus Wood:
+    // Board of ONE must offer Wood (good 1) and want Food (good 0).
+    let one_offers_wood = board_one.iter().any(|row| {
+        !row.is_empty() && row.good == ResourceKind::Wood.to_u8() && row.wants == ADVERT_OFFERS
+    });
+    let one_wants_food = board_one.iter().any(|row| {
+        !row.is_empty() && row.good == ResourceKind::Food.to_u8() && row.wants == ADVERT_WANTS
+    });
+    assert!(
+        one_offers_wood,
+        "faction one must offer wood: {board_one:?}"
+    );
+    assert!(one_wants_food, "faction one must want food: {board_one:?}");
+
+    // Match complementary boards:
+    let match_terms = cachette_core::controller::match_boards(board_zero, board_one);
+    assert!(
+        match_terms.is_some(),
+        "complementary offers and wants across distinct commodities must match"
+    );
+    let terms = match_terms.unwrap();
+    assert_eq!(terms.take_kind, ResourceKind::Wood.to_u8());
+    assert_eq!(terms.give_kind, ResourceKind::Food.to_u8());
 }
 
 // ---------------------------------------------------------------------------

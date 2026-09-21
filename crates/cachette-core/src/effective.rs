@@ -301,9 +301,9 @@ impl World {
     /// The three terms add. Each one is at or above zero, so the sum is at or
     /// above zero and the rate table accepts it.[^1]
     ///
-    /// **Every commodity takes both derived terms.** The commodity set holds
-    /// one member, so no rule here separates them. A second commodity needs a
-    /// decision that nobody has made.
+    /// **The resident term pays in food.** Food is commodity zero, which
+    /// residents consume as their ration. Holding cost applies to each
+    /// commodity independently based on the quantity held.[^1]
     ///
     /// # References
     ///
@@ -312,7 +312,11 @@ impl World {
     fn effective_upkeep_at(&self, site: Entity, slot: u32, commodity: CommodityId) -> Fix32 {
         let base = self.rates().upkeep(slot, commodity).unwrap_or(Fix32::ZERO);
         let with_holding = sim_math::add(base, self.holding_term(site, commodity));
-        sim_math::add(with_holding, self.resident_term(site))
+        if commodity == CommodityId(0) {
+            sim_math::add(with_holding, self.resident_term(site))
+        } else {
+            with_holding
+        }
     }
 
     /// Returns what a site pays each tick to keep what it holds.

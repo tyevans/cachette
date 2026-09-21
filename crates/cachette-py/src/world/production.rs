@@ -413,7 +413,8 @@ impl PyWorld {
     /// The unit type is a row of the shared unit type table, as an integer.
     /// The work is the advances the entry takes. The people are the residents
     /// a finished entry spends. The goods are one quantity for each
-    /// commodity, in commodity order, as raw Q16.16 integers. Returns `None`.
+    /// commodity, in commodity order, as raw Q16.16 integers. Missing trailing
+    /// commodities default to zero. Returns `None`.
     ///
     /// **The costs sit in their own table and not in the unit type row.** A
     /// unit type row is a set of capability columns, and a zero in one means
@@ -427,7 +428,8 @@ impl PyWorld {
     /// # Errors
     ///
     /// Raises `VerbError` when the number names no row of the unit type
-    /// table, and when the goods list is not one quantity for each commodity.
+    /// table, and when the goods list holds more quantities than the world
+    /// holds commodities.
     ///
     /// # References
     ///
@@ -443,9 +445,9 @@ impl PyWorld {
     ) -> PyResult<()> {
         let mut world = self.lock();
         let mut quantities = [Fix32::ZERO; COMMODITY_COUNT];
-        if goods.len() != COMMODITY_COUNT {
+        if goods.len() > COMMODITY_COUNT {
             return Err(VerbError::new_err(format!(
-                "the goods list holds {} quantities and the world holds {COMMODITY_COUNT} commodities",
+                "the goods list holds {} quantities and the world holds at most {COMMODITY_COUNT} commodities",
                 goods.len()
             )));
         }

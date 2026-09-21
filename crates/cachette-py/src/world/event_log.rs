@@ -352,8 +352,8 @@ impl PyWorld {
     ///   carries the Q16.16 fixed-point scale, so 65536 is one whole unit of
     ///   the commodity. It is never zero.
     /// - `commodity`, `numpy.uint16`. The commodity that the site owed. A
-    ///   commodity is not a resource kind. The world holds one commodity
-    ///   today, and its number is zero.
+    ///   commodity is not a resource kind. The world holds three
+    ///   commodities: food (0), wood (1), and stone (2).
     ///
     /// This method copies each column.[^2]
     ///
@@ -392,8 +392,8 @@ impl PyWorld {
     /// - `granted`, `numpy.int64`. What the store gave, in the same Q16.16
     ///   scale. It is always below the demanded amount.
     /// - `commodity`, `numpy.uint16`. The commodity that the cohorts drew. A
-    ///   commodity is not a resource kind. The world holds one commodity
-    ///   today, and its number is zero.
+    ///   commodity is not a resource kind. The world holds three
+    ///   commodities: food (0), wood (1), and stone (2).
     ///
     /// This method copies each column.[^2]
     ///

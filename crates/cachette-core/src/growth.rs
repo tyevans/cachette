@@ -115,7 +115,11 @@ pub const FOUNDING_HOUSING_DEFAULT: u32 = crate::terrain::ORDINARY_CAPACITY;
 /// # References
 ///
 /// [^1]: Balance register, the population, the food per birth row. `docs/reference/balance.md`
-pub const FOOD_PER_BIRTH_DEFAULT: [Fix32; COMMODITY_COUNT] = [Fix32::ONE; COMMODITY_COUNT];
+pub const FOOD_PER_BIRTH_DEFAULT: [Fix32; COMMODITY_COUNT] = {
+    let mut cost = [Fix32::ZERO; COMMODITY_COUNT];
+    cost[0] = Fix32::ONE;
+    cost
+};
 
 /// The placeholder chance that one proposal becomes a birth.[^1]
 ///

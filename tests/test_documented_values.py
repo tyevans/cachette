@@ -49,9 +49,10 @@ DOCUMENTED_LARGEST_TILE = 64.0
 DOCUMENTED_RADIUS = 8
 DOCUMENTED_RADIUS_CEILING = 64
 
-# The doc comment of `World.site_economy` states that the world holds one
-# commodity, numbered zero.
-DOCUMENTED_COMMODITY = 0
+# The doc comment of `World.site_economy` states that the world holds three
+# commodities, numbered zero to two.
+DOCUMENTED_COMMODITIES = (0, 1, 2)
+DOCUMENTED_FIRST_REFUSED_COMMODITY = 3
 
 # The doc comment of `World.order_gather` states that the resource kinds are
 # zero, one and two, and that three and above name none.
@@ -159,13 +160,16 @@ def test_the_window_census_radius_holds_the_documented_default_and_ceiling(
         world.window_census(4, 4, radius=ceiling + 1)
 
 
-def test_the_world_holds_one_commodity_and_its_number_is_zero(seed: int) -> None:
+def test_the_world_holds_three_commodities_and_their_numbers_are_zero_to_two(
+    seed: int,
+) -> None:
     world = cachette.World(width=32, height=32, seed=seed, faction_count=2)
     site = world.found_group(8, 0)["site"]
-    assert world.site_economy(site)["commodity"] == DOCUMENTED_COMMODITY
-    assert world.site_economy(site, DOCUMENTED_COMMODITY)["commodity"] == 0
+    assert world.site_economy(site)["commodity"] == 0
+    for commodity in DOCUMENTED_COMMODITIES:
+        assert world.site_economy(site, commodity)["commodity"] == commodity
     with pytest.raises(cachette.ViewError):
-        world.site_economy(site, DOCUMENTED_COMMODITY + 1)
+        world.site_economy(site, DOCUMENTED_FIRST_REFUSED_COMMODITY)
 
 
 def test_the_gather_order_takes_three_resource_kinds_and_refuses_the_fourth(
