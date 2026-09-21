@@ -186,7 +186,7 @@ fn ground_with_a_finished_lodging() -> Ground {
     let reach = WIDTH + HEIGHT;
     world.set_reach_rules(ReachRules::new(reach, 1, reach));
     world.set_growth_schedule(RateSchedule::new(1, 0).expect("one is inside the range"));
-    world.set_food_per_birth([FOOD]);
+    world.set_food_per_birth([FOOD, Fix32::ZERO, Fix32::ZERO]);
     world.set_housing_per_person(1);
     world.set_need_rule(
         NeedRule::new(Fix32::ZERO, Fix32::ZERO, Fix32::ZERO, Fix32::ZERO, BOUND)

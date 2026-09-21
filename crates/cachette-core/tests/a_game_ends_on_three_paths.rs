@@ -289,11 +289,13 @@ fn settle_and_fill(world: &mut World, faction: FactionId, amounts: &[i32]) -> (V
     let mut sum = 0i64;
     for amount in amounts {
         let site = settle(world, faction);
-        world
-            .set_settlement_store(site, CommodityId(0), Fix32(*amount))
-            .expect("the commodity exists");
+        for c in 0..cachette_core::COMMODITY_COUNT {
+            world
+                .set_settlement_store(site, CommodityId(c as u16), Fix32(*amount))
+                .expect("the commodity exists");
+            sum += i64::from(*amount);
+        }
         sites.push(site);
-        sum += i64::from(*amount);
     }
     (sites, sum)
 }
@@ -345,9 +347,9 @@ fn two_settlements_at_the_top_of_the_range_end_no_game_and_the_total_does_not_wr
     // negative number in 32 bits. The reported total is a 64-bit sum, so it
     // stands above the bar and above the range of one store.
     let (_, put_in) = settle_and_fill(&mut world, FactionId(0), &[i32::MAX, i32::MAX]);
-    assert_eq!(put_in, 2 * i64::from(i32::MAX));
+    assert_eq!(put_in, 2 * STOCK_CEILING_OF_ONE_SETTLEMENT);
     assert!(
-        put_in > i64::from(i32::MAX),
+        put_in > STOCK_CEILING_OF_ONE_SETTLEMENT,
         "the fixture reaches the overflow"
     );
     assert_eq!(

@@ -228,8 +228,8 @@ fn stock_ceiling_of_one_settlement() -> i64 {
 /// Read which scale a member takes before you pass a number to it.[^4]
 ///
 /// **A commodity is a third scale, and it is not a kind.** `site_economy`
-/// takes a commodity number. The world holds one commodity today, and its
-/// number is zero.
+/// takes a commodity number. The world holds three commodities: food (0),
+/// wood (1), and stone (2).
 ///
 /// A faction is a number from zero to one below the faction count of the
 /// world. Where a value may name nobody, the entry is either `None` or the

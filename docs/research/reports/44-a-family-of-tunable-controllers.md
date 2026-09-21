@@ -593,7 +593,7 @@ always resolves early.
 [^fnd486]: Findings register, FND-486, every founded unit carries the worker row. `docs/FINDINGS.md`
 [^item491]: Backlog item 0491, seed the demonstration world with unit types that can fight, gather and carry. `docs/backlog/refined/0491-seed-the-demonstration-world-with-unit-types-that-can-fight-gather-and-carry.md`
 [^adr146]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
-[^item181]: Backlog item 0181, give a kind of work the commodity it fills. `docs/backlog/refined/0181-give-a-kind-of-work-the-commodity-it-fills.md`
+[^item181]: Backlog item 0181, give a kind of work the commodity it fills. `docs/backlog/complete/0181-give-a-kind-of-work-the-commodity-it-fills.md`
 [^bindfaction]: The faction bindings, the weight verb and the evaluation count. `crates/cachette-py/src/world/faction_view.rs`
 [^bindrelation]: The relation bindings, the overmatch ratio. `crates/cachette-py/src/world/relations.rs`
 [^bindtrade]: The trade bindings, the four trade settings. `crates/cachette-py/src/world/trade.rs`

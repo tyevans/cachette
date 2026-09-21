@@ -1,7 +1,7 @@
 ---
 id: 0181
 title: Give a kind of work the commodity it fills
-status: refined
+status: complete
 created: 2026-09-02
 implements: [ADR-0149 D3, ADR-0147 D1]
 changes: []
@@ -65,7 +65,7 @@ and `crates/cachette-core/src/trade.rs`.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Adopted DEC-073 and expanded `COMMODITY_COUNT` to 3 distinct commodities in `site.rs` and mapped work kinds in `position.rs` to their corresponding commodities. Site stores track inventory independently, positions open according to commodity deficits, trade boards advertise differentiated surplus offers and shortfall demands, and complimentary offers bind into contracts and carrier deliveries. Golden state hashes updated and verified. Merged in PR #70.
 
 ## References
 

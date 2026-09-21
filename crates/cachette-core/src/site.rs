@@ -86,10 +86,9 @@ const SLOT_INDEX_LIMIT: u32 = u32::MAX;
 
 /// The number of commodities that a settlement store holds.
 ///
-/// The set holds one commodity. A second commodity raises this number and
-/// changes no code outside the store, because every read and every write
-/// names a commodity by its identifier.
-pub const COMMODITY_COUNT: usize = 1;
+/// The set holds three commodities: food (0), wood (1), and stone (2).
+/// Every read and every write names a commodity by its identifier.
+pub const COMMODITY_COUNT: usize = 3;
 
 /// The identifier of a commodity in the store.
 ///

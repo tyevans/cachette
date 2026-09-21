@@ -1105,7 +1105,7 @@ that governs this work requires that the birth draws something.
 
 ### DEC-073 — What does a kind of work fill, and what does a site want of it?
 
-**Open. The engine holds a placeholder table, and content replaces it.**
+**Closed on 20 September 2026. Option 1: leave both in the engine as a table, and grow the commodity set to three commodities (food, wood, stone).** Item 0181 landed it.
 
 A site opens a number of positions of each kind of work, and it decides that
 number from what it wants of each kind less what it holds.[^DEC73A] Two values

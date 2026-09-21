@@ -12383,7 +12383,7 @@ index against the set of open items and never against what an item says.
 [^F190A]: What a unit does in a tick, section 5. `docs/research/what-a-unit-does-in-a-tick.md`
 [^F190B]: The option score. `crates/cachette-core/src/choose.rs`
 [^F190C]: ADR-0091, movement takes its direction from a per-cell field, never from a per-unit search, decision D4. `docs/adrs/draft/adr-0091-movement-takes-its-direction-from-a-per-cell-field.md`
-[^F191A]: Backlog item 0181, give a kind of work the commodity it fills. `docs/backlog/refined/0181-give-a-kind-of-work-the-commodity-it-fills.md`
+[^F191A]: Backlog item 0181, give a kind of work the commodity it fills. `docs/backlog/complete/0181-give-a-kind-of-work-the-commodity-it-fills.md`
 [^F191B]: The founding provisions a site, and the consumption pass draws a ration. `crates/cachette-core/src/world/founding.rs`, `crates/cachette-core/src/world/rates.rs`
 [^F192A]: ADR Registry, the retired numbers. `docs/adrs/REGISTRY.md`
 [^F192B]: The record check script. `scripts/check_adrs.py`
