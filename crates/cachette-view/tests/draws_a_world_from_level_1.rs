@@ -12,13 +12,11 @@
 
 #![allow(clippy::disallowed_types)]
 
-use std::time::Instant;
-
 use cachette_core::terrain::TileKind;
 use cachette_core::{Axial, FactionId, World, WorldConfig};
 use cachette_view::frame::{fill_frame, fill_frame_level1, FrameError, RenderLevel, Surface};
 use cachette_view::paint::{Camera, Canvas};
-use cachette_view::{draw_frame_level1, Metrics, Overlay};
+use cachette_view::{draw_frame_level1, Lap, Metrics, Overlay};
 
 /// The seed for the fixture worlds.
 const SEED: u64 = 42;
@@ -144,11 +142,11 @@ fn renders_overview_of_one_million_tile_world_under_16_ms() {
         .expect("warm-up fill succeeds");
 
     // Timed draw.
-    let start = Instant::now();
+    let at = Lap::start();
     let surface_timed = Surface::new(width, height, &mut pixels).expect("builds surface");
     let readout = fill_frame_level1(&world, camera, &metrics, &[], Overlay::Panel, surface_timed)
         .expect("timed fill succeeds");
-    let elapsed = start.elapsed();
+    let elapsed = at.elapsed();
 
     assert_eq!(readout.level(), 1);
     assert_eq!(readout.render_level(), RenderLevel::Level1);

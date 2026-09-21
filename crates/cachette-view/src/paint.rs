@@ -2368,6 +2368,10 @@ pub fn draw_level1(world: &World, camera: Camera, canvas: &mut Canvas) -> Result
 ///
 /// Returns an error when the engine spatial structure no longer describes
 /// its units.
+///
+/// # References
+///
+/// [^11]: ADR-0022, level 0 is the only truth and every level above it is derived, decision D4. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 #[allow(clippy::too_many_arguments)]
 pub fn draw_level1_paced(
     world: &World,
@@ -2388,7 +2392,7 @@ pub fn draw_level1_paced(
 
     let (first_row, last_row) = camera.visible_rows(world, canvas);
     let first_by = first_row / edge;
-    let last_by = ((last_row + edge - 1) / edge).min(blocks_high);
+    let last_by = last_row.div_ceil(edge).min(blocks_high);
 
     for by in first_by..last_by {
         let (first_column_top, last_column_top) = camera.visible_columns(by * edge, world, canvas);
@@ -2400,7 +2404,7 @@ pub fn draw_level1_paced(
         let first_col = first_column_top.min(first_column_bottom);
         let last_col = last_column_top.max(last_column_bottom);
         let first_bx = first_col / edge;
-        let last_bx = ((last_col + edge - 1) / edge).min(blocks_wide);
+        let last_bx = last_col.div_ceil(edge).min(blocks_wide);
 
         for bx in first_bx..last_bx {
             let block = by * blocks_wide + bx;
