@@ -883,6 +883,20 @@ impl World {
             .direction(destination, self.cell_of(tile)?)
     }
 
+    /// Returns the seeds assigned to one destination plane.
+    ///
+    /// The seeds are the tiles the control plane sent units toward.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0125, the control plane names the seed set of a destination field, decision D1. `docs/adrs/draft/adr-0125-the-control-plane-names-the-seed-set-of-a-destination-field.md`
+    #[must_use]
+    pub fn destination_seeds(&self, destination: u16) -> Option<&[TileIdx]> {
+        self.destination_seeds
+            .get(destination as usize)
+            .map(|seeds| seeds.as_slice())
+    }
+
     /// Returns the destination field of the world.
     ///
     /// The field holds one direction for each level 1 cell and each

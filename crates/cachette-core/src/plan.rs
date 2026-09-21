@@ -978,21 +978,44 @@ pub fn solve(
     written
 }
 
-/// Removes every project of one faction that a builder finished.
-fn sweep_finished(ground: &Ground<'_>, faction: FactionId, plan: &mut PlanRegister) {
-    let finished: Vec<TileIdx> = plan
-        .projects_of(faction)
-        .iter()
-        .filter(|project| {
-            ground
-                .upgrades
-                .at(project.tile)
-                .is_some_and(|site| site.is_complete() && site.category == project.category)
-        })
-        .map(|project| project.tile)
-        .collect();
-    for tile in finished {
-        plan.finish(faction, tile);
+/// Removes every project of one faction that a builder finished, or that
+/// cannot be built.
+///
+/// A tile carries only one upgrade. A project on a tile that already carries
+/// another category cannot be built, and a project whose category the ground
+/// terrain refuses at level 1 cannot be built. Both are cleared so they do
+/// not hold the plan bound.[^1] [^2]
+///
+/// # References
+///
+/// [^1]: ADR-0090, a tile upgrade is stored sparsely, decision D1. `docs/adrs/draft/adr-0090-a-tile-upgrade-is-stored-sparsely.md`
+/// [^2]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
+pub fn sweep_finished(ground: &Ground<'_>, faction: FactionId, plan: &mut PlanRegister) {
+    let projects: Vec<Project> = plan.projects_of(faction).to_vec();
+    for project in projects {
+        if let Some(site) = ground.upgrades.at(project.tile) {
+            if site.category == project.category {
+                if site.is_complete() {
+                    plan.finish(faction, project.tile);
+                }
+            } else {
+                plan.clear(faction, project.tile);
+            }
+            continue;
+        }
+        let fits_level_1 = ground
+            .grid
+            .address_of(project.tile)
+            .and_then(|addr| ground.terrain.kind(addr))
+            .is_some_and(|kind| {
+                ground
+                    .table
+                    .row(project.category, 1)
+                    .is_some_and(|row| row.fits(kind))
+            });
+        if !fits_level_1 {
+            plan.clear(faction, project.tile);
+        }
     }
 }
 
