@@ -89,7 +89,7 @@ Filled in when the item moves to `complete/`.
 [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D1 and D2. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 [^2]: PRD-0054, a god's ground is the ground around its cities. `docs/product/shaped/prd-0054-a-gods-ground-is-the-ground-around-its-cities.md`
 [^3]: ADR-0153, a tile's lease follows the units that stand on it. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
-[^4]: Backlog item 0493, fill the ground one faction has surrounded. `docs/backlog/refined/0493-fill-the-ground-one-faction-has-surrounded.md`
+[^4]: Backlog item 0493, fill the ground one faction has surrounded. `docs/backlog/complete/0493-fill-the-ground-one-faction-has-surrounded.md`
 [^5]: The holding module of the core crate. `crates/cachette-core/src/holding.rs`
 [^6]: ADR-0147, a contract consideration is a tagged kind, decision D3. `docs/adrs/accepted/adr-0147-a-contract-consideration-is-a-tagged-kind.md`
 [^7]: Blockers register, BLK-036. `docs/BLOCKERS.md`

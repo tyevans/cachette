@@ -1,7 +1,7 @@
 ---
 id: 0493
 title: Fill the ground one faction has surrounded
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0153 D6, ADR-0153 D7]
 changes: [ADR-0150 D1]
@@ -103,7 +103,23 @@ O((held + leased + cities * reach^2) * pass_count).
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Shipped in PR #78.
+
+- Implemented `ClosureRules` with `pass_count` (provisional default 2) and
+  `neighbour_threshold` (provisional default 4).
+- Added closure passes to `Holding::rewrite` using double-buffered candidate
+  arrays evaluated in parallel across worker threads.
+- Candidate set expands by `pass_count` steps around cities and leases, avoiding
+  full world scans.
+- Updated `Holding::check_invariants` to permit enclosed impassable ground
+  (such as water or mountains) to be held per ADR-0153 D6 amending ADR-0150 D1.
+- Updated balance register with provisional defaults for closure passes and
+  thresholds.
+- Added census accounting for closed tiles under the `census-holding` feature.
+- Added integration test suite in `tests/territory_closure.rs` verifying 1-tile
+  enclosed lake fill, straight border stability without outward expansion,
+  two-faction contest refusal, held ground preservation, and refusal under a
+  corrupted threshold.
 
 ## References
 
