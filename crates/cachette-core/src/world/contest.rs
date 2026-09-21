@@ -18,6 +18,12 @@ impl World {
         &self.fell_log
     }
 
+    /// Returns the number of units that fell in combat over the run.
+    #[must_use]
+    pub const fn units_fallen(&self) -> i64 {
+        self.census.units_fallen
+    }
+
     /// Returns the fallen log as bytes.
     ///
     /// The thread-count equivalence test compares this slice byte for
@@ -95,6 +101,7 @@ impl World {
             let ended = self.despawn_soldier(unit);
             debug_assert!(ended, "a marked slot holds a live unit");
         }
+        self.census.units_fallen += self.fell_log.len() as i64;
         // The cohorts are derived from the home column of the units, and this
         // pass has just removed some of them. A table left as it was would
         // hold a headcount that no unit answers to, and the invariant check

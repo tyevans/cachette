@@ -722,6 +722,17 @@ impl SoldierArena {
             .unwrap_or([0; UNIT_TYPE_COUNT])
     }
 
+    /// Returns the live soldier count of one type, summed over every faction.
+    #[must_use]
+    pub fn population_of_type(&self, unit_type: UnitTypeId) -> u32 {
+        let index = unit_type.index();
+        let mut total = 0;
+        for row in &self.by_faction_type {
+            total += row[index];
+        }
+        total
+    }
+
     /// Returns the number of slots that the arena has retired.
     #[must_use]
     pub const fn retired_count(&self) -> u32 {

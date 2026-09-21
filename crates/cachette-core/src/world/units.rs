@@ -230,6 +230,12 @@ impl World {
         self.soldiers.population_by_type(faction)
     }
 
+    /// Returns the live soldier count of one type across all factions.
+    #[must_use]
+    pub fn population_of_type(&self, unit_type: UnitTypeId) -> u32 {
+        self.soldiers.population_of_type(unit_type)
+    }
+
     /// Returns the military strength of every live unit of one faction.
     ///
     /// The strength of one unit is the attack of its type plus the armour of

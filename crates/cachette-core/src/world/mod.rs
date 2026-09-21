@@ -136,7 +136,9 @@ pub use self::errors::{
     ArenaMismatchError, CampaignError, ConvertError, IdentityError, MoveRelationError, RazeError,
     SeedError, SendError, StepError, WorldError,
 };
-pub use self::founding::FOUNDING_GROUP_DEFAULT;
+pub use self::founding::{
+    founding_unit_type_distribution, FOUNDING_GROUP_DEFAULT, FOUNDING_MERCHANT_MIN_GROUP,
+};
 pub use self::luxuries::LUXURY_DEPOSITS_DEFAULT;
 pub use self::sites::STOCK_CEILING_OF_ONE_SETTLEMENT;
 pub use self::victory::{Standing, WonderSite};

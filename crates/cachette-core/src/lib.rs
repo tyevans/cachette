@@ -188,8 +188,9 @@ pub use weather::{
     WARMTH_FLOOR, WET_MARK,
 };
 pub use world::{
-    ArenaMismatchError, CampaignError, CensusBasis, CensusRow, ConvertError, IdentityError,
-    MoveRelationError, RazeError, SeedError, Standing, StepError, WonderSite, World, WorldConfig,
-    WorldError, FOUNDING_GROUP_DEFAULT, LUXURY_DEPOSITS_DEFAULT, STOCK_CEILING_OF_ONE_SETTLEMENT,
+    founding_unit_type_distribution, ArenaMismatchError, CampaignError, CensusBasis, CensusRow,
+    ConvertError, IdentityError, MoveRelationError, RazeError, SeedError, Standing, StepError,
+    WonderSite, World, WorldConfig, WorldError, FOUNDING_GROUP_DEFAULT,
+    FOUNDING_MERCHANT_MIN_GROUP, LUXURY_DEPOSITS_DEFAULT, STOCK_CEILING_OF_ONE_SETTLEMENT,
     SUBSYSTEM_CENSUS,
 };

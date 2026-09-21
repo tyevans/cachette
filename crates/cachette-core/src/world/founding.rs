@@ -5,6 +5,7 @@
 //! place did not take it. One act, so one module.
 
 use super::World;
+use crate::controller::FactionWeights;
 use crate::event::SettlementFounded;
 use crate::founding::{
     self, Founding, FoundingError, FoundingOutcome, SettleError, SettleOutcome, Survey,
@@ -14,6 +15,7 @@ use crate::resource::Amount;
 use crate::sim_math;
 use crate::site::{CommodityId, SettlementError};
 use crate::types::{Entity, FactionId, Fix32};
+use crate::unit_type::{UnitTypeId, MERCHANT, SOLDIER, WORKER};
 
 /// The number of people each faction founds with when the seeding layer
 /// founds the run.
@@ -29,6 +31,93 @@ use crate::types::{Entity, FactionId, Fix32};
 ///
 /// [^1]: Balance register, the founding group. `docs/reference/balance.md`
 pub const FOUNDING_GROUP_DEFAULT: u32 = 2;
+
+/// The smallest group size that receives a merchant at founding.
+///
+/// **This is a provisional value and not a measured one.** The balance
+/// register holds the row, marks it unset, and records how this value was
+/// chosen.[^1]
+///
+/// # References
+///
+/// [^1]: Balance register, the founding merchant minimum group. `docs/reference/balance.md`
+pub const FOUNDING_MERCHANT_MIN_GROUP: u32 = 3;
+
+/// Returns the unit type assigned to each person of a founding group.
+///
+/// The distribution assigns workers, soldiers, and (when the group reaches
+/// [`FOUNDING_MERCHANT_MIN_GROUP`]) merchants in proportion to the faction's
+/// weights using the largest-remainder method.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+#[must_use]
+pub fn founding_unit_type_distribution(group: u32, weights: FactionWeights) -> Vec<UnitTypeId> {
+    if group == 0 {
+        return Vec::new();
+    }
+
+    let w_build = u32::from(weights.build);
+    let w_war = u32::from(weights.war);
+    let w_trade = if group >= FOUNDING_MERCHANT_MIN_GROUP {
+        u32::from(weights.trade)
+    } else {
+        0
+    };
+
+    let total_w = w_build + w_war + w_trade;
+    if total_w == 0 {
+        return vec![WORKER; group as usize];
+    }
+
+    let categories: [(UnitTypeId, u32, usize); 3] = [
+        (WORKER, w_build, 0),
+        (SOLDIER, w_war, 1),
+        (MERCHANT, w_trade, 2),
+    ];
+
+    let mut counts = [0u32; 3];
+    let mut remainders = [(0u32, 0u32, 0usize); 3];
+
+    let mut sum_floor = 0u32;
+    for (i, &(_, weight, idx)) in categories.iter().enumerate() {
+        let quota_floor = (group * weight) / total_w;
+        let remainder = (group * weight) % total_w;
+        counts[i] = quota_floor;
+        sum_floor += quota_floor;
+        remainders[i] = (remainder, weight, idx);
+    }
+
+    let remaining = group.saturating_sub(sum_floor) as usize;
+    if remaining > 0 {
+        remainders.sort_by(|a, b| {
+            b.0.cmp(&a.0)
+                .then_with(|| b.1.cmp(&a.1))
+                .then_with(|| a.2.cmp(&b.2))
+        });
+        for item in remainders.iter().take(remaining) {
+            counts[item.2] += 1;
+        }
+    }
+
+    // Every founded settlement requires at least one worker to gather food
+    // and build, otherwise the settlement starves immediately and performs no work.
+    if group >= 1 && counts[0] == 0 {
+        counts[0] = 1;
+        if counts[1] > 0 {
+            counts[1] -= 1;
+        } else if counts[2] > 0 {
+            counts[2] -= 1;
+        }
+    }
+
+    let mut types = Vec::with_capacity(group as usize);
+    types.resize(counts[0] as usize, WORKER);
+    types.resize((counts[0] + counts[1]) as usize, SOLDIER);
+    types.resize((counts[0] + counts[1] + counts[2]) as usize, MERCHANT);
+    types
+}
 
 impl World {
     /// Founds a settlement in the world and returns its identity.
@@ -229,6 +318,9 @@ impl World {
             let result = self.found_one(group, faction, &taken);
             if let Ok(founding) = &result {
                 taken.push(founding.place());
+                if group == FOUNDING_GROUP_DEFAULT {
+                    self.assign_founding_unit_types(founding.people(), faction);
+                }
             }
             outcomes.push(FoundingOutcome::new(faction, result));
         }
@@ -621,6 +713,25 @@ impl World {
             self.set_home_site(*person, Some(settlement));
         }
         Ok((settlement, people))
+    }
+
+    /// Assigns unit types to a founded group according to the faction's weights.
+    ///
+    /// The assignment applies the largest-remainder distribution to the group,
+    /// so warrior factions receive more soldiers and builder factions receive
+    /// more workers.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decisions D1 and D4. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
+    pub fn assign_founding_unit_types(&mut self, people: &[Entity], faction: FactionId) {
+        let weights = self
+            .faction_weights(faction)
+            .unwrap_or_else(|| FactionWeights::from_seed(self.config.seed, faction));
+        let types = founding_unit_type_distribution(people.len() as u32, weights);
+        for (person, unit_type) in people.iter().zip(types) {
+            self.set_unit_type(*person, unit_type);
+        }
     }
 
     /// Undoes a founding that could not finish.

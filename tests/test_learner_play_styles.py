@@ -200,7 +200,7 @@ def test_a_refusal_changes_the_ranking() -> None:
 
     also_army = PlayStyle(
         name="trade-and-army",
-        weights={**trade.weights, "military": 3.0},
+        weights={**trade.weights, "military": 10.0},
         refuses=tuple(name for name in trade.refuses if name != "military"),
         won=trade.won,
         lost=trade.lost,
