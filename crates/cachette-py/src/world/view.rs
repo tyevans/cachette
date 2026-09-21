@@ -18,7 +18,9 @@ use cachette_core::hex::NEIGHBOURS;
 use cachette_core::TileIdx;
 use cachette_core::{Axial, FactionId};
 use cachette_view::panel::Set as PanelSet;
-use cachette_view::{fill_frame_paced, Lap, Motion, Overlay, Pace, Surface};
+use cachette_view::{
+    fill_frame_level1_paced, fill_frame_paced, Lap, Motion, Overlay, Pace, Surface,
+};
 use numpy::{PyReadwriteArray1, ToPyArray};
 use pyo3::prelude::*;
 use pyo3::types::PyDict;
@@ -251,7 +253,7 @@ impl PyWorld {
     // [^7]: ADR-0067, the viewer reads the world and never writes to it, decision D3. `docs/adrs/accepted/adr-0067-the-viewer-reads-the-world-and-never-writes-to-it.md`
     #[allow(clippy::disallowed_types)]
     #[allow(clippy::too_many_arguments)]
-    #[pyo3(signature = (camera, width, height, pixels, reference = false, panel = false, panels = None, pointer = None, overlay = None, phase = 0.0, speed_milli = 1000))]
+    #[pyo3(signature = (camera, width, height, pixels, reference = false, panel = false, panels = None, pointer = None, overlay = None, phase = 0.0, speed_milli = 1000, render_level = 0))]
     fn draw<'py>(
         &self,
         python: Python<'py>,
@@ -266,6 +268,7 @@ impl PyWorld {
         overlay: Option<String>,
         phase: f32,
         speed_milli: u32,
+        render_level: u8,
     ) -> PyResult<Bound<'py, PyDict>> {
         let mut pixels = pixels;
         let buffer = pixels.as_slice_mut().map_err(|_| {
@@ -337,18 +340,35 @@ impl PyWorld {
                 outcomes,
                 motion,
             } = &mut *presenter;
-            fill_frame_paced(
-                &world,
-                camera.inner,
-                metrics,
-                outcomes,
-                overlay,
-                layer,
-                Pace::new(phase, speed_milli),
-                motion,
-                surface,
-            )
-            .map_err(|error| FrameError::new_err(error.to_string()))?
+            let pace = Pace::new(phase, speed_milli);
+            let result = match render_level {
+                0 => fill_frame_paced(
+                    &world,
+                    camera.inner,
+                    metrics,
+                    outcomes,
+                    overlay,
+                    layer,
+                    pace,
+                    motion,
+                    surface,
+                ),
+                1 => fill_frame_level1_paced(
+                    &world,
+                    camera.inner,
+                    metrics,
+                    outcomes,
+                    overlay,
+                    layer,
+                    pace,
+                    motion,
+                    surface,
+                ),
+                _ => return Err(FrameError::new_err(format!(
+                    "pyramid level {render_level} does not exist; the pyramid holds levels 0 and 1"
+                ))),
+            };
+            result.map_err(|error| FrameError::new_err(error.to_string()))?
         };
         self.presenter().metrics.draw(at.elapsed());
 
@@ -426,7 +446,53 @@ impl PyWorld {
                 )
             }),
         )?;
+        // The pyramid level that this frame was drawn from. Level 0 is
+        // ground truth; level 1 is the macroscopic summary.
+        report.set_item("render_level", readout.level())?;
         Ok(report)
+    }
+
+    /// Fills the caller's pixels with one macroscopic level 1 frame of this world.
+    ///
+    /// The caller explicitly selects Level 1 to view macroscopic world shapes
+    /// without sub-pixel refusals.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0022, level 0 is the only truth and every level above it is derived, decision D4. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+    #[allow(clippy::disallowed_types)]
+    #[allow(clippy::too_many_arguments)]
+    #[pyo3(signature = (camera, width, height, pixels, reference = false, panel = false, panels = None, pointer = None, overlay = None, phase = 0.0, speed_milli = 1000))]
+    fn draw_level1<'py>(
+        &self,
+        python: Python<'py>,
+        camera: &PyCamera,
+        width: usize,
+        height: usize,
+        pixels: PyReadwriteArray1<'py, u32>,
+        reference: bool,
+        panel: bool,
+        panels: Option<Vec<String>>,
+        pointer: Option<(i32, i32)>,
+        overlay: Option<String>,
+        phase: f32,
+        speed_milli: u32,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        self.draw(
+            python,
+            camera,
+            width,
+            height,
+            pixels,
+            reference,
+            panel,
+            panels,
+            pointer,
+            overlay,
+            phase,
+            speed_milli,
+            1,
+        )
     }
 
     /// Returns the direction home for one faction at one address.

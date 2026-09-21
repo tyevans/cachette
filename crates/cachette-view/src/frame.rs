@@ -32,6 +32,34 @@ use crate::overlay::Layer;
 use crate::paint::{Camera, Canvas};
 use crate::tween::{Motion, Pace};
 
+/// The pyramid level that a frame was painted from.
+///
+/// ADR-0022 D4 requires that the level read is part of the answer, and
+/// forbids silent substitution of one level for another.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0022, level 0 is the only truth and every level above it is derived, decision D4. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum RenderLevel {
+    /// Level 0: individual tiles and units.
+    #[default]
+    Level0,
+    /// Level 1: aggregate blocks of tiles at city/region scale.
+    Level1,
+}
+
+impl RenderLevel {
+    /// Returns the pyramid level as an integer (0 or 1).
+    #[must_use]
+    pub const fn to_u8(self) -> u8 {
+        match self {
+            Self::Level0 => 0,
+            Self::Level1 => 1,
+        }
+    }
+}
+
 /// The smallest tile size a frame will draw, in pixels on a side.
 ///
 /// **This is a property of the pixel lattice, not a budget.** Below one pixel
@@ -286,6 +314,85 @@ pub fn fill_frame_paced(
     let (width, height) = (surface.width, surface.height);
     let mut canvas = Canvas::borrowing(surface.pixels, width, height);
     crate::draw_frame_paced(
+        world,
+        camera,
+        metrics,
+        outcomes,
+        overlay,
+        layer,
+        pace,
+        motion,
+        &mut canvas,
+    )
+    .map_err(FrameError::Bridge)
+}
+
+/// Fills a caller's pixels with one macroscopic level 1 frame of a world.
+///
+/// The caller explicitly selects Level 1 to view macroscopic world shapes
+/// without sub-pixel refusals.[^1]
+///
+/// # Errors
+///
+/// Returns `ScaleBelowLattice` when the camera draws a level 1 cell smaller
+/// than one pixel. Returns `Bridge` when the engine's spatial structure no
+/// longer describes its units.
+///
+/// # References
+///
+/// [^1]: ADR-0022, level 0 is the only truth and every level above it is derived, decision D4. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+pub fn fill_frame_level1(
+    world: &World,
+    camera: Camera,
+    metrics: &Metrics,
+    outcomes: &[FoundingOutcome],
+    overlay: Overlay,
+    surface: Surface<'_>,
+) -> Result<Readout, FrameError> {
+    let mut motion = Motion::none();
+    fill_frame_level1_paced(
+        world,
+        camera,
+        metrics,
+        outcomes,
+        overlay,
+        None,
+        Pace::STILL,
+        &mut motion,
+        surface,
+    )
+}
+
+/// Fills a caller's pixels with one macroscopic level 1 frame, at a pace the caller sets.
+///
+/// # Errors
+///
+/// Returns `ScaleBelowLattice` when a cell is smaller than one pixel.
+#[allow(clippy::too_many_arguments)]
+pub fn fill_frame_level1_paced(
+    world: &World,
+    camera: Camera,
+    metrics: &Metrics,
+    outcomes: &[FoundingOutcome],
+    overlay: Overlay,
+    layer: Option<&'static dyn Layer>,
+    pace: Pace,
+    motion: &mut Motion,
+    surface: Surface<'_>,
+) -> Result<Readout, FrameError> {
+    let edge = world.pyramid().layout().block_edge() as f32;
+    let cell_width = camera.tile_width * edge;
+    let cell_height = camera.tile_height * edge;
+    if cell_width < LATTICE_BOUND || cell_height < LATTICE_BOUND {
+        return Err(FrameError::ScaleBelowLattice {
+            tile_width: cell_width,
+            tile_height: cell_height,
+        });
+    }
+
+    let (width, height) = (surface.width, surface.height);
+    let mut canvas = Canvas::borrowing(surface.pixels, width, height);
+    crate::draw_frame_level1_paced(
         world,
         camera,
         metrics,

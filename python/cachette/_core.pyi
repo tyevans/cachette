@@ -1076,6 +1076,7 @@ class FrameReading(TypedDict):
     # colour, the value at which it draws full colour, and whether the pass
     # found anything in the window. It is None when the caller named none.
     overlay: tuple[str, int, int, bool] | None
+    render_level: int
 
 class CachetteError(Exception): ...
 class StepError(CachetteError): ...
@@ -1462,6 +1463,21 @@ class World:
     def set_contract_term(self, term: int) -> None: ...
     def carrier_columns(self) -> CarrierColumns: ...
     def draw(
+        self,
+        camera: Camera,
+        width: int,
+        height: int,
+        pixels: npt.NDArray[np.uint32],
+        reference: bool = ...,
+        panel: bool = ...,
+        panels: Sequence[str] | None = ...,
+        pointer: tuple[int, int] | None = ...,
+        overlay: str | None = ...,
+        phase: float = ...,
+        speed_milli: int = ...,
+        render_level: int = ...,
+    ) -> FrameReading: ...
+    def draw_level1(
         self,
         camera: Camera,
         width: int,

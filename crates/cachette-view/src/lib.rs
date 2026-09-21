@@ -49,12 +49,15 @@ pub mod text;
 pub mod tween;
 pub mod ways;
 
-pub use frame::{fill_frame, fill_frame_paced, FrameError, Surface, LATTICE_BOUND};
+pub use frame::{
+    fill_frame, fill_frame_level1, fill_frame_level1_paced, fill_frame_paced, FrameError,
+    RenderLevel, Surface, LATTICE_BOUND,
+};
 pub use glass::Overlay;
 pub use hud::{FoundingReport, Readout};
 pub use metrics::{Lap, Metrics};
 pub use overlay::{Layer, Span};
-pub use paint::{Camera, Canvas, Extent, FrameSize};
+pub use paint::{draw_level1, draw_level1_paced, Camera, Canvas, Extent, FrameSize};
 pub use tween::{speed_word, Motion, Pace, ONE_TICK_EACH_FRAME, TWEEN_REACH};
 pub use ways::{draws_as_a_way, road_ways, Way, WayShape};
 
@@ -169,6 +172,87 @@ pub fn draw_frame_paced(
     paint::draw_paced(world, camera, canvas, pace, motion, layer)?;
     paint::mark_foundings(camera, canvas, outcomes);
     let readout = Readout::of(world, camera, canvas, metrics, outcomes).at_speed(pace.speed_milli);
+    match overlay {
+        Overlay::Glass { reference } => glass::draw(&readout, canvas, reference),
+        Overlay::Panel => hud::draw(&readout, canvas),
+        Overlay::Deck {
+            reference,
+            panels,
+            pointer,
+        } => {
+            glass::draw(&readout, canvas, reference);
+            let view = panel::View {
+                world,
+                camera,
+                frame_width: canvas.width(),
+                frame_height: canvas.height(),
+                focus: canvas.focus(),
+                pointer,
+            };
+            panel::draw_deck(&view, panels, canvas);
+        }
+    }
+    Ok(readout)
+}
+
+/// Draws one macroscopic level 1 frame: the world summary, and then the panel.
+///
+/// Walks the level 1 summary cells rather than individual level 0 tiles,
+/// rendering macroscopic features (continents, mountain ridges, water bodies,
+/// and faction borders).[^1]
+///
+/// # Errors
+///
+/// Returns an error when the engine's spatial structure no longer describes
+/// its units.
+///
+/// # References
+///
+/// [^1]: ADR-0022, level 0 is the only truth and every level above it is derived, decision D4. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+pub fn draw_frame_level1(
+    world: &World,
+    camera: Camera,
+    metrics: &Metrics,
+    outcomes: &[FoundingOutcome],
+    overlay: Overlay,
+    canvas: &mut Canvas<'_>,
+) -> Result<Readout, BridgeError> {
+    let mut motion = Motion::none();
+    draw_frame_level1_paced(
+        world,
+        camera,
+        metrics,
+        outcomes,
+        overlay,
+        None,
+        Pace::STILL,
+        &mut motion,
+        canvas,
+    )
+}
+
+/// Draws one macroscopic level 1 frame at a pace the caller sets.
+///
+/// # Errors
+///
+/// Returns an error when the engine's spatial structure no longer describes
+/// its units.
+#[allow(clippy::too_many_arguments)]
+pub fn draw_frame_level1_paced(
+    world: &World,
+    camera: Camera,
+    metrics: &Metrics,
+    outcomes: &[FoundingOutcome],
+    overlay: Overlay,
+    layer: Option<&'static dyn Layer>,
+    pace: Pace,
+    motion: &mut Motion,
+    canvas: &mut Canvas<'_>,
+) -> Result<Readout, BridgeError> {
+    paint::draw_level1_paced(world, camera, canvas, pace, motion, layer)?;
+    paint::mark_foundings(camera, canvas, outcomes);
+    let readout =
+        Readout::of_level1(world, camera, canvas, metrics, outcomes).at_speed(pace.speed_milli);
     match overlay {
         Overlay::Glass { reference } => glass::draw(&readout, canvas, reference),
         Overlay::Panel => hud::draw(&readout, canvas),

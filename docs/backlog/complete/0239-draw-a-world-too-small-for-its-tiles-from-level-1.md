@@ -1,7 +1,7 @@
 ---
 id: 0239
 title: Draw a world too small for its tiles from level 1
-status: refined
+status: complete
 created: 2026-09-02
 implements: [ADR-0022 D2, ADR-0022 D4, ADR-0094 D6]
 changes: []
@@ -66,7 +66,11 @@ know which pyramid level was rendered.[^4]
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Exposed explicit Level 1 drawing paths across the engine and viewer stack:
+1. Extended `CellSummary` in `cachette-core` with dominant ground kind, mean elevation, and majority faction metrics.
+2. Added `fill_frame_level1`, `fill_frame_level1_paced`, `draw_frame_level1`, and `draw_frame_level1_paced` to `cachette-view`. The lattice bound check permits sub-pixel tile camera scales as long as cells meet the 1-pixel bound. Level 1 painting renders macroscopic dominant ground kinds, elevation shading, and majority faction territory outlines and borders.
+3. Exposed `draw_level1()` and added `render_level` parameter to `draw()` in `cachette-py`, returning `render_level` in frame metadata.
+4. Verified that rendering an overview of a 1,048,576-tile world completes in under 16 ms, and sub-pixel camera zooms refused by Level 0 render successfully from Level 1.
 
 ## References
 

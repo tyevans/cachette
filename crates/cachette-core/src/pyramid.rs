@@ -69,7 +69,7 @@ use crate::holding::Holder;
 use crate::resource::{ledger_key, Amount, DepletionLedger, ResourceField, ResourceKind};
 use crate::sim_math;
 use crate::soldier::SoldierArena;
-use crate::terrain::Terrain;
+use crate::terrain::{Terrain, TileKind, KIND_COUNT};
 use crate::tile_value::TileValues;
 use crate::types::{Accum, FactionId, Fix32, TileIdx};
 
@@ -97,6 +97,8 @@ pub struct CellSummary {
     food_total: Accum,
     height_square_total: Accum,
     deposit_tiles: i64,
+    kind_counts: [i64; KIND_COUNT],
+    majority_faction: Option<FactionId>,
 }
 
 impl CellSummary {
@@ -119,6 +121,8 @@ impl CellSummary {
         food_total: Accum(0),
         height_square_total: Accum(0),
         deposit_tiles: 0,
+        kind_counts: [0; KIND_COUNT],
+        majority_faction: None,
     };
 
     /// Combines two summaries.
@@ -138,6 +142,24 @@ impl CellSummary {
     /// [^3]: ADR-0023, an aggregate combines exactly, in any order, decision D4. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     #[must_use]
     pub const fn combine(self, other: Self) -> Self {
+        let mut kind_counts = [0i64; KIND_COUNT];
+        let mut i = 0;
+        while i < KIND_COUNT {
+            kind_counts[i] = self.kind_counts[i].saturating_add(other.kind_counts[i]);
+            i += 1;
+        }
+        let majority_faction = match (self.majority_faction, other.majority_faction) {
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (Some(a), Some(b)) => {
+                if self.held_tiles >= other.held_tiles {
+                    Some(a)
+                } else {
+                    Some(b)
+                }
+            }
+            (None, None) => None,
+        };
         Self {
             tiles: self.tiles.saturating_add(other.tiles),
             open_tiles: self.open_tiles.saturating_add(other.open_tiles),
@@ -151,6 +173,8 @@ impl CellSummary {
                 other.height_square_total,
             ),
             deposit_tiles: self.deposit_tiles.saturating_add(other.deposit_tiles),
+            kind_counts,
+            majority_faction,
         }
     }
 
@@ -166,6 +190,12 @@ impl CellSummary {
     /// [^1]: ADR-0023, an aggregate combines exactly, in any order, decision D4. `docs/adrs/accepted/adr-0023-an-aggregate-combines-exactly-in-any-order.md`
     #[must_use]
     pub const fn remove(self, other: Self) -> Self {
+        let mut kind_counts = [0i64; KIND_COUNT];
+        let mut i = 0;
+        while i < KIND_COUNT {
+            kind_counts[i] = self.kind_counts[i].saturating_sub(other.kind_counts[i]);
+            i += 1;
+        }
         Self {
             tiles: self.tiles.saturating_sub(other.tiles),
             open_tiles: self.open_tiles.saturating_sub(other.open_tiles),
@@ -180,6 +210,8 @@ impl CellSummary {
                     .saturating_sub(other.height_square_total.0),
             ),
             deposit_tiles: self.deposit_tiles.saturating_sub(other.deposit_tiles),
+            kind_counts,
+            majority_faction: self.majority_faction,
         }
     }
 
@@ -193,11 +225,14 @@ impl CellSummary {
     ///
     /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     pub(crate) const fn of_ground(
+        kind: TileKind,
         passable: bool,
         height: Fix32,
         food: Amount,
         deposit: bool,
     ) -> Self {
+        let mut kind_counts = [0i64; KIND_COUNT];
+        kind_counts[kind as usize] = 1;
         Self {
             tiles: 1,
             open_tiles: if passable { 1 } else { 0 },
@@ -208,6 +243,8 @@ impl CellSummary {
             food_total: food.to_accum(),
             height_square_total: sim_math::accumulate(Accum(0), sim_math::mul(height, height)),
             deposit_tiles: if deposit { 1 } else { 0 },
+            kind_counts,
+            majority_faction: None,
         }
     }
 
@@ -225,6 +262,7 @@ impl CellSummary {
         held_tiles: i64,
         value_total: Accum,
         food_taken: i64,
+        majority_faction: Option<FactionId>,
     ) -> Self {
         Self {
             tiles: 0,
@@ -236,7 +274,46 @@ impl CellSummary {
             food_total: Accum(-food_taken),
             height_square_total: Accum(0),
             deposit_tiles: 0,
+            kind_counts: [0; KIND_COUNT],
+            majority_faction,
         }
+    }
+
+    /// Returns the counts of tiles for each terrain kind in the cell. Extensive.
+    #[must_use]
+    pub const fn kind_counts(self) -> [i64; KIND_COUNT] {
+        self.kind_counts
+    }
+
+    /// Returns the dominant ground kind of the cell. Intensive.
+    ///
+    /// Returns `None` when the cell covers no tile.
+    #[must_use]
+    pub fn dominant_kind(self) -> Option<TileKind> {
+        if self.tiles <= 0 {
+            return None;
+        }
+        let mut best_kind = TileKind::ALL[0];
+        let mut best_count = -1i64;
+        for (idx, &count) in self.kind_counts.iter().enumerate() {
+            if count > best_count {
+                best_count = count;
+                best_kind = TileKind::ALL[idx];
+            }
+        }
+        Some(best_kind)
+    }
+
+    /// Returns the mean elevation of the cell. Intensive.
+    #[must_use]
+    pub fn mean_elevation(self) -> Option<Fix32> {
+        self.mean_height()
+    }
+
+    /// Returns the majority faction that holds ground in the cell, or `None`.
+    #[must_use]
+    pub const fn majority_faction(self) -> Option<FactionId> {
+        self.majority_faction
     }
 
     /// Returns the tiles the summary covers. Extensive.
@@ -856,6 +933,7 @@ fn ground_of_block(layout: BlockLayout, resources: ResourceField, block: u32) ->
                 .is_some_and(|stock| stock.0 > 0)
         });
         summary = summary.combine(CellSummary::of_ground(
+            ground.kind,
             ground.kind.is_passable(),
             ground.height,
             food,
@@ -894,6 +972,7 @@ fn moving_part(
     let mut value_total = Accum(0);
     let mut held_tiles = 0i64;
     let mut food_taken = 0i64;
+    let mut faction_counts = [0u32; 64];
     for row in first_row..(first_row + edge).min(grid.height()) {
         let start = (row * grid.width() + first_column) as usize;
         let end = (row * grid.width() + (first_column + edge).min(grid.width())) as usize;
@@ -912,9 +991,23 @@ fn moving_part(
         // The holder column is indexed the same way as the value column, so
         // one row of a block is one contiguous run of it too.
         for holder in &holders[start..end] {
-            held_tiles += i64::from(!holder.is_nobody());
+            if let Some(faction) = holder.faction() {
+                held_tiles += 1;
+                if (faction.0 as usize) < faction_counts.len() {
+                    faction_counts[faction.0 as usize] += 1;
+                }
+            }
         }
         food_taken += food_taken_in_run(depletion, start as u32, end as u32);
+    }
+
+    let mut majority_faction = None;
+    let mut max_held = 0;
+    for (f_idx, &count) in faction_counts.iter().enumerate() {
+        if count > max_held {
+            max_held = count;
+            majority_faction = Some(FactionId(f_idx as u16));
+        }
     }
 
     // The ground part holds the food the tiles started with, so the moving
@@ -928,6 +1021,7 @@ fn moving_part(
         held_tiles,
         value_total,
         food_taken,
+        majority_faction,
     ))
 }
 
@@ -2205,7 +2299,12 @@ mod ground_field_tests {
 
     /// Builds the ground part of one tile.
     fn ground(height: i32, deposit: bool, passable: bool) -> CellSummary {
-        CellSummary::of_ground(passable, Fix32(height), Amount::ZERO, deposit)
+        let kind = if passable {
+            crate::terrain::TileKind::Plain
+        } else {
+            crate::terrain::TileKind::Water
+        };
+        CellSummary::of_ground(kind, passable, Fix32(height), Amount::ZERO, deposit)
     }
 
     /// Folds a list of parts in the order given.
