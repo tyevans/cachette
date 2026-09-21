@@ -294,7 +294,7 @@ fn two_cities_of_two_factions_meet_and_no_tile_is_held_twice() {
     // itself.
     let mut world = World::new(VARIED).expect("the extent must describe a world");
     city(&mut world, FactionId(0), Axial::new(20, 20));
-    city(&mut world, FactionId(1), Axial::new(26, 20));
+    city(&mut world, FactionId(1), Axial::new(23, 20));
     run(&mut world, 2, 4);
 
     let mut border = 0;
