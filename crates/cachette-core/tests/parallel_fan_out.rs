@@ -132,7 +132,7 @@ fn a_step_at_one_thread_creates_no_thread() {
 }
 
 #[test]
-fn a_step_at_twelve_threads_still_divides_the_work() {
+fn a_step_at_twelve_threads_creates_no_thread_in_steady_state() {
     let guard = COUNTER
         .lock()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -142,10 +142,46 @@ fn a_step_at_twelve_threads_still_divides_the_work() {
     }
     reset_spawn_count();
     world.step(12).expect("the step must run");
-    let spawned = spawn_count();
-    assert!(
-        spawned > 0,
-        "a step at twelve threads must still divide the work, and it spawned {spawned} threads"
+    assert_eq!(
+        spawn_count(),
+        0,
+        "a step at twelve threads creates zero operating system threads in steady state"
+    );
+    assert_eq!(
+        world.stage_worker_count(),
+        11,
+        "the world retains eleven persistent workers for twelve threads"
+    );
+    drop(guard);
+}
+
+#[test]
+fn a_world_with_configured_stage_workers_builds_them_at_initialization() {
+    let guard = COUNTER
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    reset_spawn_count();
+    let world = World::with_stage_workers(
+        WorldConfig {
+            width: 48,
+            height: 48,
+            seed: 0,
+            faction_count: 3,
+            unit_capacity: WorldConfig::TARGET_UNIT_POPULATION,
+            ..WorldConfig::DEFAULT
+        },
+        12,
+    )
+    .expect("the shape must describe a world");
+    assert_eq!(
+        world.stage_worker_count(),
+        11,
+        "a world configured for twelve threads holds eleven persistent workers"
+    );
+    assert_eq!(
+        spawn_count(),
+        11,
+        "the eleven workers were spawned once during initialization"
     );
     drop(guard);
 }

@@ -60,6 +60,19 @@ impl World {
         Self::with_weather_scale(config, WeatherScale::DEFAULT)
     }
 
+    /// Builds a world from the settings, with persistent stage workers sized for the given thread count.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the configured extent does not describe a grid.
+    pub fn with_stage_workers(config: WorldConfig, threads: usize) -> Result<Self, WorldError> {
+        let world = Self::new(config)?;
+        if threads > 1 {
+            world.ensure_stage_workers(threads - 1);
+        }
+        Ok(world)
+    }
+
     /// Builds a world from the settings, at a stated weather resolution.
     ///
     /// **The resolution of the weather is a parameter of the world.** The
@@ -355,6 +368,7 @@ impl World {
             eliminated: vec![0u8; FACTION_CEILING as usize],
             market: MarketTable::new(config.faction_count, DEFAULT_BOARD_ROWS),
             land_list_bound: DEFAULT_LAND_LIST_BOUND,
+            workers: crate::parallel::StagePool::new(),
         };
         // A world that has never stepped still answers a question about a
         // region. A level that nothing rebuilt would describe an empty world

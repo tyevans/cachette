@@ -1115,6 +1115,15 @@ pub struct World {
     /// [^2]: ADR-0164, every stored value the step reads enters the state hash, decision D1. `docs/adrs/draft/adr-0164-every-stored-value-the-step-reads-enters-the-state-hash.md`
     /// [^3]: ADR-0001, one binary gives one answer at any thread count, decision D4. `docs/adrs/accepted/adr-0001-one-binary-gives-one-answer-at-any-thread-count.md`
     event_memory: EventMemory,
+    /// Persistent stage worker pool for parallel stages.
+    ///
+    /// The worker threads outlive the step and are scoped to the lifecycle of
+    /// this world instance.[^4]
+    ///
+    /// # References
+    ///
+    /// [^4]: ADR-0047, many worlds live in one interpreter, decision D2. `docs/adrs/draft/adr-0047-many-worlds-live-in-one-interpreter.md`
+    workers: crate::parallel::StagePool,
 }
 
 impl World {
@@ -1160,5 +1169,16 @@ impl World {
     #[must_use]
     pub fn event_log_bytes(&self) -> &[u8] {
         bytemuck::cast_slice(&self.log)
+    }
+
+    /// Returns how many persistent stage workers this world retains.
+    #[must_use]
+    pub fn stage_worker_count(&self) -> usize {
+        self.workers.worker_count()
+    }
+
+    /// Ensures that this world retains at least `workers` persistent stage workers.
+    pub fn ensure_stage_workers(&self, workers: usize) {
+        self.workers.ensure_workers(workers);
     }
 }
