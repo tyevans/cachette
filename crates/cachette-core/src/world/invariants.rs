@@ -258,10 +258,9 @@ impl World {
             Err(BridgeError::Stale { .. }) => {}
             Err(_) => return false,
         }
-        // The holding covers the same world, no tile names a faction the
-        // world does not have, and no faction holds ground that admits no
-        // unit. The check derives the held list, the census and the block
-        // masks again and compares them against the stored ones.[^1]
+        // The holding covers the same world, and no tile names a faction the
+        // world does not have. The check derives the held list, the census and
+        // the block masks again and compares them against the stored ones.[^1]
         //
         // [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
         if self.holding.grid() != self.grid {

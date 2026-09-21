@@ -121,7 +121,7 @@ pub use founding::{
 };
 pub use hash::StateHash;
 pub use hex::{Axial, Grid, GridError};
-pub use holding::{FactionMask, Holder, Holding};
+pub use holding::{ClosureRules, FactionMask, Holder, Holding, LeaseRules, ReachRules};
 pub use influence::{Conductance, Influence, InfluenceError, InfluenceField};
 pub use luxury::{
     LuxuryError, LuxuryField, LuxuryId, LuxurySet, LuxuryTile, VarietyLevel, LUXURY_CEILING,

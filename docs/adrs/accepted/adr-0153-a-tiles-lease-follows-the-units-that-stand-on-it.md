@@ -337,4 +337,4 @@ no trade and no fight, so an upgrade meets that question on more tiles.
 [^22]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^23]: Blockers register, BLK-036. `docs/BLOCKERS.md`
 [^24]: ADR-0167, war opens the border that tension closes, decision D1. `docs/adrs/draft/adr-0167-war-opens-the-border-that-tension-closes.md`
-[^25]: Backlog item 0493, fill the ground one faction has surrounded. `docs/backlog/proposed/0493-fill-the-ground-one-faction-has-surrounded.md`
+[^25]: Backlog item 0493, fill the ground one faction has surrounded. `docs/backlog/refined/0493-fill-the-ground-one-faction-has-surrounded.md`

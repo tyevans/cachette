@@ -81,11 +81,25 @@ pub mod census {
     /// The candidate tiles that had a challenger able to beat the holder.
     static CHALLENGED: AtomicU64 = AtomicU64::new(0);
 
+    /// The unheld tiles that closure passes gave to a faction, since the last reset.
+    static CLOSED: AtomicU64 = AtomicU64::new(0);
+
     /// Records one apply.
     pub fn record(moved: u64, dirty: u64, rebuilt: u64) {
         MOVED.fetch_add(moved, Ordering::Relaxed);
         DIRTY.fetch_add(dirty, Ordering::Relaxed);
         REBUILT.fetch_add(rebuilt, Ordering::Relaxed);
+    }
+
+    /// Records how many unheld tiles closure passes gave to a faction.
+    pub fn record_closed(count: u64) {
+        CLOSED.fetch_add(count, Ordering::Relaxed);
+    }
+
+    /// Returns the tiles closure passes closed.
+    #[must_use]
+    pub fn closed_total() -> u64 {
+        CLOSED.load(Ordering::Relaxed)
     }
 
     /// Records one candidate tile that the decide pass read.
@@ -137,6 +151,7 @@ pub mod census {
         SUPPORTERS.store(0, Ordering::Relaxed);
         SORTED.store(0, Ordering::Relaxed);
         CHALLENGED.store(0, Ordering::Relaxed);
+        CLOSED.store(0, Ordering::Relaxed);
     }
 }
 
@@ -618,6 +633,89 @@ impl Default for LeaseRules {
     }
 }
 
+/// How many closure passes run after the city reach and lease decisions,
+/// when nobody has set another value.
+///
+/// **This is a provisional value and not a measured one.** Two passes close
+/// holes up to two hex steps deep, such as 1-tile, 2-tile, and 3-tile pockets or
+/// lakes, while keeping computation strictly bounded.[^1] The balance register
+/// holds the row.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D6. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+/// [^2]: Balance register, the holding. `docs/reference/balance.md`
+pub const CLOSURE_PASS_COUNT_DEFAULT: u32 = 2;
+
+/// The number of neighbours of one faction needed to give an unheld tile to
+/// that faction, when nobody has set another value.
+///
+/// **This is a provisional value and not a measured one.** On a hex grid of
+/// six neighbours, a straight border has at most three neighbours of the held
+/// faction (so a flat edge does not expand outward), while a concave pocket or
+/// lake has four, five, or six neighbours of one faction and zero neighbours of
+/// any other faction.[^1] The balance register holds the row.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D6. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+/// [^2]: Balance register, the holding. `docs/reference/balance.md`
+pub const CLOSURE_NEIGHBOUR_THRESHOLD_DEFAULT: u32 = 4;
+
+/// How an unheld tile is claimed by the one faction that surrounds it.
+///
+/// Every value is a whole number. No fraction and no floating point number
+/// reaches a holder.[^1] Each one is a balance value under one blocker.[^2]
+///
+/// # References
+///
+/// [^1]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
+/// [^2]: Balance register, the holding. `docs/reference/balance.md`
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ClosureRules {
+    pass_count: u32,
+    neighbour_threshold: u32,
+}
+
+impl ClosureRules {
+    /// The provisional values that the balance register holds.
+    pub const DEFAULT: Self = Self {
+        pass_count: CLOSURE_PASS_COUNT_DEFAULT,
+        neighbour_threshold: CLOSURE_NEIGHBOUR_THRESHOLD_DEFAULT,
+    };
+
+    /// Builds a rule set.
+    #[must_use]
+    pub const fn new(pass_count: u32, neighbour_threshold: u32) -> Self {
+        Self {
+            pass_count,
+            neighbour_threshold: if neighbour_threshold == 0 {
+                1
+            } else {
+                neighbour_threshold
+            },
+        }
+    }
+
+    /// Returns how many closure passes run after the rewrite decisions.
+    #[must_use]
+    pub const fn pass_count(self) -> u32 {
+        self.pass_count
+    }
+
+    /// Returns the number of neighbours of one faction needed to close a tile.
+    #[must_use]
+    pub const fn neighbour_threshold(self) -> u32 {
+        self.neighbour_threshold
+    }
+}
+
+impl Default for ClosureRules {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
 /// The holding of a world.
 ///
 /// It holds the holder of each tile, the list of tiles that somebody holds,
@@ -709,6 +807,15 @@ pub struct Holding {
     ///
     /// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D7. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
     lease_rules: LeaseRules,
+    /// How an unheld tile is claimed by the one faction that surrounds it.
+    ///
+    /// The rewrite reads these on every step, so they enter the state hash
+    /// beside the columns they decide.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decisions D6 and D7. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    closure_rules: ClosureRules,
     /// The tiles that a step watches for a change of holder, in ascending
     /// tile order, each with a mark that says whether its holder changed.
     ///
@@ -739,6 +846,7 @@ impl Holding {
             lease_count: vec![0; tiles],
             leased: Vec::new(),
             lease_rules: LeaseRules::DEFAULT,
+            closure_rules: ClosureRules::DEFAULT,
             watch: Vec::new(),
         }
     }
@@ -763,6 +871,17 @@ impl Holding {
     /// Sets how a lease rises, falls and claims.
     pub const fn set_lease_rules(&mut self, rules: LeaseRules) {
         self.lease_rules = rules;
+    }
+
+    /// Returns how an unheld tile is claimed by the one faction that surrounds it.
+    #[must_use]
+    pub const fn closure_rules(&self) -> ClosureRules {
+        self.closure_rules
+    }
+
+    /// Sets how an unheld tile is claimed by the one faction that surrounds it.
+    pub const fn set_closure_rules(&mut self, rules: ClosureRules) {
+        self.closure_rules = rules;
     }
 
     /// Returns the lease of one tile: the faction it names and the count.
@@ -1007,6 +1126,8 @@ impl Holding {
             .write_u64(u64::from(self.lease_rules.decay_phase()))
             .write_u64(self.lease_rules.bound() as u64)
             .write_u64(self.lease_rules.claim_threshold() as u64)
+            .write_u64(u64::from(self.closure_rules.pass_count()))
+            .write_u64(u64::from(self.closure_rules.neighbour_threshold()))
     }
 
     /// Rewrites the holder column from the cities and returns the number of
@@ -1075,7 +1196,7 @@ impl Holding {
         // [^1]: ADR-0009, parallel stages write disjoint outputs, decisions D1, D2 and D3. `docs/adrs/accepted/adr-0009-parallel-stages-write-disjoint-outputs.md`
         let chunk_len = candidates.len().div_ceil(threads).max(1);
         let slot_count = candidates.len().div_ceil(chunk_len);
-        let mut slots: Slots<Vec<(TileIdx, Holder)>> = Slots::filled(slot_count, Vec::new())
+        let mut slots: Slots<Vec<Holder>> = Slots::filled(slot_count, Vec::new())
             .expect("the candidate list is not empty, so it needs at least one slot");
         let holders = &self.holders[..];
         let cities = &cities[..];
@@ -1088,24 +1209,110 @@ impl Holding {
         crate::parallel::fan_out_each(candidates.chunks(chunk_len).zip(slots.entries_mut()).map(
             move |(chunk, slot)| {
                 move || {
-                    let mut changes = Vec::new();
+                    let mut decided = Vec::with_capacity(chunk.len());
                     for tile in chunk {
-                        let decided = decide(grid, terrain, cities, lease, *tile);
-                        #[cfg(feature = "census-holding")]
-                        census::record_decide(
-                            cities.len() as u64,
-                            false,
-                            decided != holders[tile.0 as usize],
-                        );
-                        if decided != holders[tile.0 as usize] {
-                            changes.push((*tile, decided));
-                        }
+                        decided.push(decide(grid, terrain, cities, lease, *tile));
                     }
-                    *slot = changes;
+                    *slot = decided;
                 }
             },
         ));
+
+        let mut current_holders =
+            slots.combine(Vec::with_capacity(candidates.len()), |mut joined, slot| {
+                joined.extend_from_slice(slot);
+                joined
+            });
+
+        #[cfg(feature = "census-holding")]
+        let initial_holders = current_holders.clone();
+
+        let passes = self.closure_rules.pass_count() as usize;
+        let threshold = self.closure_rules.neighbour_threshold();
+        if passes > 0 {
+            let mut next_holders = vec![Holder::NOBODY; candidates.len()];
+            for _ in 0..passes {
+                let current_ref = &current_holders[..];
+                let cand_ref = &candidates[..];
+                crate::parallel::fan_out_each(
+                    cand_ref
+                        .chunks(chunk_len)
+                        .zip(current_ref.chunks(chunk_len))
+                        .zip(next_holders.chunks_mut(chunk_len))
+                        .map(|((c_chunk, from_chunk), out_chunk)| {
+                            move || {
+                                for ((tile, from_h), out) in c_chunk
+                                    .iter()
+                                    .zip(from_chunk.iter())
+                                    .zip(out_chunk.iter_mut())
+                                {
+                                    if !from_h.is_nobody() {
+                                        *out = *from_h;
+                                        continue;
+                                    }
+                                    let Some(address) = grid.address_of(*tile) else {
+                                        *out = Holder::NOBODY;
+                                        continue;
+                                    };
+                                    let mut single_faction: Option<FactionId> = None;
+                                    let mut count = 0u32;
+                                    let mut mixed = false;
+                                    for dir in 0..6 {
+                                        let Some(n_addr) = grid.neighbour(address, dir) else {
+                                            continue;
+                                        };
+                                        let Some(n_tile) = grid.index_of(n_addr) else {
+                                            continue;
+                                        };
+                                        let n_holder =
+                                            if let Ok(pos) = cand_ref.binary_search(&n_tile) {
+                                                current_ref[pos]
+                                            } else {
+                                                Holder::NOBODY
+                                            };
+                                        if let Some(faction) = n_holder.faction() {
+                                            match single_faction {
+                                                None => {
+                                                    single_faction = Some(faction);
+                                                    count = 1;
+                                                }
+                                                Some(f) if f == faction => {
+                                                    count += 1;
+                                                }
+                                                Some(_) => {
+                                                    mixed = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if !mixed && count >= threshold {
+                                        *out = Holder::of(
+                                            single_faction
+                                                .expect("count >= threshold >= 1 implies faction"),
+                                        );
+                                    } else {
+                                        *out = Holder::NOBODY;
+                                    }
+                                }
+                            }
+                        }),
+                );
+                std::mem::swap(&mut current_holders, &mut next_holders);
+            }
+        }
         drop(decide_span);
+
+        #[cfg(feature = "census-holding")]
+        {
+            let closed = candidates
+                .iter()
+                .zip(initial_holders.iter())
+                .zip(current_holders.iter())
+                .filter(|((_, initial), final_h)| initial.is_nobody() && !final_h.is_nobody())
+                .count() as u64;
+            census::record_closed(closed);
+        }
 
         // The change list is one pair of a tile and the value that tile
         // takes. A second per-tile column joins the pair rather than opening
@@ -1115,10 +1322,15 @@ impl Holding {
         // The join and the write are one stage. The join is what fixes the
         // order of the result, and the write is what the order is for.
         let _span = stage::open(Stage::HoldingApply);
-        let changes = slots.combine(Vec::new(), |mut joined, slot| {
-            joined.extend_from_slice(slot);
-            joined
-        });
+        let mut changes = Vec::new();
+        for (&tile, &decided) in candidates.iter().zip(current_holders.iter()) {
+            let previous = holders[tile.0 as usize];
+            #[cfg(feature = "census-holding")]
+            census::record_decide(cities.len() as u64, false, decided != previous);
+            if decided != previous {
+                changes.push((tile, decided));
+            }
+        }
         self.apply(&changes, threads);
         Ok(changes.len())
     }
@@ -1197,6 +1409,7 @@ impl Holding {
     /// [^1]: ADR-0150, held ground is the ground within reach of a city its faction owns, decision D3. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
     fn candidates(&self, cities: &[City]) -> Vec<TileIdx> {
         let grid = self.layout.grid();
+        let pass_count = self.closure_rules.pass_count() as i32;
         let mut candidates: Vec<TileIdx> = Vec::with_capacity(self.held.len() + self.leased.len());
         candidates.extend_from_slice(&self.held);
         // A tile whose lease is live can change holder even when no city
@@ -1206,7 +1419,7 @@ impl Holding {
         // [^2]: ADR-0153, a tile's lease follows the units that stand on it, decision D5. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
         candidates.extend_from_slice(&self.leased);
         for city in cities {
-            let reach = city.reach as i32;
+            let reach = city.reach as i32 + pass_count;
             for dq in -reach..=reach {
                 let low = (-reach).max(-dq - reach);
                 let high = reach.min(-dq + reach);
@@ -1214,6 +1427,36 @@ impl Holding {
                     let address = Axial::new(city.address.q + dq, city.address.r + dr);
                     if let Some(tile) = grid.index_of(address) {
                         candidates.push(tile);
+                    }
+                }
+            }
+        }
+        if pass_count > 0 {
+            for &tile in &self.held {
+                if let Some(address) = grid.address_of(tile) {
+                    for dq in -pass_count..=pass_count {
+                        let low = (-pass_count).max(-dq - pass_count);
+                        let high = pass_count.min(-dq + pass_count);
+                        for dr in low..=high {
+                            let addr = Axial::new(address.q + dq, address.r + dr);
+                            if let Some(t) = grid.index_of(addr) {
+                                candidates.push(t);
+                            }
+                        }
+                    }
+                }
+            }
+            for &tile in &self.leased {
+                if let Some(address) = grid.address_of(tile) {
+                    for dq in -pass_count..=pass_count {
+                        let low = (-pass_count).max(-dq - pass_count);
+                        let high = pass_count.min(-dq + pass_count);
+                        for dr in low..=high {
+                            let addr = Axial::new(address.q + dq, address.r + dr);
+                            if let Some(t) = grid.index_of(addr) {
+                                candidates.push(t);
+                            }
+                        }
                     }
                 }
             }
@@ -1540,13 +1783,17 @@ impl Holding {
     /// The holder column is the truth. The held list, the census and the
     /// block masks are three further declarations of the same fact, so this
     /// check derives each of them from the column and compares.[^1] It also
-    /// proves the two properties the record states: no tile names a faction
-    /// the world does not have, and no faction holds open water.[^2]
+    /// proves that no tile names a faction the world does not have.[^2]
+    ///
+    /// **Enclosed impassable ground may be held.** ADR-0153 D6 amends the
+    /// rule of ADR-0150 D1: closure passes give an unheld tile to the faction
+    /// that surrounds it, including an enclosed lake or mountain range.[^3]
     ///
     /// # References
     ///
     /// [^1]: Recurring defect shapes, shape 1. `.claude/rules/recurring-defects.md`
     /// [^2]: ADR-0053, a faction is a bit in a mask, and a relation is a plane, decision D5. `docs/adrs/accepted/adr-0053-a-faction-is-a-bit-in-a-mask-and-a-relation-is-a-plane.md`
+    /// [^3]: ADR-0153, a tile's lease follows the units that stand on it, decision D6. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
     #[must_use]
     pub fn check_invariants(&self, terrain: Terrain, faction_ceiling: u16) -> bool {
         let grid = self.layout.grid();
@@ -1577,13 +1824,7 @@ impl Holding {
             if faction.0 >= faction_ceiling || faction.0 >= FACTION_CEILING {
                 return false;
             }
-            // No faction holds ground that admits no unit. The rule refuses
-            // such a tile, and this is what fails when a later path forgets
-            // to.
-            let Some(address) = grid.address_of(tile) else {
-                return false;
-            };
-            if !terrain.kind(address).is_some_and(TileKind::is_passable) {
+            if grid.address_of(tile).is_none() {
                 return false;
             }
             census[faction.0 as usize] += 1;
