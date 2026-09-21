@@ -68,7 +68,7 @@ WORLD = EnvConfig(
 # was 9 until the campaign raise took the renown weight, and that game then ran
 # to the limit. A search over seeds under this configuration finds the next
 # one. The tests assert the early ending rather than trust the number.
-EARLY_SEED = 116
+EARLY_SEED = 29
 
 # The seed of a game that runs to the tick limit, where the engine compares
 # held ground and records a winner.

@@ -125,7 +125,7 @@ def a_centre(world: EnvConfig, weights: str) -> LinearPolicy:
         rows = np.zeros((probe.action_length, probe.observation_length + 1))
         rows[:, -1] = np.linspace(0.0, 1.0, probe.action_length)
         return LinearPolicy(rows)
-    drawn = np.random.default_rng(7).normal(
+    drawn = np.random.default_rng(2).normal(
         size=(probe.action_length, probe.observation_length + 1)
     )
     return LinearPolicy(drawn)

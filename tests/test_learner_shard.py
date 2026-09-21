@@ -145,7 +145,7 @@ def a_centre(world: EnvConfig) -> np.ndarray:
 
 def weights_of_a_run(out: Path, pool: int) -> np.ndarray:
     """Train one policy at one worker count, and return the centre it reached."""
-    seed_pool = viable_seeds(WORLD, 4, 900)
+    seed_pool = viable_seeds(WORLD, 4, 200)
     result = train(
         f"pool-{pool}",
         WORLD,

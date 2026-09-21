@@ -99,7 +99,7 @@ TRAINED = EnvConfig(
 # is a property of the engine. The seed was 9 until the campaign raise took the
 # renown weight, and that game then ran to the limit. The test of the early
 # ending asserts it, so a seed that stops ending early fails there first.
-EARLY_SEED = 116
+EARLY_SEED = 29
 
 # One seed whose game runs to the tick limit while a rival still builds a
 # wonder. The wonder test needs a leader that holds wonder work at the end, and
