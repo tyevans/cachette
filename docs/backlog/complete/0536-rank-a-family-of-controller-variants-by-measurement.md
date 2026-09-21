@@ -167,5 +167,5 @@ CLI parsing, and league execution.
 [^bindings]: The faction bindings, the weight verb. `crates/cachette-py/src/world/faction_view.rs`
 [^endings]: The endings instrument. `python/cachette/learn/endings.py`
 [^adr175]: ADR-0175, a win threshold decides when a reader fires and never what the simulation does, decision D2. `docs/adrs/draft/adr-0175-a-win-threshold-decides-when-a-reader-fires.md`
-[^item181]: Backlog item 0181, give a kind of work the commodity it fills. `docs/backlog/refined/0181-give-a-kind-of-work-the-commodity-it-fills.md`
+[^item181]: Backlog item 0181, give a kind of work the commodity it fills. `docs/backlog/complete/0181-give-a-kind-of-work-the-commodity-it-fills.md`
 [^fnd735]: Findings register, FND-735. `docs/FINDINGS.md`
