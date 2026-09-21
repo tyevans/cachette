@@ -1003,6 +1003,9 @@ class FactionWeights(TypedDict):
     build: int
     renown: int
     settle: int
+    own_ground: int
+    rival_ground: int
+    unheld_ground: int
 
 class GameEnd(TypedDict):
     """How a game ended: the winner, the path and the tick.
@@ -1403,6 +1406,9 @@ class World:
         build: int,
         renown: int,
         settle: int,
+        own_ground: int = 128,
+        rival_ground: int = 128,
+        unheld_ground: int = 128,
     ) -> None: ...
     def set_externally_controlled(self, faction: int, controlled: bool) -> None: ...
     def is_externally_controlled(self, faction: int) -> bool: ...

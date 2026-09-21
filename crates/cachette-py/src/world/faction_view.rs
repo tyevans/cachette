@@ -883,6 +883,9 @@ impl PyWorld {
         report.set_item("build", weights.build)?;
         report.set_item("renown", weights.renown)?;
         report.set_item("settle", weights.settle)?;
+        report.set_item("own_ground", weights.own_ground)?;
+        report.set_item("rival_ground", weights.rival_ground)?;
+        report.set_item("unheld_ground", weights.unheld_ground)?;
         Ok(report)
     }
 
@@ -919,7 +922,8 @@ impl PyWorld {
     /// [^2]: ADR-0156, a faction's option weights are policy, set through one verb, decision D1. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
     /// [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D1. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
     /// [^4]: Balance register, the weight vector range. `docs/reference/balance.md`
-    #[pyo3(signature = (faction, *, war, trade, build, renown, settle))]
+    #[pyo3(signature = (faction, *, war, trade, build, renown, settle, own_ground = 128, rival_ground = 128, unheld_ground = 128))]
+    #[allow(clippy::too_many_arguments)]
     fn set_faction_weights(
         &self,
         faction: u16,
@@ -928,6 +932,9 @@ impl PyWorld {
         build: u8,
         renown: u8,
         settle: u8,
+        own_ground: u8,
+        rival_ground: u8,
+        unheld_ground: u8,
     ) -> PyResult<()> {
         let weights = FactionWeights {
             war,
@@ -935,6 +942,9 @@ impl PyWorld {
             build,
             renown,
             settle,
+            own_ground,
+            rival_ground,
+            unheld_ground,
         };
         if !weights.is_inside_bound() {
             return Err(VerbError::new_err(format!(

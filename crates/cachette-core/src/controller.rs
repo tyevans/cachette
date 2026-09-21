@@ -169,13 +169,26 @@ pub const OVERMATCH_RATIO_DEFAULT: i32 = 2 << 16;
 /// [^2]: Balance register, the win threat share. `docs/reference/balance.md`
 pub const WIN_THREAT_SHARE_DEFAULT: i32 = (5 << 16) / 8;
 
+/// The lowest weight a ground option may carry.
+///
+/// **The weight is never zero.** A zero would make the term a fence, and
+/// ADR-0156 D5 refuses a fence.[^1]
+///
+/// # References
+///
+/// [^1]: ADR-0156, a faction's option weights are policy, set through one verb, decision D5. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
+pub const GROUND_WEIGHT_LOW: u8 = 1;
+
+/// The highest weight a ground option may carry.
+pub const GROUND_WEIGHT_HIGH: u8 = 255;
+
 /// The weights that bias the choices of one faction.
 ///
 /// The vector is drawn from the seed when the world is built, and it is
 /// simulated state. Every weight is one byte, so the vector holds no padding
 /// and the state hash reads its bytes.
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, Pod, Zeroable)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Pod, Zeroable)]
 pub struct FactionWeights {
     /// How much the faction wants war with a rival.
     ///
@@ -206,6 +219,27 @@ pub struct FactionWeights {
     ///
     /// [^1]: Balance register, the weight vector range. `docs/reference/balance.md`
     pub settle: u8,
+    /// How much a unit of the faction favours ground its own faction holds.
+    pub own_ground: u8,
+    /// How much a unit of the faction favours ground another faction holds.
+    pub rival_ground: u8,
+    /// How much a unit of the faction favours ground nobody holds.
+    pub unheld_ground: u8,
+}
+
+impl Default for FactionWeights {
+    fn default() -> Self {
+        Self {
+            war: WEIGHT_LOW,
+            trade: WEIGHT_LOW,
+            build: WEIGHT_LOW,
+            renown: WEIGHT_LOW,
+            settle: WEIGHT_LOW,
+            own_ground: 128,
+            rival_ground: 128,
+            unheld_ground: 128,
+        }
+    }
 }
 
 /// The number of weights that the vector holds.
@@ -231,9 +265,9 @@ impl FactionWeights {
     #[must_use]
     pub const fn from_seed(seed: u64, faction: FactionId) -> Self {
         let range = (WEIGHT_HIGH - WEIGHT_LOW) as u64 + 1;
-        let mut drawn = [0u8; WEIGHT_COUNT as usize];
+        let mut drawn = [0u8; 5];
         let mut index = 0u32;
-        while index < WEIGHT_COUNT {
+        while index < 5 {
             let below = rng::draw_below(
                 seed,
                 rng::SYSTEM_CONTROLLER,
@@ -245,37 +279,51 @@ impl FactionWeights {
             drawn[index as usize] = WEIGHT_LOW + below as u8;
             index += 1;
         }
+
+        // Draw index 5 is strength S for ground preference.
+        // ADR-0156 D4: The built-in controller favours ground its own faction holds,
+        // drawing preference strength from the seed by a keyed draw.
+        let s = rng::draw_below(seed, rng::SYSTEM_CONTROLLER, 0, faction.0 as u64, 5, 64);
+        let _ = rng::draw_below(seed, rng::SYSTEM_CONTROLLER, 0, faction.0 as u64, 6, range);
+        let _ = rng::draw_below(seed, rng::SYSTEM_CONTROLLER, 0, faction.0 as u64, 7, range);
+
+        let unheld = 128u8;
+        let delta = ((s / 2) + 1) as u8;
+        let own = unheld.saturating_add(delta);
+        let diff = unheld.saturating_sub(delta);
+        let rival = if diff > WEIGHT_LOW { diff } else { WEIGHT_LOW };
+
         Self {
             war: drawn[0],
             trade: drawn[1],
             build: drawn[2],
             renown: drawn[3],
             settle: drawn[4],
+            own_ground: own,
+            rival_ground: rival,
+            unheld_ground: unheld,
         }
     }
 
     /// Says whether every weight of the vector lies inside the bound.
     ///
-    /// The bound is the range the seeding draws, so a weight a caller writes
-    /// and a weight the seeding draws hold one range and one declaration
-    /// site.[^1] The engine bounds every weight, and this is where it does
-    /// it.[^2]
-    ///
-    /// The check reads the bytes of the vector rather than the fields by
-    /// name. The vector holds one byte for each weight and no padding, so a
-    /// weight added to the shape is checked without a second list of the
-    /// weights.[^3]
+    /// The first five weights must lie between `WEIGHT_LOW` and `WEIGHT_HIGH`.
+    /// The three ground weights must lie between `GROUND_WEIGHT_LOW` and
+    /// `GROUND_WEIGHT_HIGH`.[^1]
     ///
     /// # References
     ///
-    /// [^1]: Balance register, the weight vector range. `docs/reference/balance.md`
-    /// [^2]: ADR-0156, a faction's option weights are policy, set through one verb, decision D1. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
-    /// [^3]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
+    /// [^1]: ADR-0156, a faction's option weights are policy, set through one verb, decisions D1 and D2. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
     #[must_use]
     pub fn is_inside_bound(&self) -> bool {
-        bytemuck::bytes_of(self)
-            .iter()
-            .all(|weight| (WEIGHT_LOW..=WEIGHT_HIGH).contains(weight))
+        (WEIGHT_LOW..=WEIGHT_HIGH).contains(&self.war)
+            && (WEIGHT_LOW..=WEIGHT_HIGH).contains(&self.trade)
+            && (WEIGHT_LOW..=WEIGHT_HIGH).contains(&self.build)
+            && (WEIGHT_LOW..=WEIGHT_HIGH).contains(&self.renown)
+            && (WEIGHT_LOW..=WEIGHT_HIGH).contains(&self.settle)
+            && (GROUND_WEIGHT_LOW..=GROUND_WEIGHT_HIGH).contains(&self.own_ground)
+            && (GROUND_WEIGHT_LOW..=GROUND_WEIGHT_HIGH).contains(&self.rival_ground)
+            && (GROUND_WEIGHT_LOW..=GROUND_WEIGHT_HIGH).contains(&self.unheld_ground)
     }
 }
 
@@ -304,10 +352,11 @@ pub struct FactionRow {
     pub externally_controlled: u8,
     /// Declared padding, always zero.
     ///
-    /// The row is 4 bytes of seat, the weight vector, one flag, this array,
-    /// the ratio and the share below, at an alignment of four. The assertion
-    /// below fails to compile when the array stops filling the row.
-    pub padding: [u8; 2],
+    /// The row is 4 bytes of seat, the weight vector (8 bytes), one flag,
+    /// this array (3 bytes), the ratio (4 bytes) and the share below (4 bytes),
+    /// at an alignment of four. The assertion below fails to compile when the
+    /// array stops filling the row.
+    pub padding: [u8; 3],
     /// The held ground this faction must have over another before it hunts
     /// it, as a raw Q16.16 factor.
     ///
@@ -342,7 +391,7 @@ pub struct FactionRow {
 }
 
 /// The size of one controller row, in bytes.
-pub const FACTION_ROW_BYTES: usize = 20;
+pub const FACTION_ROW_BYTES: usize = 24;
 
 const _: () = assert!(core::mem::size_of::<FactionRow>() == FACTION_ROW_BYTES);
 
@@ -1354,7 +1403,7 @@ impl Controller {
                 seat: NO_SEAT,
                 weights: FactionWeights::from_seed(seed, FactionId(index)),
                 externally_controlled: 0,
-                padding: [0; 2],
+                padding: [0; 3],
                 overmatch_ratio: OVERMATCH_RATIO_DEFAULT,
                 win_threat_share: WIN_THREAT_SHARE_DEFAULT,
             })

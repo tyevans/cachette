@@ -146,6 +146,45 @@ pub const SUBSYSTEM_CENSUS: &[CensusRow] = &[
         read: |world| i64::from(world.population_of_type(crate::unit_type::MERCHANT)),
     },
     CensusRow {
+        name: "units_on_own_ground",
+        basis: CensusBasis::Held,
+        read: |world| {
+            let holders = world.holding.holders();
+            let factions = world.soldiers.faction_column();
+            let tiles = world.soldiers.tile_column();
+            world
+                .soldiers
+                .iter()
+                .filter(|unit| {
+                    let slot = unit.index() as usize;
+                    let tile = tiles[slot].0 as usize;
+                    holders.get(tile).and_then(|h| h.faction()) == Some(factions[slot])
+                })
+                .count() as i64
+        },
+    },
+    CensusRow {
+        name: "units_on_rival_ground",
+        basis: CensusBasis::Held,
+        read: |world| {
+            let holders = world.holding.holders();
+            let factions = world.soldiers.faction_column();
+            let tiles = world.soldiers.tile_column();
+            world
+                .soldiers
+                .iter()
+                .filter(|unit| {
+                    let slot = unit.index() as usize;
+                    let tile = tiles[slot].0 as usize;
+                    match holders.get(tile).and_then(|h| h.faction()) {
+                        Some(f) => f != factions[slot],
+                        None => false,
+                    }
+                })
+                .count() as i64
+        },
+    },
+    CensusRow {
         name: "settlements",
         basis: CensusBasis::Held,
         read: |world| i64::from(world.settlements.len()),

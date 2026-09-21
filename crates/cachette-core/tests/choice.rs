@@ -17,7 +17,9 @@ use cachette_core::choose::{self, ChoiceSchedule, NeedBuckets, SCORE_FLOOR};
 use cachette_core::cohort::{NeedRule, NEED_FULL};
 use cachette_core::resource::ResourceKind;
 use cachette_core::terrain::TileKind;
-use cachette_core::{Axial, Entity, FactionId, Fix32, World, WorldConfig, NO_INTENT};
+use cachette_core::{
+    Axial, Entity, FactionId, FactionWeights, Fix32, World, WorldConfig, NO_INTENT,
+};
 
 /// The extent of the one-cell world.
 ///
@@ -884,8 +886,21 @@ fn drive_to_a_divergent_need(world: &mut World, unit: Entity) -> Fix32 {
         .map(Fix32)
         .find(|need| {
             let lower = buckets.need(buckets.bucket(*need));
-            choose::best_option(*need, choose::CarryClass::Free, summary, &profile)
-                != choose::best_option(lower, choose::CarryClass::Free, summary, &profile)
+            choose::best_option(
+                FactionId(0),
+                *need,
+                choose::CarryClass::Free,
+                summary,
+                &profile,
+                &FactionWeights::default(),
+            ) != choose::best_option(
+                FactionId(0),
+                lower,
+                choose::CarryClass::Free,
+                summary,
+                &profile,
+                &FactionWeights::default(),
+            )
         })
         .expect("the fixture must reach a need whose bucket changes the answer");
 
@@ -939,7 +954,14 @@ fn a_unit_acts_on_the_bucket_of_its_need_and_not_on_its_need() {
         .cell(before.cell)
         .expect("the unit stands in a cell of the pyramid");
     let profile = choose::WeightProfile::EVEN;
-    let exact = choose::best_option(target, choose::CarryClass::Free, summary, &profile);
+    let exact = choose::best_option(
+        FactionId(0),
+        target,
+        choose::CarryClass::Free,
+        summary,
+        &profile,
+        &FactionWeights::default(),
+    );
 
     assert_ne!(
         before.need, before.scored_need,
@@ -998,15 +1020,34 @@ fn a_cell_answers_once_for_every_unit_that_shares_a_bucket() {
         for bucket in 0..buckets.count() - 1 {
             let lower = buckets.need(bucket);
             let inside = Fix32(lower.0 + inset + round);
-            let expected = choose::best_option(lower, choose::CarryClass::Free, summary, &profile);
+            let expected = choose::best_option(
+                FactionId(0),
+                lower,
+                choose::CarryClass::Free,
+                summary,
+                &profile,
+                &FactionWeights::default(),
+            );
             if round == 0
-                && choose::best_option(inside, choose::CarryClass::Free, summary, &profile)
-                    != expected
+                && choose::best_option(
+                    FactionId(0),
+                    inside,
+                    choose::CarryClass::Free,
+                    summary,
+                    &profile,
+                    &FactionWeights::default(),
+                ) != expected
             {
                 divergent += 1;
             }
             assert_eq!(
-                full.answer(inside, choose::CarryClass::Free, &profile),
+                full.answer(
+                    FactionId(0),
+                    inside,
+                    choose::CarryClass::Free,
+                    &profile,
+                    &FactionWeights::default(),
+                ),
                 expected,
                 "a need inside a bucket must read the answer of the lower bound of that bucket"
             );
@@ -1026,7 +1067,13 @@ fn a_cell_answers_once_for_every_unit_that_shares_a_bucket() {
     let mut shared = choose::CellAnswers::new(summary, buckets);
     let step = 1 << (buckets.shift() - 4);
     for offset in 0..16 {
-        shared.answer(Fix32(offset * step), choose::CarryClass::Free, &profile);
+        shared.answer(
+            FactionId(0),
+            Fix32(offset * step),
+            choose::CarryClass::Free,
+            &profile,
+            &FactionWeights::default(),
+        );
     }
     assert_eq!(
         shared.scored_count(),

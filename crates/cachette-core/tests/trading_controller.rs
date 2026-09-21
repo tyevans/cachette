@@ -357,6 +357,9 @@ const MIXED: FactionWeights = FactionWeights {
     build: 1,
     renown: 1,
     settle: 1,
+    own_ground: 128,
+    rival_ground: 128,
+    unheld_ground: 128,
 };
 
 #[test]

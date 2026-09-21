@@ -52,6 +52,7 @@ fn distribution_allocates_by_weights_using_largest_remainder() {
         trade: 2,
         renown: 1,
         settle: 1,
+        ..FactionWeights::default()
     };
     let types = founding_unit_type_distribution(2, balanced);
     assert_eq!(types.len(), 2);
@@ -66,6 +67,7 @@ fn distribution_allocates_by_weights_using_largest_remainder() {
         trade: 1,
         renown: 1,
         settle: 1,
+        ..FactionWeights::default()
     };
     let warrior_types = founding_unit_type_distribution(2, warrior);
     assert_eq!(warrior_types.iter().filter(|&&t| t == SOLDIER).count(), 1);
@@ -78,6 +80,7 @@ fn distribution_allocates_by_weights_using_largest_remainder() {
         trade: 1,
         renown: 1,
         settle: 1,
+        ..FactionWeights::default()
     };
     let builder_types = founding_unit_type_distribution(2, builder);
     assert_eq!(builder_types.iter().filter(|&&t| t == WORKER).count(), 2);
@@ -90,6 +93,7 @@ fn distribution_allocates_by_weights_using_largest_remainder() {
         trade: 2,
         renown: 1,
         settle: 1,
+        ..FactionWeights::default()
     };
     let types_3 = founding_unit_type_distribution(FOUNDING_MERCHANT_MIN_GROUP, merchant_weights);
     assert_eq!(types_3.len(), 3);
@@ -164,6 +168,7 @@ fn warrior_faction_receives_more_soldiers_than_builder_faction() {
             trade: 1,
             renown: 1,
             settle: 1,
+            ..FactionWeights::default()
         },
     );
     world.set_faction_weights(
@@ -174,6 +179,7 @@ fn warrior_faction_receives_more_soldiers_than_builder_faction() {
             trade: 1,
             renown: 1,
             settle: 1,
+            ..FactionWeights::default()
         },
     );
 

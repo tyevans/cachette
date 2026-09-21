@@ -97,6 +97,7 @@ impl World {
         let pyramid = &self.pyramid;
         let bridge = &self.bridge;
         let soldiers = &self.soldiers;
+        let controller = &self.controller;
         let chunk_len = (cells as usize).div_ceil(threads).max(1) as u32;
         let mut slots: Slots<Vec<(Entity, u8)>> =
             Slots::filled(threads, Vec::new()).map_err(|_| StepError::ZeroThreads)?;
@@ -112,6 +113,7 @@ impl World {
                     let needs = soldiers.need_column();
                     let carries = soldiers.carry_column();
                     let homes = soldiers.home_column();
+                    let factions = soldiers.faction_column();
                     let mut chosen: Vec<(Entity, u8)> = Vec::new();
                     for cell in start..end {
                         // The stagger key is the level 1 cell. It is never
@@ -131,6 +133,11 @@ impl World {
                         let mut answers = choose::CellAnswers::new(summary, buckets);
                         for unit in units {
                             let slot = unit.index() as usize;
+                            let faction = factions[slot];
+                            let fw = controller
+                                .row(faction)
+                                .map(|r| r.weights)
+                                .unwrap_or_default();
                             let need = needs[slot];
                             // The carry class is the third term of the key. It
                             // is a bounded class of the state of the unit
@@ -138,7 +145,8 @@ impl World {
                             //
                             // [^17]: ADR-0109, the choice key holds a bounded class of the unit's own state, decision D1. `docs/adrs/draft/adr-0109-the-choice-key-holds-a-bounded-class-of-the-unit-state.md`
                             let carry = carry_class_of(carries[slot], homes[slot], mark);
-                            chosen.push((*unit, answers.answer(need, carry, weights)));
+                            chosen
+                                .push((*unit, answers.answer(faction, need, carry, weights, &fw)));
                         }
                     }
                     *slot = chosen;
@@ -288,6 +296,12 @@ impl World {
         let tile = self.soldiers.tile(entity)?;
         let cell = self.cell_of(tile)?;
         let summary = self.pyramid.cell(cell)?;
+        let faction = self.soldiers.faction_column()[slot as usize];
+        let faction_weights = self
+            .controller
+            .row(faction)
+            .map(|r| r.weights)
+            .unwrap_or_default();
         let need = self.soldiers.need_column()[slot as usize];
         let intent = self.soldiers.intent_column()[slot as usize];
         let carry = carry_class_of(
@@ -296,10 +310,12 @@ impl World {
             self.carry_mark,
         );
         Some(choose::explain(
+            faction,
             cell,
             choose::UnitState { need, carry },
             summary,
             &self.weights,
+            &faction_weights,
             self.buckets,
             intent,
             self.choice.chooses_now(cell, self.tick.0.wrapping_add(1)),

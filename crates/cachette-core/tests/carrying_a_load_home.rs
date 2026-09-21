@@ -35,6 +35,7 @@ use cachette_core::position::WORK_COMMODITY;
 use cachette_core::resource::{Amount, RecoveryRules, ResourceKind, RESOURCE_KIND_COUNT};
 use cachette_core::types::{Entity, FactionId, Fix32, TileIdx};
 use cachette_core::world::{World, WorldConfig};
+use cachette_core::FactionWeights;
 
 /// The option index of the row that carries a load home.
 ///
@@ -527,10 +528,12 @@ fn an_empty_unit_is_free_and_takes_no_delivery() {
     let profile = choose::WeightProfile::EVEN;
     assert_ne!(
         choose::best_option(
+            FactionId(0),
             cachette_core::cohort::NEED_FULL,
             CarryClass::Free,
             summary,
-            &profile
+            &profile,
+            &FactionWeights::default(),
         ),
         DELIVER,
         "a unit that carries nothing must never take the option"
@@ -590,11 +593,13 @@ fn a_laden_unit_wins_a_tie_against_the_ground() {
         .enumerate()
         .map(|(index, row)| {
             choose::score(
+                FactionId(0),
                 need,
                 CarryClass::Laden,
                 profile.weight(index as u8).expect("inside the set"),
                 summary,
                 *row,
+                &FactionWeights::default(),
             )
         })
         .collect();
@@ -603,7 +608,14 @@ fn a_laden_unit_wins_a_tie_against_the_ground() {
         "the fixture must produce the tie that this test is about"
     );
     assert_eq!(
-        choose::best_option(need, CarryClass::Laden, summary, &profile),
+        choose::best_option(
+            FactionId(0),
+            need,
+            CarryClass::Laden,
+            summary,
+            &profile,
+            &FactionWeights::default(),
+        ),
         DELIVER,
         "the tie must go to the option that reads the state of the unit"
     );

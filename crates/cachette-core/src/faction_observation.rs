@@ -1133,7 +1133,7 @@ declare_observation_fields! {
 
     /// Block L. The weight vector the faction plays under.
     ///
-    /// The engine holds five controller weights, and they fill the first five
+    /// The engine holds eight controller weights, and they fill the first eight
     /// positions in the order the weight vector declares. The remaining
     /// positions read zero, because the twelve-element objective vector of
     /// the reward design does not exist in the engine yet.
@@ -2607,12 +2607,21 @@ impl World {
         let tokens = self.faction_entity_tokens(faction, &ring_stack, &frontier, &powers)?;
         let legal = self.legal_actions(faction).unwrap_or_default();
         let weights = self.faction_weights(faction).map_or_else(Vec::new, |set| {
-            [set.war, set.trade, set.build, set.renown, set.settle]
-                .into_iter()
-                .map(|weight| {
-                    i64::from(sim_math::bounded_share(i64::from(weight), i64::from(u8::MAX)).0)
-                })
-                .collect()
+            [
+                set.war,
+                set.trade,
+                set.build,
+                set.renown,
+                set.settle,
+                set.own_ground,
+                set.rival_ground,
+                set.unheld_ground,
+            ]
+            .into_iter()
+            .map(|weight| {
+                i64::from(sim_math::bounded_share(i64::from(weight), i64::from(u8::MAX)).0)
+            })
+            .collect()
         });
         let board_rows = i64::from(self.board_rows());
         let board_used = self

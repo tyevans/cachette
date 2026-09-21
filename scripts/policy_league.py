@@ -297,6 +297,9 @@ class Weights:
     build: int
     renown: int
     settle: int
+    own_ground: int = 128
+    rival_ground: int = 128
+    unheld_ground: int = 128
 
     def as_dict(self) -> dict[str, int]:
         """Return this vector as plain values, for a report file."""
@@ -306,6 +309,9 @@ class Weights:
             "build": self.build,
             "renown": self.renown,
             "settle": self.settle,
+            "own_ground": self.own_ground,
+            "rival_ground": self.rival_ground,
+            "unheld_ground": self.unheld_ground,
         }
 
 
@@ -435,6 +441,9 @@ def seat_a_variant(world: World, seat: int, variant: ControllerVariant) -> None:
             build=variant.weights.build,
             renown=variant.weights.renown,
             settle=variant.weights.settle,
+            own_ground=variant.weights.own_ground,
+            rival_ground=variant.weights.rival_ground,
+            unheld_ground=variant.weights.unheld_ground,
         )
     if variant.ratio is not None:
         world.set_faction_overmatch_ratio(seat, int(variant.ratio))
