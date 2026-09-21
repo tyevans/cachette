@@ -659,7 +659,7 @@ pub fn ground_weight_for(
 /// # References
 ///
 /// [^1]: ADR-0156, a faction's option weights are policy, set through one verb, decisions D2 and D5. `docs/adrs/accepted/adr-0156-a-factions-option-weights-are-policy-set-through-one-verb.md`
-/// [^2]: Backlog item 0496, let a faction set the weight it gives each option. `docs/backlog/refined/0496-let-a-faction-set-the-weight-it-gives-each-option.md`
+/// [^2]: Backlog item 0496, let a faction set the weight it gives each option. `docs/backlog/complete/0496-let-a-faction-set-the-weight-it-gives-each-option.md`
 /// [^3]: ADR-0002, simulated and aggregated state holds no floating point number, decision D2. `docs/adrs/accepted/adr-0002-state-holds-no-floating-point-number.md`
 #[must_use]
 pub fn score(
