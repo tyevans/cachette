@@ -9,7 +9,7 @@
 //!
 //! # References
 //!
-//! [^1]: Backlog item 0514. `docs/backlog/refined/0514-let-a-faction-found-a-city-during-a-run.md`
+//! [^1]: Backlog item 0514. `docs/backlog/complete/0514-let-a-faction-found-a-city-during-a-run.md`
 //! [^2]: ADR-0150, held ground is the ground within reach of a city its faction owns, decisions D2 and D5. `docs/adrs/draft/adr-0150-held-ground-is-the-ground-within-reach-of-a-city-its-faction-owns.md`
 //! [^3]: ADR-0148, a game end is recorded once and stops the controllers, decision D3. `docs/adrs/accepted/adr-0148-a-game-end-is-recorded-once-and-stops-the-controllers.md`
 //! [^4]: Testing rules, section 1, a determinism test must be able to fail. `.agents/rules/testing.md`

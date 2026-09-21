@@ -1,7 +1,7 @@
 ---
 id: 0514
 title: Let a faction found a city during a run
-status: refined
+status: complete
 created: 2026-09-06
 implements: [ADR-0150 D2, ADR-0150 D5, ADR-0144 D2, ADR-0148 D3]
 changes: [ADR-0150]
@@ -71,7 +71,15 @@ counters when positions or sites open.
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The faction controller now queues a settler unit when a site holds the required
+goods store surplus and unheld eligible land exists within survey reach. The
+settler walks toward the survey target and executes `Verb::Settle`, creating a
+new settlement entity, opening site rows, and consuming the settler unit. The
+faction's primary seat remains unchanged on secondary founding, preserving
+domination win path invariants. The new city projects its reach disc and
+expands the faction's held ground. Verified in integration tests covering
+autonomous queuing, building, walking, settling, seat immutability, and
+deterministic multi-threaded execution.
 
 ## References
 
