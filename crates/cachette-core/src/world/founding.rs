@@ -457,6 +457,7 @@ impl World {
             .ok_or(SettleError::OutsideWorld(address))?;
         let (settlement, people) = self.settle_group(address, group, faction)?;
         self.provision_site(settlement, chosen.provision().food);
+        self.assign_founding_unit_types(&people, faction);
         // The seat of a faction is the tile of its first founding, and a
         // settler founds after that one. The call leaves a seat that stands.
         self.record_seat(faction, address);

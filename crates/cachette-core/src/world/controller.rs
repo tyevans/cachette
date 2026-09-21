@@ -19,7 +19,7 @@ use crate::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use crate::stage::{self, Stage};
 use crate::trade::{Consideration, TradeError, TradeRow, TRADE_OFFERED};
 use crate::types::{Entity, FactionId, Fix32, TileIdx};
-use crate::unit_type::{UnitTypeId, UnitTypeRow, LEADER, UNIT_TYPE_COUNT};
+use crate::unit_type::{UnitTypeId, UnitTypeRow, LEADER, SETTLER, UNIT_TYPE_COUNT};
 use crate::upgrade::UpgradeCategory;
 
 /// One negotiation step that the built-in controller chooses for a faction.
@@ -1132,11 +1132,18 @@ impl World {
                     // faction with no mariner reads no sample and the
                     // bounded survey costs an idle world nothing.
                     cross_to: self.controller_crossing_target(faction),
-                    queue_type: self.controller_queue_site(faction).and_then(|_| {
+                    queue_type: self.controller_queue_site(faction).and_then(|site| {
                         if speakers.get(index).copied().flatten().is_none()
                             && !self.leader_is_on_order(faction)
                         {
                             return Some(LEADER);
+                        }
+                        if !settlers.get(index).copied().unwrap_or(false)
+                            && !self.settler_is_on_order(faction)
+                            && self.site_has_settler_surplus(site)
+                            && self.settling_target_within_reach(faction).is_some()
+                        {
+                            return Some(SETTLER);
                         }
                         controller::queued_type_of(
                             self.config.seed,

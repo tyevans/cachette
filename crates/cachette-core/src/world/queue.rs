@@ -11,7 +11,7 @@ use crate::sim_math;
 use crate::site::{CommodityId, COMMODITY_COUNT};
 use crate::soldier::NO_HOME;
 use crate::types::{ArenaKind, Entity, FactionId, Fix32};
-use crate::unit_type::UnitTypeId;
+use crate::unit_type::{UnitTypeId, SETTLER};
 
 impl World {
     /// Returns the queue of one site, in queue position order.
@@ -464,6 +464,29 @@ impl World {
                     .iter()
                     .any(|entry| self.unit_types.row(entry.unit_type).command_reach > 0)
         })
+    }
+
+    /// Reports whether any site of one faction holds a settler on order in its queue.
+    pub(super) fn settler_is_on_order(&self, faction: FactionId) -> bool {
+        let sites = self.settlements.faction_column();
+        (0..self.settlements.slot_count()).any(|slot| {
+            self.settlements.entity_at(slot).is_some()
+                && sites[slot as usize] == faction
+                && self
+                    .queues
+                    .entries_of(slot)
+                    .iter()
+                    .any(|entry| self.unit_types.row(entry.unit_type).settle_group > 0)
+        })
+    }
+
+    /// Reports whether one site holds the required store surplus to sponsor a settler.
+    pub(super) fn site_has_settler_surplus(&self, site: Entity) -> bool {
+        let Some(slot) = self.settlements.slot_of(site) else {
+            return false;
+        };
+        let settler_cost = self.build_costs.row(SETTLER);
+        self.store_holds(slot, &settler_cost.goods)
     }
 
     /// Returns the lowest-slot site of one faction whose queue has room.
