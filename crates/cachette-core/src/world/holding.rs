@@ -8,7 +8,7 @@ use super::errors::StepError;
 use super::World;
 use crate::bridge::BridgeError;
 use crate::hex::Axial;
-use crate::holding::{FactionMask, Holder, Holding, LeaseRules, ReachRules};
+use crate::holding::{ClosureRules, FactionMask, Holder, Holding, LeaseRules, ReachRules};
 use crate::site::SiegeRules;
 use crate::slots::Slots;
 use crate::types::{Entity, FactionId, Tick, TileIdx};
@@ -342,6 +342,32 @@ impl World {
     /// [^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
     pub const fn set_lease_rules(&mut self, rules: LeaseRules) {
         self.holding.set_lease_rules(rules);
+    }
+
+    /// Returns how an unheld tile is claimed by the one faction that surrounds it.
+    ///
+    /// A fixed number of closure passes runs after city reach and lease decisions.
+    /// An unheld tile whose valid hex neighbours name exactly one faction at or
+    /// above the neighbour threshold is given to that faction.[^1]
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0153, a tile's lease follows the units that stand on it, decision D6. `docs/adrs/accepted/adr-0153-a-tiles-lease-follows-the-units-that-stand-on-it.md`
+    #[must_use]
+    pub const fn closure_rules(&self) -> ClosureRules {
+        self.holding.closure_rules()
+    }
+
+    /// Sets how an unheld tile is claimed by the one faction that surrounds it.
+    ///
+    /// The values are balance rows, and one blocker governs them.[^1] [^2]
+    ///
+    /// # References
+    ///
+    /// [^1]: Balance register, the holding. `docs/reference/balance.md`
+    /// [^2]: Blockers register, BLK-050. `docs/BLOCKERS.md`
+    pub const fn set_closure_rules(&mut self, rules: ClosureRules) {
+        self.holding.set_closure_rules(rules);
     }
 
     /// Returns the lease of one tile: the faction it names, and the count.
