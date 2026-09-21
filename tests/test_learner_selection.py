@@ -178,7 +178,7 @@ def test_an_equal_win_share_falls_to_the_shaped_return() -> None:
     """
     seeds = viable_seeds(TIED, 8, 3000)
     zeros = a_centre(TIED, "zeros")
-    drawn = a_centre(TIED, "drawn", seed=1)
+    drawn = a_centre(TIED, "drawn", seed=2)
 
     quiet = a_judge(TIED, seeds, zeros)
     on_zeros = quiet.score(zeros, "")

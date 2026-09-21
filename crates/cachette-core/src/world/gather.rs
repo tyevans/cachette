@@ -16,7 +16,7 @@ use crate::soldier::SoldierArena;
 #[cfg(not(feature = "probe-nondeterminism"))]
 use crate::sort;
 use crate::sort::{BoundedKey, SortError};
-use crate::types::{Entity, TileIdx};
+use crate::types::{Entity, FactionId, TileIdx};
 use crate::unit_type::UnitTypeId;
 use crate::upgrade;
 
@@ -61,6 +61,8 @@ struct GatherIntent {
     /// The type of the unit. The resolve reads the gather rate and the carry
     /// capacity of the row it indexes.
     unit_type: UnitTypeId,
+    /// The faction of the unit that gathers.
+    faction: Option<FactionId>,
 }
 
 /// Returns the order in which the resolve reads the gather intents.
@@ -146,11 +148,13 @@ fn gather_intents(soldiers: &SoldierArena, threads: usize) -> Result<Vec<GatherI
                         let kind = soldiers.gather_order(*unit)??;
                         let tile = soldiers.tile(*unit)?;
                         let unit_type = soldiers.unit_type(*unit)?;
+                        let faction = soldiers.faction(*unit);
                         Some(GatherIntent {
                             unit: *unit,
                             tile,
                             kind,
                             unit_type,
+                            faction,
                         })
                     })
                     .collect();
@@ -287,12 +291,26 @@ impl World {
             // [^2]: ADR-0143, wet ground yields more to a gatherer, decision D1. `docs/adrs/draft/adr-0143-wet-ground-yields-more-to-a-gatherer.md`
             // [^3]: ADR-0140, weather is a field over the level 1 cell lattice, decision D3. `docs/adrs/draft/adr-0140-weather-is-a-field-over-the-level-1-cell-lattice.md`
             let rate = rate.saturating_add(self.wet_bonus(first.tile));
+            let tile_holder = self
+                .holding
+                .holders()
+                .get(first.tile.0 as usize)
+                .copied()
+                .unwrap_or_default();
             let mut granted = 0u32;
             for position in &order[at..end] {
                 if left == 0 {
                     break;
                 }
                 let intent = intents[*position as usize];
+                // A unit cannot forage or harvest on another faction's held ground
+                // unless the two factions are at war. Friendly gathering on another's
+                // land is theft and is refused.
+                if let (Some(unit_f), Some(land_owner)) = (intent.faction, tile_holder.faction()) {
+                    if unit_f != land_owner && !self.at_war(unit_f, land_owner) {
+                        continue;
+                    }
+                }
                 // The type of the unit scales the tile rate and caps the
                 // load. A gather rate of zero takes nothing, and a load at
                 // the carry capacity takes nothing more.[^4]
