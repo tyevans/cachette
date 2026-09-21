@@ -7,7 +7,7 @@
 //!
 //! # References
 //!
-//! [^1]: Backlog item 0491. `docs/backlog/refined/0491-seed-the-demonstration-world-with-unit-types-that-can-fight-gather-and-carry.md`
+//! [^1]: Backlog item 0491. `docs/backlog/complete/0491-seed-the-demonstration-world-with-unit-types-that-can-fight-gather-and-carry.md`
 //! [^2]: ADR-0145, a unit type is a row of capability columns, and zero means cannot. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
 //! [^3]: ADR-0122, an attacker whose attack does not exceed the defender's armour contributes zero. `docs/adrs/draft/adr-0122-an-attacker-below-the-armour-contributes-exactly-zero.md`
 //! [^4]: Testing rules, section 1, a determinism test must be able to fail. `.agents/rules/testing.md`

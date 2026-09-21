@@ -12804,7 +12804,7 @@ public interface, and everyone would learn to ignore it.
 [^F486K]: Findings register, FND-483, in this document.
 [^F486L]: Testing Rules, rule 2a. `.agents/rules/testing.md`
 [^F486M]: ADR-0145, a unit type is a row of capability columns, and zero means cannot, decision D2. `docs/adrs/accepted/adr-0145-a-unit-type-is-a-row-of-capability-columns-and-zero-means-cannot.md`
-[^F486N]: Backlog item 0491, seed the demonstration world with unit types that can fight, gather and carry. `docs/backlog/refined/0491-seed-the-demonstration-world-with-unit-types-that-can-fight-gather-and-carry.md`
+[^F486N]: Backlog item 0491, seed the demonstration world with unit types that can fight, gather and carry. `docs/backlog/complete/0491-seed-the-demonstration-world-with-unit-types-that-can-fight-gather-and-carry.md`
 
 ## H. The trading controller
 

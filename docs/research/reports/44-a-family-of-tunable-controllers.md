@@ -591,7 +591,7 @@ always resolves early.
 [^adr158]: ADR-0158, a site builds a typed unit from a bounded queue its store pays for, decision D2. `docs/adrs/accepted/adr-0158-a-site-builds-a-typed-unit-from-a-bounded-queue-its-store-pays-for.md`
 [^campaign]: The campaign register, the cohort and the objective. `crates/cachette-core/src/campaign.rs`
 [^fnd486]: Findings register, FND-486, every founded unit carries the worker row. `docs/FINDINGS.md`
-[^item491]: Backlog item 0491, seed the demonstration world with unit types that can fight, gather and carry. `docs/backlog/refined/0491-seed-the-demonstration-world-with-unit-types-that-can-fight-gather-and-carry.md`
+[^item491]: Backlog item 0491, seed the demonstration world with unit types that can fight, gather and carry. `docs/backlog/complete/0491-seed-the-demonstration-world-with-unit-types-that-can-fight-gather-and-carry.md`
 [^adr146]: ADR-0146, a faction relation is one signed integer per ordered pair, and a pass reads a threshold, decision D3. `docs/adrs/accepted/adr-0146-a-faction-relation-is-one-signed-integer-per-ordered-pair-and-a-pass-reads-a-threshold.md`
 [^item181]: Backlog item 0181, give a kind of work the commodity it fills. `docs/backlog/complete/0181-give-a-kind-of-work-the-commodity-it-fills.md`
 [^bindfaction]: The faction bindings, the weight verb and the evaluation count. `crates/cachette-py/src/world/faction_view.rs`

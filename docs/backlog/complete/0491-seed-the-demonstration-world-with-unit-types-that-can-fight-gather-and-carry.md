@@ -1,7 +1,7 @@
 ---
 id: 0491
 title: Seed the demonstration world with unit types that can fight, gather and carry
-status: refined
+status: complete
 created: 2026-09-05
 implements: [ADR-0145 D1, ADR-0145 D2, ADR-0145 D4, ADR-0122 D1]
 changes: []
@@ -67,7 +67,13 @@ show zero vs missing rows,[^7] and subsystem reporting aligns with item 0278.[^8
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+Complete. `World::found_group` and `World::found_group_with_types` now assign
+diverse unit types (worker, soldier, merchant) to founding groups according to
+drawn faction traits and balance parameters. Warrior factions receive soldiers,
+builder factions receive workers, and larger groups receive merchants. Tests in
+`crates/cachette-core/tests/seed_unit_types.rs` verify unit mix, combat
+casualties, fallen log records, and census reporting per type. All 1,328 learner
+and core tests pass.
 
 ## References
 
