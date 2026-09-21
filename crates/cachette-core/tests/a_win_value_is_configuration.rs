@@ -24,6 +24,7 @@
 //! [^3]: Testing rules, section 1. `.agents/rules/testing.md`
 
 use cachette_core::contest::RENOWN_PER_FELL;
+use cachette_core::holding::ReachRules;
 use cachette_core::upgrade::{self, UpgradeCategory};
 use cachette_core::{FactionId, Fix32, WinPath, World, WorldConfig, RENOWN_TARGET};
 
@@ -116,8 +117,10 @@ fn the_event_log_comparison_fails_when_a_reader_fires() {
     // frames, so the territory reader fires and the controllers fall silent.
     // The logs must then differ.
     let mut watching = seeded();
+    watching.set_reach_rules(ReachRules::new(8, 4, 16));
     watching.set_tick_limit(FRAMES / 2);
     let mut recording = seeded();
+    recording.set_reach_rules(ReachRules::new(8, 4, 16));
     recording.set_tick_limit(FRAMES / 2);
     recording.set_win_readers_enabled(false);
 

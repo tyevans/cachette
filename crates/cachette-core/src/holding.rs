@@ -342,7 +342,7 @@ impl ReachRules {
     pub const DEFAULT: Self = Self {
         base: 2,
         upgrades_per_step: 2,
-        cap: 4,
+        cap: 16,
     };
 
     /// Builds a rule set.
