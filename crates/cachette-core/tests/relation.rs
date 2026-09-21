@@ -528,6 +528,19 @@ fn speaker_run(b_speaks: bool) -> SpeakerRun {
         end: start,
     };
     for tick in 0..200 {
+        if !b_speaks {
+            let b_leaders: Vec<Entity> = world
+                .soldiers()
+                .iter()
+                .filter(|unit| {
+                    world.soldiers().faction(*unit) == Some(B)
+                        && world.soldiers().unit_type(*unit) == Some(LEADER)
+                })
+                .collect();
+            for unit in b_leaders {
+                assert!(world.set_unit_type(unit, WORKER));
+            }
+        }
         // The plan reads the arena at the head of the step, so the state
         // before the step is the state the plan saw.
         let spoke = has_speaker(&world, B);
