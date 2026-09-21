@@ -670,13 +670,16 @@ impl World {
     /// while a campaign runs or while the carriers hold it. Those are the
     /// three gates the project verb reads before it moves a unit.
     fn project_work(&self, faction: FactionId) -> bool {
-        let Some((standing, walking)) = self.project_partition(faction) else {
-            return false;
+        let plane = faction.0;
+        let Some(partition) = self.project_partition(faction) else {
+            return plane < self.destinations.plane_count()
+                && !self.destination_seeds[plane as usize].is_empty();
         };
-        if !walking.is_empty() && faction.0 < self.destinations.plane_count() {
+        if !partition.walking.is_empty() && faction.0 < self.destinations.plane_count() {
             return true;
         }
-        standing
+        partition
+            .standing
             .iter()
             .any(|(unit, category)| self.build_refusal(*unit, *category).is_ok())
     }

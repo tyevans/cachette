@@ -50,6 +50,18 @@ pub(super) enum TradeMove {
     },
 }
 
+/// The partition of units for a faction's projects.
+///
+/// Units are split into those standing on a zoned project and those
+/// walking toward one, along with the assembled destination seeds for
+/// the faction's project plane.
+#[derive(Clone, Debug)]
+pub(super) struct ProjectPartition {
+    pub standing: Vec<(Entity, UpgradeCategory)>,
+    pub walking: Vec<(Entity, Project)>,
+    pub seeds: Vec<Axial>,
+}
+
 impl World {
     /// Returns the weight vector of one faction, or `None` when the world
     /// has no such faction.
@@ -722,29 +734,36 @@ impl World {
         // legality answer reads the same partition.[^lg]
         //
         // [^lg]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-        let Some((standing, walking)) = self.project_partition(faction) else {
+        let plane = faction.0;
+        let Some(partition) = self.project_partition(faction) else {
+            if plane < self.destinations.plane_count()
+                && !self.destination_seeds[plane as usize].is_empty()
+            {
+                return self.send_units_to(&[], &[], plane).is_ok();
+            }
             return false;
         };
         let mut applied = false;
-        if !walking.is_empty() {
-            let plane = faction.0;
-            if plane < self.destinations.plane_count() {
-                // The seeds are the projects the units took. The send verb
-                // sorts and deduplicates the set itself, so the order of this
-                // list decides nothing.
-                let seeds: Vec<Axial> = walking
-                    .iter()
-                    .filter_map(|(_, project)| self.grid.address_of(project.tile))
-                    .collect();
-                let set: Vec<Entity> = walking.iter().map(|(unit, _)| *unit).collect();
-                applied |= self.send_units_to(&set, &seeds, plane).is_ok();
+        if plane < self.destinations.plane_count() {
+            let mut next_tiles: Vec<TileIdx> = partition
+                .seeds
+                .iter()
+                .filter_map(|addr| self.grid.index_of(*addr))
+                .collect();
+            next_tiles.sort_unstable_by_key(|tile| tile.0);
+            next_tiles.dedup();
+            let seeds_changed = self.destination_seeds.get(plane as usize) != Some(&next_tiles);
+            if !partition.walking.is_empty() || seeds_changed {
+                let set: Vec<Entity> = partition.walking.iter().map(|(unit, _)| *unit).collect();
+                applied |= self.send_units_to(&set, &partition.seeds, plane).is_ok();
             }
         }
         // The build order names the category of the project the unit stands
         // on. The units are grouped by category, in category order, so each
         // call is the set form the boundary already exposes.
         for category in UpgradeCategory::ALL {
-            let group: Vec<Entity> = standing
+            let group: Vec<Entity> = partition
+                .standing
                 .iter()
                 .filter(|(_, held)| *held == category)
                 .map(|(unit, _)| *unit)
@@ -771,11 +790,7 @@ impl World {
     /// # References
     ///
     /// [^1]: ADR-0154, the observation and the action of a faction are schema-declared bounded tables, decision D5. `docs/adrs/accepted/adr-0154-the-observation-and-the-action-of-a-faction-are-schema-declared-bounded-tables.md`
-    #[allow(clippy::type_complexity)]
-    pub(super) fn project_partition(
-        &self,
-        faction: FactionId,
-    ) -> Option<(Vec<(Entity, UpgradeCategory)>, Vec<(Entity, Project)>)> {
+    pub(super) fn project_partition(&self, faction: FactionId) -> Option<ProjectPartition> {
         if self.plan.projects_of(faction).is_empty() {
             return None;
         }
@@ -797,6 +812,8 @@ impl World {
         // project nearest to it. A unit that is neither is left alone.
         let mut standing: Vec<(Entity, UpgradeCategory)> = Vec::new();
         let mut walking: Vec<(Entity, Project)> = Vec::new();
+        let mut seeds: Vec<Axial> = Vec::new();
+        let plane = faction.0;
         for unit in units {
             let Some(tile) = self.soldiers.tile(unit) else {
                 continue;
@@ -805,33 +822,47 @@ impl World {
                 standing.push((unit, category));
                 continue;
             }
-            if self.soldiers.sent(unit) != Some(None) {
-                continue;
-            }
-            // **A unit that carries a water crossing takes no project.** The
-            // crossing order is the one order that spends such a unit well,
-            // and it applies after this one, so a project order that swept up
-            // the mariners of an island faction would take them on the tick
-            // each one was built and the faction would never leave its
-            // island. The rule has the shape of the one the campaign keeps
-            // for a unit that carries command reach.
-            //
-            // The unit is not idle in the sense of doing nothing. A mariner
-            // that stands on a project of its faction still takes the build
-            // order above, because that branch reads where the unit stands
-            // and not what it is.
-            if self
-                .soldiers
-                .unit_type(unit)
-                .is_some_and(|unit_type| self.unit_types.row(unit_type).water_crossing > 0)
-            {
-                continue;
-            }
-            if let Some(project) = self.project_for(faction, unit) {
-                walking.push((unit, project));
+            if self.soldiers.sent(unit) == Some(None) {
+                // **A unit that carries a water crossing takes no project.** The
+                // crossing order is the one order that spends such a unit well,
+                // and it applies after this one, so a project order that swept up
+                // the mariners of an island faction would take them on the tick
+                // each one was built and the faction would never leave its
+                // island. The rule has the shape of the one the campaign keeps
+                // for a unit that carries command reach.
+                //
+                // The unit is not idle in the sense of doing nothing. A mariner
+                // that stands on a project of its faction still takes the build
+                // order above, because that branch reads where the unit stands
+                // and not what it is.
+                if self
+                    .soldiers
+                    .unit_type(unit)
+                    .is_some_and(|unit_type| self.unit_types.row(unit_type).water_crossing > 0)
+                {
+                    continue;
+                }
+                if let Some(project) = self.project_for(faction, unit) {
+                    walking.push((unit, project));
+                    if let Some(address) = self.grid.address_of(project.tile) {
+                        seeds.push(address);
+                    }
+                }
+            } else if self.soldiers.sent(unit) == Some(Some(plane)) {
+                if let Some(project) = self.project_for(faction, unit) {
+                    if let Some(address) = self.grid.address_of(project.tile) {
+                        seeds.push(address);
+                    }
+                }
             }
         }
-        Some((standing, walking))
+        seeds.sort_unstable_by_key(|a| (a.r, a.q));
+        seeds.dedup();
+        Some(ProjectPartition {
+            standing,
+            walking,
+            seeds,
+        })
     }
 
     pub(super) fn controller_carriers(&mut self, faction: FactionId) -> bool {
@@ -1110,7 +1141,9 @@ impl World {
                     // for.[^9]
                     //
                     // [^9]: ADR-0152, a faction plans its roads and zones with one solver, decision D5. `docs/adrs/accepted/adr-0152-a-faction-plans-its-roads-and-zones-with-one-solver.md`
-                    project_due: !self.plan.projects_of(faction).is_empty()
+                    project_due: (!self.plan.projects_of(faction).is_empty()
+                        || usize::from(faction.0) < self.destination_seeds.len()
+                            && !self.destination_seeds[usize::from(faction.0)].is_empty())
                         && objectives.get(index).copied().flatten().is_none(),
                     // A faction that owns no site with room in its queue
                     // queues nothing. The type comes from one keyed draw over
