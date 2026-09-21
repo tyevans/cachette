@@ -364,9 +364,11 @@ impl PyWorld {
                     motion,
                     surface,
                 ),
-                _ => return Err(FrameError::new_err(format!(
+                _ => {
+                    return Err(FrameError::new_err(format!(
                     "pyramid level {render_level} does not exist; the pyramid holds levels 0 and 1"
-                ))),
+                )))
+                }
             };
             result.map_err(|error| FrameError::new_err(error.to_string()))?
         };
