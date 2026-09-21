@@ -8,6 +8,7 @@ use super::errors::{ArenaMismatchError, IdentityError, StepError};
 use super::World;
 use crate::bridge::{BridgeError, UnitTileBridge};
 use crate::hex::Axial;
+use crate::holding::FactionMask;
 use crate::resource::{CarryLoad, ResourceKind};
 use crate::sim_math;
 use crate::soldier::{SoldierArena, SoldierError};
@@ -50,6 +51,38 @@ impl World {
     #[must_use]
     pub const fn soldiers(&self) -> &SoldierArena {
         &self.soldiers
+    }
+
+    /// Returns which factions see one soldier now.
+    ///
+    /// Returns an empty mask when the identity names no live soldier or when
+    /// the soldier is unobserved.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    #[must_use]
+    pub fn unit_mask(&self, entity: Entity) -> FactionMask {
+        if !self.soldiers.contains(entity) {
+            return FactionMask::EMPTY;
+        }
+        self.observation.unit_mask(entity)
+    }
+
+    /// Reports whether one faction sees one soldier now.
+    ///
+    /// Returns `false` when the identity names no live soldier or when the
+    /// soldier is unobserved.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    #[must_use]
+    pub fn unit_is_seen_by(&self, entity: Entity, faction: FactionId) -> bool {
+        if !self.soldiers.contains(entity) {
+            return false;
+        }
+        self.observation.unit_is_seen_by(entity, faction)
     }
 
     /// Resolves the value of an identity back to the soldier it names.

@@ -89,7 +89,7 @@ use crate::holding::FactionMask;
 use crate::slots::Slots;
 use crate::soldier::SoldierArena;
 use crate::terrain::{Terrain, TileKind};
-use crate::types::{FactionId, Tick, TileIdx, FACTION_CEILING};
+use crate::types::{ArenaKind, Entity, FactionId, Tick, TileIdx, FACTION_CEILING};
 
 /// How far a unit sees before the rules round the number, in hex steps.
 ///
@@ -801,6 +801,15 @@ pub struct Observation {
     /// [^2]: Recurring defect shapes, shape 1. `.agents/rules/recurring-defects.md`
     /// [^3]: ADR-0059, fog storage grows with observed area, not with world area, decision D5. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
     last_seen: Vec<Option<Vec<Tick>>>,
+    /// Which factions see each unit now.
+    ///
+    /// The projection is derived from the visible layers, so it enters no
+    /// state hash.[^4]
+    ///
+    /// # References
+    ///
+    /// [^4]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    unit_masks: Vec<FactionMask>,
 }
 
 impl Observation {
@@ -825,6 +834,7 @@ impl Observation {
             seen_masks: vec![FactionMask::EMPTY; blocks],
             ever_masks: vec![FactionMask::EMPTY; blocks],
             last_seen: vec![None; factions],
+            unit_masks: Vec::new(),
         }
     }
 
@@ -933,6 +943,54 @@ impl Observation {
         tiles_in_block(self.layout, block)
     }
 
+    /// Returns which factions see the unit in one slot now.
+    ///
+    /// The mask is derived from the visible layers, so it enters no state
+    /// hash.[^1] Returns an empty mask when the slot is dead or unobserved.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    #[must_use]
+    pub fn unit_mask_by_slot(&self, slot: usize) -> FactionMask {
+        self.unit_masks
+            .get(slot)
+            .copied()
+            .unwrap_or(FactionMask::EMPTY)
+    }
+
+    /// Returns which factions see one unit now.
+    ///
+    /// Returns an empty mask when the identity names a non-soldier arena or
+    /// when the unit is unobserved.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    #[must_use]
+    pub fn unit_mask(&self, unit: Entity) -> FactionMask {
+        if unit.arena() != ArenaKind::Soldier {
+            return FactionMask::EMPTY;
+        }
+        self.unit_mask_by_slot(unit.index() as usize)
+    }
+
+    /// Reports whether one faction sees one unit now.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    #[must_use]
+    pub fn unit_is_seen_by(&self, unit: Entity, faction: FactionId) -> bool {
+        self.unit_mask(unit).contains(faction)
+    }
+
+    /// Returns the whole unit mask projection.
+    #[must_use]
+    pub fn unit_masks(&self) -> &[FactionMask] {
+        &self.unit_masks
+    }
+
     /// Rebuilds what every faction sees, and folds the result into what every
     /// faction remembers.
     ///
@@ -973,6 +1031,7 @@ impl Observation {
         };
         let _span = crate::stage::open(crate::stage::Stage::ObserveApply);
         self.apply(produced, tick);
+        self.rebuild_unit_masks(arena);
         Ok(())
     }
 
@@ -1172,6 +1231,48 @@ impl Observation {
                     *slot = tick;
                 }
             }
+        }
+    }
+
+    /// Rebuilds the projection of which factions see each unit now.
+    ///
+    /// The projection is derived from the visible layers, so it enters no
+    /// state hash.[^1] A unit slot that is not live, or whose tile is outside
+    /// the world, receives an empty mask.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    fn rebuild_unit_masks(&mut self, arena: &SoldierArena) {
+        let live = arena.live_column();
+        let tiles = arena.tile_column();
+        let slots = live.len();
+        self.unit_masks.resize(slots, FactionMask::EMPTY);
+        self.unit_masks.fill(FactionMask::EMPTY);
+
+        for (slot, &is_live) in live.iter().enumerate() {
+            if is_live == 0 {
+                continue;
+            }
+            let Some(tile) = tiles.get(slot).copied() else {
+                continue;
+            };
+            let Some(key) = self.layout.key_of(tile) else {
+                continue;
+            };
+            let block = self.layout.block_of_key(key);
+            let block_mask = self.block_seen_now(block);
+            if block_mask.is_empty() {
+                continue;
+            }
+            let mut unit_mask = FactionMask::EMPTY;
+            for faction_idx in 0..FACTION_CEILING {
+                let faction = FactionId(faction_idx);
+                if block_mask.contains(faction) && self.sees_now(faction, tile) {
+                    unit_mask = unit_mask.with(faction);
+                }
+            }
+            self.unit_masks[slot] = unit_mask;
         }
     }
 
