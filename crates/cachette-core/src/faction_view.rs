@@ -804,8 +804,13 @@ impl World {
                 .original_of_ground(address, ground.kind, *kind)
                 .is_some_and(|stock| stock.0 > 0)
         });
-        let mut summary =
-            CellSummary::of_ground(ground.kind.is_passable(), ground.height, food, deposit);
+        let mut summary = CellSummary::of_ground(
+            ground.kind,
+            ground.kind.is_passable(),
+            ground.height,
+            food,
+            deposit,
+        );
         if !sees_now {
             return Ok(summary);
         }
@@ -819,10 +824,9 @@ impl World {
         //
         // [^2]: Findings register, FND-647. `docs/FINDINGS.md`
         let units = self.bridge().count_on_tile(self.soldiers(), address)?;
-        let held = i64::from(
-            self.tile_holder(address)
-                .is_some_and(|holder| !holder.is_nobody()),
-        );
+        let tile_holder = self.tile_holder(address);
+        let held = i64::from(tile_holder.is_some_and(|holder| !holder.is_nobody()));
+        let majority = tile_holder.and_then(|h| h.faction());
         let value = self
             .tile_value_at(tile)
             .ok_or(FactionViewError::NoTile(address))?;
@@ -831,6 +835,7 @@ impl World {
             held,
             sim_math::accumulate(Accum(0), value),
             taken.to_accum().0,
+            majority,
         ));
         Ok(summary)
     }

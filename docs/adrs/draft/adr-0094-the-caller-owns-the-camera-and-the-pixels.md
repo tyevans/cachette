@@ -225,5 +225,5 @@ later without a second migration, so the order is deliberate.
 [^5]: Findings register, FND-198. `docs/FINDINGS.md`
 [^6]: ADR-0022, level 0 is the only truth and every level above it is derived, decision D4. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
 [^7]: ADR-0022, level 0 is the only truth and every level above it is derived, decision D2. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
-[^8]: Backlog item 0239, draw a world too small for its tiles from level 1. `docs/backlog/refined/0239-draw-a-world-too-small-for-its-tiles-from-level-1.md`
+[^8]: Backlog item 0239, draw a world too small for its tiles from level 1. `docs/backlog/complete/0239-draw-a-world-too-small-for-its-tiles-from-level-1.md`
 [^9]: Backlog item 0210, generate the ground of a drawn tile once. `docs/backlog/complete/0210-generate-the-ground-of-a-drawn-tile-once.md`

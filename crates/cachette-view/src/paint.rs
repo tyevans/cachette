@@ -51,7 +51,9 @@ use cachette_core::hex::NEIGHBOURS;
 use cachette_core::resource::{ResourceKind, RESOURCE_KIND_COUNT};
 use cachette_core::terrain::{TileKind, KIND_COUNT};
 use cachette_core::upgrade::{UpgradeCategory, UpgradeSite, UPGRADE_CATEGORY_COUNT};
-use cachette_core::{Axial, BridgeError, Entity, FactionId, Holder, World, CYCLONE_DEPTH_CEILING};
+use cachette_core::{
+    Axial, BridgeError, Entity, FactionId, Fix32, Holder, World, CYCLONE_DEPTH_CEILING,
+};
 
 use crate::overlay::{self, Layer};
 use crate::text;
@@ -2336,6 +2338,216 @@ pub fn kind_colour(kind: TileKind) -> u32 {
 pub fn draw(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), BridgeError> {
     let mut motion = Motion::none();
     draw_paced(world, camera, canvas, Pace::STILL, &mut motion, None)
+}
+
+/// Draws the macroscopic level 1 view of the world onto the canvas.
+///
+/// This call paints level 1 cells at a still pace with no motion memory.[^11]
+///
+/// # Errors
+///
+/// Returns an error when the engine spatial structure no longer describes
+/// its units.
+///
+/// # References
+///
+/// [^11]: ADR-0022, level 0 is the only truth and every level above it is derived, decision D4. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+pub fn draw_level1(world: &World, camera: Camera, canvas: &mut Canvas) -> Result<(), BridgeError> {
+    let mut motion = Motion::none();
+    draw_level1_paced(world, camera, canvas, Pace::STILL, &mut motion, None)
+}
+
+/// Draws the macroscopic level 1 view of the world onto the canvas, at a pace the caller sets.
+///
+/// Walks the level 1 summary cells rather than individual level 0 tiles.
+/// Each level 1 cell carries the dominant terrain kind, mean elevation,
+/// and majority faction ownership, allowing smooth whole-world visualization
+/// for multi-million tile worlds without sub-pixel refusals.[^11]
+///
+/// # Errors
+///
+/// Returns an error when the engine spatial structure no longer describes
+/// its units.
+///
+/// # References
+///
+/// [^11]: ADR-0022, level 0 is the only truth and every level above it is derived, decision D4. `docs/adrs/accepted/adr-0022-level-0-is-the-only-truth-and-every-level-above-it-is-derived.md`
+#[allow(clippy::too_many_arguments)]
+pub fn draw_level1_paced(
+    world: &World,
+    camera: Camera,
+    canvas: &mut Canvas,
+    _pace: Pace,
+    _motion: &mut Motion,
+    layer: Option<&'static dyn Layer>,
+) -> Result<(), BridgeError> {
+    canvas.clear();
+    let layout = world.pyramid().layout();
+    let edge = layout.block_edge();
+    let blocks_wide = layout.blocks_wide();
+    let blocks_high = layout.blocks_high();
+
+    let chosen = layer.map(|layer| (layer, layer.span(world)));
+    let mut reading = chosen.map(|(layer, span)| overlay::Reading::opening(layer, span));
+
+    let (first_row, last_row) = camera.visible_rows(world, canvas);
+    let first_by = first_row / edge;
+    let last_by = last_row.div_ceil(edge).min(blocks_high);
+
+    for by in first_by..last_by {
+        let (first_column_top, last_column_top) = camera.visible_columns(by * edge, world, canvas);
+        let bottom_row = ((by + 1) * edge)
+            .saturating_sub(1)
+            .min(world.grid().height() - 1);
+        let (first_column_bottom, last_column_bottom) =
+            camera.visible_columns(bottom_row, world, canvas);
+        let first_col = first_column_top.min(first_column_bottom);
+        let last_col = last_column_top.max(last_column_bottom);
+        let first_bx = first_col / edge;
+        let last_bx = last_col.div_ceil(edge).min(blocks_wide);
+
+        for bx in first_bx..last_bx {
+            let block = by * blocks_wide + bx;
+            let Some(cell) = world.pyramid().cell(block) else {
+                continue;
+            };
+            if cell.tiles() == 0 {
+                continue;
+            }
+            canvas.blocks_read += 1;
+            canvas.tiles_painted += cell.tiles() as u32;
+
+            let dominant_kind = cell.dominant_kind().unwrap_or(TileKind::Plain);
+            canvas.painted_by_kind[dominant_kind.to_u8() as usize] += cell.tiles() as u32;
+
+            let mean_elevation = cell.mean_elevation().unwrap_or(Fix32::ZERO);
+            let mut ground_colour = tile_colour(dominant_kind, mean_elevation.0, 0, false);
+
+            if let Some((layer, span)) = chosen {
+                let center_addr =
+                    Axial::new((bx * edge + edge / 2) as i32, (by * edge + edge / 2) as i32);
+                let value = overlay::value_of(layer, world, center_addr, None);
+                if let Some(seen) = reading.as_mut() {
+                    seen.saw(value);
+                }
+                let strength = layer.strength(value, span);
+                if strength > 0 {
+                    ground_colour = mix(ground_colour, layer.colour(value), strength);
+                }
+            }
+
+            let majority = cell.majority_faction();
+            let (cell_colour, held_faction) = match majority {
+                Some(faction) => {
+                    canvas.tiles_held += cell.held_tiles() as u32;
+                    if (faction.0 as usize) < canvas.painted_by_faction.len() {
+                        canvas.painted_by_faction[faction.0 as usize] += cell.held_tiles() as u32;
+                    }
+                    (
+                        mix(ground_colour, faction_colour(faction), HOLDER_WEIGHT),
+                        Some(faction),
+                    )
+                }
+                None => (ground_colour, None),
+            };
+
+            let is_edge = held_faction.is_some_and(|f| {
+                let neighbors: [(i32, i32); 4] = [(-1, 0), (1, 0), (0, -1), (0, 1)];
+                for (dx, dy) in neighbors {
+                    let nx = bx as i32 + dx;
+                    let ny = by as i32 + dy;
+                    if nx < 0 || nx >= blocks_wide as i32 || ny < 0 || ny >= blocks_high as i32 {
+                        return true;
+                    }
+                    let n_block = ny as u32 * blocks_wide + nx as u32;
+                    if world
+                        .pyramid()
+                        .cell(n_block)
+                        .and_then(|c| c.majority_faction())
+                        != Some(f)
+                    {
+                        return true;
+                    }
+                }
+                false
+            });
+
+            let border_colour =
+                held_faction.map(|f| mix(cell_colour, faction_colour(f), EDGE_WEIGHT));
+
+            let r_top = by * edge;
+            let r_bottom = (by + 1) * edge;
+            let y_start = (camera.origin_y + r_top as f32 * camera.tile_height).round() as i32;
+            let y_end = (camera.origin_y + r_bottom as f32 * camera.tile_height).round() as i32;
+            let y_start_clamped = y_start.clamp(0, canvas.height() as i32);
+            let y_end_clamped = y_end.clamp(0, canvas.height() as i32);
+
+            for y in y_start_clamped..y_end_clamped {
+                let r = if camera.tile_height > 0.0 {
+                    (y as f32 - camera.origin_y) / camera.tile_height
+                } else {
+                    r_top as f32
+                };
+                let x_start = (camera.origin_x
+                    + (bx as f32 * edge as f32 + r / 2.0) * camera.tile_width)
+                    .round() as i32;
+                let x_end = (camera.origin_x
+                    + ((bx + 1) as f32 * edge as f32 + r / 2.0) * camera.tile_width)
+                    .round() as i32;
+                let x_start_clamped = x_start.clamp(0, canvas.width() as i32);
+                let x_end_clamped = x_end.clamp(0, canvas.width() as i32);
+                if x_start_clamped >= x_end_clamped {
+                    continue;
+                }
+
+                if is_edge && (y == y_start || y == y_end - 1) {
+                    canvas.fill_rect(
+                        x_start_clamped,
+                        y,
+                        x_end_clamped - x_start_clamped,
+                        1,
+                        border_colour.unwrap_or(cell_colour),
+                    );
+                } else if is_edge {
+                    if let Some(border) = border_colour {
+                        canvas.fill_rect(x_start_clamped, y, 1, 1, border);
+                        if x_end_clamped - 1 > x_start_clamped {
+                            canvas.fill_rect(
+                                x_start_clamped + 1,
+                                y,
+                                x_end_clamped - 1 - (x_start_clamped + 1),
+                                1,
+                                cell_colour,
+                            );
+                            canvas.fill_rect(x_end_clamped - 1, y, 1, 1, border);
+                        }
+                    } else {
+                        canvas.fill_rect(
+                            x_start_clamped,
+                            y,
+                            x_end_clamped - x_start_clamped,
+                            1,
+                            cell_colour,
+                        );
+                    }
+                } else {
+                    canvas.fill_rect(
+                        x_start_clamped,
+                        y,
+                        x_end_clamped - x_start_clamped,
+                        1,
+                        cell_colour,
+                    );
+                }
+            }
+        }
+    }
+
+    if let Some(reading) = reading {
+        canvas.overlay = Some(reading);
+    }
+
+    Ok(())
 }
 
 /// Draws the world onto the canvas, at a pace the caller sets.

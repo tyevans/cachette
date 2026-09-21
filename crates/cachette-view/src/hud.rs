@@ -39,6 +39,7 @@ use cachette_core::{
     NO_INTENT, OPTIONS, OPTION_COUNT,
 };
 
+use crate::frame::RenderLevel;
 use crate::metrics::Metrics;
 use crate::paint::{faction_colour, kind_colour, Camera, Canvas, Focus, COLOURED_FACTIONS};
 use crate::text;
@@ -667,6 +668,8 @@ pub struct Readout {
     /// whether the pass found anything. A key that named only the span could
     /// not tell an empty overlay from a broken one.
     overlay: Option<crate::overlay::Reading>,
+    /// The pyramid level that this frame was rendered from.
+    render_level: RenderLevel,
 }
 
 impl Readout {
@@ -690,6 +693,45 @@ impl Readout {
         metrics: &Metrics,
         outcomes: &[FoundingOutcome],
     ) -> Self {
+        Self::of_at_level(
+            world,
+            camera,
+            canvas,
+            metrics,
+            outcomes,
+            RenderLevel::Level0,
+        )
+    }
+
+    /// Reads what the panel will say for a macroscopic level 1 frame.
+    #[must_use]
+    pub fn of_level1(
+        world: &World,
+        camera: Camera,
+        canvas: &Canvas,
+        metrics: &Metrics,
+        outcomes: &[FoundingOutcome],
+    ) -> Self {
+        Self::of_at_level(
+            world,
+            camera,
+            canvas,
+            metrics,
+            outcomes,
+            RenderLevel::Level1,
+        )
+    }
+
+    /// Reads what the panel will say at an explicit pyramid render level.
+    #[must_use]
+    pub fn of_at_level(
+        world: &World,
+        camera: Camera,
+        canvas: &Canvas,
+        metrics: &Metrics,
+        outcomes: &[FoundingOutcome],
+        render_level: RenderLevel,
+    ) -> Self {
         let grid = world.grid();
         let (first_row, last_row) = camera.visible_rows(world, canvas);
         let middle_row = (first_row + last_row) / 2;
@@ -705,6 +747,7 @@ impl Readout {
         let seats_taken: u32 = sites.iter().map(SiteReadout::seats_held).sum();
 
         Self {
+            render_level,
             // The tick is the engine's own counter. The viewer reads it and
             // keeps no copy of its own, because two counters for one number
             // is one fact in two places.
@@ -973,9 +1016,22 @@ impl Readout {
     /// # References
     ///
     /// [^1]: PRD-0003, a developer sees a world worth looking at. `docs/product/accepted/prd-0003-a-developer-sees-a-world-worth-looking-at.md`
+    /// Returns the counts of tiles painted for each terrain kind.
     #[must_use]
     pub const fn by_kind(&self) -> &[u32; KIND_COUNT] {
         &self.by_kind
+    }
+
+    /// Returns the pyramid level from which the frame was rendered.
+    #[must_use]
+    pub const fn render_level(&self) -> RenderLevel {
+        self.render_level
+    }
+
+    /// Returns the pyramid level number (0 or 1).
+    #[must_use]
+    pub const fn level(&self) -> u8 {
+        self.render_level.to_u8()
     }
 
     /// Returns the level 1 summary of the region under the middle of the
