@@ -706,17 +706,16 @@ impl World {
     /// Returns every unit that one faction sees now, with its tile and its
     /// faction.
     ///
-    /// A faction sees a unit when it sees the tile the unit stands on. It
-    /// therefore sees its own units on the ground its own units watch, and it
-    /// sees a rival that walks into that ground.[^1]
+    /// Returns which units one faction sees now, ordered by faction and then
+    /// by entity identity.
     ///
-    /// **The walk runs over the factions in faction order, and over the units
-    /// of each faction in slot order.** Both orders are fixed, so two runs
-    /// return one answer. Nothing reads a thread.[^2]
+    /// The reader tests the unit mask projection that the observation rebuild
+    /// derived.[^1] Two runs at different thread counts return one answer.
+    /// Nothing reads a thread.[^2]
     ///
     /// # References
     ///
-    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
     /// [^2]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
     #[must_use]
     pub fn units_seen_by(&self, faction: FactionId) -> Vec<SeenUnit> {
@@ -728,7 +727,7 @@ impl World {
                 let Some(tile) = arena.tile(unit) else {
                     continue;
                 };
-                if self.observation().sees_now(faction, tile) {
+                if self.observation().unit_is_seen_by(unit, faction) {
                     seen.push(SeenUnit {
                         unit,
                         tile,
@@ -738,6 +737,16 @@ impl World {
             }
         }
         seen
+    }
+
+    /// Reports whether one faction sees one unit now.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decisions D3 and D4. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    #[must_use]
+    pub fn sees_unit(&self, faction: FactionId, unit: Entity) -> bool {
+        self.unit_is_seen_by(unit, faction)
     }
 
     /// Returns the generated ground of one tile.

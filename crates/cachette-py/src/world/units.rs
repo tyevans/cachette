@@ -529,6 +529,32 @@ impl PyWorld {
         Ok(columns)
     }
 
+    /// Returns which factions see one soldier now, as a bit mask.
+    ///
+    /// Returns zero when the soldier is dead or unobserved.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    /// [^2]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    fn unit_seeing_factions(&self, unit: u64) -> PyResult<u64> {
+        let world = self.lock();
+        let entity = resolve(&world, unit)?;
+        Ok(world.unit_mask(entity).to_bits())
+    }
+
+    /// Reports whether one faction sees one soldier now.
+    ///
+    /// # References
+    ///
+    /// [^1]: ADR-0059, fog storage grows with observed area, not with world area, decision D3. `docs/adrs/accepted/adr-0059-fog-storage-grows-with-observed-area.md`
+    /// [^2]: ADR-0085, an entity crosses to Python as one opaque identity that the engine resolves, decisions D1 and D3. `docs/adrs/accepted/adr-0085-an-entity-crosses-to-python-as-one-opaque-identity.md`
+    fn unit_is_seen_by(&self, unit: u64, faction: u16) -> PyResult<bool> {
+        let world = self.lock();
+        let entity = resolve(&world, unit)?;
+        Ok(world.unit_is_seen_by(entity, FactionId(faction)))
+    }
+
     /// Changes the faction of every soldier the identities name.
     ///
     /// The units are a sequence of identities, or the NumPy array of
