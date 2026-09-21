@@ -183,6 +183,15 @@ row.[^26] A later record may change the value without touching the verb.
 The verb that founds a settlement at an address, with no unit, stays for the
 seeding layer. It founds the first city of a faction before any settler exists.
 
+**Secondary city founding governs expansion during a run.** Three rules apply:
+1. The primary seat of a faction (the founding tile recorded at tick zero) is
+   immutable. A secondary founding creates a new settlement entity and opens
+   site rows, but does not move the faction's seat.[^22]
+2. Sponsoring a settler unit consumes store food or goods from the parent site
+   according to balance parameters.[^9]
+3. The new city projects an additional reach disc, uniting or expanding the
+   faction's held ground.[^4]
+
 A reviewer finds a violation when a pass compares a type index to a constant to
 find a settler, when the controller founds a city through a path a Python
 caller cannot call, or when a settler founds on held ground.

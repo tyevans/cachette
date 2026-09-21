@@ -566,6 +566,13 @@ impl World {
             .filter_map(|candidate| {
                 let tile = candidate.tile();
                 let address = self.grid.address_of(tile)?;
+                if self
+                    .holding
+                    .holder(address)
+                    .is_some_and(|holder| !holder.is_nobody())
+                {
+                    return None;
+                }
                 let near = mine
                     .iter()
                     .map(|seat| seat.distance(address))
@@ -591,6 +598,50 @@ impl World {
             .iter()
             .min_by_key(|(near, _, tile, _)| (*near, tile.0))
             .map(|(_, _, _, address)| *address)
+    }
+
+    /// Returns the best eligible unheld place within settler reach, or `None`.
+    pub(super) fn settling_target_within_reach(&self, faction: FactionId) -> Option<Axial> {
+        let mine: Vec<Axial> = self
+            .settlements
+            .iter()
+            .filter(|site| self.settlements.faction(*site) == Some(faction))
+            .filter_map(|site| self.settlements.address(site))
+            .collect();
+        let taken: Vec<Axial> = self
+            .settlements
+            .iter()
+            .filter_map(|site| self.settlements.address(site))
+            .collect();
+        let survey = self
+            .survey_founding_apart(SETTLING_SURVEY_GROUP, faction, &taken)
+            .ok()?;
+        let in_reach: Vec<(u32, Accum, TileIdx, Axial)> = survey
+            .candidates()
+            .iter()
+            .filter(|candidate| candidate.is_eligible())
+            .filter_map(|candidate| {
+                let tile = candidate.tile();
+                let address = self.grid.address_of(tile)?;
+                if self
+                    .holding
+                    .holder(address)
+                    .is_some_and(|holder| !holder.is_nobody())
+                {
+                    return None;
+                }
+                let near = mine
+                    .iter()
+                    .map(|seat| seat.distance(address))
+                    .min()
+                    .unwrap_or(0);
+                (near <= SETTLER_REACH).then_some((near, candidate.score(), tile, address))
+            })
+            .collect();
+        let best = in_reach
+            .iter()
+            .max_by_key(|(_, score, tile, _)| (score.0, core::cmp::Reverse(tile.0)));
+        best.map(|(_, _, _, address)| *address)
     }
 
     /// Founds a city from every settler of one faction that stands on ground
