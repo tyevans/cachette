@@ -178,7 +178,7 @@ fn the_lookup_names_the_nearest_city_of_the_faction_that_holds_the_wonder() {
 /// in that order.
 fn two_cities_at_one_distance(west_first: bool) -> (World, Entity, Entity, Axial) {
     let mut world = a_still_world(0x0a1d_5eed_0002_0002);
-    let spread = 3;
+    let spread = 2;
     let axes = [
         Axial::new(spread, 0),
         Axial::new(0, spread),
