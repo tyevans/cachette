@@ -81,9 +81,9 @@ const DIVIDE: i32 = 30;
 
 /// How far each city of the fixture stands from the divide.
 ///
-/// The two cities are seven tiles apart, which is inside twice the reach of a
+/// The two cities are three tiles apart, which is inside twice the reach of a
 /// city, so the two holdings meet.
-const SEAT_STEP: i32 = 4;
+const SEAT_STEP: i32 = 2;
 
 /// The steps the fixture runs before it draws.
 ///
