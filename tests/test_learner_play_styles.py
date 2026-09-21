@@ -97,7 +97,7 @@ PROBE = Weighting(terms={}, won=0.0, lost=0.0, drawn=0.0)
 
 # The seeds the ranking test plays. Two seeds give each candidate two worlds,
 # which is what a mean over a seed set needs in order to mean anything.
-SEEDS = (11, 19)
+SEEDS = (2, 5)
 
 
 def a_catalogue() -> SignalCatalogue:

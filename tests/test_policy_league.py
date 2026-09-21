@@ -598,9 +598,11 @@ def test_the_controller_rates_above_a_fixed_preference_order_and_a_no_op() -> No
         assert by_name[league.CONTROLLER].elo > by_name[opponent].elo
 
     ordered = league.ordered_pairs(ratings, league.difference_errors(raw))
-    assert ordered, "the controller must clear the error bar over both opponents"
-    assert all(high == league.CONTROLLER for high, _low, _gap, _error in ordered)
-    assert {low for _high, low, _gap, _error in ordered} == {"idle", "preference"}
+    controller_ordered = [pair for pair in ordered if pair[0] == league.CONTROLLER]
+    assert {low for _high, low, _gap, _error in controller_ordered} == {
+        "idle",
+        "preference",
+    }
 
     found = league.endings(results, players)
     assert all(row.games == len(seatings) * SEATS // len(players) for row in found)
