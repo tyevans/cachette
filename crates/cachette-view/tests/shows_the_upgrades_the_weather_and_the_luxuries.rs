@@ -46,7 +46,7 @@ const HOLDING_TICKS: u32 = 4;
 /// zoom and not at a far one. The tests that read the air compare one tile at
 /// two zooms, and they need ground with nothing standing on it. The tiles
 /// inside this radius are held, because the city reaches further than it.
-const QUIET_RADIUS: u32 = 3;
+const QUIET_RADIUS: u32 = 1;
 
 /// The most ticks a storm is given to fall out of the air onto the ground.
 ///

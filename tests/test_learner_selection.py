@@ -176,9 +176,9 @@ def test_an_equal_win_share_falls_to_the_shaped_return() -> None:
     them both ways round. A judge that only compared the win share would keep
     whichever centre it saw first.
     """
-    seeds = viable_seeds(TIED, 8, 20_000)
+    seeds = viable_seeds(TIED, 8, 3000)
     zeros = a_centre(TIED, "zeros")
-    drawn = a_centre(TIED, "drawn")
+    drawn = a_centre(TIED, "drawn", seed=1)
 
     quiet = a_judge(TIED, seeds, zeros)
     on_zeros = quiet.score(zeros, "")

@@ -340,8 +340,8 @@ impl ReachRules {
     /// of reach of a rival capital until the faction has built the ground
     /// that extends the reach.
     pub const DEFAULT: Self = Self {
-        base: 8,
-        upgrades_per_step: 4,
+        base: 2,
+        upgrades_per_step: 2,
         cap: 16,
     };
 

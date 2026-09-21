@@ -354,7 +354,9 @@ fn a_change_the_faction_cannot_see_does_not_reach_the_stack() {
 /// [^1]: Findings register, FND-671. `docs/FINDINGS.md`
 #[test]
 fn the_reader_reads_the_ground_it_holds_and_does_not_watch() {
-    let (world, _) = a_world_with_a_city(96, 96, 0x0f0f_0f0f_0f0f_0f0f, Axial::new(48, 48));
+    let (mut world, _) = a_world_with_a_city(96, 96, 0x0f0f_0f0f_0f0f_0f0f, Axial::new(48, 48));
+    world.set_sight_rules(SightRules::new(1, 1, 16, 0));
+    world.step(1).expect("the step runs");
     let unwatched = world
         .holding()
         .tiles_held_by(READER)

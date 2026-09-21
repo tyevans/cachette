@@ -349,9 +349,9 @@ TIMED_LIMIT = 600
 # last two, by domination at tick 529 and by held ground at the limit.
 EARLY_WIN_SEED = 4
 LATER_WIN_SEED = 7
-LIMIT_WIN_SEED = 3
-EARLY_LOSS_SEED = 10
-LIMIT_LOSS_SEED = 2
+LIMIT_WIN_SEED = 2
+EARLY_LOSS_SEED = 0
+LIMIT_LOSS_SEED = 3
 
 # What a win, a loss and the time left on the clock pay in the tests below.
 # Each is a fixture value and never a proposal.[^3]
