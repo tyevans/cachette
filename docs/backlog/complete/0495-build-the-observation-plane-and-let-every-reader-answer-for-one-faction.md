@@ -142,7 +142,7 @@ was added.
 [^9]: ADR-0004, iteration order is explicit, decision D1. `docs/adrs/accepted/adr-0004-iteration-order-is-explicit.md`
 [^10]: Research report 31, the state of the learner surface, section 3.3. `docs/research/reports/31-the-state-of-the-learner-surface.md`
 [^11]: Findings register, FND-568. `docs/FINDINGS.md`
-[^12]: Backlog item 0521. `docs/backlog/refined/0521-give-each-unit-the-mask-of-the-factions-that-see-it.md`
+[^12]: Backlog item 0521. `docs/backlog/complete/0521-give-each-unit-the-mask-of-the-factions-that-see-it.md`
 [^13]: Decisions register, DEC-276. `docs/DECISIONS.md`
 [^14]: Blockers register, BLK-007. `docs/BLOCKERS.md`
 [^15]: ADR-0068, terrain is generated from the seed and is never stored as a map, decision D1. `docs/adrs/accepted/adr-0068-terrain-is-generated-from-the-seed-and-is-never-stored-as-a-map.md`

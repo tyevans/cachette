@@ -1,7 +1,7 @@
 ---
 id: 0521
 title: Give each unit the mask of the factions that see it
-status: refined
+status: complete
 created: 2026-09-06
 implements: [ADR-0059 D3, ADR-0059 D5]
 changes: []
@@ -74,7 +74,18 @@ capability without an active caller.[^9] The caller is
 
 ## Outcome
 
-Filled in when the item moves to `complete/`.
+The third derived fog of war projection from ADR-0059 D3 is now built.
+`Observation` maintains `unit_masks: Vec<FactionMask>` over the soldier arena
+slots. The rebuild pass populates the masks at `Stage::ObserveApply` after
+visible layers are derived.
+
+`FactionView::units_seen_by` checks the unit mask directly, replacing per-unit
+block lookups with an O(1) bit test. `World::sees_unit`, `World::unit_mask`, and
+`World::unit_is_seen_by` expose unit visibility, and Python bindings expose
+`unit_seeing_factions` and `unit_is_seen_by`.
+
+The projection is pure derived state and stays outside the state hash per
+ADR-0059 D5 and ADR-0164 D2.
 
 ## References
 
