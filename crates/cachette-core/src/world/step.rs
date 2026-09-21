@@ -31,6 +31,11 @@ impl World {
             return Err(StepError::ZeroThreads);
         }
 
+        if threads > 1 {
+            self.workers.ensure_workers(threads - 1);
+        }
+        let _stage_guard = self.workers.activate();
+
         self.trade_log.clear();
         // **These three logs are cleared here, before any system runs.** The
         // rule for every log in this engine is the same: a log holds what
