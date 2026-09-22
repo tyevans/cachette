@@ -93,6 +93,30 @@ impl World {
             .ok_or(MoveRelationError::Relation(RelationError::SameFaction))
     }
 
+    /// Reports whether two factions have met.
+    ///
+    /// Every faction has met itself. Two distinct factions have met when
+    /// their units or cities have passed within line of sight of each other.
+    #[must_use]
+    pub fn has_met(&self, a: FactionId, b: FactionId) -> bool {
+        self.relations.has_met(a, b)
+    }
+
+    /// Records that two factions have met.
+    pub fn meet(&mut self, a: FactionId, b: FactionId) {
+        self.relations.meet(a, b);
+    }
+
+    /// Sets whether two factions have met.
+    pub fn set_met(&mut self, a: FactionId, b: FactionId, met: bool) -> bool {
+        let count = self.config.faction_count.max(1);
+        if a.0 >= count || b.0 >= count {
+            return false;
+        }
+        self.relations.set_met(a, b, met);
+        true
+    }
+
     /// Reports whether the relation verb would refuse one move, without
     /// moving anything.
     ///
@@ -125,6 +149,9 @@ impl World {
         }
         if other == faction {
             return Err(RelationError::SameFaction.into());
+        }
+        if !self.relations.has_met(faction, other) {
+            return Err(RelationError::UnmetFaction(other.0).into());
         }
         if self.unit_types.row(unit_type).command_reach == 0 {
             return Err(RelationError::NoCommandReach.into());

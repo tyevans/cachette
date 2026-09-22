@@ -396,6 +396,7 @@ impl World {
         world
             .observation
             .rebuild(&world.soldiers, world.terrain, 1, world.tick)?;
+        world.update_contacts();
         Ok(world)
     }
     /// Seeds the world: founds one run for every faction and places the

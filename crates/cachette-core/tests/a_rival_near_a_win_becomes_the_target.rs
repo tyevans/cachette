@@ -241,6 +241,11 @@ fn a_wonder_underway(seed: u64, enough: impl Fn(i32) -> bool) -> (World, Axial) 
     seat_near(&mut world, OTHER, Axial::new(48, 80));
     city_near(&mut world, OTHER, Axial::new(84, 80));
     give_a_leader(&mut world, home);
+    for a in [WATCHER, LEADING, OTHER] {
+        for b in [WATCHER, LEADING, OTHER] {
+            world.meet(a, b);
+        }
+    }
     assert!(world.set_faction_overmatch_ratio(WATCHER, 0));
     world.step(THREADS).expect("the step runs");
     put_builders(&mut world, LEADING, wonder);
@@ -388,6 +393,11 @@ fn a_rival_that_nears_another_win_path_becomes_the_target() {
     let home = seat_near(&mut world, WATCHER, Axial::new(12, 48));
     let taken = seat_near(&mut world, LEADING, Axial::new(48, 16));
     seat_near(&mut world, OTHER, Axial::new(48, 80));
+    for a in [WATCHER, LEADING, OTHER] {
+        for b in [WATCHER, LEADING, OTHER] {
+            world.meet(a, b);
+        }
+    }
     give_a_leader(&mut world, home);
     world.step(THREADS).expect("the step runs");
 

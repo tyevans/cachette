@@ -514,7 +514,10 @@ impl World {
         }
         for index in 0..self.config.faction_count.max(1) {
             let other = FactionId(index);
-            if other == faction || !self.relations.permits_offer(faction, other) {
+            if other == faction
+                || !self.has_met(faction, other)
+                || !self.relations.permits_offer(faction, other)
+            {
                 continue;
             }
             if self.live_orientation(faction, other).is_ok() {
@@ -1041,20 +1044,32 @@ impl World {
         let rivals: Vec<Option<FactionId>> = (0..factions)
             .map(|index| {
                 speakers[index]?;
-                controller::rival_of(FactionId(index as u16), held.iter().copied())
+                let faction = FactionId(index as u16);
+                controller::rival_of(
+                    faction,
+                    held.iter()
+                        .copied()
+                        .filter(|(other, _)| self.has_met(faction, *other)),
+                )
             })
             .collect();
         // The prey of a faction is the weakest other faction it overmatches.
         // A faction with no speaker has no prey, because the relation verb
         // would refuse it. **The prey is chosen from the same held ground
         // list the rival is chosen from**, so the two never read different
-        // counts of one tick.
+        // counts of one tick. Factions that have not met are excluded.
         let prey: Vec<Option<FactionId>> = (0..factions)
             .map(|index| {
                 speakers[index]?;
                 let faction = FactionId(index as u16);
                 let ratio = self.controller.overmatch_ratio(faction)?;
-                controller::prey_of(faction, ratio, held.iter().copied())
+                controller::prey_of(
+                    faction,
+                    ratio,
+                    held.iter()
+                        .copied()
+                        .filter(|(other, _)| self.has_met(faction, *other)),
+                )
             })
             .collect();
         // A faction that holds a carrier raises no campaign, because the

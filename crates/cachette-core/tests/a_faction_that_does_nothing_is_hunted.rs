@@ -113,6 +113,11 @@ fn seat(world: &mut World, seated: u16) {
         }
         assert!(founded, "faction {faction} must find a place");
     }
+    for a in 0..seated {
+        for b in 0..seated {
+            world.meet(FactionId(a), FactionId(b));
+        }
+    }
 }
 
 /// Builds a world of three factions and leaves the first one idle.

@@ -21,6 +21,7 @@ A record here is a need, not a plan. The backlog says what work answers it.[^3]
 
 | No. | Why it sits here |
 |---|---|
+| 0058 | Two factions must meet before they can interact. Implemented to enforce line-of-sight contact before diplomacy. |
 | 0012 | Eight of nine statements are met in a run. Nothing is born, so the end population is still the starting number.[^6] |
 | 0007 | Tiles hold resources and units take them. Consumption is what completes it. |
 | 0006 | A watcher can see the ground now. One statement still fails: two values name a tile's owner. |

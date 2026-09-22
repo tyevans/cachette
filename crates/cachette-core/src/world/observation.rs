@@ -185,4 +185,68 @@ impl World {
     pub const fn observation(&self) -> &Observation {
         &self.observation
     }
+
+    /// Updates contacts between factions based on current lines of sight.
+    ///
+    /// Two factions meet when:
+    /// 1. A live unit of one faction observes a tile holding a live unit of the other.
+    /// 2. A live unit of one faction observes a tile holding a city (settlement) of the other.
+    ///
+    /// The contact is symmetric: each is marked as having met the other.
+    pub(super) fn update_contacts(&mut self) {
+        let factions = self.config.faction_count.max(1);
+        if factions <= 1 {
+            return;
+        }
+
+        // 1. Units passing within line of sight of each other.
+        let live = self.soldiers.live_column();
+        let soldier_factions = self.soldiers.faction_column();
+        for (slot, &is_live) in live.iter().enumerate() {
+            if is_live == 0 {
+                continue;
+            }
+            let Some(&faction) = soldier_factions.get(slot) else {
+                continue;
+            };
+            let seen_by = self.observation.unit_mask_by_slot(slot);
+            for other_idx in 0..factions {
+                let other = FactionId(other_idx);
+                if other != faction && seen_by.contains(other) {
+                    self.relations.meet(faction, other);
+                }
+            }
+        }
+
+        // 2. Units passing within line of sight of a city (settlement).
+        let site_live = self.settlements.live_column();
+        let site_tiles = self.settlements.tile_column();
+        let site_factions = self.settlements.faction_column();
+        for (slot, &is_live) in site_live.iter().enumerate() {
+            if is_live == 0 {
+                continue;
+            }
+            let (Some(&tile), Some(&faction)) = (site_tiles.get(slot), site_factions.get(slot))
+            else {
+                continue;
+            };
+            let Some(key) = self.observation.layout().key_of(tile) else {
+                continue;
+            };
+            let block = self.observation.layout().block_of_key(key);
+            let block_mask = self.observation.block_seen_now(block);
+            if block_mask.is_empty() {
+                continue;
+            }
+            for other_idx in 0..factions {
+                let other = FactionId(other_idx);
+                if other != faction
+                    && block_mask.contains(other)
+                    && self.observation.sees_now(other, tile)
+                {
+                    self.relations.meet(faction, other);
+                }
+            }
+        }
+    }
 }

@@ -99,6 +99,25 @@ impl PyWorld {
         Ok(())
     }
 
+    /// Reports whether two factions have met.
+    fn has_met(&self, a: u16, b: u16) -> PyResult<bool> {
+        let world = self.lock();
+        Ok(world.has_met(FactionId(a), FactionId(b)))
+    }
+
+    /// Records that two factions have met.
+    fn meet(&self, a: u16, b: u16) -> PyResult<()> {
+        let mut world = self.lock();
+        world.meet(FactionId(a), FactionId(b));
+        Ok(())
+    }
+
+    /// Sets whether two factions have met.
+    fn set_met(&self, a: u16, b: u16, met: bool) -> PyResult<bool> {
+        let mut world = self.lock();
+        Ok(world.set_met(FactionId(a), FactionId(b), met))
+    }
+
     /// Moves what the faction of a speaker unit feels toward another faction
     /// by a bounded step, and returns the value after the move.
     ///

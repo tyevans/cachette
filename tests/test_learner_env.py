@@ -222,7 +222,7 @@ ENDING = EnvConfig(
     decision_interval=8,
 )
 
-ENDING_START = 1160
+ENDING_START = 3440
 """Where the search for the ending worlds starts.
 
 One name holds it, so the two tests below cannot disagree about which worlds

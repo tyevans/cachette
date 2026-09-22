@@ -44,7 +44,7 @@ const GROUP: u32 = 96;
 /// A unit is promoted for what it did, so it must be given time to do it. A
 /// world drawn before the deeds accumulate holds no character whatever the
 /// pass does, and the first test below refuses such a world.
-const STEPS: usize = 300;
+const STEPS: usize = 420;
 
 /// Builds a founded world, run far enough that somebody is promoted.
 fn founded(steps: usize) -> (World, Vec<FoundingOutcome>, Axial) {
