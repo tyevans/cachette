@@ -61,7 +61,7 @@ EXTENT = 24
 
 # A seed whose run reaches a game end quickly. The probe that chose it is in
 # the commit body.
-ENDING_SEED = 19
+ENDING_SEED = 4
 
 # The tick by which the run of that seed has ended. The probe measured the
 # end at tick 161, and this bound leaves room.
@@ -348,9 +348,9 @@ TIMED_LIMIT = 600
 # domination at tick 241, and by held ground at the tick limit. It loses the
 # last two, by domination at tick 529 and by held ground at the limit.
 EARLY_WIN_SEED = 4
-LATER_WIN_SEED = 12
+LATER_WIN_SEED = 16
 LIMIT_WIN_SEED = 2
-EARLY_LOSS_SEED = 0
+EARLY_LOSS_SEED = 120
 LIMIT_LOSS_SEED = 3
 
 # What a win, a loss and the time left on the clock pay in the tests below.
