@@ -352,6 +352,7 @@ const TERM: u32 = 50;
 fn quiet_pair(seed: u64) -> World {
     let mut world = World::new(config(2, seed)).expect("the extent describes a world");
     seat(&mut world, 2);
+    world.meet(ASKER, SELLER);
     for faction in [ASKER, SELLER] {
         assert!(world.set_externally_controlled(faction, true));
     }
