@@ -177,23 +177,23 @@ def test_an_equal_win_share_falls_to_the_shaped_return() -> None:
     whichever centre it saw first.
     """
     seeds = viable_seeds(TIED, 8, 3000)
-    zeros = a_centre(TIED, "zeros")
-    drawn = a_centre(TIED, "drawn", seed=2)
+    lower = a_centre(TIED, "drawn", seed=1)
+    higher = a_centre(TIED, "zeros")
 
-    quiet = a_judge(TIED, seeds, zeros)
-    on_zeros = quiet.score(zeros, "")
-    on_drawn = quiet.score(drawn, "")
-    assert on_drawn.won == pytest.approx(on_zeros.won), "the fixture holds no tie"
-    assert on_drawn.mean > on_zeros.mean, "the fixture gives no return to break it"
+    quiet = a_judge(TIED, seeds, lower)
+    on_lower = quiet.score(lower, "")
+    on_higher = quiet.score(higher, "")
+    assert on_higher.won == pytest.approx(on_lower.won), "the fixture holds no tie"
+    assert on_higher.mean > on_lower.mean, "the fixture gives no return to break it"
 
-    rising = a_judge(TIED, seeds, zeros)
-    rising.check(zeros, 0)
-    rising.check(drawn, 1)
+    rising = a_judge(TIED, seeds, lower)
+    rising.check(lower, 0)
+    rising.check(higher, 1)
     assert rising.best_generation == 1, "the tie did not fall to the higher return"
 
-    falling = a_judge(TIED, seeds, drawn)
-    falling.check(drawn, 0)
-    falling.check(zeros, 1)
+    falling = a_judge(TIED, seeds, higher)
+    falling.check(higher, 0)
+    falling.check(lower, 1)
     assert falling.best_generation == 0, "the tie fell to the later pass"
 
 

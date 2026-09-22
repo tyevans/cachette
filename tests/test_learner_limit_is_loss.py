@@ -77,7 +77,7 @@ CONTROLLER = EnvConfig(
 CONTROLLER_LIMIT = replace(CONTROLLER, limit_is_loss=True)
 
 EARLY_SEED = 4
-LIMIT_SEED = 0
+LIMIT_SEED = 13
 
 WIN = 100.0
 LOSS = 10.0

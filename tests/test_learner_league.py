@@ -376,7 +376,7 @@ def test_a_seated_generation_gives_one_answer_at_two_worker_counts() -> None:
     one = play(population(0), workers=1)
     four = play(population(0), workers=4)
     assert np.array_equal(one, four)
-    assert not np.array_equal(one, play(population(1), workers=1))
+    assert not np.array_equal(one, play(population(2), workers=1))
 
 
 def test_a_seated_generation_ranks_the_margin_and_reports_the_return() -> None:

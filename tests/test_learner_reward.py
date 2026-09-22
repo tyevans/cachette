@@ -348,7 +348,7 @@ TIMED_LIMIT = 600
 # domination at tick 241, and by held ground at the tick limit. It loses the
 # last two, by domination at tick 529 and by held ground at the limit.
 EARLY_WIN_SEED = 4
-LATER_WIN_SEED = 7
+LATER_WIN_SEED = 12
 LIMIT_WIN_SEED = 2
 EARLY_LOSS_SEED = 0
 LIMIT_LOSS_SEED = 3

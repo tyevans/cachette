@@ -84,7 +84,7 @@ AGREED_SCORES = np.array([6.0, 1.0, 5.0, 2.0, 4.0, 3.0])
 @pytest.fixture
 def pool() -> list[int]:
     """Return a training seed pool for the small world."""
-    return viable_seeds(WORLD, 6, 100)
+    return viable_seeds(WORLD, 6, 30)
 
 
 def a_run(
