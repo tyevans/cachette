@@ -217,7 +217,14 @@ impl World {
             .map(|at| {
                 let faction = FactionId(at as u16);
                 let share = self.controller.win_threat_share(faction)?;
-                let threat = controller::win_threat_of(faction, share, highest.iter().copied())?;
+                let threat = controller::win_threat_of(
+                    faction,
+                    share,
+                    highest
+                        .iter()
+                        .copied()
+                        .filter(|(other, _)| self.has_met(faction, *other)),
+                )?;
                 let nears_the_wonder = readings
                     .get(usize::from(threat.0))
                     .is_some_and(|paths| paths[WinPath::Wonder.index()].0 >= share.0);

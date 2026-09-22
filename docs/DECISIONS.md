@@ -23,7 +23,7 @@ A writer that numbers a row by reading the last row collides with any other
 writer working at the same time. That happened, and it is recorded as
 precedent.[^ALLOC]
 
-**Next number: DEC-285**
+**Next number: DEC-286**
 
 ## Open
 
@@ -4676,9 +4676,34 @@ keeps every other upgrade with the ground.[^DEC160C]
 **The rate is a balance row, and the record states no value.**[^DEC284C] One
 blocker governs every cost in work.[^BLK7]
 
+### DEC-285 — Does the engine allow factions to interact before they have met within line of sight?
+
+**Closed. Option A. Factions must meet within line of sight of each other or a
+city before they can interact, declare war, or be targeted by controllers.**
+
+Previously, diplomacy and controller targeting operated with global scope from
+tick zero. A faction could move relations, propose deals, or declare war on an
+unseen faction across the map, and controllers could pick unseen factions as
+rivals or prey. The project owner ruled on 21 September 2026 that players and
+controllers must not interact or declare war if they have never met: units must
+pass within line of sight of each other or a city.
+
+**Option A. Require line of sight to a unit or city to establish contact.**
+Factions start unmet. Moving relations between unmet factions is refused with a
+typed error. Meeting is symmetric and occurs when a live unit of one faction
+observes a live unit or settlement of another faction. Controllers evaluate
+only met factions for strategic interaction.
+
+**Option B. Unrestricted diplomacy from tick zero.** Rejected. This broke fog
+of war at the strategic level and gave exploration no diplomatic utility.
+
+**Why A.** It aligns diplomacy with fog of war and exploration mechanics. A
+record states the rule.[^DEC285A]
+
 
 ## References
 
+[^DEC285A]: ADR-0205, two factions meet when a unit has line of sight to another unit or a city. `docs/adrs/draft/adr-0205-two-factions-meet-when-a-unit-has-line-of-sight-to-another-unit-or-a-city.md`
 [^DEC279B]: ADR-0151, an upgrade is a category with a ground fit and a level, decision D2. `docs/adrs/accepted/adr-0151-an-upgrade-is-a-category-with-a-ground-fit-and-a-level.md`
 [^DEC279C]: Balance register, the siege. `docs/reference/balance.md`
 [^DEC278A]: ADR-0180, a site changes hands or the taker destroys it, decision D3. `docs/adrs/draft/adr-0180-a-site-changes-hands-or-the-taker-destroys-it.md`

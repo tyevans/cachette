@@ -254,6 +254,8 @@ pub enum RelationError {
     NoCommandReach,
     /// The step is above the bound in one direction or the other.
     StepAboveBound { step: i32, bound: i32 },
+    /// The factions have not met yet.
+    UnmetFaction(u16),
 }
 
 impl core::fmt::Display for RelationError {
@@ -269,6 +271,9 @@ impl core::fmt::Display for RelationError {
             ),
             Self::StepAboveBound { step, bound } => {
                 write!(formatter, "the step {step} is above the bound of {bound}")
+            }
+            Self::UnmetFaction(faction) => {
+                write!(formatter, "the faction has not met {faction} yet")
             }
         }
     }
@@ -341,6 +346,8 @@ pub struct RelationMatrix {
     factions: u16,
     /// The entry for (A, B) is at `A * factions + B`.
     entries: Vec<i32>,
+    /// Whether faction A has met faction B. One byte per ordered pair.
+    contacts: Vec<u8>,
     rules: RelationRules,
     log: Vec<RelationCrossed>,
 }
@@ -351,9 +358,14 @@ impl RelationMatrix {
     pub fn new(faction_count: u16) -> Self {
         let factions = faction_count.max(1);
         let count = usize::from(factions) * usize::from(factions);
+        let mut contacts = vec![0u8; count];
+        for i in 0..factions {
+            contacts[usize::from(i) * usize::from(factions) + usize::from(i)] = 1;
+        }
         Self {
             factions,
             entries: vec![RelationRules::DEFAULT.peace_edge; count],
+            contacts,
             rules: RelationRules::DEFAULT,
             log: Vec::new(),
         }
@@ -381,6 +393,48 @@ impl RelationMatrix {
             return None;
         }
         Some(from.0 as usize * self.factions as usize + to.0 as usize)
+    }
+
+    /// Reports whether two factions have met.
+    ///
+    /// Every faction has met itself. Two distinct factions have met when
+    /// their units or cities have passed within line of sight of each other.
+    #[must_use]
+    pub fn has_met(&self, from: FactionId, to: FactionId) -> bool {
+        if from == to {
+            return true;
+        }
+        self.index_of(from, to)
+            .is_some_and(|idx| self.contacts[idx] != 0)
+    }
+
+    /// Records that two factions have met.
+    ///
+    /// The contact is symmetric: each is marked as having met the other.
+    pub fn meet(&mut self, a: FactionId, b: FactionId) {
+        if a == b {
+            return;
+        }
+        if let Some(idx) = self.index_of(a, b) {
+            self.contacts[idx] = 1;
+        }
+        if let Some(idx) = self.index_of(b, a) {
+            self.contacts[idx] = 1;
+        }
+    }
+
+    /// Sets whether two factions have met.
+    pub fn set_met(&mut self, a: FactionId, b: FactionId, met: bool) {
+        if a == b {
+            return;
+        }
+        let val = if met { 1 } else { 0 };
+        if let Some(idx) = self.index_of(a, b) {
+            self.contacts[idx] = val;
+        }
+        if let Some(idx) = self.index_of(b, a) {
+            self.contacts[idx] = val;
+        }
     }
 
     /// Returns what one faction feels toward another, or `None` when a
@@ -481,6 +535,7 @@ impl RelationMatrix {
         if from == to {
             return None;
         }
+        self.meet(from, to);
         let index = self.index_of(from, to)?;
         let before = self.entries[index];
         self.entries[index] = value;
@@ -620,6 +675,7 @@ impl RelationMatrix {
     pub fn hash_into(&self, hash: StateHash) -> StateHash {
         hash.write_u64(u64::from(self.factions))
             .write(bytemuck::cast_slice(&self.entries))
+            .write(&self.contacts)
             .write(bytemuck::bytes_of(&self.rules))
     }
 }
@@ -654,5 +710,26 @@ mod tests {
     fn the_rules_hold_no_padding_byte() {
         assert_eq!(core::mem::size_of::<RelationRules>(), 14 * 4);
         assert_eq!(core::mem::size_of::<RelationCrossed>(), 16);
+    }
+
+    #[test]
+    fn factions_start_unmet_and_meeting_is_symmetric() {
+        let mut matrix = RelationMatrix::new(3);
+        let (a, b, c) = (FactionId(0), FactionId(1), FactionId(2));
+        assert!(matrix.has_met(a, a));
+        assert!(matrix.has_met(b, b));
+        assert!(!matrix.has_met(a, b));
+        assert!(!matrix.has_met(b, a));
+        assert!(!matrix.has_met(a, c));
+
+        matrix.meet(a, b);
+        assert!(matrix.has_met(a, b));
+        assert!(matrix.has_met(b, a));
+        assert!(!matrix.has_met(a, c));
+        assert!(!matrix.has_met(c, a));
+
+        matrix.set_met(a, b, false);
+        assert!(!matrix.has_met(a, b));
+        assert!(!matrix.has_met(b, a));
     }
 }

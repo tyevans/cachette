@@ -78,6 +78,7 @@ documents cite it.
 | 0055 | A god raises the ground its people hold, and sees what stands there | Shaped | Game developer | `shaped/prd-0055-a-god-raises-the-ground-its-people-hold-and-sees-what-stands-there.md` |
 | 0056 | A learner plays one faction against the controllers | Accepted | AI researcher | `accepted/prd-0056-a-learner-plays-one-faction-against-the-controllers.md` |
 | 0057 | More than one way to win decides a game | Shaped | Game developer | `shaped/prd-0057-more-than-one-way-to-win-decides-a-game.md` |
+| 0058 | Two factions must meet before they can interact | Accepted | Game developer | `accepted/prd-0058-two-factions-must-meet-before-they-can-interact.md` |
 
 ## What does not belong in a record
 

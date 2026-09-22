@@ -107,6 +107,12 @@ def test_move_relation_reads_the_command_reach_of_the_speaker() -> None:
     world.set_unit_types([leader], LEADER)
     start = world.relation(A, B)
 
+    assert not world.has_met(A, B)
+    with pytest.raises(VerbError):
+        world.move_relation(leader, B, -1)
+    world.meet(A, B)
+    assert world.has_met(A, B)
+
     with pytest.raises(VerbError):
         world.move_relation(worker, B, -1)
     assert world.relation(A, B) == start, "a refused move changes nothing"

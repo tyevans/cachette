@@ -328,6 +328,13 @@ fn move_relation_reads_the_command_reach_of_the_speaker_and_the_bound() {
     let start = world.relation(A, B).expect("the pair exists");
 
     assert_eq!(
+        world.move_relation(leader, B, -1),
+        Err(MoveRelationError::Relation(RelationError::UnmetFaction(1))),
+        "two factions that have not met cannot move a relation"
+    );
+    world.meet(A, B);
+
+    assert_eq!(
         world.move_relation(worker, B, -1),
         Err(MoveRelationError::Relation(RelationError::NoCommandReach)),
         "a type with a command reach of zero cannot move a relation"
@@ -517,6 +524,7 @@ fn speaker_run(b_speaks: bool) -> SpeakerRun {
             assert!(world.set_unit_type(unit, LEADER));
         }
     }
+    world.meet(A, B);
     let start = world.relation(A, B).expect("the pair exists");
     let mut run = SpeakerRun {
         speechless: 0,
